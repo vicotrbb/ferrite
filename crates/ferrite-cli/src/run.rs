@@ -11,9 +11,12 @@ use std::time::Instant;
 pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error>> {
     let args = args::parse(args)?;
     let bytes = fs::read(&args.model_path)?;
+    let model_file_bytes = bytes.len();
     let gguf = parse_gguf(&bytes)?;
     let tokenizer = GgufTokenizer::from_gguf(&gguf)?;
     let model = ScalarLlamaModel::from_gguf_scalar(&gguf, &bytes)?;
+    drop(bytes);
+
     let prompt_token_ids = prompt_token_ids(&tokenizer, args.prompt)?;
     let mut session = model.start_session();
     let next = session.accept_prompt(&prompt_token_ids)?;
@@ -46,7 +49,8 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
         println!("benchmark_total_ns={total_ns}");
         println!("benchmark_avg_ns={avg_ns}");
     }
-    println!("model_file_bytes={}", bytes.len());
+    println!("model_file_bytes={model_file_bytes}");
+    println!("model_file_retained_bytes=0");
     println!("scalar_weight_bytes={}", model.scalar_weight_bytes());
     println!("kv_cache_bytes={}", session.kv_cache_bytes());
     if let Some(expected_token_id) = args.expected_token_id {

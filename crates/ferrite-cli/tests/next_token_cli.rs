@@ -146,6 +146,7 @@ fn cli_benchmarks_repeated_next_token_runs_after_loading_once() -> Result<(), Bo
     assert!(stdout.contains("benchmark_total_ns="));
     assert!(stdout.contains("benchmark_avg_ns="));
     assert!(stdout.contains("model_file_bytes="));
+    assert!(stdout.contains("model_file_retained_bytes=0"));
     assert!(stdout.contains("scalar_weight_bytes=184"));
     assert!(stdout.contains("kv_cache_bytes=64"));
     Ok(())
