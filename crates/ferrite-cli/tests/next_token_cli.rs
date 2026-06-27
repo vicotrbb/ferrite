@@ -207,6 +207,57 @@ fn cli_rejects_generation_and_benchmark_together() -> Result<(), Box<dyn Error>>
 }
 
 #[test]
+fn cli_streams_generated_token_chunks() -> Result<(), Box<dyn Error>> {
+    let model_path = write_fixture_model()?;
+    let binary = cli_binary()?;
+
+    let output = Command::new(binary)
+        .arg("--model")
+        .arg(&model_path)
+        .arg("--prompt")
+        .arg("hello")
+        .arg("--generate-tokens")
+        .arg("2")
+        .arg("--stream")
+        .output()?;
+
+    remove_fixture_model(&model_path)?;
+
+    assert!(
+        output.status.success(),
+        "cli failed with stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout)?;
+    assert_eq!(stdout.matches("stream_token_id=2").count(), 2);
+    assert_eq!(stdout.matches("stream_text=winner").count(), 2);
+    assert!(stdout.contains("generated_token_ids=2,2"));
+    assert!(stdout.contains("generated_text=winnerwinner"));
+    Ok(())
+}
+
+#[test]
+fn cli_rejects_stream_without_generation_count() -> Result<(), Box<dyn Error>> {
+    let model_path = write_fixture_model()?;
+    let binary = cli_binary()?;
+
+    let output = Command::new(binary)
+        .arg("--model")
+        .arg(&model_path)
+        .arg("--prompt")
+        .arg("hello")
+        .arg("--stream")
+        .output()?;
+
+    remove_fixture_model(&model_path)?;
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8(output.stderr)?;
+    assert!(stderr.contains("use --stream with --generate-tokens"));
+    Ok(())
+}
+
+#[test]
 fn cli_fails_when_next_token_does_not_match_expected_id() -> Result<(), Box<dyn Error>> {
     let model_path = write_fixture_model()?;
     let binary = cli_binary()?;

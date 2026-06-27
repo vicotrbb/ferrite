@@ -1,5 +1,5 @@
 use crate::args::{self, PromptSource};
-use ferrite_inference::scalar::ScalarLlamaModel;
+use ferrite_inference::scalar::{NextToken, ScalarLlamaModel, ScalarLlamaSession};
 use ferrite_model::gguf::parse_gguf;
 use ferrite_model::tokenizer::GgufTokenizer;
 use std::error::Error;
@@ -31,7 +31,8 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
     println!("next_token_id={}", next.token_id);
     println!("next_token={token}");
     if let Some(count) = args.generate_tokens {
-        let generated_token_ids = generate_tokens(&mut session, next.clone(), count)?;
+        let generated_token_ids =
+            generate_tokens(&mut session, &tokenizer, next.clone(), count, args.stream)?;
         println!("generated_cached_tokens={}", session.cached_token_count());
         println!(
             "generated_token_ids={}",
@@ -78,13 +79,19 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
 }
 
 fn generate_tokens(
-    session: &mut ferrite_inference::scalar::ScalarLlamaSession<'_>,
-    next: ferrite_inference::scalar::NextToken,
+    session: &mut ScalarLlamaSession<'_>,
+    tokenizer: &GgufTokenizer,
+    next: NextToken,
     count: usize,
+    stream: bool,
 ) -> Result<Vec<usize>, Box<dyn Error>> {
     let mut next = next;
     let mut generated_token_ids = Vec::with_capacity(count);
     for _ in 0..count {
+        if stream {
+            println!("stream_token_id={}", next.token_id);
+            println!("stream_text={}", tokenizer.decode(&[next.token_id])?);
+        }
         generated_token_ids.push(next.token_id);
         next = session.accept_token(next.token_id)?;
     }

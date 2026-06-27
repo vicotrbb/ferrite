@@ -9,6 +9,7 @@ pub struct CliArgs {
     pub expected_token_id: Option<usize>,
     pub benchmark_runs: Option<usize>,
     pub generate_tokens: Option<usize>,
+    pub stream: bool,
 }
 
 pub enum PromptSource {
@@ -23,6 +24,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
     let mut expected_token_id = None;
     let mut benchmark_runs = None;
     let mut generate_tokens = None;
+    let mut stream = false;
     let mut iter = args.into_iter();
     let _program = iter.next();
 
@@ -62,6 +64,9 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
                     "--generate-tokens",
                 )?);
             }
+            "--stream" => {
+                stream = true;
+            }
             "--help" | "-h" => {
                 return Err(io::Error::other(usage()).into());
             }
@@ -73,7 +78,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
         }
     }
 
-    validate_modes(generate_tokens, benchmark_runs)?;
+    validate_modes(generate_tokens, benchmark_runs, stream)?;
 
     Ok(CliArgs {
         model_path: model_path.ok_or_else(|| io::Error::other("missing --model argument"))?,
@@ -81,17 +86,22 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
         expected_token_id,
         benchmark_runs,
         generate_tokens,
+        stream,
     })
 }
 
 fn validate_modes(
     generate_tokens: Option<usize>,
     benchmark_runs: Option<usize>,
+    stream: bool,
 ) -> Result<(), Box<dyn Error>> {
     if generate_tokens.is_some() && benchmark_runs.is_some() {
         return Err(
             io::Error::other("use either --generate-tokens or --benchmark-runs, not both").into(),
         );
+    }
+    if stream && generate_tokens.is_none() {
+        return Err(io::Error::other("use --stream with --generate-tokens").into());
     }
     Ok(())
 }
@@ -159,5 +169,5 @@ fn parse_token_ids(value: OsString) -> Result<Vec<usize>, Box<dyn Error>> {
 }
 
 fn usage() -> &'static str {
-    "usage: ferrite --model <path.gguf> (--prompt <text> | --prompt-token-ids <id[,id...]>) [--expect-token-id <id>] [--generate-tokens <count>] [--benchmark-runs <count>]"
+    "usage: ferrite --model <path.gguf> (--prompt <text> | --prompt-token-ids <id[,id...]>) [--expect-token-id <id>] [--generate-tokens <count>] [--stream] [--benchmark-runs <count>]"
 }
