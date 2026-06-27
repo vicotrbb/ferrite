@@ -2,8 +2,8 @@ use super::{
     math::dot,
     quantized::{
         decode_q4_k_values, decode_q5_0_row, decode_q6_k_values, decode_q8_0_row, q4_k_mul_vec,
-        q4_k_storage_bytes, q5_0_row_bytes, q6_k_mul_vec, q6_k_storage_bytes, q8_0_row_bytes,
-        Q5_0_BLOCK_VALUES, Q8_0_BLOCK_VALUES,
+        q4_k_storage_bytes, q5_0_row_bytes, q6_k_mul_vec, q6_k_storage_bytes, q8_0_mul_vec,
+        q8_0_row_bytes, Q5_0_BLOCK_VALUES, Q8_0_BLOCK_VALUES,
     },
     InferenceError,
 };
@@ -264,6 +264,9 @@ impl Matrix {
         }
         if let MatrixData::Q6K(data) = &self.data {
             return q6_k_mul_vec(data, self.rows, self.cols, vector);
+        }
+        if let MatrixData::Q8_0(data) = &self.data {
+            return q8_0_mul_vec(data, self.rows, self.cols, vector);
         }
 
         let mut output = Vec::with_capacity(self.rows);
