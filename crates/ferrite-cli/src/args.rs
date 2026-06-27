@@ -7,6 +7,7 @@ pub struct CliArgs {
     pub model_path: PathBuf,
     pub prompt: PromptSource,
     pub expected_token_id: Option<usize>,
+    pub expected_generated_token_ids: Option<Vec<usize>>,
     pub benchmark_runs: Option<usize>,
     pub generate_tokens: Option<usize>,
     pub stream: bool,
@@ -22,6 +23,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
     let mut prompt = None;
     let mut prompt_token_ids = None;
     let mut expected_token_id = None;
+    let mut expected_generated_token_ids = None;
     let mut benchmark_runs = None;
     let mut generate_tokens = None;
     let mut stream = false;
@@ -52,6 +54,12 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
                     "--expect-token-id",
                 )?);
             }
+            "--expect-generated-token-ids" => {
+                expected_generated_token_ids = Some(parse_token_ids(next_value(
+                    &mut iter,
+                    "--expect-generated-token-ids",
+                )?)?);
+            }
             "--benchmark-runs" => {
                 benchmark_runs = Some(parse_nonzero_usize(
                     next_value(&mut iter, "--benchmark-runs")?,
@@ -78,12 +86,18 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
         }
     }
 
-    validate_modes(generate_tokens, benchmark_runs, stream)?;
+    validate_modes(
+        generate_tokens,
+        benchmark_runs,
+        stream,
+        expected_generated_token_ids.as_deref(),
+    )?;
 
     Ok(CliArgs {
         model_path: model_path.ok_or_else(|| io::Error::other("missing --model argument"))?,
         prompt: prompt_source(prompt, prompt_token_ids)?,
         expected_token_id,
+        expected_generated_token_ids,
         benchmark_runs,
         generate_tokens,
         stream,
@@ -94,6 +108,7 @@ fn validate_modes(
     generate_tokens: Option<usize>,
     benchmark_runs: Option<usize>,
     stream: bool,
+    expected_generated_token_ids: Option<&[usize]>,
 ) -> Result<(), Box<dyn Error>> {
     if generate_tokens.is_some() && benchmark_runs.is_some() {
         return Err(
@@ -102,6 +117,11 @@ fn validate_modes(
     }
     if stream && generate_tokens.is_none() {
         return Err(io::Error::other("use --stream with --generate-tokens").into());
+    }
+    if expected_generated_token_ids.is_some() && generate_tokens.is_none() {
+        return Err(
+            io::Error::other("use --expect-generated-token-ids with --generate-tokens").into(),
+        );
     }
     Ok(())
 }
@@ -169,5 +189,5 @@ fn parse_token_ids(value: OsString) -> Result<Vec<usize>, Box<dyn Error>> {
 }
 
 fn usage() -> &'static str {
-    "usage: ferrite --model <path.gguf> (--prompt <text> | --prompt-token-ids <id[,id...]>) [--expect-token-id <id>] [--generate-tokens <count>] [--stream] [--benchmark-runs <count>]"
+    "usage: ferrite --model <path.gguf> (--prompt <text> | --prompt-token-ids <id[,id...]>) [--expect-token-id <id>] [--generate-tokens <count>] [--expect-generated-token-ids <id[,id...]>] [--stream] [--benchmark-runs <count>]"
 }

@@ -39,6 +39,22 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
             join_token_ids(&generated_token_ids)
         );
         println!("generated_text={}", tokenizer.decode(&generated_token_ids)?);
+        if let Some(expected_token_ids) = args.expected_generated_token_ids {
+            println!(
+                "expected_generated_token_ids={}",
+                join_token_ids(&expected_token_ids)
+            );
+            let matches = generated_token_ids == expected_token_ids;
+            println!("generated_match={matches}");
+            if !matches {
+                return Err(io::Error::other(format!(
+                    "generated token ids {} did not match expected token ids {}",
+                    join_token_ids(&generated_token_ids),
+                    join_token_ids(&expected_token_ids)
+                ))
+                .into());
+            }
+        }
     }
     if let Some(runs) = args.benchmark_runs {
         let mut benchmark_next = next.clone();
