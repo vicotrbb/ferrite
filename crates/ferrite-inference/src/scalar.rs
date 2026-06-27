@@ -2,6 +2,7 @@ mod loader;
 mod math;
 mod matrix;
 mod prompt;
+mod tensor;
 
 pub use math::{apply_rope, argmax, rms_norm};
 pub use matrix::Matrix;

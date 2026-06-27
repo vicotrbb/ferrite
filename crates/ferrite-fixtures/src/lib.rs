@@ -3,6 +3,7 @@ const VALUE_ARRAY: u32 = 9;
 const VALUE_UINT64: u32 = 10;
 const GGML_TYPE_F32: u32 = 0;
 const GGML_TYPE_F16: u32 = 1;
+const GGML_TYPE_Q8_0: u32 = 8;
 const GGML_TYPE_BF16: u32 = 30;
 
 struct F32TensorFixture {
@@ -22,6 +23,52 @@ pub fn scalar_llama_f16_gguf_fixture() -> Vec<u8> {
 
 pub fn scalar_llama_bf16_gguf_fixture() -> Vec<u8> {
     scalar_llama_gguf_fixture(GGML_TYPE_BF16)
+}
+
+pub fn scalar_llama_q8_0_gguf_fixture() -> Vec<u8> {
+    let alignment = 64u64;
+    let mut tensors = q8_scalar_tensors();
+
+    let mut offset = 0u64;
+    for tensor in &mut tensors {
+        tensor.offset = align_value(offset, alignment);
+        offset = tensor.offset + q8_storage_bytes(tensor.values.len());
+    }
+
+    let mut bytes = Vec::new();
+    bytes.extend_from_slice(b"GGUF");
+    push_u32(&mut bytes, 3);
+    push_u64(&mut bytes, tensors.len() as u64);
+    push_u64(&mut bytes, 13);
+    push_kv_string(&mut bytes, "general.architecture", "llama");
+    push_kv_u64(&mut bytes, "general.alignment", alignment);
+    push_kv_u64(&mut bytes, "llama.context_length", 1);
+    push_kv_u64(&mut bytes, "llama.embedding_length", 32);
+    push_kv_u64(&mut bytes, "llama.block_count", 1);
+    push_kv_u64(&mut bytes, "llama.feed_forward_length", 32);
+    push_kv_u64(&mut bytes, "llama.attention.head_count", 1);
+    push_kv_u64(&mut bytes, "llama.attention.head_count_kv", 1);
+    push_kv_u64(&mut bytes, "llama.attention.key_length", 32);
+    push_kv_u64(&mut bytes, "llama.attention.value_length", 32);
+    push_kv_u64(&mut bytes, "llama.rope.dimension_count", 0);
+    push_kv_string(&mut bytes, "tokenizer.ggml.model", "llama");
+    push_kv_string_array(&mut bytes, "tokenizer.ggml.tokens", &["<unk>", "winner"]);
+
+    for tensor in &tensors {
+        push_tensor_info_with_type(&mut bytes, tensor, GGML_TYPE_Q8_0);
+    }
+    align_len(&mut bytes, alignment as usize);
+
+    let tensor_data_start = bytes.len();
+    for tensor in &tensors {
+        let target_len = tensor_data_start + tensor.offset as usize;
+        if bytes.len() < target_len {
+            bytes.resize(target_len, 0);
+        }
+        push_q8_0_values(&mut bytes, &tensor.values);
+    }
+
+    bytes
 }
 
 fn scalar_llama_gguf_fixture(tensor_type: u32) -> Vec<u8> {
@@ -156,6 +203,91 @@ fn scalar_llama_gguf_fixture(tensor_type: u32) -> Vec<u8> {
     bytes
 }
 
+fn q8_scalar_tensors() -> Vec<F32TensorFixture> {
+    let hidden = 32usize;
+    let intermediate = 32usize;
+    vec![
+        F32TensorFixture {
+            name: "token_embd.weight",
+            dimensions: matrix_dims(hidden as u64, 2),
+            values: two_row_values(hidden, 1.0, 0.0),
+            offset: 0,
+        },
+        F32TensorFixture {
+            name: "output_norm.weight",
+            dimensions: vec![hidden as u64],
+            values: vec![1.0; hidden],
+            offset: 0,
+        },
+        F32TensorFixture {
+            name: "output.weight",
+            dimensions: matrix_dims(hidden as u64, 2),
+            values: two_row_values(hidden, 0.0, 1.0),
+            offset: 0,
+        },
+        F32TensorFixture {
+            name: "blk.0.attn_norm.weight",
+            dimensions: vec![hidden as u64],
+            values: vec![1.0; hidden],
+            offset: 0,
+        },
+        F32TensorFixture {
+            name: "blk.0.attn_q.weight",
+            dimensions: matrix_dims(hidden as u64, hidden as u64),
+            values: vec![0.0; hidden * hidden],
+            offset: 0,
+        },
+        F32TensorFixture {
+            name: "blk.0.attn_k.weight",
+            dimensions: matrix_dims(hidden as u64, hidden as u64),
+            values: vec![0.0; hidden * hidden],
+            offset: 0,
+        },
+        F32TensorFixture {
+            name: "blk.0.attn_v.weight",
+            dimensions: matrix_dims(hidden as u64, hidden as u64),
+            values: vec![0.0; hidden * hidden],
+            offset: 0,
+        },
+        F32TensorFixture {
+            name: "blk.0.attn_output.weight",
+            dimensions: matrix_dims(hidden as u64, hidden as u64),
+            values: vec![0.0; hidden * hidden],
+            offset: 0,
+        },
+        F32TensorFixture {
+            name: "blk.0.ffn_norm.weight",
+            dimensions: vec![hidden as u64],
+            values: vec![1.0; hidden],
+            offset: 0,
+        },
+        F32TensorFixture {
+            name: "blk.0.ffn_gate.weight",
+            dimensions: matrix_dims(hidden as u64, intermediate as u64),
+            values: vec![0.0; hidden * intermediate],
+            offset: 0,
+        },
+        F32TensorFixture {
+            name: "blk.0.ffn_up.weight",
+            dimensions: matrix_dims(hidden as u64, intermediate as u64),
+            values: vec![0.0; hidden * intermediate],
+            offset: 0,
+        },
+        F32TensorFixture {
+            name: "blk.0.ffn_down.weight",
+            dimensions: matrix_dims(intermediate as u64, hidden as u64),
+            values: vec![0.0; hidden * intermediate],
+            offset: 0,
+        },
+    ]
+}
+
+fn two_row_values(cols: usize, first: f32, second: f32) -> Vec<f32> {
+    let mut values = vec![first; cols];
+    values.extend(vec![second; cols]);
+    values
+}
+
 fn push_u32(bytes: &mut Vec<u8>, value: u32) {
     bytes.extend_from_slice(&value.to_le_bytes());
 }
@@ -217,6 +349,19 @@ fn align_value(value: u64, alignment: u64) -> u64 {
 fn align_len(bytes: &mut Vec<u8>, alignment: usize) {
     let padding = (alignment - (bytes.len() % alignment)) % alignment;
     bytes.resize(bytes.len() + padding, 0);
+}
+
+fn q8_storage_bytes(value_count: usize) -> u64 {
+    (value_count / 32 * 34) as u64
+}
+
+fn push_q8_0_values(bytes: &mut Vec<u8>, values: &[f32]) {
+    for block in values.chunks_exact(32) {
+        bytes.extend_from_slice(&f32_to_f16_bits(1.0).to_le_bytes());
+        for value in block {
+            bytes.push(value.round() as i8 as u8);
+        }
+    }
 }
 
 fn f32_to_f16_bits(value: f32) -> u16 {

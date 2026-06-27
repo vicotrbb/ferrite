@@ -1,7 +1,7 @@
 use super::{
-    InferenceError, Matrix, ScalarLlamaConfig, ScalarLlamaLayerWeights, ScalarLlamaWeights,
+    tensor, InferenceError, Matrix, ScalarLlamaConfig, ScalarLlamaLayerWeights, ScalarLlamaWeights,
 };
-use ferrite_model::gguf::{GgmlType, GgufFile, TensorInfo};
+use ferrite_model::gguf::{GgufFile, TensorInfo};
 
 pub(super) fn load_unquantized(
     file: &GgufFile,
@@ -150,7 +150,7 @@ fn f32_matrix(
         )));
     }
 
-    Matrix::from_row_major(rows, cols, f32_values(tensor, bytes)?)
+    Matrix::from_row_major(rows, cols, tensor::f32_values(tensor, bytes)?)
 }
 
 fn f32_vector(
@@ -168,100 +168,7 @@ fn f32_vector(
         )));
     }
 
-    f32_values(tensor, bytes)
-}
-
-fn f32_values(tensor: &TensorInfo, bytes: &[u8]) -> Result<Vec<f32>, InferenceError> {
-    let slice = bytes.get(tensor.data_range.clone()).ok_or_else(|| {
-        InferenceError::new(format!("tensor {} byte range is invalid", tensor.name))
-    })?;
-
-    match tensor.ty {
-        GgmlType::F32 => f32_values_from_le_bytes(&tensor.name, slice),
-        GgmlType::F16 => f16_values_from_le_bytes(&tensor.name, slice),
-        GgmlType::BF16 => bf16_values_from_le_bytes(&tensor.name, slice),
-        other => Err(InferenceError::new(format!(
-            "tensor {} has type {:?}; expected F32, F16, or BF16",
-            tensor.name, other
-        ))),
-    }
-}
-
-fn f32_values_from_le_bytes(name: &str, slice: &[u8]) -> Result<Vec<f32>, InferenceError> {
-    if !slice.len().is_multiple_of(4) {
-        return Err(InferenceError::new(format!(
-            "tensor {name} byte length {} is not divisible by 4",
-            slice.len()
-        )));
-    }
-
-    let mut values = Vec::with_capacity(slice.len() / 4);
-    for chunk in slice.chunks_exact(4) {
-        values.push(f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]));
-    }
-    Ok(values)
-}
-
-fn f16_values_from_le_bytes(name: &str, slice: &[u8]) -> Result<Vec<f32>, InferenceError> {
-    if !slice.len().is_multiple_of(2) {
-        return Err(InferenceError::new(format!(
-            "tensor {name} byte length {} is not divisible by 2",
-            slice.len()
-        )));
-    }
-
-    let mut values = Vec::with_capacity(slice.len() / 2);
-    for chunk in slice.chunks_exact(2) {
-        values.push(f16_bits_to_f32(u16::from_le_bytes([chunk[0], chunk[1]])));
-    }
-    Ok(values)
-}
-
-fn bf16_values_from_le_bytes(name: &str, slice: &[u8]) -> Result<Vec<f32>, InferenceError> {
-    if !slice.len().is_multiple_of(2) {
-        return Err(InferenceError::new(format!(
-            "tensor {name} byte length {} is not divisible by 2",
-            slice.len()
-        )));
-    }
-
-    let mut values = Vec::with_capacity(slice.len() / 2);
-    for chunk in slice.chunks_exact(2) {
-        let bits = u32::from(u16::from_le_bytes([chunk[0], chunk[1]])) << 16;
-        values.push(f32::from_bits(bits));
-    }
-    Ok(values)
-}
-
-fn f16_bits_to_f32(bits: u16) -> f32 {
-    let sign = ((bits & 0x8000) as u32) << 16;
-    let exponent = ((bits >> 10) & 0x1f) as u32;
-    let mantissa = (bits & 0x03ff) as u32;
-
-    let f32_bits = match exponent {
-        0 => {
-            if mantissa == 0 {
-                sign
-            } else {
-                let mut normalized_mantissa = mantissa;
-                let mut exponent_adjust = -14i32;
-                while normalized_mantissa & 0x0400 == 0 {
-                    normalized_mantissa <<= 1;
-                    exponent_adjust -= 1;
-                }
-                normalized_mantissa &= 0x03ff;
-                let exponent_bits = ((exponent_adjust + 127) as u32) << 23;
-                sign | exponent_bits | (normalized_mantissa << 13)
-            }
-        }
-        0x1f => sign | 0x7f80_0000 | (mantissa << 13),
-        _ => {
-            let exponent_bits = (exponent + 112) << 23;
-            sign | exponent_bits | (mantissa << 13)
-        }
-    };
-
-    f32::from_bits(f32_bits)
+    tensor::f32_values(tensor, bytes)
 }
 
 fn usize_from_u64(value: u64, name: &str) -> Result<usize, InferenceError> {

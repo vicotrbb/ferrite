@@ -26,8 +26,9 @@ The scalar boundary includes:
 - Multi-token causal Llama-style GQA attention over an in-memory K/V cache.
 - SwiGLU feed-forward execution.
 - Final logits and deterministic argmax selection.
-- Unquantized GGUF F32/F16/BF16 tensor loading into the scalar Llama weight
-  structure.
+- GGUF F32/F16/BF16 tensor loading into the scalar Llama weight structure.
+- Fixture-validated GGML Q8_0 tensor dequantization into the scalar reference
+  path.
 
 The initial path is deliberately synthetic and does not claim real-model
 correctness yet. Its purpose is to provide a clear scalar reference target that
@@ -40,9 +41,9 @@ Scalar correctness remains the baseline for future optimized work. Any SIMD,
 quantized, mmap-backed, or platform-specific path must be tested against this
 or a more complete scalar reference path before it can be treated as correct.
 
-The current scalar path does not include tokenizer integration, quantized
-tensor decoding, incremental serving cache reuse, or real Tier 0 GGUF model
-loading. Those are follow-up slices.
+The current scalar path includes a tokenizer bridge and Q8_0 dequantization,
+but it does not include Q4_K-family decoding, incremental serving cache reuse,
+or real Tier 0 GGUF model loading. Those are follow-up slices.
 
 ## Alternatives Considered
 
@@ -75,6 +76,11 @@ External runtimes remain valid comparison references.
   first failed because the loader rejected `BF16` tensors.
 - After implementing safe bfloat16 decoding, the same test passed and produced
   the deterministic scalar token from generated BF16 GGUF tensor bytes.
+- `cargo test -p ferrite-inference --test scalar_reference loads_scalar_llama_reference_weights_from_q8_0_gguf_fixture`
+  first failed because the loader rejected `Q8_0` tensors.
+- After extracting tensor decoding and adding Q8_0 block dequantization, the
+  same test passed and produced a deterministic scalar token from generated
+  Q8_0 GGUF tensor bytes.
 - `cargo test -p ferrite-inference --test scalar_reference` first failed for
   missing `apply_rope` and `next_token_for_prompt`.
 - After implementing RoPE and causal K/V attention, the same test passed 6
