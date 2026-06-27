@@ -195,16 +195,99 @@ pub(super) fn q6_k_mul_vec(
     let value_count = rows
         .checked_mul(cols)
         .ok_or_else(|| InferenceError::new("Q6_K matrix value count overflow"))?;
-    let values = decode_q6_k_values(bytes, value_count)?;
+    let expected = q6_k_storage_bytes(value_count)?;
+    if bytes.len() != expected {
+        return Err(InferenceError::new(format!(
+            "Q6_K byte length {} does not match {expected}",
+            bytes.len()
+        )));
+    }
     let mut output = vec![0.0; rows];
 
-    for (index, value) in values.iter().enumerate() {
-        let row = index / cols;
-        let col = index % cols;
-        output[row] += value * vector[col];
+    for (block_index, block) in bytes.chunks_exact(Q6_K_BLOCK_BYTES).enumerate() {
+        let value_offset = block_index
+            .checked_mul(Q6_K_BLOCK_VALUES)
+            .ok_or_else(|| InferenceError::new("Q6_K block value offset overflow"))?;
+        accumulate_q6_k_block(block, value_offset, rows, cols, vector, &mut output)?;
     }
 
     Ok(output)
+}
+
+fn accumulate_q6_k_block(
+    block: &[u8],
+    value_offset: usize,
+    rows: usize,
+    cols: usize,
+    vector: &[f32],
+    output: &mut [f32],
+) -> Result<(), InferenceError> {
+    if block.len() != Q6_K_BLOCK_BYTES {
+        return Err(InferenceError::new(format!(
+            "Q6_K block byte length {} does not match {Q6_K_BLOCK_BYTES}",
+            block.len()
+        )));
+    }
+    if output.len() != rows {
+        return Err(InferenceError::new(format!(
+            "Q6_K output rows {} do not match {rows}",
+            output.len()
+        )));
+    }
+
+    let low_bits = &block[0..128];
+    let high_bits = &block[128..192];
+    let scales = &block[192..208];
+    let super_scale = f16_bits_to_f32(u16::from_le_bytes([block[208], block[209]]));
+
+    for half in 0..2 {
+        let value_base = half * 128;
+        let low_base = half * 64;
+        let high_base = half * 32;
+        let scale_base = half * 8;
+
+        for index in 0..32 {
+            let scale_index = index / 16;
+            let high = high_bits[high_base + index];
+            let q1 = i32::from((low_bits[low_base + index] & 0x0f) | ((high & 3) << 4)) - 32;
+            let q2 =
+                i32::from((low_bits[low_base + index + 32] & 0x0f) | (((high >> 2) & 3) << 4)) - 32;
+            let q3 = i32::from((low_bits[low_base + index] >> 4) | (((high >> 4) & 3) << 4)) - 32;
+            let q4 =
+                i32::from((low_bits[low_base + index + 32] >> 4) | (((high >> 6) & 3) << 4)) - 32;
+
+            accumulate_matrix_value(
+                value_offset + value_base + index,
+                super_scale * f32::from(scales[scale_base + scale_index] as i8) * q1 as f32,
+                cols,
+                vector,
+                output,
+            )?;
+            accumulate_matrix_value(
+                value_offset + value_base + index + 32,
+                super_scale * f32::from(scales[scale_base + scale_index + 2] as i8) * q2 as f32,
+                cols,
+                vector,
+                output,
+            )?;
+            accumulate_matrix_value(
+                value_offset + value_base + index + 64,
+                super_scale * f32::from(scales[scale_base + scale_index + 4] as i8) * q3 as f32,
+                cols,
+                vector,
+                output,
+            )?;
+            accumulate_matrix_value(
+                value_offset + value_base + index + 96,
+                super_scale * f32::from(scales[scale_base + scale_index + 6] as i8) * q4 as f32,
+                cols,
+                vector,
+                output,
+            )?;
+        }
+    }
+
+    Ok(())
 }
 
 pub(super) fn q8_0_mul_vec(
@@ -463,8 +546,8 @@ fn f16_bits_to_f32(bits: u16) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::{
-        accumulate_q4_k_block, decode_q6_k_values, q4_k_mul_vec, q5_0_mul_vec, q6_k_mul_vec,
-        q8_0_mul_vec, InferenceError,
+        accumulate_q4_k_block, accumulate_q6_k_block, decode_q6_k_values, q4_k_mul_vec,
+        q5_0_mul_vec, q6_k_mul_vec, q8_0_mul_vec, InferenceError,
     };
 
     #[test]
@@ -523,6 +606,21 @@ mod tests {
         let actual = q6_k_mul_vec(&block, 2, 128, &[1.0; 128])?;
 
         assert_eq!(actual, vec![-4096.0, -4096.0]);
+        Ok(())
+    }
+
+    #[test]
+    fn q6_k_block_accumulation_updates_rows_without_decoded_matrix() -> Result<(), InferenceError> {
+        let mut block = vec![0u8; 128 + 64];
+        block[32] = 0xff;
+        block[128] = 0xe4;
+        block.extend(vec![1u8; 16]);
+        block.extend_from_slice(&0x3c00u16.to_le_bytes());
+
+        let mut output = vec![0.0; 2];
+        accumulate_q6_k_block(&block, 0, 2, 128, &[1.0; 128], &mut output)?;
+
+        assert_eq!(output, vec![-3970.0, -4096.0]);
         Ok(())
     }
 
