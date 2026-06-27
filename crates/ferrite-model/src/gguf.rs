@@ -387,7 +387,7 @@ pub fn parse_gguf(bytes: &[u8]) -> Result<GgufFile, GgufError> {
     )?;
     let file_len =
         u64::try_from(bytes.len()).map_err(|_| GgufError::new("file length overflow"))?;
-    if data_start > file_len {
+    if data_start > file_len && !raw_tensors.is_empty() {
         return Err(GgufError::new("tensor data start is past end of file"));
     }
 

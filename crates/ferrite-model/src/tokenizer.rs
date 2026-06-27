@@ -1,0 +1,211 @@
+use crate::gguf::{GgufError, GgufFile, MetadataValue, MetadataValueType};
+use std::fmt;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GgufTokenizer {
+    model: TokenizerModel,
+    tokens: Vec<String>,
+    token_types: Vec<TokenType>,
+}
+
+impl GgufTokenizer {
+    pub fn from_gguf(file: &GgufFile) -> Result<Self, TokenizerError> {
+        let model = match metadata_string(file, "tokenizer.ggml.model")? {
+            "llama" => TokenizerModel::Llama,
+            other => TokenizerModel::Other(other.to_owned()),
+        };
+        let tokens = metadata_string_array(file, "tokenizer.ggml.tokens")?;
+        let token_types = match metadata_i32_array(file, "tokenizer.ggml.token_type")? {
+            Some(values) => {
+                if values.len() != tokens.len() {
+                    return Err(TokenizerError::new(format!(
+                        "token_type length {} does not match tokens length {}",
+                        values.len(),
+                        tokens.len()
+                    )));
+                }
+                values.into_iter().map(TokenType::from_gguf).collect()
+            }
+            None => vec![TokenType::Normal; tokens.len()],
+        };
+
+        Ok(Self {
+            model,
+            tokens,
+            token_types,
+        })
+    }
+
+    pub fn model(&self) -> TokenizerModel {
+        self.model.clone()
+    }
+
+    pub fn len(&self) -> usize {
+        self.tokens.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.tokens.is_empty()
+    }
+
+    pub fn token(&self, id: usize) -> Option<&str> {
+        self.tokens.get(id).map(String::as_str)
+    }
+
+    pub fn token_type(&self, id: usize) -> Option<TokenType> {
+        self.token_types.get(id).copied()
+    }
+
+    pub fn decode(&self, ids: &[usize]) -> Result<String, TokenizerError> {
+        let mut output = String::new();
+        for id in ids {
+            let token = self
+                .tokens
+                .get(*id)
+                .ok_or_else(|| TokenizerError::new(format!("token id {id} is out of bounds")))?;
+            output.push_str(token);
+        }
+        Ok(output)
+    }
+
+    pub fn encode_atomic(&self, input: &str) -> Result<Vec<usize>, TokenizerError> {
+        let mut output = Vec::new();
+        let mut cursor = 0usize;
+        while cursor < input.len() {
+            let suffix = &input[cursor..];
+            let Some((id, token)) = self.longest_token_prefix(suffix) else {
+                return Err(TokenizerError::new(format!(
+                    "no atomic token matches input at byte offset {cursor}"
+                )));
+            };
+            output.push(id);
+            cursor += token.len();
+        }
+        Ok(output)
+    }
+
+    fn longest_token_prefix(&self, input: &str) -> Option<(usize, &str)> {
+        self.tokens
+            .iter()
+            .enumerate()
+            .filter_map(|(id, token)| {
+                if token.is_empty() || !input.starts_with(token) {
+                    None
+                } else {
+                    Some((id, token.as_str()))
+                }
+            })
+            .max_by_key(|(_, token)| token.len())
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum TokenizerModel {
+    Llama,
+    Other(String),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TokenType {
+    Normal,
+    Unknown,
+    Control,
+    UserDefined,
+    Unused,
+    Byte,
+    Other(i32),
+}
+
+impl TokenType {
+    fn from_gguf(value: i32) -> Self {
+        match value {
+            1 => Self::Normal,
+            2 => Self::Unknown,
+            3 => Self::Control,
+            4 => Self::UserDefined,
+            5 => Self::Unused,
+            6 => Self::Byte,
+            other => Self::Other(other),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TokenizerError {
+    message: String,
+}
+
+impl TokenizerError {
+    fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+        }
+    }
+}
+
+impl fmt::Display for TokenizerError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.message)
+    }
+}
+
+impl std::error::Error for TokenizerError {}
+
+impl From<GgufError> for TokenizerError {
+    fn from(error: GgufError) -> Self {
+        Self::new(error.to_string())
+    }
+}
+
+fn metadata_string<'a>(file: &'a GgufFile, key: &str) -> Result<&'a str, TokenizerError> {
+    match file.metadata.get(key) {
+        Some(MetadataValue::String(value)) => Ok(value),
+        Some(other) => Err(TokenizerError::new(format!(
+            "{key} must be a string, found {other:?}"
+        ))),
+        None => Err(TokenizerError::new(format!("missing metadata {key}"))),
+    }
+}
+
+fn metadata_string_array(file: &GgufFile, key: &str) -> Result<Vec<String>, TokenizerError> {
+    match file.metadata.get(key) {
+        Some(MetadataValue::Array {
+            value_type: MetadataValueType::String,
+            values,
+        }) => values
+            .iter()
+            .map(|value| match value {
+                MetadataValue::String(token) => Ok(token.clone()),
+                other => Err(TokenizerError::new(format!(
+                    "{key} contains non-string array value {other:?}"
+                ))),
+            })
+            .collect(),
+        Some(other) => Err(TokenizerError::new(format!(
+            "{key} must be a string array, found {other:?}"
+        ))),
+        None => Err(TokenizerError::new(format!("missing metadata {key}"))),
+    }
+}
+
+fn metadata_i32_array(file: &GgufFile, key: &str) -> Result<Option<Vec<i32>>, TokenizerError> {
+    match file.metadata.get(key) {
+        Some(MetadataValue::Array {
+            value_type: MetadataValueType::Int32,
+            values,
+        }) => values
+            .iter()
+            .map(|value| match value {
+                MetadataValue::Int32(token_type) => Ok(*token_type),
+                other => Err(TokenizerError::new(format!(
+                    "{key} contains non-int32 array value {other:?}"
+                ))),
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map(Some),
+        Some(other) => Err(TokenizerError::new(format!(
+            "{key} must be an int32 array, found {other:?}"
+        ))),
+        None => Ok(None),
+    }
+}
