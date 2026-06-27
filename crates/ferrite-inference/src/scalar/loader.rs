@@ -3,7 +3,7 @@ use super::{
 };
 use ferrite_model::gguf::{GgufFile, TensorInfo};
 
-pub(super) fn load_unquantized(
+pub(super) fn load_scalar(
     file: &GgufFile,
     bytes: &[u8],
 ) -> Result<(ScalarLlamaConfig, ScalarLlamaWeights), InferenceError> {

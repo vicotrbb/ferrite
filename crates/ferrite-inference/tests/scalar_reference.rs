@@ -180,7 +180,7 @@ fn loads_scalar_llama_reference_weights_from_f32_gguf_fixture() -> Result<(), Bo
     let bytes = scalar_llama_f32_gguf_fixture();
     let gguf = parse_gguf(&bytes)?;
 
-    let model = ScalarLlamaModel::from_gguf_unquantized(&gguf, &bytes)?;
+    let model = ScalarLlamaModel::from_gguf_scalar(&gguf, &bytes)?;
     let next = model.next_token(0)?;
 
     assert_eq!(next.token_id, 2);
@@ -196,7 +196,7 @@ fn text_prompt_path_encodes_with_gguf_tokenizer_before_forward() -> Result<(), B
     let gguf = parse_gguf(&bytes)?;
 
     let tokenizer = GgufTokenizer::from_gguf(&gguf)?;
-    let model = ScalarLlamaModel::from_gguf_unquantized(&gguf, &bytes)?;
+    let model = ScalarLlamaModel::from_gguf_scalar(&gguf, &bytes)?;
     let next = model.next_token_for_text_prompt(&tokenizer, "hello")?;
     let expected = model.next_token_for_prompt(&[1])?;
 
@@ -213,7 +213,7 @@ fn loads_scalar_llama_reference_weights_from_f16_gguf_fixture() -> Result<(), Bo
     let bytes = scalar_llama_f16_gguf_fixture();
     let gguf = parse_gguf(&bytes)?;
 
-    let model = ScalarLlamaModel::from_gguf_unquantized(&gguf, &bytes)?;
+    let model = ScalarLlamaModel::from_gguf_scalar(&gguf, &bytes)?;
     let next = model.next_token(0)?;
 
     assert_eq!(next.token_id, 2);
@@ -226,7 +226,7 @@ fn loads_scalar_llama_reference_weights_from_bf16_gguf_fixture() -> Result<(), B
     let bytes = scalar_llama_bf16_gguf_fixture();
     let gguf = parse_gguf(&bytes)?;
 
-    let model = ScalarLlamaModel::from_gguf_unquantized(&gguf, &bytes)?;
+    let model = ScalarLlamaModel::from_gguf_scalar(&gguf, &bytes)?;
     let next = model.next_token(0)?;
 
     assert_eq!(next.token_id, 2);
@@ -239,7 +239,7 @@ fn loads_scalar_llama_reference_weights_from_q8_0_gguf_fixture() -> Result<(), B
     let bytes = scalar_llama_q8_0_gguf_fixture();
     let gguf = parse_gguf(&bytes)?;
 
-    let model = ScalarLlamaModel::from_gguf_unquantized(&gguf, &bytes)?;
+    let model = ScalarLlamaModel::from_gguf_scalar(&gguf, &bytes)?;
     let next = model.next_token(0)?;
 
     assert_eq!(next.token_id, 1);
@@ -252,7 +252,7 @@ fn loads_scalar_llama_reference_weights_from_q4_k_gguf_fixture() -> Result<(), B
     let bytes = scalar_llama_q4_k_gguf_fixture();
     let gguf = parse_gguf(&bytes)?;
 
-    let model = ScalarLlamaModel::from_gguf_unquantized(&gguf, &bytes)?;
+    let model = ScalarLlamaModel::from_gguf_scalar(&gguf, &bytes)?;
     let next = model.next_token(0)?;
 
     assert_eq!(next.token_id, 1);
@@ -265,7 +265,7 @@ fn falls_back_to_token_embeddings_for_tied_output_weight() -> Result<(), Box<dyn
     let bytes = scalar_llama_tied_output_f32_gguf_fixture();
     let gguf = parse_gguf(&bytes)?;
 
-    let model = ScalarLlamaModel::from_gguf_unquantized(&gguf, &bytes)?;
+    let model = ScalarLlamaModel::from_gguf_scalar(&gguf, &bytes)?;
     let next = model.next_token(0)?;
 
     assert_eq!(next.logits.len(), 3);

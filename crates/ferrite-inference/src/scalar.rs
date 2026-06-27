@@ -142,11 +142,15 @@ impl ScalarLlamaModel {
     }
 
     pub fn from_gguf_f32(file: &GgufFile, bytes: &[u8]) -> Result<Self, InferenceError> {
-        Self::from_gguf_unquantized(file, bytes)
+        Self::from_gguf_scalar(file, bytes)
     }
 
     pub fn from_gguf_unquantized(file: &GgufFile, bytes: &[u8]) -> Result<Self, InferenceError> {
-        let (config, weights) = loader::load_unquantized(file, bytes)?;
+        Self::from_gguf_scalar(file, bytes)
+    }
+
+    pub fn from_gguf_scalar(file: &GgufFile, bytes: &[u8]) -> Result<Self, InferenceError> {
+        let (config, weights) = loader::load_scalar(file, bytes)?;
         Self::new(config, weights)
     }
 
