@@ -76,3 +76,19 @@ source after a real SmolLM2 Q4_K_M probe failed on a `Q5_0` tensor:
 
 Reference source:
 `https://github.com/ggml-org/llama.cpp/blob/master/ggml/src/ggml-quants.c`
+
+## 2026-06-27 Q6_K Verification Update
+
+Ferrite refreshed the `Q6_K` layout against upstream `ggml-org/llama.cpp`
+source after the real SmolLM2 Q4_K_M probe advanced to a `Q6K` tensor:
+
+- `GGML_TYPE_Q6_K` uses one 210-byte block per 256 values.
+- The block stores 128 bytes of low 4-bit values.
+- The block stores 64 bytes of upper 2-bit values.
+- The block stores 16 signed 8-bit scales.
+- The block stores one F16 super-block scale.
+- Dequantization reconstructs signed quantized values in `[-32, 31]`, applies
+  the per-group signed scale, and then applies the F16 super-block scale.
+
+Reference source:
+`https://github.com/ggml-org/llama.cpp/blob/master/ggml/src/ggml-quants.c`

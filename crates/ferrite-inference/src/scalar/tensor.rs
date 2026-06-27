@@ -13,8 +13,9 @@ pub(super) fn f32_values(tensor: &TensorInfo, bytes: &[u8]) -> Result<Vec<f32>, 
         GgmlType::Q8_0 => q8_0_values_from_le_bytes(&tensor.name, slice),
         GgmlType::Q5_0 => q5_0_values_from_le_bytes(&tensor.name, slice),
         GgmlType::Q4K => q4_k_values_from_le_bytes(&tensor.name, slice),
+        GgmlType::Q6K => q6_k_values_from_le_bytes(&tensor.name, slice),
         other => Err(InferenceError::new(format!(
-            "tensor {} has type {:?}; expected F32, F16, BF16, Q8_0, Q5_0, or Q4K",
+            "tensor {} has type {:?}; expected F32, F16, BF16, Q8_0, Q5_0, Q4K, or Q6K",
             tensor.name, other
         ))),
     }
@@ -158,6 +159,60 @@ fn q4_k_values_from_le_bytes(name: &str, slice: &[u8]) -> Result<Vec<f32>, Infer
     Ok(values)
 }
 
+fn q6_k_values_from_le_bytes(name: &str, slice: &[u8]) -> Result<Vec<f32>, InferenceError> {
+    const Q6_K_BLOCK_BYTES: usize = 210;
+    const Q6_K_BLOCK_VALUES: usize = 256;
+
+    if !slice.len().is_multiple_of(Q6_K_BLOCK_BYTES) {
+        return Err(InferenceError::new(format!(
+            "tensor {name} byte length {} is not divisible by Q6K block size {Q6_K_BLOCK_BYTES}",
+            slice.len()
+        )));
+    }
+
+    let mut values = Vec::with_capacity(slice.len() / Q6_K_BLOCK_BYTES * Q6_K_BLOCK_VALUES);
+    for block in slice.chunks_exact(Q6_K_BLOCK_BYTES) {
+        let low_bits = &block[0..128];
+        let high_bits = &block[128..192];
+        let scales = &block[192..208];
+        let super_scale = f16_bits_to_f32(u16::from_le_bytes([block[208], block[209]]));
+        let mut block_values = vec![0.0; Q6_K_BLOCK_VALUES];
+
+        for half in 0..2 {
+            let value_base = half * 128;
+            let low_base = half * 64;
+            let high_base = half * 32;
+            let scale_base = half * 8;
+
+            for index in 0..32 {
+                let scale_index = index / 16;
+                let high = high_bits[high_base + index];
+                let q1 = i32::from((low_bits[low_base + index] & 0x0f) | ((high & 3) << 4)) - 32;
+                let q2 =
+                    i32::from((low_bits[low_base + index + 32] & 0x0f) | (((high >> 2) & 3) << 4))
+                        - 32;
+                let q3 =
+                    i32::from((low_bits[low_base + index] >> 4) | (((high >> 4) & 3) << 4)) - 32;
+                let q4 =
+                    i32::from((low_bits[low_base + index + 32] >> 4) | (((high >> 6) & 3) << 4))
+                        - 32;
+
+                block_values[value_base + index] =
+                    super_scale * f32::from(scales[scale_base + scale_index] as i8) * q1 as f32;
+                block_values[value_base + index + 32] =
+                    super_scale * f32::from(scales[scale_base + scale_index + 2] as i8) * q2 as f32;
+                block_values[value_base + index + 64] =
+                    super_scale * f32::from(scales[scale_base + scale_index + 4] as i8) * q3 as f32;
+                block_values[value_base + index + 96] =
+                    super_scale * f32::from(scales[scale_base + scale_index + 6] as i8) * q4 as f32;
+            }
+        }
+
+        values.extend(block_values);
+    }
+    Ok(values)
+}
+
 fn q4_k_scale_min(index: usize, scales: &[u8]) -> (u8, u8) {
     if index < 4 {
         (scales[index] & 63, scales[index + 4] & 63)
@@ -202,7 +257,7 @@ fn f16_bits_to_f32(bits: u16) -> f32 {
 
 #[cfg(test)]
 mod tests {
-    use super::{f16_bits_to_f32, q5_0_values_from_le_bytes};
+    use super::{f16_bits_to_f32, q5_0_values_from_le_bytes, q6_k_values_from_le_bytes};
 
     #[test]
     fn q5_0_decoder_reconstructs_signed_block_values() -> Result<(), super::InferenceError> {
@@ -218,6 +273,23 @@ mod tests {
         let expected = (-16..16).map(|value| value as f32).collect::<Vec<_>>();
         assert_eq!(f16_bits_to_f32(0x3c00), 1.0);
         assert_eq!(values, expected);
+        Ok(())
+    }
+
+    #[test]
+    fn q6_k_decoder_reconstructs_signed_block_values() -> Result<(), super::InferenceError> {
+        let mut block = vec![0u8; 128 + 64];
+        block[32] = 0xff;
+        block[128] = 0xe4;
+        block.extend(vec![1u8; 16]);
+        block.extend_from_slice(&0x3c00u16.to_le_bytes());
+
+        let values = q6_k_values_from_le_bytes("q6", &block)?;
+
+        assert_eq!(values[0], -32.0);
+        assert_eq!(values[32], -1.0);
+        assert_eq!(values[64], 0.0);
+        assert_eq!(values[96], 31.0);
         Ok(())
     }
 }
