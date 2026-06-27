@@ -1,4 +1,11 @@
-use super::{math::dot, InferenceError};
+use super::{
+    math::dot,
+    quantized::{
+        decode_q4_k_values, decode_q5_0_row, decode_q8_0_row, q4_k_storage_bytes, q5_0_row_bytes,
+        q8_0_row_bytes, Q5_0_BLOCK_VALUES, Q8_0_BLOCK_VALUES,
+    },
+    InferenceError,
+};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Matrix {
@@ -10,6 +17,7 @@ pub struct Matrix {
 #[derive(Clone, Debug, PartialEq)]
 enum MatrixData {
     F32(Vec<f32>),
+    Q4K(Vec<u8>),
     Q5_0(Vec<u8>),
     Q8_0(Vec<u8>),
 }
@@ -93,6 +101,29 @@ impl Matrix {
         })
     }
 
+    pub fn from_q4_k_row_major_bytes(
+        rows: usize,
+        cols: usize,
+        data: Vec<u8>,
+    ) -> Result<Self, InferenceError> {
+        let value_count = rows
+            .checked_mul(cols)
+            .ok_or_else(|| InferenceError::new("Q4_K matrix value count overflow"))?;
+        let expected = q4_k_storage_bytes(value_count)?;
+        if data.len() != expected {
+            return Err(InferenceError::new(format!(
+                "Q4_K matrix byte length {} does not match shape {rows}x{cols}",
+                data.len()
+            )));
+        }
+
+        Ok(Self {
+            rows,
+            cols,
+            data: MatrixData::Q4K(data),
+        })
+    }
+
     pub fn rows(&self) -> usize {
         self.rows
     }
@@ -133,6 +164,20 @@ impl Matrix {
 
         match &self.data {
             MatrixData::F32(_) => Ok(self.row(index)?.to_vec()),
+            MatrixData::Q4K(data) => {
+                let value_count = self
+                    .rows
+                    .checked_mul(self.cols)
+                    .ok_or_else(|| InferenceError::new("Q4_K matrix value count overflow"))?;
+                let values = decode_q4_k_values(data, value_count)?;
+                let start = index
+                    .checked_mul(self.cols)
+                    .ok_or_else(|| InferenceError::new("Q4_K row offset overflow"))?;
+                let end = start
+                    .checked_add(self.cols)
+                    .ok_or_else(|| InferenceError::new("Q4_K row end overflow"))?;
+                Ok(values[start..end].to_vec())
+            }
             MatrixData::Q5_0(data) => {
                 let row_bytes = q5_0_row_bytes(self.cols)?;
                 let start = index
@@ -159,6 +204,7 @@ impl Matrix {
     pub fn storage_bytes(&self) -> u128 {
         match &self.data {
             MatrixData::F32(values) => values.len() as u128 * std::mem::size_of::<f32>() as u128,
+            MatrixData::Q4K(bytes) => bytes.len() as u128,
             MatrixData::Q5_0(bytes) => bytes.len() as u128,
             MatrixData::Q8_0(bytes) => bytes.len() as u128,
         }
@@ -180,101 +226,4 @@ impl Matrix {
         }
         Ok(output)
     }
-}
-
-const Q5_0_BLOCK_VALUES: usize = 32;
-const Q5_0_BLOCK_BYTES: usize = 22;
-const Q8_0_BLOCK_VALUES: usize = 32;
-const Q8_0_BLOCK_BYTES: usize = 34;
-
-fn q5_0_row_bytes(cols: usize) -> Result<usize, InferenceError> {
-    cols.checked_div(Q5_0_BLOCK_VALUES)
-        .and_then(|blocks| blocks.checked_mul(Q5_0_BLOCK_BYTES))
-        .ok_or_else(|| InferenceError::new("Q5_0 row byte length overflow"))
-}
-
-fn q8_0_row_bytes(cols: usize) -> Result<usize, InferenceError> {
-    cols.checked_div(Q8_0_BLOCK_VALUES)
-        .and_then(|blocks| blocks.checked_mul(Q8_0_BLOCK_BYTES))
-        .ok_or_else(|| InferenceError::new("Q8_0 row byte length overflow"))
-}
-
-fn decode_q5_0_row(bytes: &[u8], cols: usize) -> Result<Vec<f32>, InferenceError> {
-    let expected = q5_0_row_bytes(cols)?;
-    if bytes.len() != expected {
-        return Err(InferenceError::new(format!(
-            "Q5_0 row byte length {} does not match {expected}",
-            bytes.len()
-        )));
-    }
-
-    let mut values = Vec::with_capacity(cols);
-    for block in bytes.chunks_exact(Q5_0_BLOCK_BYTES) {
-        let scale = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
-        let high_bits = u32::from_le_bytes([block[2], block[3], block[4], block[5]]);
-        let quants = &block[6..];
-
-        for (index, quant) in quants.iter().enumerate() {
-            let high = ((high_bits >> index) << 4) as u8 & 0x10;
-            let signed = i32::from((quant & 0x0f) | high) - 16;
-            values.push(scale * signed as f32);
-        }
-
-        for (index, quant) in quants.iter().enumerate() {
-            let high = (high_bits >> (index + 12)) as u8 & 0x10;
-            let signed = i32::from((quant >> 4) | high) - 16;
-            values.push(scale * signed as f32);
-        }
-    }
-    Ok(values)
-}
-
-fn decode_q8_0_row(bytes: &[u8], cols: usize) -> Result<Vec<f32>, InferenceError> {
-    let expected = q8_0_row_bytes(cols)?;
-    if bytes.len() != expected {
-        return Err(InferenceError::new(format!(
-            "Q8_0 row byte length {} does not match {expected}",
-            bytes.len()
-        )));
-    }
-
-    let mut values = Vec::with_capacity(cols);
-    for block in bytes.chunks_exact(Q8_0_BLOCK_BYTES) {
-        let scale = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
-        for quantized in &block[2..] {
-            values.push(scale * f32::from(*quantized as i8));
-        }
-    }
-    Ok(values)
-}
-
-fn f16_bits_to_f32(bits: u16) -> f32 {
-    let sign = ((bits & 0x8000) as u32) << 16;
-    let exponent = ((bits >> 10) & 0x1f) as u32;
-    let mantissa = (bits & 0x03ff) as u32;
-
-    let f32_bits = match exponent {
-        0 => {
-            if mantissa == 0 {
-                sign
-            } else {
-                let mut normalized_mantissa = mantissa;
-                let mut exponent_adjust = -14i32;
-                while normalized_mantissa & 0x0400 == 0 {
-                    normalized_mantissa <<= 1;
-                    exponent_adjust -= 1;
-                }
-                normalized_mantissa &= 0x03ff;
-                let exponent_bits = ((exponent_adjust + 127) as u32) << 23;
-                sign | exponent_bits | (normalized_mantissa << 13)
-            }
-        }
-        0x1f => sign | 0x7f80_0000 | (mantissa << 13),
-        _ => {
-            let exponent_bits = (exponent + 112) << 23;
-            sign | exponent_bits | (mantissa << 13)
-        }
-    };
-
-    f32::from_bits(f32_bits)
 }

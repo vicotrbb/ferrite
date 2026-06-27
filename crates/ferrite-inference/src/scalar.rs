@@ -4,6 +4,7 @@ mod matrix;
 mod memory;
 mod output;
 mod prompt;
+mod quantized;
 mod session;
 mod tensor;
 

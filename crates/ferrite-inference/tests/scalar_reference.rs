@@ -402,6 +402,7 @@ fn loads_scalar_llama_reference_weights_from_q4_k_gguf_fixture() -> Result<(), B
     let model = ScalarLlamaModel::from_gguf_scalar(&gguf, &bytes)?;
     let next = model.next_token(0)?;
 
+    assert_eq!(model.scalar_weight_bytes(), 17_184);
     assert_eq!(next.token_id, 1);
     assert!(next.logits[1] > next.logits[0]);
     Ok(())

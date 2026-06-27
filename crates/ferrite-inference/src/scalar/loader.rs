@@ -155,6 +155,9 @@ fn f32_matrix(
     }
 
     match tensor.ty {
+        GgmlType::Q4K => {
+            Matrix::from_q4_k_row_major_bytes(rows, cols, tensor::raw_bytes(tensor, bytes)?)
+        }
         GgmlType::Q5_0 => {
             Matrix::from_q5_0_row_major_bytes(rows, cols, tensor::raw_bytes(tensor, bytes)?)
         }
