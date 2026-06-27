@@ -23,5 +23,17 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
 
     println!("next_token_id={}", next.token_id);
     println!("next_token={token}");
+    if let Some(expected_token_id) = args.expected_token_id {
+        println!("expected_token_id={expected_token_id}");
+        let matches = next.token_id == expected_token_id;
+        println!("match={matches}");
+        if !matches {
+            return Err(io::Error::other(format!(
+                "next token id {} did not match expected token id {expected_token_id}",
+                next.token_id
+            ))
+            .into());
+        }
+    }
     Ok(())
 }

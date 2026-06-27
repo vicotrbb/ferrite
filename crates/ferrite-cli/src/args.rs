@@ -6,11 +6,13 @@ use std::path::PathBuf;
 pub struct CliArgs {
     pub model_path: PathBuf,
     pub prompt: String,
+    pub expected_token_id: Option<usize>,
 }
 
 pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dyn Error>> {
     let mut model_path = None;
     let mut prompt = None;
+    let mut expected_token_id = None;
     let mut iter = args.into_iter();
     let _program = iter.next();
 
@@ -26,6 +28,12 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
             "--prompt" => {
                 prompt = Some(os_string_to_string(next_value(&mut iter, "--prompt")?)?);
             }
+            "--expect-token-id" => {
+                expected_token_id = Some(parse_usize(
+                    next_value(&mut iter, "--expect-token-id")?,
+                    "--expect-token-id",
+                )?);
+            }
             "--help" | "-h" => {
                 return Err(io::Error::other(usage()).into());
             }
@@ -40,6 +48,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
     Ok(CliArgs {
         model_path: model_path.ok_or_else(|| io::Error::other("missing --model argument"))?,
         prompt: prompt.ok_or_else(|| io::Error::other("missing --prompt argument"))?,
+        expected_token_id,
     })
 }
 
@@ -57,6 +66,13 @@ fn os_string_to_string(value: OsString) -> Result<String, Box<dyn Error>> {
         .map_err(|_| io::Error::other("prompt must be valid UTF-8").into())
 }
 
+fn parse_usize(value: OsString, flag: &str) -> Result<usize, Box<dyn Error>> {
+    let value = os_string_to_string(value)?;
+    value
+        .parse::<usize>()
+        .map_err(|error| io::Error::other(format!("{flag} must be a usize: {error}")).into())
+}
+
 fn usage() -> &'static str {
-    "usage: ferrite --model <path.gguf> --prompt <text>"
+    "usage: ferrite --model <path.gguf> --prompt <text> [--expect-token-id <id>]"
 }

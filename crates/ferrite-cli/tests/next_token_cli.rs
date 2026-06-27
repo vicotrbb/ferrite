@@ -30,6 +30,58 @@ fn cli_loads_gguf_and_prints_text_prompt_next_token() -> Result<(), Box<dyn Erro
     Ok(())
 }
 
+#[test]
+fn cli_succeeds_when_next_token_matches_expected_id() -> Result<(), Box<dyn Error>> {
+    let model_path = write_fixture_model()?;
+    let binary = cli_binary()?;
+
+    let output = Command::new(binary)
+        .arg("--model")
+        .arg(&model_path)
+        .arg("--prompt")
+        .arg("hello")
+        .arg("--expect-token-id")
+        .arg("2")
+        .output()?;
+
+    fs::remove_file(&model_path)?;
+
+    assert!(
+        output.status.success(),
+        "cli failed with stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout)?;
+    assert!(stdout.contains("expected_token_id=2"));
+    assert!(stdout.contains("match=true"));
+    Ok(())
+}
+
+#[test]
+fn cli_fails_when_next_token_does_not_match_expected_id() -> Result<(), Box<dyn Error>> {
+    let model_path = write_fixture_model()?;
+    let binary = cli_binary()?;
+
+    let output = Command::new(binary)
+        .arg("--model")
+        .arg(&model_path)
+        .arg("--prompt")
+        .arg("hello")
+        .arg("--expect-token-id")
+        .arg("1")
+        .output()?;
+
+    fs::remove_file(&model_path)?;
+
+    assert!(!output.status.success());
+    let stdout = String::from_utf8(output.stdout)?;
+    assert!(stdout.contains("expected_token_id=1"));
+    assert!(stdout.contains("match=false"));
+    let stderr = String::from_utf8(output.stderr)?;
+    assert!(stderr.contains("did not match expected token id 1"));
+    Ok(())
+}
+
 fn cli_binary() -> Result<OsString, Box<dyn Error>> {
     std::env::var_os("CARGO_BIN_EXE_ferrite").ok_or_else(|| "missing CARGO_BIN_EXE_ferrite".into())
 }
