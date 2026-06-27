@@ -51,7 +51,9 @@ next_token_id=30
 next_token=.
 generated_cached_tokens=8
 generated_token_ids=30,198,198,57,5248,597
-generated_text=.ĊĊI'mĠalso
+generated_text=.
+
+I'm also
 model_file_bytes=105454432
 model_file_retained_bytes=0
 scalar_weight_bytes=103668480
@@ -65,7 +67,7 @@ for the prompt `hello world`: `[30, 198, 198, 57, 5248, 597]`.
 
 ## Boundaries
 
-`generated_text` currently uses direct GGUF token string concatenation, so byte
-fallback display markers such as `Ċ` and `Ġ` are printed literally. This mode
-does not add sampling, stop-token handling, chat-template rendering, or
-human-normalized tokenizer display.
+This mode does not add sampling, stop-token handling, or chat-template
+rendering. BPE token display now applies the inverse GPT-2 byte alphabet, which
+is enough for this SmolLM2 prompt but is still not a full chat/runtime text
+policy.
