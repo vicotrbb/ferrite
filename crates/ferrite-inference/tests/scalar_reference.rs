@@ -5,7 +5,7 @@ use ferrite_fixtures::{
 };
 use ferrite_inference::scalar::{
     apply_rope, argmax, rms_norm, Matrix, ScalarLlamaConfig, ScalarLlamaLayerWeights,
-    ScalarLlamaModel, ScalarLlamaWeights,
+    ScalarLlamaModel, ScalarLlamaOutputWeights, ScalarLlamaWeights,
 };
 use ferrite_model::gguf::parse_gguf;
 use ferrite_model::tokenizer::GgufTokenizer;
@@ -72,7 +72,7 @@ fn single_token_llama_reference_path_produces_documented_argmax() -> Result<(), 
                 ],
             )?,
             output_norm: vec![1.0, 1.0],
-            output: Matrix::from_row_major(
+            output: ScalarLlamaOutputWeights::untied(Matrix::from_row_major(
                 3,
                 2,
                 vec![
@@ -80,7 +80,7 @@ fn single_token_llama_reference_path_produces_documented_argmax() -> Result<(), 
                     0.2, 0.0, // token 1 logit = 0.2 after final norm
                     1.0, 0.5, // token 2 logit = 1.5 after final norm
                 ],
-            )?,
+            )?),
             layers: vec![ScalarLlamaLayerWeights {
                 attn_norm: vec![1.0, 1.0],
                 q_proj: identity.clone(),
@@ -144,7 +144,7 @@ fn prompt_path_uses_causal_kv_attention_for_latest_token() -> Result<(), Box<dyn
                 ],
             )?,
             output_norm: vec![1.0, 1.0],
-            output: Matrix::from_row_major(
+            output: ScalarLlamaOutputWeights::untied(Matrix::from_row_major(
                 4,
                 2,
                 vec![
@@ -153,7 +153,7 @@ fn prompt_path_uses_causal_kv_attention_for_latest_token() -> Result<(), Box<dyn
                     0.0, 1.0, // token 2 follows current token
                     -1.0, -1.0, // token 3
                 ],
-            )?,
+            )?),
             layers: vec![ScalarLlamaLayerWeights {
                 attn_norm: vec![1.0, 1.0],
                 q_proj: identity.clone(),
@@ -203,7 +203,7 @@ fn scalar_session_reuses_cached_prompt_state_incrementally() -> Result<(), Box<d
                 ],
             )?,
             output_norm: vec![1.0, 1.0],
-            output: Matrix::from_row_major(
+            output: ScalarLlamaOutputWeights::untied(Matrix::from_row_major(
                 4,
                 2,
                 vec![
@@ -212,7 +212,7 @@ fn scalar_session_reuses_cached_prompt_state_incrementally() -> Result<(), Box<d
                     0.0, 1.0, // token 2
                     -1.0, -1.0, // token 3
                 ],
-            )?,
+            )?),
             layers: vec![ScalarLlamaLayerWeights {
                 attn_norm: vec![1.0, 1.0],
                 q_proj: identity.clone(),
@@ -270,7 +270,7 @@ fn scalar_model_reports_weight_and_session_kv_cache_bytes() -> Result<(), Box<dy
                 ],
             )?,
             output_norm: vec![1.0, 1.0],
-            output: Matrix::from_row_major(
+            output: ScalarLlamaOutputWeights::untied(Matrix::from_row_major(
                 4,
                 2,
                 vec![
@@ -279,7 +279,7 @@ fn scalar_model_reports_weight_and_session_kv_cache_bytes() -> Result<(), Box<dy
                     0.0, 1.0, // token 2
                     -1.0, -1.0, // token 3
                 ],
-            )?,
+            )?),
             layers: vec![ScalarLlamaLayerWeights {
                 attn_norm: vec![1.0, 1.0],
                 q_proj: identity.clone(),
@@ -413,6 +413,7 @@ fn falls_back_to_token_embeddings_for_tied_output_weight() -> Result<(), Box<dyn
     let model = ScalarLlamaModel::from_gguf_scalar(&gguf, &bytes)?;
     let next = model.next_token(0)?;
 
+    assert_eq!(model.scalar_weight_bytes(), 160);
     assert_eq!(next.logits.len(), 3);
     assert!(next.logits[0] > next.logits[1]);
     assert!(next.logits[0] > next.logits[2]);

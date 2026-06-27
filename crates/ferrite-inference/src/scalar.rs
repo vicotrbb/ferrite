@@ -2,12 +2,14 @@ mod loader;
 mod math;
 mod matrix;
 mod memory;
+mod output;
 mod prompt;
 mod session;
 mod tensor;
 
 pub use math::{apply_rope, argmax, rms_norm};
 pub use matrix::Matrix;
+pub use output::ScalarLlamaOutputWeights;
 pub use session::ScalarLlamaSession;
 
 use ferrite_model::gguf::{GgufError, GgufFile};
@@ -32,7 +34,7 @@ pub struct ScalarLlamaConfig {
 pub struct ScalarLlamaWeights {
     pub token_embedding: Matrix,
     pub output_norm: Vec<f32>,
-    pub output: Matrix,
+    pub output: ScalarLlamaOutputWeights,
     pub layers: Vec<ScalarLlamaLayerWeights>,
 }
 
@@ -285,12 +287,9 @@ fn validate_weights(
         config.vocab_size,
         config.hidden_size,
     )?;
-    ensure_matrix_shape(
-        "output",
-        &weights.output,
-        config.vocab_size,
-        config.hidden_size,
-    )?;
+    if let Some(output) = weights.output.untied_matrix() {
+        ensure_matrix_shape("output", output, config.vocab_size, config.hidden_size)?;
+    }
     ensure_len("output_norm", &weights.output_norm, config.hidden_size)?;
 
     let kv_width = config

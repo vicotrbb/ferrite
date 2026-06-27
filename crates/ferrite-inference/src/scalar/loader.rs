@@ -1,5 +1,6 @@
 use super::{
-    tensor, InferenceError, Matrix, ScalarLlamaConfig, ScalarLlamaLayerWeights, ScalarLlamaWeights,
+    tensor, InferenceError, Matrix, ScalarLlamaConfig, ScalarLlamaLayerWeights,
+    ScalarLlamaOutputWeights, ScalarLlamaWeights,
 };
 use ferrite_model::gguf::{GgufFile, TensorInfo};
 
@@ -162,11 +163,17 @@ fn output_matrix_or_tied(
     token_embedding: &Matrix,
     rows: usize,
     cols: usize,
-) -> Result<Matrix, InferenceError> {
+) -> Result<ScalarLlamaOutputWeights, InferenceError> {
     if file.tensor("output.weight").is_some() {
-        f32_matrix(file, bytes, "output.weight", rows, cols)
+        Ok(ScalarLlamaOutputWeights::untied(f32_matrix(
+            file,
+            bytes,
+            "output.weight",
+            rows,
+            cols,
+        )?))
     } else if token_embedding.rows() == rows && token_embedding.cols() == cols {
-        Ok(token_embedding.clone())
+        Ok(ScalarLlamaOutputWeights::tied_token_embedding())
     } else {
         Err(InferenceError::new(format!(
             "token_embd.weight shape {}x{} cannot be reused as output.weight shape {rows}x{cols}",

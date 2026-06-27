@@ -5,7 +5,7 @@ const F32_BYTES: u128 = std::mem::size_of::<f32>() as u128;
 pub(super) fn weights_bytes(weights: &ScalarLlamaWeights) -> u128 {
     matrix_bytes(&weights.token_embedding)
         + vector_bytes(&weights.output_norm)
-        + matrix_bytes(&weights.output)
+        + weights.output.untied_matrix().map_or(0, matrix_bytes)
         + weights.layers.iter().map(layer_bytes).sum::<u128>()
 }
 

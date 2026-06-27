@@ -101,7 +101,12 @@ impl<'a> ScalarLlamaSession<'a> {
             &self.model.weights.output_norm,
             self.model.config.rms_norm_epsilon,
         )?;
-        let logits = self.model.weights.output.mul_vec(&normed)?;
+        let logits = self
+            .model
+            .weights
+            .output
+            .logits_matrix(&self.model.weights.token_embedding)
+            .mul_vec(&normed)?;
         let token_id = argmax(&logits)?;
         self.cached_token_count += 1;
 
