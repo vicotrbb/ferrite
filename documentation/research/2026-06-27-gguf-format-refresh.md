@@ -1,0 +1,49 @@
+# 2026-06-27 GGUF Format Refresh
+
+## Question
+
+Which GGUF structural details are required before Ferrite can safely expose
+tensor byte ranges for Tier 0 loading?
+
+## Current Evidence
+
+The current ggml GGUF specification describes GGUF v3 as:
+
+- `GGUF` magic bytes.
+- Version `3`.
+- `u64` tensor count and metadata key-value count.
+- Typed metadata values.
+- Tensor info records with name, dimensions, GGML tensor type, and tensor-data
+  relative offset.
+- Global alignment controlled by `general.alignment`, defaulting to `32` when
+  absent.
+- Tensor-data padding after tensor info records to the next alignment boundary.
+
+Tensor offsets are relative to the start of the tensor-data section, not the
+start of the file, and must be aligned to the global alignment.
+
+## Impact on Ferrite
+
+Ferrite's parser should expose absolute byte ranges only after validating the
+relative tensor offsets and computing the aligned tensor-data start. The parser
+should not expose raw offsets as if they were file offsets.
+
+The baseline quantization note listed Q4_K_M as 148 bytes per 256 values.
+Current GGML block sizing for `GGML_TYPE_Q4_K` is 144 bytes per 256 values; the
+medium/small distinction is encoded by file-type and tensor-type mixtures, not
+by a separate GGML tensor type named Q4_K_M. Ferrite should treat exact GGML
+block sizes as implementation facts that must be validated against current
+upstream code or fixture evidence before dequantization work.
+
+## Decision for Current Slice
+
+The first reader implements byte sizing for common GGML tensor types and fails
+explicitly for tensor types whose block layouts have not yet been encoded. This
+keeps the parser useful for standard Tier 0 metadata and tensor range discovery
+without silently guessing unsupported quantization layouts.
+
+## Follow-Up
+
+Before implementing Q4_K dequantization, verify block layouts against the
+current `ggml-quants.h` definitions and add fixture tests that prove storage
+byte calculations for representative tensor shapes.

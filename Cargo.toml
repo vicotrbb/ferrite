@@ -1,0 +1,16 @@
+[workspace]
+members = ["crates/ferrite-inference", "crates/ferrite-model"]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/victorbona/ferrite"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+panic = "deny"
+unwrap_used = "deny"
+expect_used = "deny"
