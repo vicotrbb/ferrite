@@ -1,4 +1,6 @@
-use super::InferenceError;
+use super::{float::f16_bits_to_f32, InferenceError};
+
+pub(super) use super::q8_0::{decode_q8_0_row, q8_0_mul_vec, q8_0_row_bytes, Q8_0_BLOCK_VALUES};
 
 pub(super) const Q4_K_BLOCK_VALUES: usize = 256;
 pub(super) const Q4_K_BLOCK_BYTES: usize = 144;
@@ -6,9 +8,6 @@ pub(super) const Q5_0_BLOCK_VALUES: usize = 32;
 pub(super) const Q5_0_BLOCK_BYTES: usize = 22;
 pub(super) const Q6_K_BLOCK_VALUES: usize = 256;
 pub(super) const Q6_K_BLOCK_BYTES: usize = 210;
-pub(super) const Q8_0_BLOCK_VALUES: usize = 32;
-pub(super) const Q8_0_BLOCK_BYTES: usize = 34;
-
 pub(super) fn q4_k_storage_bytes(value_count: usize) -> Result<usize, InferenceError> {
     storage_bytes(value_count, Q4_K_BLOCK_VALUES, Q4_K_BLOCK_BYTES, "Q4_K")
 }
@@ -19,10 +18,6 @@ pub(super) fn q5_0_row_bytes(cols: usize) -> Result<usize, InferenceError> {
 
 pub(super) fn q6_k_storage_bytes(value_count: usize) -> Result<usize, InferenceError> {
     storage_bytes(value_count, Q6_K_BLOCK_VALUES, Q6_K_BLOCK_BYTES, "Q6_K")
-}
-
-pub(super) fn q8_0_row_bytes(cols: usize) -> Result<usize, InferenceError> {
-    storage_bytes(cols, Q8_0_BLOCK_VALUES, Q8_0_BLOCK_BYTES, "Q8_0")
 }
 
 pub(super) fn decode_q4_k_values(
@@ -290,45 +285,6 @@ fn accumulate_q6_k_block(
     Ok(())
 }
 
-pub(super) fn q8_0_mul_vec(
-    bytes: &[u8],
-    rows: usize,
-    cols: usize,
-    vector: &[f32],
-) -> Result<Vec<f32>, InferenceError> {
-    if vector.len() != cols {
-        return Err(InferenceError::new(format!(
-            "matrix columns {cols} do not match vector length {}",
-            vector.len()
-        )));
-    }
-    let row_bytes = q8_0_row_bytes(cols)?;
-    let expected = rows
-        .checked_mul(row_bytes)
-        .ok_or_else(|| InferenceError::new("Q8_0 matrix byte length overflow"))?;
-    if bytes.len() != expected {
-        return Err(InferenceError::new(format!(
-            "Q8_0 matrix byte length {} does not match shape {rows}x{cols}",
-            bytes.len()
-        )));
-    }
-
-    let mut output = vec![0.0; rows];
-    for (row, row_bytes) in bytes.chunks_exact(row_bytes).enumerate() {
-        let mut sum = 0.0;
-        for (block_index, block) in row_bytes.chunks_exact(Q8_0_BLOCK_BYTES).enumerate() {
-            let scale = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
-            let col_base = block_index * Q8_0_BLOCK_VALUES;
-            for (offset, quantized) in block[2..].iter().enumerate() {
-                sum += scale * f32::from(*quantized as i8) * vector[col_base + offset];
-            }
-        }
-        output[row] = sum;
-    }
-
-    Ok(output)
-}
-
 pub(super) fn q5_0_mul_vec(
     bytes: &[u8],
     rows: usize,
@@ -464,25 +420,6 @@ pub(super) fn decode_q6_k_values(
     Ok(values)
 }
 
-pub(super) fn decode_q8_0_row(bytes: &[u8], cols: usize) -> Result<Vec<f32>, InferenceError> {
-    let expected = q8_0_row_bytes(cols)?;
-    if bytes.len() != expected {
-        return Err(InferenceError::new(format!(
-            "Q8_0 row byte length {} does not match {expected}",
-            bytes.len()
-        )));
-    }
-
-    let mut values = Vec::with_capacity(cols);
-    for block in bytes.chunks_exact(Q8_0_BLOCK_BYTES) {
-        let scale = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
-        for quantized in &block[2..] {
-            values.push(scale * f32::from(*quantized as i8));
-        }
-    }
-    Ok(values)
-}
-
 fn storage_bytes(
     value_count: usize,
     block_values: usize,
@@ -512,39 +449,9 @@ fn q4_k_scale_min(index: usize, scales: &[u8]) -> (u8, u8) {
     }
 }
 
-fn f16_bits_to_f32(bits: u16) -> f32 {
-    let sign = ((bits & 0x8000) as u32) << 16;
-    let exponent = ((bits >> 10) & 0x1f) as u32;
-    let mantissa = (bits & 0x03ff) as u32;
-
-    let f32_bits = match exponent {
-        0 => {
-            if mantissa == 0 {
-                sign
-            } else {
-                let mut normalized_mantissa = mantissa;
-                let mut exponent_adjust = -14i32;
-                while normalized_mantissa & 0x0400 == 0 {
-                    normalized_mantissa <<= 1;
-                    exponent_adjust -= 1;
-                }
-                normalized_mantissa &= 0x03ff;
-                let exponent_bits = ((exponent_adjust + 127) as u32) << 23;
-                sign | exponent_bits | (normalized_mantissa << 13)
-            }
-        }
-        0x1f => sign | 0x7f80_0000 | (mantissa << 13),
-        _ => {
-            let exponent_bits = (exponent + 112) << 23;
-            sign | exponent_bits | (mantissa << 13)
-        }
-    };
-
-    f32::from_bits(f32_bits)
-}
-
 #[cfg(test)]
 mod tests {
+    use super::super::q8_0::{q8_0_mul_vec_with_backend, Q8_0MatVecBackend};
     use super::{
         accumulate_q4_k_block, accumulate_q6_k_block, decode_q6_k_values, q4_k_mul_vec,
         q5_0_mul_vec, q6_k_mul_vec, q8_0_mul_vec, InferenceError,
@@ -639,6 +546,20 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_arch = "aarch64")]
+    fn q8_0_matvec_uses_neon_backend_on_aarch64() -> Result<(), InferenceError> {
+        let mut bytes = Vec::new();
+        bytes.extend(q8_0_block_with_value(1));
+        bytes.extend(q8_0_block_with_value(-2));
+
+        let output = q8_0_mul_vec_with_backend(&bytes, 2, 32, &[1.0; 32])?;
+
+        assert_eq!(output.backend, Q8_0MatVecBackend::Aarch64Neon);
+        assert_eq!(output.values, vec![32.0, -64.0]);
+        Ok(())
+    }
+
+    #[test]
     fn q5_0_mul_vec_accumulates_rows_without_row_decodes() -> Result<(), InferenceError> {
         let mut bytes = Vec::new();
         bytes.extend(q5_0_block_with_value(1));
@@ -663,6 +584,13 @@ mod tests {
         block.extend_from_slice(&0x3c00u16.to_le_bytes());
         block.extend_from_slice(&high_bits.to_le_bytes());
         block.extend([(quantized & 0x0f) | ((quantized & 0x0f) << 4); 16]);
+        block
+    }
+
+    fn q8_0_block_with_value(value: i8) -> Vec<u8> {
+        let mut block = Vec::new();
+        block.extend_from_slice(&0x3c00u16.to_le_bytes());
+        block.extend([value as u8; 32]);
         block
     }
 }

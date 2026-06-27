@@ -1,4 +1,5 @@
 mod attention;
+mod float;
 mod kernel_check;
 mod loader;
 mod math;
@@ -7,6 +8,7 @@ mod matvec;
 mod memory;
 mod output;
 mod prompt;
+mod q8_0;
 mod quantized;
 mod rope;
 mod session;
