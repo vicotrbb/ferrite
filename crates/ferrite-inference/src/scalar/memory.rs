@@ -26,7 +26,7 @@ fn layer_bytes(layer: &ScalarLlamaLayerWeights) -> u128 {
 }
 
 fn matrix_bytes(matrix: &Matrix) -> u128 {
-    matrix.rows() as u128 * matrix.cols() as u128 * F32_BYTES
+    matrix.storage_bytes()
 }
 
 fn vector_bytes(values: &[f32]) -> u128 {

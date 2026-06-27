@@ -2,7 +2,7 @@ use super::{
     tensor, InferenceError, Matrix, ScalarLlamaConfig, ScalarLlamaLayerWeights,
     ScalarLlamaOutputWeights, ScalarLlamaWeights,
 };
-use ferrite_model::gguf::{GgufFile, TensorInfo};
+use ferrite_model::gguf::{GgmlType, GgufFile, TensorInfo};
 
 pub(super) fn load_scalar(
     file: &GgufFile,
@@ -154,7 +154,12 @@ fn f32_matrix(
         )));
     }
 
-    Matrix::from_row_major(rows, cols, tensor::f32_values(tensor, bytes)?)
+    match tensor.ty {
+        GgmlType::Q8_0 => {
+            Matrix::from_q8_0_row_major_bytes(rows, cols, tensor::raw_bytes(tensor, bytes)?)
+        }
+        _ => Matrix::from_row_major(rows, cols, tensor::f32_values(tensor, bytes)?),
+    }
 }
 
 fn output_matrix_or_tied(

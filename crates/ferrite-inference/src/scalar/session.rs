@@ -53,7 +53,7 @@ impl<'a> ScalarLlamaSession<'a> {
         }
 
         let position = self.cached_token_count;
-        let mut hidden = self.model.weights.token_embedding.row(token_id)?.to_vec();
+        let mut hidden = self.model.weights.token_embedding.row_values(token_id)?;
 
         for (layer_index, layer) in self.model.weights.layers.iter().enumerate() {
             let normed = rms_norm(

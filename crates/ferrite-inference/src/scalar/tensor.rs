@@ -1,6 +1,13 @@
 use super::InferenceError;
 use ferrite_model::gguf::{GgmlType, TensorInfo};
 
+pub(super) fn raw_bytes(tensor: &TensorInfo, bytes: &[u8]) -> Result<Vec<u8>, InferenceError> {
+    bytes
+        .get(tensor.data_range.clone())
+        .map(<[u8]>::to_vec)
+        .ok_or_else(|| InferenceError::new(format!("tensor {} byte range is invalid", tensor.name)))
+}
+
 pub(super) fn f32_values(tensor: &TensorInfo, bytes: &[u8]) -> Result<Vec<f32>, InferenceError> {
     let slice = bytes.get(tensor.data_range.clone()).ok_or_else(|| {
         InferenceError::new(format!("tensor {} byte range is invalid", tensor.name))
