@@ -1,5 +1,9 @@
 [workspace]
-members = ["crates/ferrite-inference", "crates/ferrite-model"]
+members = [
+    "crates/ferrite-fixtures",
+    "crates/ferrite-inference",
+    "crates/ferrite-model",
+]
 resolver = "2"
 
 [workspace.package]
