@@ -92,6 +92,33 @@ pub(super) fn q4_k_mul_vec(
     Ok(output)
 }
 
+pub(super) fn q6_k_mul_vec(
+    bytes: &[u8],
+    rows: usize,
+    cols: usize,
+    vector: &[f32],
+) -> Result<Vec<f32>, InferenceError> {
+    if vector.len() != cols {
+        return Err(InferenceError::new(format!(
+            "matrix columns {cols} do not match vector length {}",
+            vector.len()
+        )));
+    }
+    let value_count = rows
+        .checked_mul(cols)
+        .ok_or_else(|| InferenceError::new("Q6_K matrix value count overflow"))?;
+    let values = decode_q6_k_values(bytes, value_count)?;
+    let mut output = vec![0.0; rows];
+
+    for (index, value) in values.iter().enumerate() {
+        let row = index / cols;
+        let col = index % cols;
+        output[row] += value * vector[col];
+    }
+
+    Ok(output)
+}
+
 pub(super) fn decode_q5_0_row(bytes: &[u8], cols: usize) -> Result<Vec<f32>, InferenceError> {
     let expected = q5_0_row_bytes(cols)?;
     if bytes.len() != expected {
@@ -258,7 +285,7 @@ fn f16_bits_to_f32(bits: u16) -> f32 {
 
 #[cfg(test)]
 mod tests {
-    use super::{decode_q6_k_values, q4_k_mul_vec, InferenceError};
+    use super::{decode_q6_k_values, q4_k_mul_vec, q6_k_mul_vec, InferenceError};
 
     #[test]
     fn q4_k_mul_vec_accumulates_rows_without_full_row_decodes() -> Result<(), InferenceError> {
@@ -288,6 +315,18 @@ mod tests {
         assert_eq!(values[32], -1.0);
         assert_eq!(values[64], 0.0);
         assert_eq!(values[96], 31.0);
+        Ok(())
+    }
+
+    #[test]
+    fn q6_k_mul_vec_accumulates_rows_without_full_row_decodes() -> Result<(), InferenceError> {
+        let mut block = vec![0u8; 128 + 64];
+        block.extend(vec![1u8; 16]);
+        block.extend_from_slice(&0x3c00u16.to_le_bytes());
+
+        let actual = q6_k_mul_vec(&block, 2, 128, &[1.0; 128])?;
+
+        assert_eq!(actual, vec![-4096.0, -4096.0]);
         Ok(())
     }
 }
