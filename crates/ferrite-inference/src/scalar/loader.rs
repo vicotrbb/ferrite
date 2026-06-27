@@ -118,12 +118,15 @@ pub(super) fn load_unquantized(
         });
     }
 
+    let token_embedding = f32_matrix(file, bytes, "token_embd.weight", vocab_size, hidden_size)?;
+    let output = output_matrix_or_tied(file, bytes, &token_embedding, vocab_size, hidden_size)?;
+
     Ok((
         config,
         ScalarLlamaWeights {
-            token_embedding: f32_matrix(file, bytes, "token_embd.weight", vocab_size, hidden_size)?,
+            token_embedding,
             output_norm: f32_vector(file, bytes, "output_norm.weight", hidden_size)?,
-            output: f32_matrix(file, bytes, "output.weight", vocab_size, hidden_size)?,
+            output,
             layers,
         },
     ))
@@ -151,6 +154,26 @@ fn f32_matrix(
     }
 
     Matrix::from_row_major(rows, cols, tensor::f32_values(tensor, bytes)?)
+}
+
+fn output_matrix_or_tied(
+    file: &GgufFile,
+    bytes: &[u8],
+    token_embedding: &Matrix,
+    rows: usize,
+    cols: usize,
+) -> Result<Matrix, InferenceError> {
+    if file.tensor("output.weight").is_some() {
+        f32_matrix(file, bytes, "output.weight", rows, cols)
+    } else if token_embedding.rows() == rows && token_embedding.cols() == cols {
+        Ok(token_embedding.clone())
+    } else {
+        Err(InferenceError::new(format!(
+            "token_embd.weight shape {}x{} cannot be reused as output.weight shape {rows}x{cols}",
+            token_embedding.rows(),
+            token_embedding.cols()
+        )))
+    }
 }
 
 fn f32_vector(

@@ -7,15 +7,19 @@ use crate::gguf_writer::{
 };
 
 pub fn scalar_llama_f32_gguf_fixture() -> Vec<u8> {
-    scalar_llama_gguf_fixture(GGML_TYPE_F32)
+    scalar_llama_gguf_fixture(GGML_TYPE_F32, true)
+}
+
+pub fn scalar_llama_tied_output_f32_gguf_fixture() -> Vec<u8> {
+    scalar_llama_gguf_fixture(GGML_TYPE_F32, false)
 }
 
 pub fn scalar_llama_f16_gguf_fixture() -> Vec<u8> {
-    scalar_llama_gguf_fixture(GGML_TYPE_F16)
+    scalar_llama_gguf_fixture(GGML_TYPE_F16, true)
 }
 
 pub fn scalar_llama_bf16_gguf_fixture() -> Vec<u8> {
-    scalar_llama_gguf_fixture(GGML_TYPE_BF16)
+    scalar_llama_gguf_fixture(GGML_TYPE_BF16, true)
 }
 
 pub fn scalar_llama_q8_0_gguf_fixture() -> Vec<u8> {
@@ -114,7 +118,7 @@ pub fn scalar_llama_q4_k_gguf_fixture() -> Vec<u8> {
     bytes
 }
 
-fn scalar_llama_gguf_fixture(tensor_type: u32) -> Vec<u8> {
+fn scalar_llama_gguf_fixture(tensor_type: u32, include_output_weight: bool) -> Vec<u8> {
     let alignment = 64u64;
     let mut tensors = vec![
         F32TensorFixture {
@@ -190,6 +194,10 @@ fn scalar_llama_gguf_fixture(tensor_type: u32) -> Vec<u8> {
             offset: 0,
         },
     ];
+
+    if !include_output_weight {
+        tensors.retain(|tensor| tensor.name != "output.weight");
+    }
 
     let mut offset = 0u64;
     let bytes_per_value = if tensor_type == GGML_TYPE_F32 { 4 } else { 2 };
