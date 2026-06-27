@@ -243,6 +243,71 @@ fn scalar_session_reuses_cached_prompt_state_incrementally() -> Result<(), Box<d
 }
 
 #[test]
+fn scalar_model_reports_weight_and_session_kv_cache_bytes() -> Result<(), Box<dyn Error>> {
+    let identity = Matrix::from_row_major(2, 2, vec![1.0, 0.0, 0.0, 1.0])?;
+    let config = ScalarLlamaConfig {
+        vocab_size: 4,
+        hidden_size: 2,
+        intermediate_size: 2,
+        attention_head_count: 1,
+        attention_head_count_kv: 1,
+        head_dim: 2,
+        rope_dimension_count: 0,
+        rope_freq_base: 10_000.0,
+        rms_norm_epsilon: 0.0,
+    };
+    let model = ScalarLlamaModel::new(
+        config,
+        ScalarLlamaWeights {
+            token_embedding: Matrix::from_row_major(
+                4,
+                2,
+                vec![
+                    1.0, 0.0, // token 0
+                    0.0, 1.0, // token 1
+                    1.0, 1.0, // token 2
+                    0.0, 0.0, // token 3
+                ],
+            )?,
+            output_norm: vec![1.0, 1.0],
+            output: Matrix::from_row_major(
+                4,
+                2,
+                vec![
+                    0.0, 0.0, // token 0
+                    1.0, 0.0, // token 1
+                    0.0, 1.0, // token 2
+                    -1.0, -1.0, // token 3
+                ],
+            )?,
+            layers: vec![ScalarLlamaLayerWeights {
+                attn_norm: vec![1.0, 1.0],
+                q_proj: identity.clone(),
+                k_proj: identity.clone(),
+                v_proj: identity.clone(),
+                o_proj: identity.clone(),
+                ffn_norm: vec![1.0, 1.0],
+                ffn_gate: Matrix::from_row_major(2, 2, vec![0.0; 4])?,
+                ffn_up: identity.clone(),
+                ffn_down: identity,
+            }],
+        },
+    )?;
+
+    assert_eq!(model.scalar_weight_bytes(), 200);
+
+    let mut session = model.start_session();
+    assert_eq!(session.kv_cache_bytes(), 0);
+
+    let next = session.accept_prompt(&[0, 1])?;
+    assert_eq!(session.kv_cache_bytes(), 32);
+
+    session.accept_token(next.token_id)?;
+    assert_eq!(session.kv_cache_bytes(), 48);
+    Ok(())
+}
+
+#[test]
 fn loads_scalar_llama_reference_weights_from_f32_gguf_fixture() -> Result<(), Box<dyn Error>> {
     let bytes = scalar_llama_f32_gguf_fixture();
     let gguf = parse_gguf(&bytes)?;

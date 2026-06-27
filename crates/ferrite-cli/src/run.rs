@@ -46,6 +46,9 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
         println!("benchmark_total_ns={total_ns}");
         println!("benchmark_avg_ns={avg_ns}");
     }
+    println!("model_file_bytes={}", bytes.len());
+    println!("scalar_weight_bytes={}", model.scalar_weight_bytes());
+    println!("kv_cache_bytes={}", session.kv_cache_bytes());
     if let Some(expected_token_id) = args.expected_token_id {
         println!("expected_token_id={expected_token_id}");
         let matches = next.token_id == expected_token_id;

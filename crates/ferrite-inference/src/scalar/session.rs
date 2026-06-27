@@ -25,6 +25,10 @@ impl<'a> ScalarLlamaSession<'a> {
         self.cached_token_count
     }
 
+    pub fn kv_cache_bytes(&self) -> u128 {
+        super::memory::kv_cache_bytes(&self.layer_keys, &self.layer_values)
+    }
+
     pub fn accept_prompt(&mut self, tokens: &[usize]) -> Result<NextToken, InferenceError> {
         if tokens.is_empty() {
             return Err(InferenceError::new(

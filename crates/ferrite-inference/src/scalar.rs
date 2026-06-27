@@ -1,6 +1,7 @@
 mod loader;
 mod math;
 mod matrix;
+mod memory;
 mod prompt;
 mod session;
 mod tensor;
@@ -74,6 +75,10 @@ impl ScalarLlamaModel {
 
     pub fn start_session(&self) -> ScalarLlamaSession<'_> {
         ScalarLlamaSession::new(self)
+    }
+
+    pub fn scalar_weight_bytes(&self) -> u128 {
+        memory::weights_bytes(&self.weights)
     }
 
     pub fn next_token_for_text_prompt(

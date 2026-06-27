@@ -1,0 +1,42 @@
+use super::{Matrix, ScalarLlamaLayerWeights, ScalarLlamaWeights};
+
+const F32_BYTES: u128 = std::mem::size_of::<f32>() as u128;
+
+pub(super) fn weights_bytes(weights: &ScalarLlamaWeights) -> u128 {
+    matrix_bytes(&weights.token_embedding)
+        + vector_bytes(&weights.output_norm)
+        + matrix_bytes(&weights.output)
+        + weights.layers.iter().map(layer_bytes).sum::<u128>()
+}
+
+pub(super) fn kv_cache_bytes(keys: &[Vec<Vec<f32>>], values: &[Vec<Vec<f32>>]) -> u128 {
+    nested_vector_bytes(keys) + nested_vector_bytes(values)
+}
+
+fn layer_bytes(layer: &ScalarLlamaLayerWeights) -> u128 {
+    vector_bytes(&layer.attn_norm)
+        + matrix_bytes(&layer.q_proj)
+        + matrix_bytes(&layer.k_proj)
+        + matrix_bytes(&layer.v_proj)
+        + matrix_bytes(&layer.o_proj)
+        + vector_bytes(&layer.ffn_norm)
+        + matrix_bytes(&layer.ffn_gate)
+        + matrix_bytes(&layer.ffn_up)
+        + matrix_bytes(&layer.ffn_down)
+}
+
+fn matrix_bytes(matrix: &Matrix) -> u128 {
+    matrix.rows() as u128 * matrix.cols() as u128 * F32_BYTES
+}
+
+fn vector_bytes(values: &[f32]) -> u128 {
+    values.len() as u128 * F32_BYTES
+}
+
+fn nested_vector_bytes(values: &[Vec<Vec<f32>>]) -> u128 {
+    values
+        .iter()
+        .flat_map(|layer| layer.iter())
+        .map(|position| vector_bytes(position))
+        .sum()
+}
