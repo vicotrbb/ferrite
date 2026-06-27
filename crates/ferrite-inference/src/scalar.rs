@@ -2,14 +2,16 @@ mod loader;
 mod math;
 mod matrix;
 mod prompt;
+mod session;
 mod tensor;
 
 pub use math::{apply_rope, argmax, rms_norm};
 pub use matrix::Matrix;
+pub use session::ScalarLlamaSession;
 
 use ferrite_model::gguf::{GgufError, GgufFile};
 use ferrite_model::tokenizer::GgufTokenizer;
-use math::{add_assign, dot, ensure_len, softmax, swiglu};
+use math::{dot, ensure_len, softmax};
 use std::fmt;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -67,69 +69,11 @@ impl ScalarLlamaModel {
     }
 
     pub fn next_token_for_prompt(&self, tokens: &[usize]) -> Result<NextToken, InferenceError> {
-        if tokens.is_empty() {
-            return Err(InferenceError::new(
-                "prompt must contain at least one token",
-            ));
-        }
+        self.start_session().accept_prompt(tokens)
+    }
 
-        let mut layer_keys = vec![Vec::<Vec<f32>>::new(); self.weights.layers.len()];
-        let mut layer_values = vec![Vec::<Vec<f32>>::new(); self.weights.layers.len()];
-        let mut last_logits = Vec::new();
-
-        for (position, token_id) in tokens.iter().enumerate() {
-            if *token_id >= self.config.vocab_size {
-                return Err(InferenceError::new(format!(
-                    "token id {token_id} is out of bounds for vocab size {}",
-                    self.config.vocab_size
-                )));
-            }
-
-            let mut hidden = self.weights.token_embedding.row(*token_id)?.to_vec();
-
-            for (layer_index, layer) in self.weights.layers.iter().enumerate() {
-                let normed = rms_norm(&hidden, &layer.attn_norm, self.config.rms_norm_epsilon)?;
-                let mut query = layer.q_proj.mul_vec(&normed)?;
-                let mut key = layer.k_proj.mul_vec(&normed)?;
-                let value = layer.v_proj.mul_vec(&normed)?;
-
-                query =
-                    self.apply_rope_to_heads(&query, position, self.config.attention_head_count)?;
-                key =
-                    self.apply_rope_to_heads(&key, position, self.config.attention_head_count_kv)?;
-
-                layer_keys[layer_index].push(key);
-                layer_values[layer_index].push(value);
-
-                let attention = self.causal_attention(
-                    &query,
-                    &layer_keys[layer_index],
-                    &layer_values[layer_index],
-                )?;
-                let attention_output = layer.o_proj.mul_vec(&attention)?;
-                add_assign(&mut hidden, &attention_output)?;
-
-                let ffn_normed = rms_norm(&hidden, &layer.ffn_norm, self.config.rms_norm_epsilon)?;
-                let gate = layer.ffn_gate.mul_vec(&ffn_normed)?;
-                let up = layer.ffn_up.mul_vec(&ffn_normed)?;
-                let activated = swiglu(&gate, &up)?;
-                let ffn_output = layer.ffn_down.mul_vec(&activated)?;
-                add_assign(&mut hidden, &ffn_output)?;
-            }
-
-            let normed = rms_norm(
-                &hidden,
-                &self.weights.output_norm,
-                self.config.rms_norm_epsilon,
-            )?;
-            last_logits = self.weights.output.mul_vec(&normed)?;
-        }
-
-        let token_id = argmax(&last_logits)?;
-        Ok(NextToken {
-            token_id,
-            logits: last_logits,
-        })
+    pub fn start_session(&self) -> ScalarLlamaSession<'_> {
+        ScalarLlamaSession::new(self)
     }
 
     pub fn next_token_for_text_prompt(

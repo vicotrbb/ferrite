@@ -176,6 +176,73 @@ fn prompt_path_uses_causal_kv_attention_for_latest_token() -> Result<(), Box<dyn
 }
 
 #[test]
+fn scalar_session_reuses_cached_prompt_state_incrementally() -> Result<(), Box<dyn Error>> {
+    let identity = Matrix::from_row_major(2, 2, vec![1.0, 0.0, 0.0, 1.0])?;
+    let config = ScalarLlamaConfig {
+        vocab_size: 4,
+        hidden_size: 2,
+        intermediate_size: 2,
+        attention_head_count: 1,
+        attention_head_count_kv: 1,
+        head_dim: 2,
+        rope_dimension_count: 0,
+        rope_freq_base: 10_000.0,
+        rms_norm_epsilon: 0.0,
+    };
+    let model = ScalarLlamaModel::new(
+        config,
+        ScalarLlamaWeights {
+            token_embedding: Matrix::from_row_major(
+                4,
+                2,
+                vec![
+                    1.0, 0.0, // token 0
+                    0.0, 1.0, // token 1
+                    1.0, 1.0, // token 2
+                    0.0, 0.0, // token 3
+                ],
+            )?,
+            output_norm: vec![1.0, 1.0],
+            output: Matrix::from_row_major(
+                4,
+                2,
+                vec![
+                    0.0, 0.0, // token 0
+                    1.0, 0.0, // token 1
+                    0.0, 1.0, // token 2
+                    -1.0, -1.0, // token 3
+                ],
+            )?,
+            layers: vec![ScalarLlamaLayerWeights {
+                attn_norm: vec![1.0, 1.0],
+                q_proj: identity.clone(),
+                k_proj: identity.clone(),
+                v_proj: identity.clone(),
+                o_proj: identity.clone(),
+                ffn_norm: vec![1.0, 1.0],
+                ffn_gate: Matrix::from_row_major(2, 2, vec![0.0; 4])?,
+                ffn_up: identity.clone(),
+                ffn_down: identity,
+            }],
+        },
+    )?;
+
+    let mut session = model.start_session();
+    let prompt_next = session.accept_prompt(&[0, 1])?;
+    let full_prompt_next = model.next_token_for_prompt(&[0, 1])?;
+
+    assert_eq!(session.cached_token_count(), 2);
+    assert_eq!(prompt_next, full_prompt_next);
+
+    let generated_next = session.accept_token(prompt_next.token_id)?;
+    let full_generated_next = model.next_token_for_prompt(&[0, 1, prompt_next.token_id])?;
+
+    assert_eq!(session.cached_token_count(), 3);
+    assert_eq!(generated_next, full_generated_next);
+    Ok(())
+}
+
+#[test]
 fn loads_scalar_llama_reference_weights_from_f32_gguf_fixture() -> Result<(), Box<dyn Error>> {
     let bytes = scalar_llama_f32_gguf_fixture();
     let gguf = parse_gguf(&bytes)?;

@@ -24,11 +24,13 @@ The scalar boundary includes:
 - RMSNorm.
 - RoPE rotation.
 - Multi-token causal Llama-style GQA attention over an in-memory K/V cache.
+- Incremental scalar session state that reuses per-layer K/V cache entries
+  across accepted tokens.
 - SwiGLU feed-forward execution.
 - Final logits and deterministic argmax selection.
 - GGUF F32/F16/BF16 tensor loading into the scalar Llama weight structure.
-- Fixture-validated GGML Q8_0 and Q4_K tensor dequantization into the scalar
-  reference path.
+- Fixture-validated GGML Q8_0, Q5_0, Q4_K, and Q6_K tensor dequantization into
+  the scalar reference path.
 
 The initial path is deliberately synthetic and does not claim real-model
 correctness yet. Its purpose is to provide a clear scalar reference target that
@@ -41,9 +43,10 @@ Scalar correctness remains the baseline for future optimized work. Any SIMD,
 quantized, mmap-backed, or platform-specific path must be tested against this
 or a more complete scalar reference path before it can be treated as correct.
 
-The current scalar path includes a tokenizer bridge plus Q8_0 and Q4_K
-dequantization, but it does not include optimized quantized matmul kernels,
-incremental serving cache reuse, or real Tier 0 GGUF model loading. Those are
+The current scalar path includes a tokenizer bridge, mixed GGUF quantization
+decoding, real Tier 0 GGUF model loading, and an incremental session cache
+boundary. It still does not include optimized quantized matmul kernels, mmap
+weight access, threaded execution, or production serving APIs. Those are
 follow-up slices.
 
 ## Alternatives Considered
@@ -94,3 +97,9 @@ External runtimes remain valid comparison references.
 - `cargo test -p ferrite-model --test gguf_reader derives_llama_config_from_uint32_or_uint64_metadata`
   first failed for missing optional RoPE base and RMS epsilon config fields.
 - After adding those fields, the same parser test passed.
+- `cargo test -p ferrite-inference --test scalar_reference
+  scalar_session_reuses_cached_prompt_state_incrementally` first failed because
+  `ScalarLlamaModel::start_session` did not exist.
+- After adding `ScalarLlamaSession`, the same targeted test passed by matching
+  the full-prompt scalar path while retaining cached token count across
+  incremental token acceptance.
