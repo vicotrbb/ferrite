@@ -134,6 +134,7 @@ fn cli_benchmarks_repeated_next_token_runs_after_loading_once() -> Result<(), Bo
     assert!(stdout.contains("prompt_token_ids=1"));
     assert!(stdout.contains("next_token_id=2"));
     assert!(stdout.contains("benchmark_runs=3"));
+    assert!(stdout.contains("benchmark_cached_tokens=4"));
     assert!(stdout.contains("benchmark_total_ns="));
     assert!(stdout.contains("benchmark_avg_ns="));
     Ok(())

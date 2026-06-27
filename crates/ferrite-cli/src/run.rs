@@ -15,7 +15,8 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
     let tokenizer = GgufTokenizer::from_gguf(&gguf)?;
     let model = ScalarLlamaModel::from_gguf_scalar(&gguf, &bytes)?;
     let prompt_token_ids = prompt_token_ids(&tokenizer, args.prompt)?;
-    let next = model.next_token_for_prompt(&prompt_token_ids)?;
+    let mut session = model.start_session();
+    let next = session.accept_prompt(&prompt_token_ids)?;
     let token = tokenizer.token(next.token_id).ok_or_else(|| {
         io::Error::other(format!(
             "next token id {} is not present in tokenizer vocabulary",
@@ -27,13 +28,15 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
     println!("next_token_id={}", next.token_id);
     println!("next_token={token}");
     if let Some(runs) = args.benchmark_runs {
+        let mut benchmark_next = next.clone();
         let started = Instant::now();
         for _ in 0..runs {
-            model.next_token_for_prompt(&prompt_token_ids)?;
+            benchmark_next = session.accept_token(benchmark_next.token_id)?;
         }
         let total_ns = started.elapsed().as_nanos();
         let avg_ns = total_ns / runs as u128;
         println!("benchmark_runs={runs}");
+        println!("benchmark_cached_tokens={}", session.cached_token_count());
         println!("benchmark_total_ns={total_ns}");
         println!("benchmark_avg_ns={avg_ns}");
     }
