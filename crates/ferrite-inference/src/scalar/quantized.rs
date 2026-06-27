@@ -158,6 +158,56 @@ pub(super) fn q8_0_mul_vec(
     Ok(output)
 }
 
+pub(super) fn q5_0_mul_vec(
+    bytes: &[u8],
+    rows: usize,
+    cols: usize,
+    vector: &[f32],
+) -> Result<Vec<f32>, InferenceError> {
+    if vector.len() != cols {
+        return Err(InferenceError::new(format!(
+            "matrix columns {cols} do not match vector length {}",
+            vector.len()
+        )));
+    }
+    let row_bytes = q5_0_row_bytes(cols)?;
+    let expected = rows
+        .checked_mul(row_bytes)
+        .ok_or_else(|| InferenceError::new("Q5_0 matrix byte length overflow"))?;
+    if bytes.len() != expected {
+        return Err(InferenceError::new(format!(
+            "Q5_0 matrix byte length {} does not match shape {rows}x{cols}",
+            bytes.len()
+        )));
+    }
+
+    let mut output = vec![0.0; rows];
+    for (row, row_bytes) in bytes.chunks_exact(row_bytes).enumerate() {
+        let mut sum = 0.0;
+        for (block_index, block) in row_bytes.chunks_exact(Q5_0_BLOCK_BYTES).enumerate() {
+            let scale = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
+            let high_bits = u32::from_le_bytes([block[2], block[3], block[4], block[5]]);
+            let quants = &block[6..];
+            let col_base = block_index * Q5_0_BLOCK_VALUES;
+
+            for (index, quant) in quants.iter().enumerate() {
+                let high = ((high_bits >> index) << 4) as u8 & 0x10;
+                let signed = i32::from((quant & 0x0f) | high) - 16;
+                sum += scale * signed as f32 * vector[col_base + index];
+            }
+
+            for (index, quant) in quants.iter().enumerate() {
+                let high = (high_bits >> (index + 12)) as u8 & 0x10;
+                let signed = i32::from((quant >> 4) | high) - 16;
+                sum += scale * signed as f32 * vector[col_base + index + 16];
+            }
+        }
+        output[row] = sum;
+    }
+
+    Ok(output)
+}
+
 pub(super) fn decode_q5_0_row(bytes: &[u8], cols: usize) -> Result<Vec<f32>, InferenceError> {
     let expected = q5_0_row_bytes(cols)?;
     if bytes.len() != expected {
@@ -324,7 +374,9 @@ fn f16_bits_to_f32(bits: u16) -> f32 {
 
 #[cfg(test)]
 mod tests {
-    use super::{decode_q6_k_values, q4_k_mul_vec, q6_k_mul_vec, q8_0_mul_vec, InferenceError};
+    use super::{
+        decode_q6_k_values, q4_k_mul_vec, q5_0_mul_vec, q6_k_mul_vec, q8_0_mul_vec, InferenceError,
+    };
 
     #[test]
     fn q4_k_mul_vec_accumulates_rows_without_full_row_decodes() -> Result<(), InferenceError> {
@@ -381,5 +433,33 @@ mod tests {
 
         assert_eq!(actual, vec![32.0, 64.0]);
         Ok(())
+    }
+
+    #[test]
+    fn q5_0_mul_vec_accumulates_rows_without_row_decodes() -> Result<(), InferenceError> {
+        let mut bytes = Vec::new();
+        bytes.extend(q5_0_block_with_value(1));
+        bytes.extend(q5_0_block_with_value(2));
+
+        let actual = q5_0_mul_vec(&bytes, 2, 32, &[1.0; 32])?;
+
+        assert_eq!(actual, vec![32.0, 64.0]);
+        Ok(())
+    }
+
+    fn q5_0_block_with_value(value: i32) -> Vec<u8> {
+        let quantized = (value + 16) as u8;
+        let mut high_bits = 0u32;
+        for index in 0..16 {
+            if quantized & 0x10 != 0 {
+                high_bits |= 1 << index;
+                high_bits |= 1 << (index + 16);
+            }
+        }
+        let mut block = Vec::new();
+        block.extend_from_slice(&0x3c00u16.to_le_bytes());
+        block.extend_from_slice(&high_bits.to_le_bytes());
+        block.extend([(quantized & 0x0f) | ((quantized & 0x0f) << 4); 16]);
+        block
     }
 }
