@@ -61,3 +61,18 @@ source before implementing scalar dequantization:
 
 Reference source:
 `https://github.com/ggml-org/llama.cpp/blob/master/ggml/src/ggml-quants.c`
+
+## 2026-06-27 Q5_0 Verification Update
+
+Ferrite refreshed the `Q5_0` layout against upstream `ggml-org/llama.cpp`
+source after a real SmolLM2 Q4_K_M probe failed on a `Q5_0` tensor:
+
+- `GGML_TYPE_Q5_0` uses one 22-byte block per 32 values.
+- The block stores one F16 scale value.
+- The block stores four bytes of high bits.
+- The block stores 16 bytes of packed low nibbles.
+- Dequantization reconstructs signed quantized values in `[-16, 15]` and
+  multiplies them by the F16 scale.
+
+Reference source:
+`https://github.com/ggml-org/llama.cpp/blob/master/ggml/src/ggml-quants.c`

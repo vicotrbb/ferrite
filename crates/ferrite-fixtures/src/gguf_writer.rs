@@ -3,6 +3,7 @@ pub(crate) const VALUE_ARRAY: u32 = 9;
 pub(crate) const VALUE_UINT64: u32 = 10;
 pub(crate) const GGML_TYPE_F32: u32 = 0;
 pub(crate) const GGML_TYPE_F16: u32 = 1;
+pub(crate) const GGML_TYPE_Q5_0: u32 = 6;
 pub(crate) const GGML_TYPE_Q8_0: u32 = 8;
 pub(crate) const GGML_TYPE_Q4_K: u32 = 12;
 pub(crate) const GGML_TYPE_BF16: u32 = 30;
@@ -97,6 +98,8 @@ pub(crate) fn q8_storage_bytes(value_count: usize) -> u64 {
 pub(crate) fn typed_storage_bytes(tensor: &TypedTensorFixture) -> u64 {
     if tensor.tensor_type == GGML_TYPE_Q4_K {
         q4_k_storage_bytes(tensor.values.len())
+    } else if tensor.tensor_type == GGML_TYPE_Q5_0 {
+        q5_0_storage_bytes(tensor.values.len())
     } else {
         (tensor.values.len() * 4) as u64
     }
@@ -105,6 +108,8 @@ pub(crate) fn typed_storage_bytes(tensor: &TypedTensorFixture) -> u64 {
 pub(crate) fn push_typed_tensor_values(bytes: &mut Vec<u8>, tensor: &TypedTensorFixture) {
     if tensor.tensor_type == GGML_TYPE_Q4_K {
         push_q4_k_values(bytes, &tensor.values);
+    } else if tensor.tensor_type == GGML_TYPE_Q5_0 {
+        push_q5_0_values(bytes, &tensor.values);
     } else {
         for value in &tensor.values {
             bytes.extend_from_slice(&value.to_le_bytes());
@@ -148,6 +153,38 @@ fn push_string(bytes: &mut Vec<u8>, value: &str) {
 
 fn q4_k_storage_bytes(value_count: usize) -> u64 {
     (value_count / 256 * 144) as u64
+}
+
+fn q5_0_storage_bytes(value_count: usize) -> u64 {
+    (value_count / 32 * 22) as u64
+}
+
+fn push_q5_0_values(bytes: &mut Vec<u8>, values: &[f32]) {
+    for block in values.chunks_exact(32) {
+        bytes.extend_from_slice(&f32_to_f16_bits(1.0).to_le_bytes());
+        let mut qh = 0u32;
+        let mut qs = [0u8; 16];
+
+        for index in 0..16 {
+            let low = q5_0_quant(block[index]);
+            let high = q5_0_quant(block[index + 16]);
+            if low & 0x10 != 0 {
+                qh |= 1 << index;
+            }
+            if high & 0x10 != 0 {
+                qh |= 1 << (index + 16);
+            }
+            qs[index] = (low & 0x0f) | ((high & 0x0f) << 4);
+        }
+
+        bytes.extend_from_slice(&qh.to_le_bytes());
+        bytes.extend_from_slice(&qs);
+    }
+}
+
+fn q5_0_quant(value: f32) -> u8 {
+    let quantized = value.round() as i32 + 16;
+    quantized.clamp(0, 31) as u8
 }
 
 fn push_q4_k_values(bytes: &mut Vec<u8>, values: &[f32]) {

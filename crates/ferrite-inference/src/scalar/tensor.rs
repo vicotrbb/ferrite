@@ -11,9 +11,10 @@ pub(super) fn f32_values(tensor: &TensorInfo, bytes: &[u8]) -> Result<Vec<f32>, 
         GgmlType::F16 => f16_values_from_le_bytes(&tensor.name, slice),
         GgmlType::BF16 => bf16_values_from_le_bytes(&tensor.name, slice),
         GgmlType::Q8_0 => q8_0_values_from_le_bytes(&tensor.name, slice),
+        GgmlType::Q5_0 => q5_0_values_from_le_bytes(&tensor.name, slice),
         GgmlType::Q4K => q4_k_values_from_le_bytes(&tensor.name, slice),
         other => Err(InferenceError::new(format!(
-            "tensor {} has type {:?}; expected F32, F16, BF16, Q8_0, or Q4K",
+            "tensor {} has type {:?}; expected F32, F16, BF16, Q8_0, Q5_0, or Q4K",
             tensor.name, other
         ))),
     }
@@ -81,6 +82,38 @@ fn q8_0_values_from_le_bytes(name: &str, slice: &[u8]) -> Result<Vec<f32>, Infer
         let scale = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
         for quantized in &block[2..] {
             values.push(scale * f32::from(*quantized as i8));
+        }
+    }
+    Ok(values)
+}
+
+fn q5_0_values_from_le_bytes(name: &str, slice: &[u8]) -> Result<Vec<f32>, InferenceError> {
+    const Q5_0_BLOCK_BYTES: usize = 22;
+    const Q5_0_BLOCK_VALUES: usize = 32;
+
+    if !slice.len().is_multiple_of(Q5_0_BLOCK_BYTES) {
+        return Err(InferenceError::new(format!(
+            "tensor {name} byte length {} is not divisible by Q5_0 block size {Q5_0_BLOCK_BYTES}",
+            slice.len()
+        )));
+    }
+
+    let mut values = Vec::with_capacity(slice.len() / Q5_0_BLOCK_BYTES * Q5_0_BLOCK_VALUES);
+    for block in slice.chunks_exact(Q5_0_BLOCK_BYTES) {
+        let scale = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
+        let high_bits = u32::from_le_bytes([block[2], block[3], block[4], block[5]]);
+        let quants = &block[6..];
+
+        for (index, quant) in quants.iter().enumerate() {
+            let high = ((high_bits >> index) << 4) as u8 & 0x10;
+            let signed = i32::from((quant & 0x0f) | high) - 16;
+            values.push(scale * signed as f32);
+        }
+
+        for (index, quant) in quants.iter().enumerate() {
+            let high = (high_bits >> (index + 12)) as u8 & 0x10;
+            let signed = i32::from((quant >> 4) | high) - 16;
+            values.push(scale * signed as f32);
         }
     }
     Ok(values)
@@ -165,4 +198,26 @@ fn f16_bits_to_f32(bits: u16) -> f32 {
     };
 
     f32::from_bits(f32_bits)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{f16_bits_to_f32, q5_0_values_from_le_bytes};
+
+    #[test]
+    fn q5_0_decoder_reconstructs_signed_block_values() -> Result<(), super::InferenceError> {
+        let mut block = Vec::new();
+        block.extend_from_slice(&0x3c00u16.to_le_bytes());
+        block.extend_from_slice(&0xffff_0000u32.to_le_bytes());
+        for index in 0..16u8 {
+            block.push(index | (index << 4));
+        }
+
+        let values = q5_0_values_from_le_bytes("q5", &block)?;
+
+        let expected = (-16..16).map(|value| value as f32).collect::<Vec<_>>();
+        assert_eq!(f16_bits_to_f32(0x3c00), 1.0);
+        assert_eq!(values, expected);
+        Ok(())
+    }
 }

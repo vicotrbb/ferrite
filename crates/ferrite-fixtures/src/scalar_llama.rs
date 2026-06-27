@@ -3,7 +3,7 @@ use crate::gguf_writer::{
     push_kv_string_array, push_kv_u64, push_q8_0_values, push_tensor_info_with_type,
     push_typed_tensor_info, push_typed_tensor_values, push_u32, push_u64, q8_storage_bytes,
     typed_storage_bytes, F32TensorFixture, TypedTensorFixture, GGML_TYPE_BF16, GGML_TYPE_F16,
-    GGML_TYPE_F32, GGML_TYPE_Q4_K, GGML_TYPE_Q8_0,
+    GGML_TYPE_F32, GGML_TYPE_Q4_K, GGML_TYPE_Q5_0, GGML_TYPE_Q8_0,
 };
 
 pub fn scalar_llama_f32_gguf_fixture() -> Vec<u8> {
@@ -63,6 +63,52 @@ pub fn scalar_llama_q8_0_gguf_fixture() -> Vec<u8> {
             bytes.resize(target_len, 0);
         }
         push_q8_0_values(&mut bytes, &tensor.values);
+    }
+
+    bytes
+}
+
+pub fn scalar_llama_q5_0_gguf_fixture() -> Vec<u8> {
+    let alignment = 64u64;
+    let mut tensors = q5_0_scalar_tensors();
+
+    let mut offset = 0u64;
+    for tensor in &mut tensors {
+        tensor.offset = align_value(offset, alignment);
+        offset = tensor.offset + typed_storage_bytes(tensor);
+    }
+
+    let mut bytes = Vec::new();
+    bytes.extend_from_slice(b"GGUF");
+    push_u32(&mut bytes, 3);
+    push_u64(&mut bytes, tensors.len() as u64);
+    push_u64(&mut bytes, 13);
+    push_kv_string(&mut bytes, "general.architecture", "llama");
+    push_kv_u64(&mut bytes, "general.alignment", alignment);
+    push_kv_u64(&mut bytes, "llama.context_length", 1);
+    push_kv_u64(&mut bytes, "llama.embedding_length", 32);
+    push_kv_u64(&mut bytes, "llama.block_count", 1);
+    push_kv_u64(&mut bytes, "llama.feed_forward_length", 32);
+    push_kv_u64(&mut bytes, "llama.attention.head_count", 1);
+    push_kv_u64(&mut bytes, "llama.attention.head_count_kv", 1);
+    push_kv_u64(&mut bytes, "llama.attention.key_length", 32);
+    push_kv_u64(&mut bytes, "llama.attention.value_length", 32);
+    push_kv_u64(&mut bytes, "llama.rope.dimension_count", 0);
+    push_kv_string(&mut bytes, "tokenizer.ggml.model", "llama");
+    push_kv_string_array(&mut bytes, "tokenizer.ggml.tokens", &["<unk>", "winner"]);
+
+    for tensor in &tensors {
+        push_typed_tensor_info(&mut bytes, tensor);
+    }
+    align_len(&mut bytes, alignment as usize);
+
+    let tensor_data_start = bytes.len();
+    for tensor in &tensors {
+        let target_len = tensor_data_start + tensor.offset as usize;
+        if bytes.len() < target_len {
+            bytes.resize(target_len, 0);
+        }
+        push_typed_tensor_values(&mut bytes, tensor);
     }
 
     bytes
@@ -394,6 +440,19 @@ fn q4_k_scalar_tensors() -> Vec<TypedTensorFixture> {
             vec![0.0; hidden * intermediate],
         ),
     ]
+}
+
+fn q5_0_scalar_tensors() -> Vec<TypedTensorFixture> {
+    q8_scalar_tensors()
+        .into_iter()
+        .map(|tensor| TypedTensorFixture {
+            name: tensor.name,
+            dimensions: tensor.dimensions,
+            values: tensor.values,
+            tensor_type: GGML_TYPE_Q5_0,
+            offset: 0,
+        })
+        .collect()
 }
 
 fn q4_k_tensor(name: &'static str, dimensions: Vec<u64>, values: Vec<f32>) -> TypedTensorFixture {
