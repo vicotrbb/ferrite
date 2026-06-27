@@ -1,6 +1,7 @@
 use super::{
     kernel_check::ensure_within_relative_error,
     math::dot,
+    matvec::f32_mul_vec,
     quantized::{
         decode_q4_k_values, decode_q5_0_row, decode_q6_k_values, decode_q8_0_row, q4_k_mul_vec,
         q4_k_storage_bytes, q5_0_mul_vec, q5_0_row_bytes, q6_k_mul_vec, q6_k_storage_bytes,
@@ -271,6 +272,9 @@ impl Matrix {
         }
         if let MatrixData::Q5_0(data) = &self.data {
             return q5_0_mul_vec(data, self.rows, self.cols, vector);
+        }
+        if let MatrixData::F32(data) = &self.data {
+            return Ok(f32_mul_vec(self.rows, self.cols, data, vector)?.into_values());
         }
 
         let mut output = Vec::with_capacity(self.rows);

@@ -3,6 +3,7 @@ mod kernel_check;
 mod loader;
 mod math;
 mod matrix;
+mod matvec;
 mod memory;
 mod output;
 mod prompt;
