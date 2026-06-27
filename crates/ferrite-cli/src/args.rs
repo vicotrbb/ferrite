@@ -8,6 +8,7 @@ pub struct CliArgs {
     pub prompt: PromptSource,
     pub expected_token_id: Option<usize>,
     pub benchmark_runs: Option<usize>,
+    pub generate_tokens: Option<usize>,
 }
 
 pub enum PromptSource {
@@ -21,6 +22,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
     let mut prompt_token_ids = None;
     let mut expected_token_id = None;
     let mut benchmark_runs = None;
+    let mut generate_tokens = None;
     let mut iter = args.into_iter();
     let _program = iter.next();
 
@@ -54,6 +56,12 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
                     "--benchmark-runs",
                 )?);
             }
+            "--generate-tokens" => {
+                generate_tokens = Some(parse_nonzero_usize(
+                    next_value(&mut iter, "--generate-tokens")?,
+                    "--generate-tokens",
+                )?);
+            }
             "--help" | "-h" => {
                 return Err(io::Error::other(usage()).into());
             }
@@ -65,12 +73,27 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
         }
     }
 
+    validate_modes(generate_tokens, benchmark_runs)?;
+
     Ok(CliArgs {
         model_path: model_path.ok_or_else(|| io::Error::other("missing --model argument"))?,
         prompt: prompt_source(prompt, prompt_token_ids)?,
         expected_token_id,
         benchmark_runs,
+        generate_tokens,
     })
+}
+
+fn validate_modes(
+    generate_tokens: Option<usize>,
+    benchmark_runs: Option<usize>,
+) -> Result<(), Box<dyn Error>> {
+    if generate_tokens.is_some() && benchmark_runs.is_some() {
+        return Err(
+            io::Error::other("use either --generate-tokens or --benchmark-runs, not both").into(),
+        );
+    }
+    Ok(())
 }
 
 fn prompt_source(
@@ -136,5 +159,5 @@ fn parse_token_ids(value: OsString) -> Result<Vec<usize>, Box<dyn Error>> {
 }
 
 fn usage() -> &'static str {
-    "usage: ferrite --model <path.gguf> (--prompt <text> | --prompt-token-ids <id[,id...]>) [--expect-token-id <id>] [--benchmark-runs <count>]"
+    "usage: ferrite --model <path.gguf> (--prompt <text> | --prompt-token-ids <id[,id...]>) [--expect-token-id <id>] [--generate-tokens <count>] [--benchmark-runs <count>]"
 }

@@ -30,6 +30,15 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
     println!("prompt_token_ids={}", join_token_ids(&prompt_token_ids));
     println!("next_token_id={}", next.token_id);
     println!("next_token={token}");
+    if let Some(count) = args.generate_tokens {
+        let generated_token_ids = generate_tokens(&mut session, next.clone(), count)?;
+        println!("generated_cached_tokens={}", session.cached_token_count());
+        println!(
+            "generated_token_ids={}",
+            join_token_ids(&generated_token_ids)
+        );
+        println!("generated_text={}", tokenizer.decode(&generated_token_ids)?);
+    }
     if let Some(runs) = args.benchmark_runs {
         let mut benchmark_next = next.clone();
         let mut benchmark_token_ids = Vec::with_capacity(runs);
@@ -66,6 +75,20 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
         }
     }
     Ok(())
+}
+
+fn generate_tokens(
+    session: &mut ferrite_inference::scalar::ScalarLlamaSession<'_>,
+    next: ferrite_inference::scalar::NextToken,
+    count: usize,
+) -> Result<Vec<usize>, Box<dyn Error>> {
+    let mut next = next;
+    let mut generated_token_ids = Vec::with_capacity(count);
+    for _ in 0..count {
+        generated_token_ids.push(next.token_id);
+        next = session.accept_token(next.token_id)?;
+    }
+    Ok(generated_token_ids)
 }
 
 fn prompt_token_ids(

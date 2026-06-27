@@ -153,6 +153,60 @@ fn cli_benchmarks_repeated_next_token_runs_after_loading_once() -> Result<(), Bo
 }
 
 #[test]
+fn cli_generates_token_ids_and_decoded_text() -> Result<(), Box<dyn Error>> {
+    let model_path = write_fixture_model()?;
+    let binary = cli_binary()?;
+
+    let output = Command::new(binary)
+        .arg("--model")
+        .arg(&model_path)
+        .arg("--prompt")
+        .arg("hello")
+        .arg("--generate-tokens")
+        .arg("2")
+        .output()?;
+
+    remove_fixture_model(&model_path)?;
+
+    assert!(
+        output.status.success(),
+        "cli failed with stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout)?;
+    assert!(stdout.contains("prompt_token_ids=1"));
+    assert!(stdout.contains("next_token_id=2"));
+    assert!(stdout.contains("generated_cached_tokens=3"));
+    assert!(stdout.contains("generated_token_ids=2,2"));
+    assert!(stdout.contains("generated_text=winnerwinner"));
+    Ok(())
+}
+
+#[test]
+fn cli_rejects_generation_and_benchmark_together() -> Result<(), Box<dyn Error>> {
+    let model_path = write_fixture_model()?;
+    let binary = cli_binary()?;
+
+    let output = Command::new(binary)
+        .arg("--model")
+        .arg(&model_path)
+        .arg("--prompt")
+        .arg("hello")
+        .arg("--generate-tokens")
+        .arg("2")
+        .arg("--benchmark-runs")
+        .arg("2")
+        .output()?;
+
+    remove_fixture_model(&model_path)?;
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8(output.stderr)?;
+    assert!(stderr.contains("use either --generate-tokens or --benchmark-runs, not both"));
+    Ok(())
+}
+
+#[test]
 fn cli_fails_when_next_token_does_not_match_expected_id() -> Result<(), Box<dyn Error>> {
     let model_path = write_fixture_model()?;
     let binary = cli_binary()?;
