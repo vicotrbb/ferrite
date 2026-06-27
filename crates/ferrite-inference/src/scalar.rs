@@ -1,11 +1,13 @@
 mod loader;
 mod math;
 mod matrix;
+mod prompt;
 
 pub use math::{apply_rope, argmax, rms_norm};
 pub use matrix::Matrix;
 
 use ferrite_model::gguf::{GgufError, GgufFile};
+use ferrite_model::tokenizer::GgufTokenizer;
 use math::{add_assign, dot, ensure_len, softmax, swiglu};
 use std::fmt;
 
@@ -127,6 +129,15 @@ impl ScalarLlamaModel {
             token_id,
             logits: last_logits,
         })
+    }
+
+    pub fn next_token_for_text_prompt(
+        &self,
+        tokenizer: &GgufTokenizer,
+        prompt: &str,
+    ) -> Result<NextToken, InferenceError> {
+        let tokens = prompt::encode_text_prompt(tokenizer, prompt)?;
+        self.next_token_for_prompt(&tokens)
     }
 
     pub fn from_gguf_f32(file: &GgufFile, bytes: &[u8]) -> Result<Self, InferenceError> {

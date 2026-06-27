@@ -88,6 +88,14 @@ impl GgufTokenizer {
         Ok(output)
     }
 
+    pub fn encode(&self, input: &str) -> Result<Vec<usize>, TokenizerError> {
+        if self.merges.is_empty() {
+            self.encode_atomic(input)
+        } else {
+            self.encode_bpe(input)
+        }
+    }
+
     pub fn encode_bpe(&self, input: &str) -> Result<Vec<usize>, TokenizerError> {
         bpe::encode(input, &self.tokens, &self.merges)
     }

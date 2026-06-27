@@ -3,6 +3,7 @@ use ferrite_inference::scalar::{
     ScalarLlamaModel, ScalarLlamaWeights,
 };
 use ferrite_model::gguf::parse_gguf;
+use ferrite_model::tokenizer::GgufTokenizer;
 use std::error::Error;
 use std::io;
 
@@ -183,7 +184,7 @@ fn scalar_llama_gguf_fixture(tensor_type: u32) -> Vec<u8> {
     bytes.extend_from_slice(b"GGUF");
     push_u32(&mut bytes, 3);
     push_u64(&mut bytes, tensors.len() as u64);
-    push_u64(&mut bytes, 12);
+    push_u64(&mut bytes, 13);
     push_kv_string(&mut bytes, "general.architecture", "llama");
     push_kv_u64(&mut bytes, "general.alignment", alignment);
     push_kv_u64(&mut bytes, "llama.context_length", 1);
@@ -195,6 +196,7 @@ fn scalar_llama_gguf_fixture(tensor_type: u32) -> Vec<u8> {
     push_kv_u64(&mut bytes, "llama.attention.key_length", 2);
     push_kv_u64(&mut bytes, "llama.attention.value_length", 2);
     push_kv_u64(&mut bytes, "llama.rope.dimension_count", 2);
+    push_kv_string(&mut bytes, "tokenizer.ggml.model", "llama");
     push_kv_string_array(
         &mut bytes,
         "tokenizer.ggml.tokens",
@@ -421,6 +423,24 @@ fn loads_scalar_llama_reference_weights_from_f32_gguf_fixture() -> Result<(), Bo
     assert_close(next.logits[0], 0.2);
     assert_close(next.logits[1], 0.2);
     assert_close(next.logits[2], 1.5);
+    Ok(())
+}
+
+#[test]
+fn text_prompt_path_encodes_with_gguf_tokenizer_before_forward() -> Result<(), Box<dyn Error>> {
+    let bytes = scalar_llama_f32_gguf_fixture();
+    let gguf = parse_gguf(&bytes)?;
+
+    let tokenizer = GgufTokenizer::from_gguf(&gguf)?;
+    let model = ScalarLlamaModel::from_gguf_unquantized(&gguf, &bytes)?;
+    let next = model.next_token_for_text_prompt(&tokenizer, "hello")?;
+    let expected = model.next_token_for_prompt(&[1])?;
+
+    assert_eq!(next.token_id, expected.token_id);
+    assert_eq!(next.logits.len(), expected.logits.len());
+    for (actual, expected) in next.logits.iter().zip(expected.logits.iter()) {
+        assert_close(*actual, *expected);
+    }
     Ok(())
 }
 
