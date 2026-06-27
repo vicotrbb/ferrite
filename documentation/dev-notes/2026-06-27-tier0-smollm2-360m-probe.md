@@ -64,6 +64,7 @@ kv_cache_bytes=655360
 `llama.cpp` local tools:
 
 - `target/reference/llama.cpp/build/bin/llama-simple`
+- `target/reference/llama.cpp/build/bin/llama-completion`
 - `target/reference/llama.cpp/build/bin/llama-tokenize`
 
 Greedy default `llama-simple` output for six tokens was:
@@ -85,7 +86,7 @@ Output:
 [18, 284, 476, 28120, 905, 18]
 ```
 
-## Caveat
+## CPU-Only Reference Caveat
 
 Forcing `llama-simple` with `-ngl 0` produced a different greedy continuation
 for the same prompt:
@@ -100,6 +101,77 @@ Tokenizing that continuation produced:
 ```text
 [18, 198, 3272, 24, 3002, 25]
 ```
+
+After building the configured `llama-completion` target:
+
+```sh
+cmake --build target/reference/llama.cpp/build --target llama-completion -j 4
+```
+
+the same split remained visible under deterministic sampling controls:
+
+```sh
+target/reference/llama.cpp/build/bin/llama-completion -m target/models/SmolLM2-360M-Instruct-Q4_K_M.gguf -p 'hello world' -n 6 --temp 0 --top-k 1 --top-p 1 --repeat-last-n 0 --no-conversation --no-jinja --no-display-prompt --verbosity 1
+```
+
+Output:
+
+```text
+" and "hello world"
+```
+
+CPU-only:
+
+```sh
+target/reference/llama.cpp/build/bin/llama-completion -m target/models/SmolLM2-360M-Instruct-Q4_K_M.gguf -p 'hello world' -n 6 --temp 0 --top-k 1 --top-p 1 --repeat-last-n 0 --no-conversation --no-jinja --no-display-prompt --verbosity 1 --device none
+```
+
+Output:
+
+```text
+"
+print(word)
+```
+
+CPU-only with repacking disabled:
+
+```sh
+target/reference/llama.cpp/build/bin/llama-completion -m target/models/SmolLM2-360M-Instruct-Q4_K_M.gguf -p 'hello world' -n 6 --temp 0 --top-k 1 --top-p 1 --repeat-last-n 0 --no-conversation --no-jinja --no-display-prompt --verbosity 1 --device none --no-repack
+```
+
+Output:
+
+```text
+"
+print(convert_
+```
+
+Ferrite's reduced divergence-point probe after prompt token IDs
+`[28120, 905, 18]`:
+
+```sh
+target/release/ferrite --model target/models/SmolLM2-360M-Instruct-Q4_K_M.gguf --prompt-token-ids 28120,905,18 --top-logits 8 --expect-token-id 284
+```
+
+Output:
+
+```text
+prompt_token_ids=28120,905,18
+next_token_id=284
+next_token=Ġand
+top_logits=284:18.689020,198:18.645466,314:18.396881,288:18.296913,281:18.225044,347:17.635653,355:17.402699,2489:17.103884
+model_file_bytes=270590880
+model_file_retained_bytes=0
+scalar_weight_bytes=268803840
+kv_cache_bytes=245760
+expected_token_id=284
+match=true
+```
+
+The first divergent candidates are close: Ferrite's token `284` is about
+`0.043554` logit above token `198`, the CPU-only reference continuation's
+newline token. That narrow margin makes backend-sensitive quantized-kernel
+rounding a plausible explanation, but it is not proof.
 
 This means the 360M probe proves Ferrite can load, run, stream, and decode the
 larger Tier 0 model, and that it matches one local `llama.cpp` greedy reference
