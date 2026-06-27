@@ -10,6 +10,7 @@ pub struct Matrix {
 #[derive(Clone, Debug, PartialEq)]
 enum MatrixData {
     F32(Vec<f32>),
+    Q5_0(Vec<u8>),
     Q8_0(Vec<u8>),
 }
 
@@ -64,6 +65,34 @@ impl Matrix {
         })
     }
 
+    pub fn from_q5_0_row_major_bytes(
+        rows: usize,
+        cols: usize,
+        data: Vec<u8>,
+    ) -> Result<Self, InferenceError> {
+        if !cols.is_multiple_of(Q5_0_BLOCK_VALUES) {
+            return Err(InferenceError::new(format!(
+                "Q5_0 matrix columns {cols} must be divisible by {Q5_0_BLOCK_VALUES}"
+            )));
+        }
+        let row_bytes = q5_0_row_bytes(cols)?;
+        let expected = rows
+            .checked_mul(row_bytes)
+            .ok_or_else(|| InferenceError::new("Q5_0 matrix byte length overflow"))?;
+        if data.len() != expected {
+            return Err(InferenceError::new(format!(
+                "Q5_0 matrix byte length {} does not match shape {rows}x{cols}",
+                data.len()
+            )));
+        }
+
+        Ok(Self {
+            rows,
+            cols,
+            data: MatrixData::Q5_0(data),
+        })
+    }
+
     pub fn rows(&self) -> usize {
         self.rows
     }
@@ -104,6 +133,16 @@ impl Matrix {
 
         match &self.data {
             MatrixData::F32(_) => Ok(self.row(index)?.to_vec()),
+            MatrixData::Q5_0(data) => {
+                let row_bytes = q5_0_row_bytes(self.cols)?;
+                let start = index
+                    .checked_mul(row_bytes)
+                    .ok_or_else(|| InferenceError::new("Q5_0 row offset overflow"))?;
+                let end = start
+                    .checked_add(row_bytes)
+                    .ok_or_else(|| InferenceError::new("Q5_0 row end overflow"))?;
+                decode_q5_0_row(&data[start..end], self.cols)
+            }
             MatrixData::Q8_0(data) => {
                 let row_bytes = q8_0_row_bytes(self.cols)?;
                 let start = index
@@ -120,6 +159,7 @@ impl Matrix {
     pub fn storage_bytes(&self) -> u128 {
         match &self.data {
             MatrixData::F32(values) => values.len() as u128 * std::mem::size_of::<f32>() as u128,
+            MatrixData::Q5_0(bytes) => bytes.len() as u128,
             MatrixData::Q8_0(bytes) => bytes.len() as u128,
         }
     }
@@ -142,13 +182,51 @@ impl Matrix {
     }
 }
 
+const Q5_0_BLOCK_VALUES: usize = 32;
+const Q5_0_BLOCK_BYTES: usize = 22;
 const Q8_0_BLOCK_VALUES: usize = 32;
 const Q8_0_BLOCK_BYTES: usize = 34;
+
+fn q5_0_row_bytes(cols: usize) -> Result<usize, InferenceError> {
+    cols.checked_div(Q5_0_BLOCK_VALUES)
+        .and_then(|blocks| blocks.checked_mul(Q5_0_BLOCK_BYTES))
+        .ok_or_else(|| InferenceError::new("Q5_0 row byte length overflow"))
+}
 
 fn q8_0_row_bytes(cols: usize) -> Result<usize, InferenceError> {
     cols.checked_div(Q8_0_BLOCK_VALUES)
         .and_then(|blocks| blocks.checked_mul(Q8_0_BLOCK_BYTES))
         .ok_or_else(|| InferenceError::new("Q8_0 row byte length overflow"))
+}
+
+fn decode_q5_0_row(bytes: &[u8], cols: usize) -> Result<Vec<f32>, InferenceError> {
+    let expected = q5_0_row_bytes(cols)?;
+    if bytes.len() != expected {
+        return Err(InferenceError::new(format!(
+            "Q5_0 row byte length {} does not match {expected}",
+            bytes.len()
+        )));
+    }
+
+    let mut values = Vec::with_capacity(cols);
+    for block in bytes.chunks_exact(Q5_0_BLOCK_BYTES) {
+        let scale = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
+        let high_bits = u32::from_le_bytes([block[2], block[3], block[4], block[5]]);
+        let quants = &block[6..];
+
+        for (index, quant) in quants.iter().enumerate() {
+            let high = ((high_bits >> index) << 4) as u8 & 0x10;
+            let signed = i32::from((quant & 0x0f) | high) - 16;
+            values.push(scale * signed as f32);
+        }
+
+        for (index, quant) in quants.iter().enumerate() {
+            let high = (high_bits >> (index + 12)) as u8 & 0x10;
+            let signed = i32::from((quant >> 4) | high) - 16;
+            values.push(scale * signed as f32);
+        }
+    }
+    Ok(values)
 }
 
 fn decode_q8_0_row(bytes: &[u8], cols: usize) -> Result<Vec<f32>, InferenceError> {
