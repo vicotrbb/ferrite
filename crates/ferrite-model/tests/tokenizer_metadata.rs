@@ -89,9 +89,9 @@ fn byte_bpe_tokenizer_fixture() -> Vec<u8> {
     tokenizer_gguf_fixture(
         &[
             "<unk>", "h", "e", "l", "o", "he", "ll", "hell", "hello", "Ġ", "c", "a", "f", "Ã", "©",
-            "ca", "caf", "Ã©", "cafÃ©",
+            "ca", "caf", "Ã©", "cafÃ©", "Ċ",
         ],
-        &[2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        &[2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
         &[
             "h e", "l l", "he ll", "hell o", "c a", "ca f", "Ã ©", "caf Ã©",
         ],
@@ -148,5 +148,15 @@ fn bpe_seeds_from_gpt2_byte_alphabet_before_merging() -> Result<(), Box<dyn Erro
 
     assert_eq!(tokenizer.encode_bpe(" hello")?, vec![9, 8]);
     assert_eq!(tokenizer.encode_bpe("café")?, vec![18]);
+    Ok(())
+}
+
+#[test]
+fn bpe_decodes_gpt2_byte_alphabet_tokens() -> Result<(), Box<dyn Error>> {
+    let bytes = byte_bpe_tokenizer_fixture();
+    let file = parse_gguf(&bytes)?;
+    let tokenizer = GgufTokenizer::from_gguf(&file)?;
+
+    assert_eq!(tokenizer.decode(&[9, 8, 19, 18])?, " hello\ncafé");
     Ok(())
 }

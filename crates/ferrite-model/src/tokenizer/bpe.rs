@@ -1,6 +1,20 @@
 use super::TokenizerError;
 use std::collections::BTreeMap;
 
+pub(super) fn decode(ids: &[usize], tokens: &[String]) -> Result<String, TokenizerError> {
+    let mut bytes = Vec::new();
+    for id in ids {
+        let token = tokens
+            .get(*id)
+            .ok_or_else(|| TokenizerError::new(format!("token id {id} is out of bounds")))?;
+        for value in token.chars() {
+            bytes.push(unicode_to_byte(value)?);
+        }
+    }
+    String::from_utf8(bytes)
+        .map_err(|error| TokenizerError::new(format!("BPE decoded invalid UTF-8: {error}")))
+}
+
 pub(super) fn encode(
     input: &str,
     tokens: &[String],
@@ -77,6 +91,32 @@ fn byte_to_unicode(byte: u8) -> Result<char, TokenizerError> {
     char::from_u32(code_point).ok_or_else(|| {
         TokenizerError::new(format!(
             "GPT-2 byte mapping produced invalid code point {code_point}"
+        ))
+    })
+}
+
+fn unicode_to_byte(value: char) -> Result<u8, TokenizerError> {
+    let code_point = value as u32;
+    let byte = if (33..=126).contains(&code_point)
+        || (161..=172).contains(&code_point)
+        || (174..=255).contains(&code_point)
+    {
+        code_point
+    } else if (256..=288).contains(&code_point) {
+        code_point - 256
+    } else if (289..=322).contains(&code_point) {
+        code_point - 162
+    } else if code_point == 323 {
+        173
+    } else {
+        return Err(TokenizerError::new(format!(
+            "BPE token character {value:?} is not in the GPT-2 byte alphabet"
+        )));
+    };
+
+    u8::try_from(byte).map_err(|error| {
+        TokenizerError::new(format!(
+            "GPT-2 byte mapping produced invalid byte {byte}: {error}"
         ))
     })
 }

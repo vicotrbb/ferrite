@@ -61,6 +61,10 @@ impl GgufTokenizer {
     }
 
     pub fn decode(&self, ids: &[usize]) -> Result<String, TokenizerError> {
+        if !self.merges.is_empty() {
+            return bpe::decode(ids, &self.tokens);
+        }
+
         let mut output = String::new();
         for id in ids {
             let token = self
