@@ -30,6 +30,9 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
     println!("prompt_token_ids={}", join_token_ids(&prompt_token_ids));
     println!("next_token_id={}", next.token_id);
     println!("next_token={token}");
+    if let Some(count) = args.top_logits {
+        println!("top_logits={}", format_top_logits(&next.logits, count));
+    }
     if let Some(count) = args.generate_tokens {
         let generated_token_ids =
             generate_tokens(&mut session, &tokenizer, next.clone(), count, args.stream)?;
@@ -112,6 +115,23 @@ fn generate_tokens(
         next = session.accept_token(next.token_id)?;
     }
     Ok(generated_token_ids)
+}
+
+fn format_top_logits(logits: &[f32], count: usize) -> String {
+    let mut ranked = logits
+        .iter()
+        .copied()
+        .enumerate()
+        .collect::<Vec<(usize, f32)>>();
+    ranked.sort_by(|(left_id, left), (right_id, right)| {
+        right.total_cmp(left).then_with(|| left_id.cmp(right_id))
+    });
+    ranked
+        .into_iter()
+        .take(count)
+        .map(|(token_id, logit)| format!("{token_id}:{logit:.6}"))
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 fn prompt_token_ids(

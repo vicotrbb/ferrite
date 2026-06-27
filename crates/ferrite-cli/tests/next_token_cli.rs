@@ -153,6 +153,38 @@ fn cli_benchmarks_repeated_next_token_runs_after_loading_once() -> Result<(), Bo
 }
 
 #[test]
+fn cli_prints_top_next_token_logits() -> Result<(), Box<dyn Error>> {
+    let model_path = write_fixture_model()?;
+    let binary = cli_binary()?;
+
+    let output = Command::new(binary)
+        .arg("--model")
+        .arg(&model_path)
+        .arg("--prompt")
+        .arg("hello")
+        .arg("--top-logits")
+        .arg("2")
+        .output()?;
+
+    remove_fixture_model(&model_path)?;
+
+    assert!(
+        output.status.success(),
+        "cli failed with stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout)?;
+    let top_logits = stdout
+        .lines()
+        .find_map(|line| line.strip_prefix("top_logits="))
+        .ok_or("missing top_logits")?;
+    let entries = top_logits.split(',').collect::<Vec<_>>();
+    assert_eq!(entries.len(), 2);
+    assert!(entries[0].starts_with("2:"));
+    Ok(())
+}
+
+#[test]
 fn cli_generates_token_ids_and_decoded_text() -> Result<(), Box<dyn Error>> {
     let model_path = write_fixture_model()?;
     let binary = cli_binary()?;

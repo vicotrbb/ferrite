@@ -10,6 +10,7 @@ pub struct CliArgs {
     pub expected_generated_token_ids: Option<Vec<usize>>,
     pub benchmark_runs: Option<usize>,
     pub generate_tokens: Option<usize>,
+    pub top_logits: Option<usize>,
     pub stream: bool,
 }
 
@@ -26,6 +27,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
     let mut expected_generated_token_ids = None;
     let mut benchmark_runs = None;
     let mut generate_tokens = None;
+    let mut top_logits = None;
     let mut stream = false;
     let mut iter = args.into_iter();
     let _program = iter.next();
@@ -72,6 +74,12 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
                     "--generate-tokens",
                 )?);
             }
+            "--top-logits" => {
+                top_logits = Some(parse_nonzero_usize(
+                    next_value(&mut iter, "--top-logits")?,
+                    "--top-logits",
+                )?);
+            }
             "--stream" => {
                 stream = true;
             }
@@ -100,6 +108,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
         expected_generated_token_ids,
         benchmark_runs,
         generate_tokens,
+        top_logits,
         stream,
     })
 }
@@ -189,5 +198,5 @@ fn parse_token_ids(value: OsString) -> Result<Vec<usize>, Box<dyn Error>> {
 }
 
 fn usage() -> &'static str {
-    "usage: ferrite --model <path.gguf> (--prompt <text> | --prompt-token-ids <id[,id...]>) [--expect-token-id <id>] [--generate-tokens <count>] [--expect-generated-token-ids <id[,id...]>] [--stream] [--benchmark-runs <count>]"
+    "usage: ferrite --model <path.gguf> (--prompt <text> | --prompt-token-ids <id[,id...]>) [--expect-token-id <id>] [--top-logits <count>] [--generate-tokens <count>] [--expect-generated-token-ids <id[,id...]>] [--stream] [--benchmark-runs <count>]"
 }
