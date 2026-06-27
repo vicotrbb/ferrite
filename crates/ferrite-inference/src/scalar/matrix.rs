@@ -1,4 +1,4 @@
-use super::{dot, InferenceError};
+use super::{math::dot, InferenceError};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Matrix {
