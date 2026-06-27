@@ -7,6 +7,7 @@ pub struct CliArgs {
     pub model_path: PathBuf,
     pub prompt: PromptSource,
     pub expected_token_id: Option<usize>,
+    pub benchmark_runs: Option<usize>,
 }
 
 pub enum PromptSource {
@@ -19,6 +20,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
     let mut prompt = None;
     let mut prompt_token_ids = None;
     let mut expected_token_id = None;
+    let mut benchmark_runs = None;
     let mut iter = args.into_iter();
     let _program = iter.next();
 
@@ -46,6 +48,12 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
                     "--expect-token-id",
                 )?);
             }
+            "--benchmark-runs" => {
+                benchmark_runs = Some(parse_nonzero_usize(
+                    next_value(&mut iter, "--benchmark-runs")?,
+                    "--benchmark-runs",
+                )?);
+            }
             "--help" | "-h" => {
                 return Err(io::Error::other(usage()).into());
             }
@@ -61,6 +69,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
         model_path: model_path.ok_or_else(|| io::Error::other("missing --model argument"))?,
         prompt: prompt_source(prompt, prompt_token_ids)?,
         expected_token_id,
+        benchmark_runs,
     })
 }
 
@@ -101,6 +110,14 @@ fn parse_usize(value: OsString, flag: &str) -> Result<usize, Box<dyn Error>> {
         .map_err(|error| io::Error::other(format!("{flag} must be a usize: {error}")).into())
 }
 
+fn parse_nonzero_usize(value: OsString, flag: &str) -> Result<usize, Box<dyn Error>> {
+    let value = parse_usize(value, flag)?;
+    if value == 0 {
+        return Err(io::Error::other(format!("{flag} must be greater than zero")).into());
+    }
+    Ok(value)
+}
+
 fn parse_token_ids(value: OsString) -> Result<Vec<usize>, Box<dyn Error>> {
     let value = os_string_to_string(value)?;
     let mut token_ids = Vec::new();
@@ -119,5 +136,5 @@ fn parse_token_ids(value: OsString) -> Result<Vec<usize>, Box<dyn Error>> {
 }
 
 fn usage() -> &'static str {
-    "usage: ferrite --model <path.gguf> (--prompt <text> | --prompt-token-ids <id[,id...]>) [--expect-token-id <id>]"
+    "usage: ferrite --model <path.gguf> (--prompt <text> | --prompt-token-ids <id[,id...]>) [--expect-token-id <id>] [--benchmark-runs <count>]"
 }

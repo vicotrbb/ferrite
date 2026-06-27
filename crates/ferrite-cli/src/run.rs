@@ -6,6 +6,7 @@ use std::error::Error;
 use std::ffi::OsString;
 use std::fs;
 use std::io;
+use std::time::Instant;
 
 pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error>> {
     let args = args::parse(args)?;
@@ -25,6 +26,17 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
     println!("prompt_token_ids={}", join_token_ids(&prompt_token_ids));
     println!("next_token_id={}", next.token_id);
     println!("next_token={token}");
+    if let Some(runs) = args.benchmark_runs {
+        let started = Instant::now();
+        for _ in 0..runs {
+            model.next_token_for_prompt(&prompt_token_ids)?;
+        }
+        let total_ns = started.elapsed().as_nanos();
+        let avg_ns = total_ns / runs as u128;
+        println!("benchmark_runs={runs}");
+        println!("benchmark_total_ns={total_ns}");
+        println!("benchmark_avg_ns={avg_ns}");
+    }
     if let Some(expected_token_id) = args.expected_token_id {
         println!("expected_token_id={expected_token_id}");
         let matches = next.token_id == expected_token_id;
