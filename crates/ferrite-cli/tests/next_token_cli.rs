@@ -5,6 +5,9 @@ use std::fs;
 use std::io::ErrorKind;
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+static FIXTURE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[test]
 fn cli_loads_gguf_and_prints_text_prompt_next_token() -> Result<(), Box<dyn Error>> {
@@ -135,6 +138,11 @@ fn cli_benchmarks_repeated_next_token_runs_after_loading_once() -> Result<(), Bo
     assert!(stdout.contains("next_token_id=2"));
     assert!(stdout.contains("benchmark_runs=3"));
     assert!(stdout.contains("benchmark_cached_tokens=4"));
+    let benchmark_token_ids = stdout
+        .lines()
+        .find_map(|line| line.strip_prefix("benchmark_token_ids="))
+        .ok_or("missing benchmark_token_ids")?;
+    assert_eq!(benchmark_token_ids.split(',').count(), 3);
     assert!(stdout.contains("benchmark_total_ns="));
     assert!(stdout.contains("benchmark_avg_ns="));
     Ok(())
@@ -189,8 +197,5 @@ fn remove_fixture_model(path: &PathBuf) -> Result<(), Box<dyn Error>> {
 }
 
 fn unique_suffix() -> u128 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|duration| duration.as_nanos())
-        .unwrap_or(0)
+    u128::from(FIXTURE_COUNTER.fetch_add(1, Ordering::Relaxed))
 }

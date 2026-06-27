@@ -29,14 +29,20 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
     println!("next_token={token}");
     if let Some(runs) = args.benchmark_runs {
         let mut benchmark_next = next.clone();
+        let mut benchmark_token_ids = Vec::with_capacity(runs);
         let started = Instant::now();
         for _ in 0..runs {
             benchmark_next = session.accept_token(benchmark_next.token_id)?;
+            benchmark_token_ids.push(benchmark_next.token_id);
         }
         let total_ns = started.elapsed().as_nanos();
         let avg_ns = total_ns / runs as u128;
         println!("benchmark_runs={runs}");
         println!("benchmark_cached_tokens={}", session.cached_token_count());
+        println!(
+            "benchmark_token_ids={}",
+            join_token_ids(&benchmark_token_ids)
+        );
         println!("benchmark_total_ns={total_ns}");
         println!("benchmark_avg_ns={avg_ns}");
     }
