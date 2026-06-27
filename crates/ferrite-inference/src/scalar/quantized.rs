@@ -80,16 +80,104 @@ pub(super) fn q4_k_mul_vec(
     let value_count = rows
         .checked_mul(cols)
         .ok_or_else(|| InferenceError::new("Q4_K matrix value count overflow"))?;
-    let values = decode_q4_k_values(bytes, value_count)?;
+    let expected = q4_k_storage_bytes(value_count)?;
+    if bytes.len() != expected {
+        return Err(InferenceError::new(format!(
+            "Q4_K byte length {} does not match {expected}",
+            bytes.len()
+        )));
+    }
     let mut output = vec![0.0; rows];
 
-    for (index, value) in values.iter().enumerate() {
-        let row = index / cols;
-        let col = index % cols;
-        output[row] += value * vector[col];
+    for (block_index, block) in bytes.chunks_exact(Q4_K_BLOCK_BYTES).enumerate() {
+        let value_offset = block_index
+            .checked_mul(Q4_K_BLOCK_VALUES)
+            .ok_or_else(|| InferenceError::new("Q4_K block value offset overflow"))?;
+        accumulate_q4_k_block(block, value_offset, rows, cols, vector, &mut output)?;
     }
 
     Ok(output)
+}
+
+fn accumulate_q4_k_block(
+    block: &[u8],
+    value_offset: usize,
+    rows: usize,
+    cols: usize,
+    vector: &[f32],
+    output: &mut [f32],
+) -> Result<(), InferenceError> {
+    if block.len() != Q4_K_BLOCK_BYTES {
+        return Err(InferenceError::new(format!(
+            "Q4_K block byte length {} does not match {Q4_K_BLOCK_BYTES}",
+            block.len()
+        )));
+    }
+    if output.len() != rows {
+        return Err(InferenceError::new(format!(
+            "Q4_K output rows {} do not match {rows}",
+            output.len()
+        )));
+    }
+
+    let d = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
+    let dmin = f16_bits_to_f32(u16::from_le_bytes([block[2], block[3]]));
+    let scales = &block[4..16];
+    let quants = &block[16..];
+    let mut scale_index = 0usize;
+    let mut local_offset = 0usize;
+
+    for quant_chunk in quants.chunks_exact(32) {
+        let (scale_low, min_low) = q4_k_scale_min(scale_index, scales);
+        let (scale_high, min_high) = q4_k_scale_min(scale_index + 1, scales);
+        let d_low = d * f32::from(scale_low);
+        let d_high = d * f32::from(scale_high);
+        let min_low = dmin * f32::from(min_low);
+        let min_high = dmin * f32::from(min_high);
+
+        for quant in quant_chunk {
+            accumulate_matrix_value(
+                value_offset + local_offset,
+                d_low * f32::from(quant & 0x0f) - min_low,
+                cols,
+                vector,
+                output,
+            )?;
+            local_offset += 1;
+        }
+        for quant in quant_chunk {
+            accumulate_matrix_value(
+                value_offset + local_offset,
+                d_high * f32::from(quant >> 4) - min_high,
+                cols,
+                vector,
+                output,
+            )?;
+            local_offset += 1;
+        }
+        scale_index += 2;
+    }
+
+    Ok(())
+}
+
+fn accumulate_matrix_value(
+    index: usize,
+    value: f32,
+    cols: usize,
+    vector: &[f32],
+    output: &mut [f32],
+) -> Result<(), InferenceError> {
+    let row = index / cols;
+    let col = index % cols;
+    let target = output
+        .get_mut(row)
+        .ok_or_else(|| InferenceError::new("quantized matrix row index out of bounds"))?;
+    let vector_value = vector
+        .get(col)
+        .ok_or_else(|| InferenceError::new("quantized matrix column index out of bounds"))?;
+    *target += value * vector_value;
+    Ok(())
 }
 
 pub(super) fn q6_k_mul_vec(
@@ -375,7 +463,8 @@ fn f16_bits_to_f32(bits: u16) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::{
-        decode_q6_k_values, q4_k_mul_vec, q5_0_mul_vec, q6_k_mul_vec, q8_0_mul_vec, InferenceError,
+        accumulate_q4_k_block, decode_q6_k_values, q4_k_mul_vec, q5_0_mul_vec, q6_k_mul_vec,
+        q8_0_mul_vec, InferenceError,
     };
 
     #[test]
@@ -389,6 +478,22 @@ mod tests {
         let actual = q4_k_mul_vec(&block, 2, 128, &[1.0; 128])?;
 
         assert_eq!(actual, vec![128.0, 128.0]);
+        Ok(())
+    }
+
+    #[test]
+    fn q4_k_block_accumulation_updates_rows_without_decoded_matrix() -> Result<(), InferenceError> {
+        let mut block = Vec::new();
+        block.extend_from_slice(&0x3c00u16.to_le_bytes());
+        block.extend_from_slice(&0u16.to_le_bytes());
+        block.extend_from_slice(&[1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1]);
+        block.extend_from_slice(&[0x11; 64]);
+        block.extend_from_slice(&[0x22; 64]);
+
+        let mut output = vec![0.0; 2];
+        accumulate_q4_k_block(&block, 0, 2, 128, &[1.0; 128], &mut output)?;
+
+        assert_eq!(output, vec![128.0, 256.0]);
         Ok(())
     }
 
