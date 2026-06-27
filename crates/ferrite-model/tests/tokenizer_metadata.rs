@@ -78,10 +78,23 @@ fn atomic_tokenizer_fixture() -> Vec<u8> {
 fn bpe_tokenizer_fixture() -> Vec<u8> {
     tokenizer_gguf_fixture(
         &[
-            "<unk>", "h", "e", "l", "o", "he", "ll", "hell", "hello", " ",
+            "<unk>", "h", "e", "l", "o", "he", "ll", "hell", "hello", "Ġ",
         ],
         &[2, 1, 1, 1, 1, 1, 1, 1, 1, 1],
         &["h e", "l l", "he ll", "hell o"],
+    )
+}
+
+fn byte_bpe_tokenizer_fixture() -> Vec<u8> {
+    tokenizer_gguf_fixture(
+        &[
+            "<unk>", "h", "e", "l", "o", "he", "ll", "hell", "hello", "Ġ", "c", "a", "f", "Ã", "©",
+            "ca", "caf", "Ã©", "cafÃ©",
+        ],
+        &[2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        &[
+            "h e", "l l", "he ll", "hell o", "c a", "ca f", "Ã ©", "caf Ã©",
+        ],
     )
 }
 
@@ -124,5 +137,16 @@ fn encodes_with_ranked_bpe_merges_from_gguf_metadata() -> Result<(), Box<dyn Err
     let tokenizer = GgufTokenizer::from_gguf(&file)?;
 
     assert_eq!(tokenizer.encode_bpe("hello hello")?, vec![8, 9, 8]);
+    Ok(())
+}
+
+#[test]
+fn bpe_seeds_from_gpt2_byte_alphabet_before_merging() -> Result<(), Box<dyn Error>> {
+    let bytes = byte_bpe_tokenizer_fixture();
+    let file = parse_gguf(&bytes)?;
+    let tokenizer = GgufTokenizer::from_gguf(&file)?;
+
+    assert_eq!(tokenizer.encode_bpe(" hello")?, vec![9, 8]);
+    assert_eq!(tokenizer.encode_bpe("café")?, vec![18]);
     Ok(())
 }

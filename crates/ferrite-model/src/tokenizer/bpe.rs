@@ -46,9 +46,10 @@ fn seed_symbols(
     token_to_id: &BTreeMap<&str, usize>,
 ) -> Result<Vec<String>, TokenizerError> {
     input
-        .chars()
-        .map(|character| {
-            let symbol = character.to_string();
+        .as_bytes()
+        .iter()
+        .map(|byte| {
+            let symbol = byte_to_unicode(*byte)?.to_string();
             if token_to_id.contains_key(symbol.as_str()) {
                 Ok(symbol)
             } else {
@@ -58,6 +59,26 @@ fn seed_symbols(
             }
         })
         .collect()
+}
+
+fn byte_to_unicode(byte: u8) -> Result<char, TokenizerError> {
+    let code_point =
+        if (33..=126).contains(&byte) || (161..=172).contains(&byte) || (174..=255).contains(&byte)
+        {
+            return Ok(byte as char);
+        } else if byte <= 32 {
+            u32::from(byte) + 256
+        } else if byte <= 160 {
+            u32::from(byte) + 162
+        } else {
+            323
+        };
+
+    char::from_u32(code_point).ok_or_else(|| {
+        TokenizerError::new(format!(
+            "GPT-2 byte mapping produced invalid code point {code_point}"
+        ))
+    })
 }
 
 fn parse_merge(merge: &str) -> Option<(&str, &str)> {

@@ -26,12 +26,13 @@ fixtures:
 - token type lookup.
 - token ID sequence decoding.
 - greedy longest-prefix atomic encoding.
-- fixture-grade ranked BPE merge encoding from `tokenizer.ggml.merges`.
+- ranked BPE merge encoding from `tokenizer.ggml.merges`, seeded through the
+  GPT-2 byte-to-Unicode alphabet used by GGUF GPT-2-style tokenizers.
 
 This is not yet a full Llama tokenizer. It is a small verified boundary that
 lets Ferrite test tokenizer metadata extraction, simple prompt fixtures, and
-ranked merge metadata without pretending normalizer, pre-tokenizer, byte
-fallback, or chat template behavior is complete.
+ranked merge metadata without pretending chat template behavior or every
+model-specific pre-tokenizer variant is complete.
 
 ## Consequences
 
@@ -71,3 +72,9 @@ utility module.
   `GgufTokenizer` had no `encode_bpe` method.
 - After adding the focused BPE helper, the same targeted test passed with GGUF
   `tokenizer.ggml.merges` driving ranked merges for a tokenizer fixture.
+- `cargo test -p ferrite-model --test tokenizer_metadata
+  bpe_seeds_from_gpt2_byte_alphabet_before_merging` first failed because BPE
+  tried to seed from literal Unicode scalar values such as a space character.
+- After adding GPT-2 byte alphabet seeding, the same targeted test passed and
+  real SmolLM2 prompts matched `llama-tokenize` for `hello world`, ` hello`,
+  and `café`.
