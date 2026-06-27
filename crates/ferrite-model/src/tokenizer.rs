@@ -1,3 +1,5 @@
+mod bpe;
+
 use crate::gguf::{GgufError, GgufFile, MetadataValue, MetadataValueType};
 use std::fmt;
 
@@ -6,6 +8,7 @@ pub struct GgufTokenizer {
     model: TokenizerModel,
     tokens: Vec<String>,
     token_types: Vec<TokenType>,
+    merges: Vec<String>,
 }
 
 impl GgufTokenizer {
@@ -33,6 +36,7 @@ impl GgufTokenizer {
             model,
             tokens,
             token_types,
+            merges: metadata_optional_string_array(file, "tokenizer.ggml.merges")?,
         })
     }
 
@@ -82,6 +86,10 @@ impl GgufTokenizer {
             cursor += token.len();
         }
         Ok(output)
+    }
+
+    pub fn encode_bpe(&self, input: &str) -> Result<Vec<usize>, TokenizerError> {
+        bpe::encode(input, &self.tokens, &self.merges)
     }
 
     fn longest_token_prefix(&self, input: &str) -> Option<(usize, &str)> {
@@ -136,7 +144,7 @@ pub struct TokenizerError {
 }
 
 impl TokenizerError {
-    fn new(message: impl Into<String>) -> Self {
+    pub(crate) fn new(message: impl Into<String>) -> Self {
         Self {
             message: message.into(),
         }
@@ -185,6 +193,16 @@ fn metadata_string_array(file: &GgufFile, key: &str) -> Result<Vec<String>, Toke
             "{key} must be a string array, found {other:?}"
         ))),
         None => Err(TokenizerError::new(format!("missing metadata {key}"))),
+    }
+}
+
+fn metadata_optional_string_array(
+    file: &GgufFile,
+    key: &str,
+) -> Result<Vec<String>, TokenizerError> {
+    match file.metadata.get(key) {
+        Some(_) => metadata_string_array(file, key),
+        None => Ok(Vec::new()),
     }
 }
 

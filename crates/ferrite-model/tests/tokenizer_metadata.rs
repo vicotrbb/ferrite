@@ -50,26 +50,44 @@ fn push_kv_i32_array(bytes: &mut Vec<u8>, key: &str, values: &[i32]) {
     }
 }
 
-fn tokenizer_gguf_fixture() -> Vec<u8> {
+fn tokenizer_gguf_fixture(tokens: &[&str], token_types: &[i32], merges: &[&str]) -> Vec<u8> {
     let mut bytes = Vec::new();
     bytes.extend_from_slice(b"GGUF");
     push_u32(&mut bytes, 3);
     push_u64(&mut bytes, 0);
-    push_u64(&mut bytes, 4);
+    let metadata_count = if merges.is_empty() { 4 } else { 5 };
+    push_u64(&mut bytes, metadata_count);
     push_kv_string(&mut bytes, "general.architecture", "llama");
     push_kv_string(&mut bytes, "tokenizer.ggml.model", "llama");
-    push_kv_string_array(
-        &mut bytes,
-        "tokenizer.ggml.tokens",
-        &["<unk>", "hello", " ", "world", "!"],
-    );
-    push_kv_i32_array(&mut bytes, "tokenizer.ggml.token_type", &[2, 1, 1, 1, 1]);
+    push_kv_string_array(&mut bytes, "tokenizer.ggml.tokens", tokens);
+    push_kv_i32_array(&mut bytes, "tokenizer.ggml.token_type", token_types);
+    if !merges.is_empty() {
+        push_kv_string_array(&mut bytes, "tokenizer.ggml.merges", merges);
+    }
     bytes
+}
+
+fn atomic_tokenizer_fixture() -> Vec<u8> {
+    tokenizer_gguf_fixture(
+        &["<unk>", "hello", " ", "world", "!"],
+        &[2, 1, 1, 1, 1],
+        &[],
+    )
+}
+
+fn bpe_tokenizer_fixture() -> Vec<u8> {
+    tokenizer_gguf_fixture(
+        &[
+            "<unk>", "h", "e", "l", "o", "he", "ll", "hell", "hello", " ",
+        ],
+        &[2, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        &["h e", "l l", "he ll", "hell o"],
+    )
 }
 
 #[test]
 fn extracts_gguf_tokenizer_metadata_and_decodes_tokens() -> Result<(), Box<dyn Error>> {
-    let bytes = tokenizer_gguf_fixture();
+    let bytes = atomic_tokenizer_fixture();
     let file = parse_gguf(&bytes)?;
 
     let tokenizer = GgufTokenizer::from_gguf(&file)?;
@@ -85,7 +103,7 @@ fn extracts_gguf_tokenizer_metadata_and_decodes_tokens() -> Result<(), Box<dyn E
 
 #[test]
 fn atomically_encodes_with_longest_matching_tokens() -> Result<(), Box<dyn Error>> {
-    let bytes = tokenizer_gguf_fixture();
+    let bytes = atomic_tokenizer_fixture();
     let file = parse_gguf(&bytes)?;
     let tokenizer = GgufTokenizer::from_gguf(&file)?;
 
@@ -96,5 +114,15 @@ fn atomically_encodes_with_longest_matching_tokens() -> Result<(), Box<dyn Error
         Err(error) => error,
     };
     assert!(error.to_string().contains("no atomic token matches input"));
+    Ok(())
+}
+
+#[test]
+fn encodes_with_ranked_bpe_merges_from_gguf_metadata() -> Result<(), Box<dyn Error>> {
+    let bytes = bpe_tokenizer_fixture();
+    let file = parse_gguf(&bytes)?;
+    let tokenizer = GgufTokenizer::from_gguf(&file)?;
+
+    assert_eq!(tokenizer.encode_bpe("hello hello")?, vec![8, 9, 8]);
     Ok(())
 }
