@@ -1,4 +1,5 @@
 use super::{
+    kernel_check::ensure_within_relative_error,
     math::dot,
     quantized::{
         decode_q4_k_values, decode_q5_0_row, decode_q6_k_values, decode_q8_0_row, q4_k_mul_vec,
@@ -270,6 +271,34 @@ impl Matrix {
         }
         if let MatrixData::Q5_0(data) = &self.data {
             return q5_0_mul_vec(data, self.rows, self.cols, vector);
+        }
+
+        let mut output = Vec::with_capacity(self.rows);
+        for row_index in 0..self.rows {
+            let row = self.row_values(row_index)?;
+            output.push(dot(&row, vector)?);
+        }
+        Ok(output)
+    }
+
+    pub fn mul_vec_checked_against_reference(
+        &self,
+        vector: &[f32],
+        relative_error_tolerance: f32,
+    ) -> Result<Vec<f32>, InferenceError> {
+        let output = self.mul_vec(vector)?;
+        let reference = self.mul_vec_scalar_reference(vector)?;
+        ensure_within_relative_error(&output, &reference, relative_error_tolerance)?;
+        Ok(output)
+    }
+
+    fn mul_vec_scalar_reference(&self, vector: &[f32]) -> Result<Vec<f32>, InferenceError> {
+        if self.cols != vector.len() {
+            return Err(InferenceError::new(format!(
+                "matrix columns {} do not match vector length {}",
+                self.cols,
+                vector.len()
+            )));
         }
 
         let mut output = Vec::with_capacity(self.rows);

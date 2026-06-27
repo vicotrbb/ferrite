@@ -1,4 +1,5 @@
 mod attention;
+mod kernel_check;
 mod loader;
 mod math;
 mod matrix;
