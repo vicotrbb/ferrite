@@ -1,3 +1,4 @@
+mod attention;
 mod loader;
 mod math;
 mod matrix;
@@ -15,7 +16,7 @@ pub use session::ScalarLlamaSession;
 
 use ferrite_model::gguf::{GgufError, GgufFile};
 use ferrite_model::tokenizer::GgufTokenizer;
-use math::{dot, ensure_len, softmax};
+use math::ensure_len;
 use std::fmt;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -104,59 +105,6 @@ impl ScalarLlamaModel {
     pub fn from_gguf_scalar(file: &GgufFile, bytes: &[u8]) -> Result<Self, InferenceError> {
         let (config, weights) = loader::load_scalar(file, bytes)?;
         Self::new(config, weights)
-    }
-
-    fn causal_attention(
-        &self,
-        query: &[f32],
-        keys_by_position: &[Vec<f32>],
-        values_by_position: &[Vec<f32>],
-    ) -> Result<Vec<f32>, InferenceError> {
-        let expected_query = self.config.attention_head_count * self.config.head_dim;
-        let expected_kv = self.config.attention_head_count_kv * self.config.head_dim;
-        ensure_len("query", query, expected_query)?;
-        if keys_by_position.len() != values_by_position.len() {
-            return Err(InferenceError::new(format!(
-                "key position count {} does not match value position count {}",
-                keys_by_position.len(),
-                values_by_position.len()
-            )));
-        }
-        if keys_by_position.is_empty() {
-            return Err(InferenceError::new("attention cache must not be empty"));
-        }
-
-        let heads_per_kv = self
-            .config
-            .attention_head_count
-            .checked_div(self.config.attention_head_count_kv)
-            .ok_or_else(|| InferenceError::new("invalid zero kv head count"))?;
-
-        let mut output = vec![0.0; expected_query];
-        for query_head in 0..self.config.attention_head_count {
-            let kv_head = query_head / heads_per_kv;
-            let query_start = query_head * self.config.head_dim;
-            let kv_start = kv_head * self.config.head_dim;
-            let query_slice = &query[query_start..query_start + self.config.head_dim];
-            let mut scores = Vec::with_capacity(keys_by_position.len());
-
-            for key in keys_by_position {
-                ensure_len("cached key", key, expected_kv)?;
-                let key_slice = &key[kv_start..kv_start + self.config.head_dim];
-                scores.push(dot(query_slice, key_slice)? / (self.config.head_dim as f32).sqrt());
-            }
-
-            let weights = softmax(&scores)?;
-            for (position, value) in values_by_position.iter().enumerate() {
-                ensure_len("cached value", value, expected_kv)?;
-                let value_slice = &value[kv_start..kv_start + self.config.head_dim];
-                for dimension in 0..self.config.head_dim {
-                    output[query_start + dimension] += weights[position] * value_slice[dimension];
-                }
-            }
-        }
-
-        Ok(output)
     }
 
     fn apply_rope_to_heads(

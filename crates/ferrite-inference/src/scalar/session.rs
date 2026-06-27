@@ -1,4 +1,5 @@
 use super::{
+    attention::causal_attention,
     math::{add_assign, argmax, rms_norm, swiglu},
     InferenceError, NextToken, ScalarLlamaModel,
 };
@@ -79,7 +80,8 @@ impl<'a> ScalarLlamaSession<'a> {
             self.layer_keys[layer_index].push(key);
             self.layer_values[layer_index].push(value);
 
-            let attention = self.model.causal_attention(
+            let attention = causal_attention(
+                &self.model.config,
                 &query,
                 &self.layer_keys[layer_index],
                 &self.layer_values[layer_index],
