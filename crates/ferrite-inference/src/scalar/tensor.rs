@@ -11,8 +11,9 @@ pub(super) fn f32_values(tensor: &TensorInfo, bytes: &[u8]) -> Result<Vec<f32>, 
         GgmlType::F16 => f16_values_from_le_bytes(&tensor.name, slice),
         GgmlType::BF16 => bf16_values_from_le_bytes(&tensor.name, slice),
         GgmlType::Q8_0 => q8_0_values_from_le_bytes(&tensor.name, slice),
+        GgmlType::Q4K => q4_k_values_from_le_bytes(&tensor.name, slice),
         other => Err(InferenceError::new(format!(
-            "tensor {} has type {:?}; expected F32, F16, BF16, or Q8_0",
+            "tensor {} has type {:?}; expected F32, F16, BF16, Q8_0, or Q4K",
             tensor.name, other
         ))),
     }
@@ -83,6 +84,56 @@ fn q8_0_values_from_le_bytes(name: &str, slice: &[u8]) -> Result<Vec<f32>, Infer
         }
     }
     Ok(values)
+}
+
+fn q4_k_values_from_le_bytes(name: &str, slice: &[u8]) -> Result<Vec<f32>, InferenceError> {
+    const Q4_K_BLOCK_BYTES: usize = 144;
+    const Q4_K_BLOCK_VALUES: usize = 256;
+
+    if !slice.len().is_multiple_of(Q4_K_BLOCK_BYTES) {
+        return Err(InferenceError::new(format!(
+            "tensor {name} byte length {} is not divisible by Q4K block size {Q4_K_BLOCK_BYTES}",
+            slice.len()
+        )));
+    }
+
+    let mut values = Vec::with_capacity(slice.len() / Q4_K_BLOCK_BYTES * Q4_K_BLOCK_VALUES);
+    for block in slice.chunks_exact(Q4_K_BLOCK_BYTES) {
+        let d = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
+        let dmin = f16_bits_to_f32(u16::from_le_bytes([block[2], block[3]]));
+        let scales = &block[4..16];
+        let quants = &block[16..];
+        let mut scale_index = 0usize;
+
+        for quant_chunk in quants.chunks_exact(32) {
+            let (scale_low, min_low) = q4_k_scale_min(scale_index, scales);
+            let (scale_high, min_high) = q4_k_scale_min(scale_index + 1, scales);
+            let d_low = d * f32::from(scale_low);
+            let d_high = d * f32::from(scale_high);
+            let min_low = dmin * f32::from(min_low);
+            let min_high = dmin * f32::from(min_high);
+
+            for quant in quant_chunk {
+                values.push(d_low * f32::from(quant & 0x0f) - min_low);
+            }
+            for quant in quant_chunk {
+                values.push(d_high * f32::from(quant >> 4) - min_high);
+            }
+            scale_index += 2;
+        }
+    }
+    Ok(values)
+}
+
+fn q4_k_scale_min(index: usize, scales: &[u8]) -> (u8, u8) {
+    if index < 4 {
+        (scales[index] & 63, scales[index + 4] & 63)
+    } else {
+        (
+            (scales[index + 4] & 0x0f) | ((scales[index - 4] >> 6) << 4),
+            (scales[index + 4] >> 4) | ((scales[index] >> 6) << 4),
+        )
+    }
 }
 
 fn f16_bits_to_f32(bits: u16) -> f32 {

@@ -1,6 +1,6 @@
 use ferrite_fixtures::{
     scalar_llama_bf16_gguf_fixture, scalar_llama_f16_gguf_fixture, scalar_llama_f32_gguf_fixture,
-    scalar_llama_q8_0_gguf_fixture,
+    scalar_llama_q4_k_gguf_fixture, scalar_llama_q8_0_gguf_fixture,
 };
 use ferrite_inference::scalar::{
     apply_rope, argmax, rms_norm, Matrix, ScalarLlamaConfig, ScalarLlamaLayerWeights,
@@ -236,6 +236,19 @@ fn loads_scalar_llama_reference_weights_from_bf16_gguf_fixture() -> Result<(), B
 #[test]
 fn loads_scalar_llama_reference_weights_from_q8_0_gguf_fixture() -> Result<(), Box<dyn Error>> {
     let bytes = scalar_llama_q8_0_gguf_fixture();
+    let gguf = parse_gguf(&bytes)?;
+
+    let model = ScalarLlamaModel::from_gguf_unquantized(&gguf, &bytes)?;
+    let next = model.next_token(0)?;
+
+    assert_eq!(next.token_id, 1);
+    assert!(next.logits[1] > next.logits[0]);
+    Ok(())
+}
+
+#[test]
+fn loads_scalar_llama_reference_weights_from_q4_k_gguf_fixture() -> Result<(), Box<dyn Error>> {
+    let bytes = scalar_llama_q4_k_gguf_fixture();
     let gguf = parse_gguf(&bytes)?;
 
     let model = ScalarLlamaModel::from_gguf_unquantized(&gguf, &bytes)?;

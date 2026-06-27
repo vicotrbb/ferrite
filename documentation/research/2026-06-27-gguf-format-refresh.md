@@ -44,6 +44,20 @@ without silently guessing unsupported quantization layouts.
 
 ## Follow-Up
 
-Before implementing Q4_K dequantization, verify block layouts against the
-current `ggml-quants.h` definitions and add fixture tests that prove storage
-byte calculations for representative tensor shapes.
+Before implementing additional quantization families, verify block layouts
+against the current upstream `ggml` definitions and add fixture tests that prove
+storage byte calculations for representative tensor shapes.
+
+## 2026-06-27 Q4_K Verification Update
+
+Ferrite refreshed the `Q4_K` layout against upstream `ggml-org/llama.cpp`
+source before implementing scalar dequantization:
+
+- `GGML_TYPE_Q4_K` uses one 144-byte block per 256 values.
+- The block stores `d` and `dmin` as F16 values.
+- The block stores 12 packed scale/min bytes for eight 32-value subblocks.
+- The block stores 128 bytes of packed 4-bit quantized values.
+- Dequantization applies each subblock as `d * scale * quant - dmin * min`.
+
+Reference source:
+`https://github.com/ggml-org/llama.cpp/blob/master/ggml/src/ggml-quants.c`
