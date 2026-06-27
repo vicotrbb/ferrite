@@ -1,0 +1,21 @@
+[package]
+name = "ferrite-cli"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[[bin]]
+name = "ferrite"
+path = "src/main.rs"
+
+[dependencies]
+ferrite-inference = { path = "../ferrite-inference" }
+ferrite-model = { path = "../ferrite-model" }
+
+[dev-dependencies]
+ferrite-fixtures = { path = "../ferrite-fixtures" }
+
+[lints]
+workspace = true

@@ -1,0 +1,53 @@
+use ferrite_fixtures::scalar_llama_f32_gguf_fixture;
+use std::error::Error;
+use std::ffi::OsString;
+use std::fs;
+use std::path::PathBuf;
+use std::process::Command;
+
+#[test]
+fn cli_loads_gguf_and_prints_text_prompt_next_token() -> Result<(), Box<dyn Error>> {
+    let model_path = write_fixture_model()?;
+    let binary = cli_binary()?;
+
+    let output = Command::new(binary)
+        .arg("--model")
+        .arg(&model_path)
+        .arg("--prompt")
+        .arg("hello")
+        .output()?;
+
+    fs::remove_file(&model_path)?;
+
+    assert!(
+        output.status.success(),
+        "cli failed with stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout)?;
+    assert!(stdout.contains("next_token_id=2"));
+    assert!(stdout.contains("next_token=winner"));
+    Ok(())
+}
+
+fn cli_binary() -> Result<OsString, Box<dyn Error>> {
+    std::env::var_os("CARGO_BIN_EXE_ferrite").ok_or_else(|| "missing CARGO_BIN_EXE_ferrite".into())
+}
+
+fn write_fixture_model() -> Result<PathBuf, Box<dyn Error>> {
+    let mut path = std::env::temp_dir();
+    path.push(format!(
+        "ferrite-cli-fixture-{}-{}.gguf",
+        std::process::id(),
+        unique_suffix()
+    ));
+    fs::write(&path, scalar_llama_f32_gguf_fixture())?;
+    Ok(path)
+}
+
+fn unique_suffix() -> u128 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or(0)
+}

@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "crates/ferrite-cli",
     "crates/ferrite-fixtures",
     "crates/ferrite-inference",
     "crates/ferrite-model",
