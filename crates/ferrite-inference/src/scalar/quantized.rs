@@ -1,19 +1,14 @@
 use super::{float::f16_bits_to_f32, InferenceError};
 
+pub(super) use super::q5_0::{decode_q5_0_row, q5_0_mul_vec, q5_0_row_bytes, Q5_0_BLOCK_VALUES};
 pub(super) use super::q8_0::{decode_q8_0_row, q8_0_mul_vec, q8_0_row_bytes, Q8_0_BLOCK_VALUES};
 
 pub(super) const Q4_K_BLOCK_VALUES: usize = 256;
 pub(super) const Q4_K_BLOCK_BYTES: usize = 144;
-pub(super) const Q5_0_BLOCK_VALUES: usize = 32;
-pub(super) const Q5_0_BLOCK_BYTES: usize = 22;
 pub(super) const Q6_K_BLOCK_VALUES: usize = 256;
 pub(super) const Q6_K_BLOCK_BYTES: usize = 210;
 pub(super) fn q4_k_storage_bytes(value_count: usize) -> Result<usize, InferenceError> {
     storage_bytes(value_count, Q4_K_BLOCK_VALUES, Q4_K_BLOCK_BYTES, "Q4_K")
-}
-
-pub(super) fn q5_0_row_bytes(cols: usize) -> Result<usize, InferenceError> {
-    storage_bytes(cols, Q5_0_BLOCK_VALUES, Q5_0_BLOCK_BYTES, "Q5_0")
 }
 
 pub(super) fn q6_k_storage_bytes(value_count: usize) -> Result<usize, InferenceError> {
@@ -285,86 +280,6 @@ fn accumulate_q6_k_block(
     Ok(())
 }
 
-pub(super) fn q5_0_mul_vec(
-    bytes: &[u8],
-    rows: usize,
-    cols: usize,
-    vector: &[f32],
-) -> Result<Vec<f32>, InferenceError> {
-    if vector.len() != cols {
-        return Err(InferenceError::new(format!(
-            "matrix columns {cols} do not match vector length {}",
-            vector.len()
-        )));
-    }
-    let row_bytes = q5_0_row_bytes(cols)?;
-    let expected = rows
-        .checked_mul(row_bytes)
-        .ok_or_else(|| InferenceError::new("Q5_0 matrix byte length overflow"))?;
-    if bytes.len() != expected {
-        return Err(InferenceError::new(format!(
-            "Q5_0 matrix byte length {} does not match shape {rows}x{cols}",
-            bytes.len()
-        )));
-    }
-
-    let mut output = vec![0.0; rows];
-    for (row, row_bytes) in bytes.chunks_exact(row_bytes).enumerate() {
-        let mut sum = 0.0;
-        for (block_index, block) in row_bytes.chunks_exact(Q5_0_BLOCK_BYTES).enumerate() {
-            let scale = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
-            let high_bits = u32::from_le_bytes([block[2], block[3], block[4], block[5]]);
-            let quants = &block[6..];
-            let col_base = block_index * Q5_0_BLOCK_VALUES;
-
-            for (index, quant) in quants.iter().enumerate() {
-                let high = ((high_bits >> index) << 4) as u8 & 0x10;
-                let signed = i32::from((quant & 0x0f) | high) - 16;
-                sum += scale * signed as f32 * vector[col_base + index];
-            }
-
-            for (index, quant) in quants.iter().enumerate() {
-                let high = (high_bits >> (index + 12)) as u8 & 0x10;
-                let signed = i32::from((quant >> 4) | high) - 16;
-                sum += scale * signed as f32 * vector[col_base + index + 16];
-            }
-        }
-        output[row] = sum;
-    }
-
-    Ok(output)
-}
-
-pub(super) fn decode_q5_0_row(bytes: &[u8], cols: usize) -> Result<Vec<f32>, InferenceError> {
-    let expected = q5_0_row_bytes(cols)?;
-    if bytes.len() != expected {
-        return Err(InferenceError::new(format!(
-            "Q5_0 row byte length {} does not match {expected}",
-            bytes.len()
-        )));
-    }
-
-    let mut values = Vec::with_capacity(cols);
-    for block in bytes.chunks_exact(Q5_0_BLOCK_BYTES) {
-        let scale = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
-        let high_bits = u32::from_le_bytes([block[2], block[3], block[4], block[5]]);
-        let quants = &block[6..];
-
-        for (index, quant) in quants.iter().enumerate() {
-            let high = ((high_bits >> index) << 4) as u8 & 0x10;
-            let signed = i32::from((quant & 0x0f) | high) - 16;
-            values.push(scale * signed as f32);
-        }
-
-        for (index, quant) in quants.iter().enumerate() {
-            let high = (high_bits >> (index + 12)) as u8 & 0x10;
-            let signed = i32::from((quant >> 4) | high) - 16;
-            values.push(scale * signed as f32);
-        }
-    }
-    Ok(values)
-}
-
 pub(super) fn decode_q6_k_values(
     bytes: &[u8],
     value_count: usize,
@@ -451,6 +366,7 @@ fn q4_k_scale_min(index: usize, scales: &[u8]) -> (u8, u8) {
 
 #[cfg(test)]
 mod tests {
+    use super::super::q5_0::{q5_0_mul_vec_with_backend, Q5_0MatVecBackend};
     use super::super::q8_0::{q8_0_mul_vec_with_backend, Q8_0MatVecBackend};
     use super::{
         accumulate_q4_k_block, accumulate_q6_k_block, decode_q6_k_values, q4_k_mul_vec,
@@ -568,6 +484,20 @@ mod tests {
         let actual = q5_0_mul_vec(&bytes, 2, 32, &[1.0; 32])?;
 
         assert_eq!(actual, vec![32.0, 64.0]);
+        Ok(())
+    }
+
+    #[test]
+    #[cfg(target_arch = "aarch64")]
+    fn q5_0_matvec_uses_neon_backend_on_aarch64() -> Result<(), InferenceError> {
+        let mut bytes = Vec::new();
+        bytes.extend(q5_0_block_with_value(1));
+        bytes.extend(q5_0_block_with_value(-2));
+
+        let output = q5_0_mul_vec_with_backend(&bytes, 2, 32, &[1.0; 32])?;
+
+        assert_eq!(output.backend, Q5_0MatVecBackend::Aarch64Neon);
+        assert_eq!(output.values, vec![32.0, -64.0]);
         Ok(())
     }
 
