@@ -6,12 +6,14 @@ mod memory;
 mod output;
 mod prompt;
 mod quantized;
+mod rope;
 mod session;
 mod tensor;
 
-pub use math::{apply_rope, argmax, rms_norm};
+pub use math::{argmax, rms_norm};
 pub use matrix::Matrix;
 pub use output::ScalarLlamaOutputWeights;
+pub use rope::apply_rope;
 pub use session::ScalarLlamaSession;
 
 use ferrite_model::gguf::{GgufError, GgufFile};

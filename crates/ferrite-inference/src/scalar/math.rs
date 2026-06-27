@@ -36,47 +36,6 @@ pub fn argmax(values: &[f32]) -> Result<usize, InferenceError> {
     Ok(best_index)
 }
 
-pub fn apply_rope(
-    values: &[f32],
-    position: usize,
-    rope_dimension_count: usize,
-    rope_freq_base: f32,
-) -> Result<Vec<f32>, InferenceError> {
-    if rope_dimension_count == 0 {
-        return Ok(values.to_vec());
-    }
-    if rope_dimension_count > values.len() {
-        return Err(InferenceError::new(format!(
-            "rope dimension count {rope_dimension_count} exceeds vector length {}",
-            values.len()
-        )));
-    }
-    if !rope_dimension_count.is_multiple_of(2) {
-        return Err(InferenceError::new(format!(
-            "rope dimension count {rope_dimension_count} must be even"
-        )));
-    }
-    if rope_freq_base <= 0.0 {
-        return Err(InferenceError::new(format!(
-            "rope frequency base {rope_freq_base} must be positive"
-        )));
-    }
-
-    let mut output = values.to_vec();
-    for pair_start in (0..rope_dimension_count).step_by(2) {
-        let exponent = pair_start as f32 / rope_dimension_count as f32;
-        let theta = position as f32 / rope_freq_base.powf(exponent);
-        let cos = theta.cos();
-        let sin = theta.sin();
-        let even = values[pair_start];
-        let odd = values[pair_start + 1];
-        output[pair_start] = even * cos - odd * sin;
-        output[pair_start + 1] = even * sin + odd * cos;
-    }
-
-    Ok(output)
-}
-
 pub(super) fn swiglu(gate: &[f32], up: &[f32]) -> Result<Vec<f32>, InferenceError> {
     ensure_len("ffn up", up, gate.len())?;
     Ok(gate
