@@ -21,7 +21,8 @@ The registry criteria are:
 
 ## Current Verdict
 
-Tier 0 is close, but not complete.
+Tier 0's model-plumbing gate is complete under
+`documentation/adr/0005-reference-parity-policy.md`.
 
 Ferrite has strong local evidence for loading, scalar forward execution,
 generation, streaming, memory accounting, and benchmark behavior for both Tier
@@ -31,13 +32,18 @@ produces a different continuation after the first generated token. The split is
 a near-tie in Ferrite logits and appears backend-sensitive, but it is not yet
 resolved.
 
+ADR 0005 classifies this as a bounded backend-reference caveat rather than a
+Tier 0 plumbing failure, because the Tier 0 gate now requires exact token parity
+against a fixed, documented reference profile plus explicit documentation of
+known backend disagreements.
+
 ## Evidence Matrix
 
 | Criterion | 135M Status | 360M Status | Evidence |
 | --- | --- | --- | --- |
 | GGUF parser loads model | Proven | Proven | `documentation/dev-notes/2026-06-27-q6-k-loader-slice.md`, `documentation/dev-notes/2026-06-27-tier0-smollm2-360m-probe.md` |
 | Forward pass produces output | Proven | Proven | `documentation/dev-notes/2026-06-27-tier0-smollm2-reference-comparison.md`, `documentation/dev-notes/2026-06-27-tier0-smollm2-360m-probe.md` |
-| Token output matches `llama.cpp` | Proven across checked local modes | Partial | 135M matches default, CPU-only, and CPU no-repack `llama-completion`; 360M matches default `llama.cpp`, but diverges from CPU-only paths |
+| Token output matches `llama.cpp` | Proven across checked local modes | Proven against fixed reference profile, CPU-only caveat documented | 135M matches default, CPU-only, and CPU no-repack `llama-completion`; 360M matches default `llama.cpp`, but diverges from CPU-only paths |
 | Streaming mode works | Proven | Proven | `documentation/dev-notes/2026-06-27-cli-generation-mode.md`, `documentation/dev-notes/2026-06-27-tier0-smollm2-360m-probe.md` |
 | Memory and latency documented | Proven | Proven | `documentation/benchmarks/2026-06-27-tier0-smollm2-q6k-direct-block-accumulation.md`, `documentation/benchmarks/2026-06-27-tier0-smollm2-360m-scalar-probe.md` |
 
@@ -131,15 +137,12 @@ match=true
 
 The first divergent candidate margin is about `0.043554` logits.
 
-## Remaining Work Before Tier 1
+## Remaining Work After Tier 0
 
-- Decide the reference policy for backend-sensitive quantized ties:
-  - either define Ferrite's scalar path as compared against a fixed `llama.cpp`
-    backend mode,
-  - or require CPU-only `llama.cpp` parity and investigate the 360M mismatch
-    down to the tensor/kernel level.
-- Record that policy in an ADR or update an existing ADR.
-- If CPU-only parity is required, add a deeper diagnostic path that can compare
-  intermediate logits or layer outputs against `llama.cpp` for the reduced
-  prompt `[28120, 905, 18]`.
-- Only then mark Tier 0 complete and start Tier 1 SIMD/GQA validation work.
+- Start Tier 1 with SIMD/GQA validation against Ferrite's scalar reference path.
+- Keep the SmolLM2-360M CPU-only `llama.cpp` split as a tracked reference
+  caveat, not as a blocker for Tier 1 bring-up.
+- Before optimized CPU kernels are treated as correct, compare them against the
+  Ferrite scalar reference path and record CPU-backend comparison evidence.
+- Add a deeper diagnostic path for intermediate logits or layer outputs if the
+  360M CPU-only split becomes relevant to optimized CPU-kernel validation.
