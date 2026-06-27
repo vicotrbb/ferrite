@@ -1,8 +1,8 @@
 use super::{
     math::dot,
     quantized::{
-        decode_q4_k_values, decode_q5_0_row, decode_q8_0_row, q4_k_storage_bytes, q5_0_row_bytes,
-        q8_0_row_bytes, Q5_0_BLOCK_VALUES, Q8_0_BLOCK_VALUES,
+        decode_q4_k_values, decode_q5_0_row, decode_q8_0_row, q4_k_mul_vec, q4_k_storage_bytes,
+        q5_0_row_bytes, q8_0_row_bytes, Q5_0_BLOCK_VALUES, Q8_0_BLOCK_VALUES,
     },
     InferenceError,
 };
@@ -217,6 +217,10 @@ impl Matrix {
                 self.cols,
                 vector.len()
             )));
+        }
+
+        if let MatrixData::Q4K(data) = &self.data {
+            return q4_k_mul_vec(data, self.rows, self.cols, vector);
         }
 
         let mut output = Vec::with_capacity(self.rows);
