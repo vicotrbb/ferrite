@@ -1,4 +1,4 @@
-use super::InferenceError;
+use super::{quantized::decode_q6_k_values, InferenceError};
 use ferrite_model::gguf::{GgmlType, TensorInfo};
 
 pub(super) fn raw_bytes(tensor: &TensorInfo, bytes: &[u8]) -> Result<Vec<u8>, InferenceError> {
@@ -177,47 +177,8 @@ fn q6_k_values_from_le_bytes(name: &str, slice: &[u8]) -> Result<Vec<f32>, Infer
         )));
     }
 
-    let mut values = Vec::with_capacity(slice.len() / Q6_K_BLOCK_BYTES * Q6_K_BLOCK_VALUES);
-    for block in slice.chunks_exact(Q6_K_BLOCK_BYTES) {
-        let low_bits = &block[0..128];
-        let high_bits = &block[128..192];
-        let scales = &block[192..208];
-        let super_scale = f16_bits_to_f32(u16::from_le_bytes([block[208], block[209]]));
-        let mut block_values = vec![0.0; Q6_K_BLOCK_VALUES];
-
-        for half in 0..2 {
-            let value_base = half * 128;
-            let low_base = half * 64;
-            let high_base = half * 32;
-            let scale_base = half * 8;
-
-            for index in 0..32 {
-                let scale_index = index / 16;
-                let high = high_bits[high_base + index];
-                let q1 = i32::from((low_bits[low_base + index] & 0x0f) | ((high & 3) << 4)) - 32;
-                let q2 =
-                    i32::from((low_bits[low_base + index + 32] & 0x0f) | (((high >> 2) & 3) << 4))
-                        - 32;
-                let q3 =
-                    i32::from((low_bits[low_base + index] >> 4) | (((high >> 4) & 3) << 4)) - 32;
-                let q4 =
-                    i32::from((low_bits[low_base + index + 32] >> 4) | (((high >> 6) & 3) << 4))
-                        - 32;
-
-                block_values[value_base + index] =
-                    super_scale * f32::from(scales[scale_base + scale_index] as i8) * q1 as f32;
-                block_values[value_base + index + 32] =
-                    super_scale * f32::from(scales[scale_base + scale_index + 2] as i8) * q2 as f32;
-                block_values[value_base + index + 64] =
-                    super_scale * f32::from(scales[scale_base + scale_index + 4] as i8) * q3 as f32;
-                block_values[value_base + index + 96] =
-                    super_scale * f32::from(scales[scale_base + scale_index + 6] as i8) * q4 as f32;
-            }
-        }
-
-        values.extend(block_values);
-    }
-    Ok(values)
+    let value_count = slice.len() / Q6_K_BLOCK_BYTES * Q6_K_BLOCK_VALUES;
+    decode_q6_k_values(slice, value_count)
 }
 
 fn q4_k_scale_min(index: usize, scales: &[u8]) -> (u8, u8) {

@@ -1,8 +1,9 @@
 use super::{
     math::dot,
     quantized::{
-        decode_q4_k_values, decode_q5_0_row, decode_q8_0_row, q4_k_mul_vec, q4_k_storage_bytes,
-        q5_0_row_bytes, q8_0_row_bytes, Q5_0_BLOCK_VALUES, Q8_0_BLOCK_VALUES,
+        decode_q4_k_values, decode_q5_0_row, decode_q6_k_values, decode_q8_0_row, q4_k_mul_vec,
+        q4_k_storage_bytes, q5_0_row_bytes, q6_k_storage_bytes, q8_0_row_bytes, Q5_0_BLOCK_VALUES,
+        Q8_0_BLOCK_VALUES,
     },
     InferenceError,
 };
@@ -19,6 +20,7 @@ enum MatrixData {
     F32(Vec<f32>),
     Q4K(Vec<u8>),
     Q5_0(Vec<u8>),
+    Q6K(Vec<u8>),
     Q8_0(Vec<u8>),
 }
 
@@ -124,6 +126,29 @@ impl Matrix {
         })
     }
 
+    pub fn from_q6_k_row_major_bytes(
+        rows: usize,
+        cols: usize,
+        data: Vec<u8>,
+    ) -> Result<Self, InferenceError> {
+        let value_count = rows
+            .checked_mul(cols)
+            .ok_or_else(|| InferenceError::new("Q6_K matrix value count overflow"))?;
+        let expected = q6_k_storage_bytes(value_count)?;
+        if data.len() != expected {
+            return Err(InferenceError::new(format!(
+                "Q6_K matrix byte length {} does not match shape {rows}x{cols}",
+                data.len()
+            )));
+        }
+
+        Ok(Self {
+            rows,
+            cols,
+            data: MatrixData::Q6K(data),
+        })
+    }
+
     pub fn rows(&self) -> usize {
         self.rows
     }
@@ -188,6 +213,20 @@ impl Matrix {
                     .ok_or_else(|| InferenceError::new("Q5_0 row end overflow"))?;
                 decode_q5_0_row(&data[start..end], self.cols)
             }
+            MatrixData::Q6K(data) => {
+                let value_count = self
+                    .rows
+                    .checked_mul(self.cols)
+                    .ok_or_else(|| InferenceError::new("Q6_K matrix value count overflow"))?;
+                let values = decode_q6_k_values(data, value_count)?;
+                let start = index
+                    .checked_mul(self.cols)
+                    .ok_or_else(|| InferenceError::new("Q6_K row offset overflow"))?;
+                let end = start
+                    .checked_add(self.cols)
+                    .ok_or_else(|| InferenceError::new("Q6_K row end overflow"))?;
+                Ok(values[start..end].to_vec())
+            }
             MatrixData::Q8_0(data) => {
                 let row_bytes = q8_0_row_bytes(self.cols)?;
                 let start = index
@@ -206,6 +245,7 @@ impl Matrix {
             MatrixData::F32(values) => values.len() as u128 * std::mem::size_of::<f32>() as u128,
             MatrixData::Q4K(bytes) => bytes.len() as u128,
             MatrixData::Q5_0(bytes) => bytes.len() as u128,
+            MatrixData::Q6K(bytes) => bytes.len() as u128,
             MatrixData::Q8_0(bytes) => bytes.len() as u128,
         }
     }

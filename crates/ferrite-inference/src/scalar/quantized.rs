@@ -4,6 +4,8 @@ pub(super) const Q4_K_BLOCK_VALUES: usize = 256;
 pub(super) const Q4_K_BLOCK_BYTES: usize = 144;
 pub(super) const Q5_0_BLOCK_VALUES: usize = 32;
 pub(super) const Q5_0_BLOCK_BYTES: usize = 22;
+pub(super) const Q6_K_BLOCK_VALUES: usize = 256;
+pub(super) const Q6_K_BLOCK_BYTES: usize = 210;
 pub(super) const Q8_0_BLOCK_VALUES: usize = 32;
 pub(super) const Q8_0_BLOCK_BYTES: usize = 34;
 
@@ -13,6 +15,10 @@ pub(super) fn q4_k_storage_bytes(value_count: usize) -> Result<usize, InferenceE
 
 pub(super) fn q5_0_row_bytes(cols: usize) -> Result<usize, InferenceError> {
     storage_bytes(cols, Q5_0_BLOCK_VALUES, Q5_0_BLOCK_BYTES, "Q5_0")
+}
+
+pub(super) fn q6_k_storage_bytes(value_count: usize) -> Result<usize, InferenceError> {
+    storage_bytes(value_count, Q6_K_BLOCK_VALUES, Q6_K_BLOCK_BYTES, "Q6_K")
 }
 
 pub(super) fn q8_0_row_bytes(cols: usize) -> Result<usize, InferenceError> {
@@ -116,6 +122,61 @@ pub(super) fn decode_q5_0_row(bytes: &[u8], cols: usize) -> Result<Vec<f32>, Inf
     Ok(values)
 }
 
+pub(super) fn decode_q6_k_values(
+    bytes: &[u8],
+    value_count: usize,
+) -> Result<Vec<f32>, InferenceError> {
+    let expected = q6_k_storage_bytes(value_count)?;
+    if bytes.len() != expected {
+        return Err(InferenceError::new(format!(
+            "Q6_K byte length {} does not match {expected}",
+            bytes.len()
+        )));
+    }
+
+    let mut values = Vec::with_capacity(value_count);
+    for block in bytes.chunks_exact(Q6_K_BLOCK_BYTES) {
+        let low_bits = &block[0..128];
+        let high_bits = &block[128..192];
+        let scales = &block[192..208];
+        let super_scale = f16_bits_to_f32(u16::from_le_bytes([block[208], block[209]]));
+        let mut block_values = vec![0.0; Q6_K_BLOCK_VALUES];
+
+        for half in 0..2 {
+            let value_base = half * 128;
+            let low_base = half * 64;
+            let high_base = half * 32;
+            let scale_base = half * 8;
+
+            for index in 0..32 {
+                let scale_index = index / 16;
+                let high = high_bits[high_base + index];
+                let q1 = i32::from((low_bits[low_base + index] & 0x0f) | ((high & 3) << 4)) - 32;
+                let q2 =
+                    i32::from((low_bits[low_base + index + 32] & 0x0f) | (((high >> 2) & 3) << 4))
+                        - 32;
+                let q3 =
+                    i32::from((low_bits[low_base + index] >> 4) | (((high >> 4) & 3) << 4)) - 32;
+                let q4 =
+                    i32::from((low_bits[low_base + index + 32] >> 4) | (((high >> 6) & 3) << 4))
+                        - 32;
+
+                block_values[value_base + index] =
+                    super_scale * f32::from(scales[scale_base + scale_index] as i8) * q1 as f32;
+                block_values[value_base + index + 32] =
+                    super_scale * f32::from(scales[scale_base + scale_index + 2] as i8) * q2 as f32;
+                block_values[value_base + index + 64] =
+                    super_scale * f32::from(scales[scale_base + scale_index + 4] as i8) * q3 as f32;
+                block_values[value_base + index + 96] =
+                    super_scale * f32::from(scales[scale_base + scale_index + 6] as i8) * q4 as f32;
+            }
+        }
+
+        values.extend(block_values);
+    }
+    Ok(values)
+}
+
 pub(super) fn decode_q8_0_row(bytes: &[u8], cols: usize) -> Result<Vec<f32>, InferenceError> {
     let expected = q8_0_row_bytes(cols)?;
     if bytes.len() != expected {
@@ -197,7 +258,7 @@ fn f16_bits_to_f32(bits: u16) -> f32 {
 
 #[cfg(test)]
 mod tests {
-    use super::{q4_k_mul_vec, InferenceError};
+    use super::{decode_q6_k_values, q4_k_mul_vec, InferenceError};
 
     #[test]
     fn q4_k_mul_vec_accumulates_rows_without_full_row_decodes() -> Result<(), InferenceError> {
@@ -210,6 +271,23 @@ mod tests {
         let actual = q4_k_mul_vec(&block, 2, 128, &[1.0; 128])?;
 
         assert_eq!(actual, vec![128.0, 128.0]);
+        Ok(())
+    }
+
+    #[test]
+    fn q6_k_decoder_reconstructs_signed_block_values() -> Result<(), InferenceError> {
+        let mut block = vec![0u8; 128 + 64];
+        block[32] = 0xff;
+        block[128] = 0xe4;
+        block.extend(vec![1u8; 16]);
+        block.extend_from_slice(&0x3c00u16.to_le_bytes());
+
+        let values = decode_q6_k_values(&block, 256)?;
+
+        assert_eq!(values[0], -32.0);
+        assert_eq!(values[32], -1.0);
+        assert_eq!(values[64], 0.0);
+        assert_eq!(values[96], 31.0);
         Ok(())
     }
 }

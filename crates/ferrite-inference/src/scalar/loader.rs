@@ -161,6 +161,9 @@ fn f32_matrix(
         GgmlType::Q5_0 => {
             Matrix::from_q5_0_row_major_bytes(rows, cols, tensor::raw_bytes(tensor, bytes)?)
         }
+        GgmlType::Q6K => {
+            Matrix::from_q6_k_row_major_bytes(rows, cols, tensor::raw_bytes(tensor, bytes)?)
+        }
         GgmlType::Q8_0 => {
             Matrix::from_q8_0_row_major_bytes(rows, cols, tensor::raw_bytes(tensor, bytes)?)
         }

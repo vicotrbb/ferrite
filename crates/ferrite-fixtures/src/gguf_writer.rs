@@ -6,6 +6,7 @@ pub(crate) const GGML_TYPE_F16: u32 = 1;
 pub(crate) const GGML_TYPE_Q5_0: u32 = 6;
 pub(crate) const GGML_TYPE_Q8_0: u32 = 8;
 pub(crate) const GGML_TYPE_Q4_K: u32 = 12;
+pub(crate) const GGML_TYPE_Q6_K: u32 = 14;
 pub(crate) const GGML_TYPE_BF16: u32 = 30;
 
 pub(crate) struct F32TensorFixture {
@@ -98,6 +99,8 @@ pub(crate) fn q8_storage_bytes(value_count: usize) -> u64 {
 pub(crate) fn typed_storage_bytes(tensor: &TypedTensorFixture) -> u64 {
     if tensor.tensor_type == GGML_TYPE_Q4_K {
         q4_k_storage_bytes(tensor.values.len())
+    } else if tensor.tensor_type == GGML_TYPE_Q6_K {
+        q6_k_storage_bytes(tensor.values.len())
     } else if tensor.tensor_type == GGML_TYPE_Q5_0 {
         q5_0_storage_bytes(tensor.values.len())
     } else {
@@ -108,6 +111,8 @@ pub(crate) fn typed_storage_bytes(tensor: &TypedTensorFixture) -> u64 {
 pub(crate) fn push_typed_tensor_values(bytes: &mut Vec<u8>, tensor: &TypedTensorFixture) {
     if tensor.tensor_type == GGML_TYPE_Q4_K {
         push_q4_k_values(bytes, &tensor.values);
+    } else if tensor.tensor_type == GGML_TYPE_Q6_K {
+        push_q6_k_values(bytes, &tensor.values);
     } else if tensor.tensor_type == GGML_TYPE_Q5_0 {
         push_q5_0_values(bytes, &tensor.values);
     } else {
@@ -153,6 +158,10 @@ fn push_string(bytes: &mut Vec<u8>, value: &str) {
 
 fn q4_k_storage_bytes(value_count: usize) -> u64 {
     (value_count / 256 * 144) as u64
+}
+
+fn q6_k_storage_bytes(value_count: usize) -> u64 {
+    (value_count / 256 * 210) as u64
 }
 
 fn q5_0_storage_bytes(value_count: usize) -> u64 {
@@ -204,4 +213,41 @@ fn push_q4_k_values(bytes: &mut Vec<u8>, values: &[f32]) {
 
 fn q4_k_unit_scales() -> [u8; 12] {
     [1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1]
+}
+
+fn push_q6_k_values(bytes: &mut Vec<u8>, values: &[f32]) {
+    for block in values.chunks_exact(256) {
+        let mut low_bits = [0u8; 128];
+        let mut high_bits = [0u8; 64];
+
+        for half in 0..2 {
+            let value_base = half * 128;
+            let low_base = half * 64;
+            let high_base = half * 32;
+
+            for index in 0..32 {
+                let q1 = q6_k_quant(block[value_base + index]);
+                let q2 = q6_k_quant(block[value_base + index + 32]);
+                let q3 = q6_k_quant(block[value_base + index + 64]);
+                let q4 = q6_k_quant(block[value_base + index + 96]);
+
+                low_bits[low_base + index] = (q1 & 0x0f) | ((q3 & 0x0f) << 4);
+                low_bits[low_base + index + 32] = (q2 & 0x0f) | ((q4 & 0x0f) << 4);
+                high_bits[high_base + index] = ((q1 >> 4) & 3)
+                    | (((q2 >> 4) & 3) << 2)
+                    | (((q3 >> 4) & 3) << 4)
+                    | (((q4 >> 4) & 3) << 6);
+            }
+        }
+
+        bytes.extend_from_slice(&low_bits);
+        bytes.extend_from_slice(&high_bits);
+        bytes.extend_from_slice(&[1u8; 16]);
+        bytes.extend_from_slice(&f32_to_f16_bits(1.0).to_le_bytes());
+    }
+}
+
+fn q6_k_quant(value: f32) -> u8 {
+    let quantized = value.round() as i32 + 32;
+    quantized.clamp(0, 63) as u8
 }
