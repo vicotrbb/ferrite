@@ -24,8 +24,12 @@ coverage for `head_dim=64` and `head_dim=128`, session cache truncation, a
 matvec reference-comparison gate, and aarch64 NEON F32, Q8_0, Q5_0, Q6_K, and
 Q4_K matvec paths checked against scalar oracles. It also has compile-checked
 x86_64 AVX2 dispatch for all currently supported matvec formats, but no x86_64
-host runtime evidence yet. Tier 1 does not yet prove AVX2 correctness, real
-0.5B-1.7B model output, or throughput.
+host runtime evidence yet.
+
+Ferrite now has one real Tier 1 model-output proof: SmolLM2-1.7B-Instruct
+Q4_K_M matched a fixed local `llama.cpp` deterministic reference profile for
+six generated tokens from the prompt `hello world`. Tier 1 does not yet prove
+AVX2 runtime correctness, broad 0.5B-1.7B model coverage, or throughput.
 
 ## Evidence Matrix
 
@@ -38,8 +42,8 @@ host runtime evidence yet. Tier 1 does not yet prove AVX2 correctness, real
 | AArch64 SIMD correctness | Partially proven for F32, Q8_0, Q5_0, Q6_K, and Q4_K matvec on local NEON host | `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-f32-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q8-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q5-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q6-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q4-matvec.md`; targeted aarch64 backend tests |
 | AVX2 correctness | Compile-only F32, Q8_0, Q5_0, Q6_K, and Q4_K bring-up exists; runtime correctness not proven | `documentation/dev-notes/2026-06-27-tier1-x86-64-avx2-f32-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-x86-64-avx2-q8-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-x86-64-avx2-q5-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-x86-64-avx2-q6-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-x86-64-avx2-q4-matvec.md`; `cargo check -p ferrite-inference --target x86_64-unknown-linux-gnu --tests`; no x86_64 AVX2 host run yet |
 | Quantized SIMD correctness | Partially proven for Q8_0, Q5_0, Q6_K, and Q4_K on local NEON host | `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q8-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q5-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q6-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q4-matvec.md`; Q4_K and Q6_K dispatch is scoped to rows whose column count is a whole number of K-blocks |
-| Real 0.5B-1.7B model output | Not proven | No Tier 1 model reference run recorded yet |
-| Tier 1 throughput target | Not proven | No benchmark note proving `>= 10 tok/s` on 2 vCPU Q4_K_M |
+| Real 0.5B-1.7B model output | Partially proven for one 1.7B model/reference profile | `documentation/dev-notes/2026-06-27-tier1-smollm2-1-7b-reference-probe.md`; Ferrite matched local `llama.cpp` token IDs `[18, 198, 3725, 198, 198, 788]` for SmolLM2-1.7B-Instruct Q4_K_M |
+| Tier 1 throughput target | Not proven | `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-scalar-probe.md`; local scalar baseline averaged about 0.158 tok/s, far below `>= 10 tok/s` |
 
 ## Fresh Full-Workspace Gate
 
@@ -55,13 +59,43 @@ cargo check -p ferrite-inference --target x86_64-unknown-linux-gnu --tests
 
 All commands passed.
 
+## Fresh Tier 1 Model Probe
+
+Commands run for the SmolLM2-1.7B-Instruct Q4_K_M evidence slice:
+
+```sh
+huggingface-cli download bartowski/SmolLM2-1.7B-Instruct-GGUF SmolLM2-1.7B-Instruct-Q4_K_M.gguf --local-dir target/models --max-workers 1
+printf 'hello world' | target/reference/llama.cpp/build/bin/llama-tokenize -m target/models/SmolLM2-1.7B-Instruct-Q4_K_M.gguf --stdin --ids --no-bos --no-escape --log-disable
+/usr/bin/time -l target/reference/llama.cpp/build/bin/llama-completion -m target/models/SmolLM2-1.7B-Instruct-Q4_K_M.gguf -p 'hello world' -n 6 --temp 0 --top-k 1 --top-p 1 --repeat-last-n 0 --no-conversation --no-jinja --no-display-prompt --verbosity 1
+/usr/bin/time -l target/release/ferrite --model target/models/SmolLM2-1.7B-Instruct-Q4_K_M.gguf --prompt 'hello world' --generate-tokens 6 --expect-token-id 18 --expect-generated-token-ids 18,198,3725,198,198,788
+/usr/bin/time -l target/release/ferrite --model target/models/SmolLM2-1.7B-Instruct-Q4_K_M.gguf --prompt 'hello world' --benchmark-runs 5
+```
+
+Ferrite's six-token expectation run exited successfully with:
+
+```text
+expected_generated_token_ids=18,198,3725,198,198,788
+generated_match=true
+expected_token_id=18
+match=true
+```
+
+The benchmark run also exited successfully, but it is scalar baseline evidence,
+not a throughput pass:
+
+```text
+benchmark_runs=5
+benchmark_avg_ns=6333709400
+```
+
 ## Remaining Work
 
 - Run AVX2 runtime correctness checks on an x86_64 host behind ADR 0006's
   unsafe-boundary rules.
-- Run a Tier 1 model from `research/11-testing-model-registry.md` with a fixed
-  reference profile and record parser, output, memory, and latency evidence.
-- Benchmark Tier 1 decode throughput with hardware, model, quantization,
-  prompt, thread count, and RSS details before making any throughput claim.
+- Expand Tier 1 model coverage beyond the single SmolLM2-1.7B-Instruct Q4_K_M
+  fixed local reference profile recorded so far.
+- Benchmark optimized Tier 1 decode throughput with hardware, model,
+  quantization, prompt, thread count, and RSS details before making any
+  throughput claim.
 - Keep Tier 0's SmolLM2-360M CPU-only reference split documented as a caveat
   when comparing optimized CPU paths.
