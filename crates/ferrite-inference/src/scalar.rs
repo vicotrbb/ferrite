@@ -10,6 +10,8 @@ mod output;
 mod profile;
 mod prompt;
 mod q4_k;
+#[cfg(target_arch = "x86_64")]
+mod q4_k_avx2;
 #[cfg(target_arch = "aarch64")]
 mod q4_k_neon;
 mod q5_0;
