@@ -64,7 +64,7 @@ slice, but Qwen2.5-1.5B and broader Tier 1 throughput remain unproven.
 | Tier 1 throughput target | Partially proven for local Qwen2.5-0.5B Q4_K_M only; not proven for the full tier | `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-scalar-probe.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-q4k-row-parallel.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-q6k-row-parallel.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-q4k-fused-neon.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-q6k-fused-neon.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-token-id-benchmark.md`; `documentation/benchmarks/2026-06-27-tier1-qwen2-q4k-throughput.md`; `documentation/benchmarks/2026-06-27-tier1-qwen2-0-5b-q5-neon-block-dot.md`; `documentation/benchmarks/2026-06-27-tier1-qwen2-0-5b-q8-argmax.md`; token-id benchmark path improved the SmolLM2-1.7B local default-pool run to about 5.51 tok/s and the 2-thread run to about 3.36 tok/s; Qwen2.5-0.5B improved to about 10.64 tok/s default-pool and 10.76 tok/s with `RAYON_NUM_THREADS=2` after Q8_0 direct argmax, but Qwen2.5-1.5B and broader Tier 1 throughput remain below or unproven |
 | Generated token path | Proven for one real 1.7B parity profile | `documentation/dev-notes/2026-06-27-token-id-generation-path.md`; generated-token loops use token-id-only repeated acceptance and still matched SmolLM2-1.7B token IDs `[18, 198, 3725, 198, 198, 788]` |
 | Next-token operation profiling | Proven for CLI, one real 1.7B profile, and two Qwen2 profiles | `documentation/dev-notes/2026-06-27-tier1-next-token-profile.md`; `documentation/dev-notes/2026-06-27-tier1-profile-matrix-metadata.md`; `documentation/dev-notes/2026-06-27-tier1-qwen2-profile.md`; `--profile-next-token` emits per-operation labels, matrix storage kind/shape/bytes, and aggregate `profile_next_token_role` summaries; SmolLM2-1.7B points at Q4_K/Q6_K FFN/output roles, Qwen2.5-0.5B points at Q5_0 FFN gate/up, and Qwen2.5-1.5B points at Q4_K FFN plus Q6_K output/down roles |
-| Rejected optimization experiments | Q8_0 and Q5_0 naive row-level Rayon scheduling regressed and were reverted | `documentation/dev-notes/2026-06-27-tier1-q8-row-parallel-regression.md`; `documentation/dev-notes/2026-06-27-tier1-q5-row-parallel-regression.md`; Q8_0 was implemented in `3b12756` and reverted in `1ae4275`; Q5_0 was implemented in `f318e3b` and reverted in `a5d9382` |
+| Rejected optimization experiments | Q8_0 and Q5_0 naive row-level Rayon scheduling regressed and were reverted; Q6_K argmax `try_reduce` row reduction was tested and not retained | `documentation/dev-notes/2026-06-27-tier1-q8-row-parallel-regression.md`; `documentation/dev-notes/2026-06-27-tier1-q5-row-parallel-regression.md`; `documentation/dev-notes/2026-06-27-tier1-q6-argmax-reduction-regression.md`; Q8_0 was implemented in `3b12756` and reverted in `1ae4275`; Q5_0 was implemented in `f318e3b` and reverted in `a5d9382`; Q6_K argmax row reduction regressed Qwen2.5-1.5B from `295,683,141` ns to `302,361,766` ns default-pool and from `378,677,558` ns to `593,748,308` ns with `RAYON_NUM_THREADS=2` |
 
 ## Fresh Full-Workspace Gate
 
@@ -225,6 +225,9 @@ match=true
 - Do not reapply naive Q8_0 or Q5_0 row-level Rayon scheduling without first
   isolating hot tensors and testing a threshold or fused strategy; direct copies
   of the Q4_K/Q6_K pattern regressed and were reverted.
+- Do not replace the Q6_K argmax row-score collection with the tested Rayon
+  `try_reduce` shape; it regressed Qwen2.5-1.5B, especially with
+  `RAYON_NUM_THREADS=2`.
 - Benchmark optimized Tier 1 decode throughput with hardware, model,
   quantization, prompt, thread count, and RSS details before making any
   throughput claim.
