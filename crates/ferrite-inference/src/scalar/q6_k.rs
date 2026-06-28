@@ -29,6 +29,30 @@ pub(super) fn q6_k_mul_vec(
     Ok(q6_k_mul_vec_with_backend(bytes, rows, cols, vector)?.values)
 }
 
+pub(super) fn q6_k_argmax_mul_vec(
+    bytes: &[u8],
+    rows: usize,
+    cols: usize,
+    vector: &[f32],
+) -> Result<usize, InferenceError> {
+    validate_q6_k_mul_vec(bytes, rows, cols, vector)?;
+    if rows == 0 {
+        return Err(InferenceError::new("argmax input must not be empty"));
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    {
+        if cols != 0
+            && cols.is_multiple_of(Q6_K_BLOCK_VALUES)
+            && std::arch::is_aarch64_feature_detected!("neon")
+        {
+            return super::q6_k_neon::neon_q6_k_argmax_mul_vec(bytes, rows, cols, vector);
+        }
+    }
+
+    scalar_q6_k_argmax_mul_vec(bytes, rows, cols, vector)
+}
+
 pub(super) fn q6_k_mul_vec_with_backend(
     bytes: &[u8],
     rows: usize,
@@ -134,6 +158,41 @@ fn scalar_q6_k_mul_vec(
         values,
         backend: Q6KMatVecBackend::Scalar,
     })
+}
+
+fn scalar_q6_k_argmax_mul_vec(
+    bytes: &[u8],
+    rows: usize,
+    cols: usize,
+    vector: &[f32],
+) -> Result<usize, InferenceError> {
+    let blocks_per_row = cols / Q6_K_BLOCK_VALUES;
+    let row_bytes = blocks_per_row
+        .checked_mul(Q6_K_BLOCK_BYTES)
+        .ok_or_else(|| InferenceError::new("Q6_K row byte length overflow"))?;
+    let mut best_index = 0usize;
+    let mut best_value = f32::NEG_INFINITY;
+
+    for (row_index, row_chunk) in bytes.chunks_exact(row_bytes).enumerate() {
+        let mut sum = 0.0;
+        for (block_index, block) in row_chunk.chunks_exact(Q6_K_BLOCK_BYTES).enumerate() {
+            let block_values = q6_k_block_values(block)?;
+            let col_base = block_index * Q6_K_BLOCK_VALUES;
+            for (value, vector_value) in block_values
+                .iter()
+                .zip(&vector[col_base..col_base + Q6_K_BLOCK_VALUES])
+            {
+                sum += value * vector_value;
+            }
+        }
+        if row_index == 0 || sum > best_value {
+            best_index = row_index;
+            best_value = sum;
+        }
+    }
+    debug_assert_eq!(bytes.chunks_exact(row_bytes).len(), rows);
+
+    Ok(best_index)
 }
 
 pub(super) fn accumulate_q6_k_block(

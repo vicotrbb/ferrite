@@ -1,6 +1,6 @@
 use super::{
     kernel_check::ensure_within_relative_error,
-    math::dot,
+    math::{argmax, dot},
     matvec::f32_mul_vec,
     q4_k::q4_k_mul_vec,
     q6_k::q6_k_mul_vec,
@@ -316,6 +316,25 @@ impl Matrix {
             output.push(dot(&row, vector)?);
         }
         Ok(output)
+    }
+
+    pub fn argmax_mul_vec(&self, vector: &[f32]) -> Result<usize, InferenceError> {
+        if self.cols != vector.len() {
+            return Err(InferenceError::new(format!(
+                "matrix columns {} do not match vector length {}",
+                self.cols,
+                vector.len()
+            )));
+        }
+        if self.rows == 0 {
+            return Err(InferenceError::new("argmax input must not be empty"));
+        }
+
+        if let MatrixData::Q6K(data) = &self.data {
+            return super::q6_k::q6_k_argmax_mul_vec(data, self.rows, self.cols, vector);
+        }
+
+        argmax(&self.mul_vec(vector)?)
     }
 
     pub fn mul_vec_checked_against_reference(

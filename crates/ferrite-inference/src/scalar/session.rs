@@ -66,7 +66,19 @@ impl<'a> ScalarLlamaSession<'a> {
     }
 
     pub fn accept_token(&mut self, token_id: usize) -> Result<NextToken, InferenceError> {
-        self.accept_token_inner(token_id, None)
+        let accepted = self.accept_token_inner(token_id, None, OutputMode::Logits)?;
+        Ok(NextToken {
+            token_id: accepted.token_id,
+            logits: accepted
+                .logits
+                .ok_or_else(|| InferenceError::new("missing logits for next token"))?,
+        })
+    }
+
+    pub fn accept_token_id(&mut self, token_id: usize) -> Result<usize, InferenceError> {
+        Ok(self
+            .accept_token_inner(token_id, None, OutputMode::TokenIdOnly)?
+            .token_id)
     }
 
     pub fn accept_token_profiled(
@@ -74,7 +86,13 @@ impl<'a> ScalarLlamaSession<'a> {
         token_id: usize,
     ) -> Result<ProfiledNextToken, InferenceError> {
         let mut events = Vec::new();
-        let next_token = self.accept_token_inner(token_id, Some(&mut events))?;
+        let accepted = self.accept_token_inner(token_id, Some(&mut events), OutputMode::Logits)?;
+        let next_token = NextToken {
+            token_id: accepted.token_id,
+            logits: accepted
+                .logits
+                .ok_or_else(|| InferenceError::new("missing logits for profiled next token"))?,
+        };
         Ok(ProfiledNextToken { next_token, events })
     }
 
@@ -82,7 +100,8 @@ impl<'a> ScalarLlamaSession<'a> {
         &mut self,
         token_id: usize,
         mut profile_events: Option<&mut Vec<ScalarProfileEvent>>,
-    ) -> Result<NextToken, InferenceError> {
+        output_mode: OutputMode,
+    ) -> Result<AcceptedToken, InferenceError> {
         if token_id >= self.model.config.vocab_size {
             return Err(InferenceError::new(format!(
                 "token id {token_id} is out of bounds for vocab size {}",
@@ -182,20 +201,34 @@ impl<'a> ScalarLlamaSession<'a> {
             &self.model.weights.output_norm,
             self.model.config.rms_norm_epsilon,
         )?;
-        let logits = profiled_mul_vec(
-            self.model
-                .weights
-                .output
-                .logits_matrix(&self.model.weights.token_embedding),
-            &normed,
-            "output",
-            profile_events,
-        )?;
-        let token_id = argmax(&logits)?;
+        let output = self
+            .model
+            .weights
+            .output
+            .logits_matrix(&self.model.weights.token_embedding);
+        let (token_id, logits) = match output_mode {
+            OutputMode::Logits => {
+                let logits = profiled_mul_vec(output, &normed, "output", profile_events)?;
+                (argmax(&logits)?, Some(logits))
+            }
+            OutputMode::TokenIdOnly => (output.argmax_mul_vec(&normed)?, None),
+        };
         self.cached_token_count += 1;
 
-        Ok(NextToken { token_id, logits })
+        Ok(AcceptedToken { token_id, logits })
     }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum OutputMode {
+    Logits,
+    TokenIdOnly,
+}
+
+#[derive(Debug, PartialEq)]
+struct AcceptedToken {
+    token_id: usize,
+    logits: Option<Vec<f32>>,
 }
 
 fn profiled_layer_mul_vec(

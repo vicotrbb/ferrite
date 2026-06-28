@@ -3,7 +3,7 @@ pub(super) use super::q4_k::{accumulate_q4_k_block, q4_k_mul_vec};
 pub(super) use super::q4_k::{decode_q4_k_values, q4_k_storage_bytes};
 pub(super) use super::q5_0::{decode_q5_0_row, q5_0_mul_vec, q5_0_row_bytes, Q5_0_BLOCK_VALUES};
 #[cfg(test)]
-pub(super) use super::q6_k::{accumulate_q6_k_block, q6_k_mul_vec};
+pub(super) use super::q6_k::{accumulate_q6_k_block, q6_k_argmax_mul_vec, q6_k_mul_vec};
 pub(super) use super::q6_k::{decode_q6_k_values, q6_k_storage_bytes};
 pub(super) use super::q8_0::{decode_q8_0_row, q8_0_mul_vec, q8_0_row_bytes, Q8_0_BLOCK_VALUES};
 #[cfg(test)]
@@ -21,7 +21,7 @@ mod tests {
     use super::super::q8_0::{q8_0_mul_vec_with_backend, Q8_0MatVecBackend};
     use super::{
         accumulate_q4_k_block, accumulate_q6_k_block, decode_q6_k_values, q4_k_mul_vec,
-        q5_0_mul_vec, q6_k_mul_vec, q8_0_mul_vec, InferenceError,
+        q5_0_mul_vec, q6_k_argmax_mul_vec, q6_k_mul_vec, q8_0_mul_vec, InferenceError,
     };
 
     #[test]
@@ -145,6 +145,31 @@ mod tests {
         accumulate_q6_k_block(&block, 0, 2, 128, &[1.0; 128], &mut output)?;
 
         assert_eq!(output, vec![-3970.0, -4096.0]);
+        Ok(())
+    }
+
+    #[test]
+    fn q6_k_argmax_mul_vec_matches_full_matvec_argmax() -> Result<(), InferenceError> {
+        let mut bytes = Vec::new();
+        bytes.extend(q6_k_block_with_first_group_pattern());
+        bytes.extend(q6_k_block_with_minus_32());
+        bytes.extend(q6_k_block_with_first_group_pattern());
+        let vector = (0..256)
+            .map(|index| if index % 2 == 0 { 1.0 } else { -0.5 })
+            .collect::<Vec<_>>();
+
+        let values = q6_k_mul_vec(&bytes, 3, 256, &vector)?;
+        let expected = values
+            .iter()
+            .enumerate()
+            .max_by(|(left_index, left), (right_index, right)| {
+                left.total_cmp(right)
+                    .then_with(|| right_index.cmp(left_index))
+            })
+            .map(|(index, _)| index)
+            .ok_or_else(|| InferenceError::new("empty argmax"))?;
+
+        assert_eq!(q6_k_argmax_mul_vec(&bytes, 3, 256, &vector)?, expected);
         Ok(())
     }
 

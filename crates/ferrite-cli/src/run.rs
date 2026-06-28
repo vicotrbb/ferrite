@@ -66,12 +66,12 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
         }
     }
     if let Some(runs) = args.benchmark_runs {
-        let mut benchmark_next = next.clone();
+        let mut benchmark_token_id = next.token_id;
         let mut benchmark_token_ids = Vec::with_capacity(runs);
         let started = Instant::now();
         for _ in 0..runs {
-            benchmark_next = session.accept_token(benchmark_next.token_id)?;
-            benchmark_token_ids.push(benchmark_next.token_id);
+            benchmark_token_id = session.accept_token_id(benchmark_token_id)?;
+            benchmark_token_ids.push(benchmark_token_id);
         }
         let total_ns = started.elapsed().as_nanos();
         let avg_ns = total_ns / runs as u128;

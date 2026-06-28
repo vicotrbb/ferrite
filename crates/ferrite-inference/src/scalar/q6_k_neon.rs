@@ -40,8 +40,51 @@ pub(super) fn neon_q6_k_mul_vec(
     })
 }
 
+pub(super) fn neon_q6_k_argmax_mul_vec(
+    bytes: &[u8],
+    rows: usize,
+    cols: usize,
+    vector: &[f32],
+) -> Result<usize, InferenceError> {
+    let blocks_per_row = cols / Q6_K_BLOCK_VALUES;
+    let row_bytes = blocks_per_row * Q6_K_BLOCK_BYTES;
+    let row_scores = bytes
+        .par_chunks_exact(row_bytes)
+        .enumerate()
+        .map(|(row_index, row_chunk)| {
+            let mut sum = 0.0;
+            for (block_index, block) in row_chunk.chunks_exact(Q6_K_BLOCK_BYTES).enumerate() {
+                let col_base = block_index * Q6_K_BLOCK_VALUES;
+                // SAFETY: the dispatch path checks NEON support, `block` has
+                // exactly one Q6_K block, and `cols` is a multiple of 256 so
+                // the per-block vector slice is in bounds.
+                sum += unsafe {
+                    neon_q6_k_block_dot(block, &vector[col_base..col_base + Q6_K_BLOCK_VALUES])?
+                };
+            }
+            Ok((row_index, sum))
+        })
+        .collect::<Result<Vec<_>, InferenceError>>()?;
+    debug_assert_eq!(row_scores.len(), rows);
+
+    row_scores
+        .into_iter()
+        .reduce(|best, candidate| {
+            if candidate.1 > best.1 {
+                candidate
+            } else {
+                best
+            }
+        })
+        .map(|(row_index, _)| row_index)
+        .ok_or_else(|| InferenceError::new("argmax input must not be empty"))
+}
+
 #[target_feature(enable = "neon")]
-unsafe fn neon_q6_k_block_dot(block: &[u8], vector: &[f32]) -> Result<f32, InferenceError> {
+pub(super) unsafe fn neon_q6_k_block_dot(
+    block: &[u8],
+    vector: &[f32],
+) -> Result<f32, InferenceError> {
     if block.len() != Q6_K_BLOCK_BYTES {
         return Err(InferenceError::new(format!(
             "Q6_K block byte length {} does not match {Q6_K_BLOCK_BYTES}",

@@ -243,6 +243,71 @@ fn scalar_session_reuses_cached_prompt_state_incrementally() -> Result<(), Box<d
 }
 
 #[test]
+fn scalar_session_accepts_token_id_without_returning_logits() -> Result<(), Box<dyn Error>> {
+    let identity = Matrix::from_row_major(2, 2, vec![1.0, 0.0, 0.0, 1.0])?;
+    let config = ScalarLlamaConfig {
+        vocab_size: 4,
+        hidden_size: 2,
+        intermediate_size: 2,
+        attention_head_count: 1,
+        attention_head_count_kv: 1,
+        head_dim: 2,
+        rope_dimension_count: 0,
+        rope_freq_base: 10_000.0,
+        rms_norm_epsilon: 0.0,
+    };
+    let model = ScalarLlamaModel::new(
+        config,
+        ScalarLlamaWeights {
+            token_embedding: Matrix::from_row_major(
+                4,
+                2,
+                vec![
+                    1.0, 0.0, // token 0
+                    0.0, 1.0, // token 1
+                    1.0, 1.0, // token 2
+                    0.0, 0.0, // token 3
+                ],
+            )?,
+            output_norm: vec![1.0, 1.0],
+            output: ScalarLlamaOutputWeights::untied(Matrix::from_row_major(
+                4,
+                2,
+                vec![
+                    0.0, 0.0, // token 0
+                    1.0, 0.0, // token 1
+                    0.0, 1.0, // token 2
+                    -1.0, -1.0, // token 3
+                ],
+            )?),
+            layers: vec![ScalarLlamaLayerWeights {
+                attn_norm: vec![1.0, 1.0],
+                q_proj: identity.clone(),
+                k_proj: identity.clone(),
+                v_proj: identity.clone(),
+                o_proj: identity.clone(),
+                ffn_norm: vec![1.0, 1.0],
+                ffn_gate: Matrix::from_row_major(2, 2, vec![0.0; 4])?,
+                ffn_up: identity.clone(),
+                ffn_down: identity,
+            }],
+        },
+    )?;
+
+    let mut logits_session = model.start_session();
+    let mut token_id_session = model.start_session();
+    let next = logits_session.accept_token(0)?;
+    let token_id = token_id_session.accept_token_id(0)?;
+
+    assert_eq!(token_id, next.token_id);
+    assert_eq!(
+        token_id_session.cached_token_count(),
+        logits_session.cached_token_count()
+    );
+    Ok(())
+}
+
+#[test]
 fn scalar_model_reports_weight_and_session_kv_cache_bytes() -> Result<(), Box<dyn Error>> {
     let identity = Matrix::from_row_major(2, 2, vec![1.0, 0.0, 0.0, 1.0])?;
     let config = ScalarLlamaConfig {
