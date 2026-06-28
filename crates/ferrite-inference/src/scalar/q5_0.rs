@@ -155,12 +155,9 @@ fn q5_0_signed_values(block: &[u8]) -> [i8; Q5_0_BLOCK_VALUES] {
 #[cfg(target_arch = "aarch64")]
 mod aarch64 {
     use super::{
-        f16_bits_to_f32, q5_0_signed_values, Q5_0MatVecBackend, Q5_0MatVecOutput, Q5_0_BLOCK_BYTES,
-        Q5_0_BLOCK_VALUES,
+        f16_bits_to_f32, Q5_0MatVecBackend, Q5_0MatVecOutput, Q5_0_BLOCK_BYTES, Q5_0_BLOCK_VALUES,
     };
-    use std::arch::aarch64::{
-        vaddvq_f32, vcvtq_f32_s32, vdupq_n_f32, vfmaq_f32, vld1_s8, vld1q_f32, vmovl_s16, vmovl_s8,
-    };
+    use std::arch::aarch64::{vaddvq_f32, vdupq_n_f32, vfmaq_f32, vld1q_f32};
 
     pub(super) fn neon_q5_0_mul_vec(
         bytes: &[u8],
@@ -173,15 +170,13 @@ mod aarch64 {
         for (row, row_bytes) in bytes.chunks_exact(row_bytes).enumerate() {
             let mut sum = 0.0;
             for (block_index, block) in row_bytes.chunks_exact(Q5_0_BLOCK_BYTES).enumerate() {
-                let scale = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
-                let signed = q5_0_signed_values(block);
                 let col_base = block_index * Q5_0_BLOCK_VALUES;
-                // SAFETY: `signed` contains 32 decoded Q5_0 values and `cols`
-                // is validated as a multiple of 32, so every 8-byte signed load
-                // and matching 4-lane vector load is in bounds.
-                sum +=
-                    unsafe { neon_i8_f32_block_dot(signed.as_ptr(), vector[col_base..].as_ptr()) }
-                        * scale;
+                // SAFETY: the dispatch path checks NEON support, `block` has
+                // exactly one Q5_0 block, and `cols` is a multiple of 32 so the
+                // per-block vector slice is in bounds.
+                sum += unsafe {
+                    neon_q5_0_block_dot(block, &vector[col_base..col_base + Q5_0_BLOCK_VALUES])
+                };
             }
             values[row] = sum;
         }
@@ -193,26 +188,79 @@ mod aarch64 {
     }
 
     #[target_feature(enable = "neon")]
-    unsafe fn neon_i8_f32_block_dot(signed: *const i8, vector: *const f32) -> f32 {
+    unsafe fn neon_q5_0_block_dot(block: &[u8], vector: &[f32]) -> f32 {
+        let scale = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
+        let high_bits = u32::from_le_bytes([block[2], block[3], block[4], block[5]]);
+        let quants = &block[6..];
         let mut lanes = vdupq_n_f32(0.0);
-        let mut offset = 0usize;
-        while offset < Q5_0_BLOCK_VALUES {
-            let signed_i8 = vld1_s8(signed.add(offset));
-            let signed_i16 = vmovl_s8(signed_i8);
-            let low_i32 = vmovl_s16(std::arch::aarch64::vget_low_s16(signed_i16));
-            let high_i32 = vmovl_s16(std::arch::aarch64::vget_high_s16(signed_i16));
 
-            let low_f32 = vcvtq_f32_s32(low_i32);
-            let low_vector = vld1q_f32(vector.add(offset));
-            lanes = vfmaq_f32(lanes, low_f32, low_vector);
+        for lane_base in (0..16).step_by(4) {
+            let mut low_values = [0.0; 4];
+            let mut high_values = [0.0; 4];
+            for lane in 0..4 {
+                let index = lane_base + lane;
+                let quant = quants[index];
+                let low_high_bit = ((high_bits >> index) << 4) as u8 & 0x10;
+                let high_high_bit = (high_bits >> (index + 12)) as u8 & 0x10;
+                low_values[lane] = f32::from(((quant & 0x0f) | low_high_bit) as i8 - 16);
+                high_values[lane] = f32::from(((quant >> 4) | high_high_bit) as i8 - 16);
+            }
 
-            let high_f32 = vcvtq_f32_s32(high_i32);
-            let high_vector = vld1q_f32(vector.add(offset + 4));
-            lanes = vfmaq_f32(lanes, high_f32, high_vector);
+            // SAFETY: the temporary lane arrays contain four contiguous f32
+            // values, and the vector slice was validated to contain exactly one
+            // Q5_0 block worth of elements.
+            unsafe {
+                let low_vector = vld1q_f32(vector.as_ptr().add(lane_base));
+                lanes = vfmaq_f32(lanes, vld1q_f32(low_values.as_ptr()), low_vector);
 
-            offset += 8;
+                let high_vector = vld1q_f32(vector.as_ptr().add(lane_base + 16));
+                lanes = vfmaq_f32(lanes, vld1q_f32(high_values.as_ptr()), high_vector);
+            }
         }
-        vaddvq_f32(lanes)
+
+        vaddvq_f32(lanes) * scale
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::neon_q5_0_block_dot;
+        use crate::scalar::{
+            q5_0::{decode_q5_0_row, Q5_0_BLOCK_BYTES, Q5_0_BLOCK_VALUES},
+            InferenceError,
+        };
+
+        #[test]
+        fn neon_q5_0_block_dot_matches_decoded_values() -> Result<(), InferenceError> {
+            let block = patterned_q5_0_block();
+            let vector = (0..Q5_0_BLOCK_VALUES)
+                .map(|index| (index % 9) as f32 - 4.0)
+                .collect::<Vec<_>>();
+
+            let actual = unsafe { neon_q5_0_block_dot(&block, &vector) };
+            let expected = decode_q5_0_row(&block, Q5_0_BLOCK_VALUES)?
+                .iter()
+                .zip(&vector)
+                .map(|(left, right)| left * right)
+                .sum::<f32>();
+
+            assert!(
+                (actual - expected).abs() < 0.001,
+                "actual={actual} expected={expected}"
+            );
+            Ok(())
+        }
+
+        fn patterned_q5_0_block() -> Vec<u8> {
+            let mut block = Vec::with_capacity(Q5_0_BLOCK_BYTES);
+            block.extend_from_slice(&0x3c00u16.to_le_bytes());
+            block.extend_from_slice(&0xa5c33c5au32.to_le_bytes());
+            for index in 0..16 {
+                let low = (index * 3) as u8 & 0x0f;
+                let high = (15 - index) as u8 & 0x0f;
+                block.push(low | (high << 4));
+            }
+            block
+        }
     }
 }
 
