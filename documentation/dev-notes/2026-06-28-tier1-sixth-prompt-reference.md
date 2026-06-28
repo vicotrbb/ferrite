@@ -109,5 +109,6 @@ output. No x86_64 model-output result is claimed by this note.
 ## Conclusion
 
 Ferrite now has local aarch64 sixth-prompt parity for the current Tier 1 local
-model/quantization set. Broader prompt coverage, x86_64 fifth/sixth-prompt
-coverage, and 1.5B additional quantizations remain open.
+model/quantization set. Broader prompt coverage, x86_64 sixth-prompt coverage,
+x86_64 Q4_K_M fourth-prompt coverage, and 1.5B additional quantizations remain
+open.
