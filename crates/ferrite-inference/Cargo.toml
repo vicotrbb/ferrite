@@ -11,6 +11,7 @@ path = "src/lib.rs"
 
 [dependencies]
 ferrite-model = { path = "../ferrite-model" }
+rayon = "1.10"
 
 [dev-dependencies]
 ferrite-fixtures = { path = "../ferrite-fixtures" }

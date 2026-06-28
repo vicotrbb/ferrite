@@ -231,6 +231,7 @@ mod aarch64 {
         q4_k_block_values, Q4KMatVecBackend, Q4KMatVecOutput, Q4_K_BLOCK_BYTES, Q4_K_BLOCK_VALUES,
     };
     use crate::scalar::InferenceError;
+    use rayon::prelude::*;
     use std::arch::aarch64::{vaddvq_f32, vdupq_n_f32, vfmaq_f32, vld1q_f32};
 
     pub(super) fn neon_q4_k_mul_vec(
@@ -241,22 +242,24 @@ mod aarch64 {
     ) -> Result<Q4KMatVecOutput, InferenceError> {
         let blocks_per_row = cols / Q4_K_BLOCK_VALUES;
         let row_bytes = blocks_per_row * Q4_K_BLOCK_BYTES;
-        let mut values = vec![0.0; rows];
-
-        for (row, row_chunk) in bytes.chunks_exact(row_bytes).enumerate() {
-            let mut sum = 0.0;
-            for (block_index, block) in row_chunk.chunks_exact(Q4_K_BLOCK_BYTES).enumerate() {
-                let block_values = q4_k_block_values(block)?;
-                let col_base = block_index * Q4_K_BLOCK_VALUES;
-                // SAFETY: `block_values` contains exactly 256 contiguous f32
-                // values and `cols` is a multiple of 256, so every 4-lane load
-                // from the block and vector slice is in bounds.
-                sum += unsafe {
-                    neon_f32_block_dot(block_values.as_ptr(), vector[col_base..].as_ptr())
-                };
-            }
-            values[row] = sum;
-        }
+        let values = bytes
+            .par_chunks_exact(row_bytes)
+            .map(|row_chunk| {
+                let mut sum = 0.0;
+                for (block_index, block) in row_chunk.chunks_exact(Q4_K_BLOCK_BYTES).enumerate() {
+                    let block_values = q4_k_block_values(block)?;
+                    let col_base = block_index * Q4_K_BLOCK_VALUES;
+                    // SAFETY: `block_values` contains exactly 256 contiguous
+                    // f32 values and `cols` is a multiple of 256, so every
+                    // 4-lane load from the block and vector slice is in bounds.
+                    sum += unsafe {
+                        neon_f32_block_dot(block_values.as_ptr(), vector[col_base..].as_ptr())
+                    };
+                }
+                Ok(sum)
+            })
+            .collect::<Result<Vec<_>, InferenceError>>()?;
+        debug_assert_eq!(values.len(), rows);
 
         Ok(Q4KMatVecOutput {
             values,
@@ -284,6 +287,7 @@ mod x86_64 {
         q4_k_block_values, Q4KMatVecBackend, Q4KMatVecOutput, Q4_K_BLOCK_BYTES, Q4_K_BLOCK_VALUES,
     };
     use crate::scalar::InferenceError;
+    use rayon::prelude::*;
     use std::arch::x86_64::{
         _mm256_add_ps, _mm256_loadu_ps, _mm256_mul_ps, _mm256_setzero_ps, _mm256_storeu_ps,
     };
@@ -296,22 +300,24 @@ mod x86_64 {
     ) -> Result<Q4KMatVecOutput, InferenceError> {
         let blocks_per_row = cols / Q4_K_BLOCK_VALUES;
         let row_bytes = blocks_per_row * Q4_K_BLOCK_BYTES;
-        let mut values = vec![0.0; rows];
-
-        for (row, row_chunk) in bytes.chunks_exact(row_bytes).enumerate() {
-            let mut sum = 0.0;
-            for (block_index, block) in row_chunk.chunks_exact(Q4_K_BLOCK_BYTES).enumerate() {
-                let block_values = q4_k_block_values(block)?;
-                let col_base = block_index * Q4_K_BLOCK_VALUES;
-                // SAFETY: `block_values` contains exactly 256 contiguous f32
-                // values and `cols` is a multiple of 256, so every 8-lane load
-                // from the block and vector slice is in bounds.
-                sum += unsafe {
-                    avx2_f32_block_dot(block_values.as_ptr(), vector[col_base..].as_ptr())
-                };
-            }
-            values[row] = sum;
-        }
+        let values = bytes
+            .par_chunks_exact(row_bytes)
+            .map(|row_chunk| {
+                let mut sum = 0.0;
+                for (block_index, block) in row_chunk.chunks_exact(Q4_K_BLOCK_BYTES).enumerate() {
+                    let block_values = q4_k_block_values(block)?;
+                    let col_base = block_index * Q4_K_BLOCK_VALUES;
+                    // SAFETY: `block_values` contains exactly 256 contiguous
+                    // f32 values and `cols` is a multiple of 256, so every
+                    // 8-lane load from the block and vector slice is in bounds.
+                    sum += unsafe {
+                        avx2_f32_block_dot(block_values.as_ptr(), vector[col_base..].as_ptr())
+                    };
+                }
+                Ok(sum)
+            })
+            .collect::<Result<Vec<_>, InferenceError>>()?;
+        debug_assert_eq!(values.len(), rows);
 
         Ok(Q4KMatVecOutput {
             values,

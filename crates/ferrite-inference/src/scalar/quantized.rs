@@ -87,6 +87,24 @@ mod tests {
     }
 
     #[test]
+    #[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
+    fn q4_k_simd_matvec_preserves_parallel_row_order() -> Result<(), InferenceError> {
+        let mut bytes = Vec::new();
+        bytes.extend(q4_k_block_with_value(1));
+        bytes.extend(q4_k_block_with_value(2));
+        bytes.extend(q4_k_block_with_value(3));
+
+        let output = q4_k_mul_vec_with_backend(&bytes, 3, 256, &[1.0; 256])?;
+
+        #[cfg(target_arch = "aarch64")]
+        assert_eq!(output.backend, Q4KMatVecBackend::Aarch64Neon);
+        #[cfg(target_arch = "x86_64")]
+        assert_eq!(output.backend, Q4KMatVecBackend::X86_64Avx2);
+        assert_eq!(output.values, vec![256.0, 512.0, 768.0]);
+        Ok(())
+    }
+
+    #[test]
     fn q6_k_decoder_reconstructs_signed_block_values() -> Result<(), InferenceError> {
         let mut block = vec![0u8; 128 + 64];
         block[32] = 0xff;
@@ -253,6 +271,17 @@ mod tests {
         block.extend_from_slice(&0x3c00u16.to_le_bytes());
         block.extend_from_slice(&high_bits.to_le_bytes());
         block.extend([(quantized & 0x0f) | ((quantized & 0x0f) << 4); 16]);
+        block
+    }
+
+    #[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
+    fn q4_k_block_with_value(value: u8) -> Vec<u8> {
+        let quantized = value & 0x0f;
+        let mut block = Vec::new();
+        block.extend_from_slice(&0x3c00u16.to_le_bytes());
+        block.extend_from_slice(&0u16.to_le_bytes());
+        block.extend_from_slice(&[1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1]);
+        block.extend_from_slice(&[quantized | (quantized << 4); 128]);
         block
     }
 
