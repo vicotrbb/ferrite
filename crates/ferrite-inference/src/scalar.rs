@@ -26,6 +26,8 @@ mod q6_k;
 mod q6_k_avx2;
 #[cfg(target_arch = "aarch64")]
 mod q6_k_neon;
+#[allow(dead_code)]
+mod q6_k_q8_k;
 mod q8_0;
 #[cfg(target_arch = "x86_64")]
 mod q8_0_avx2;
