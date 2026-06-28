@@ -17,7 +17,7 @@ mod tests {
     use super::super::q5_0::{q5_0_mul_vec_with_backend, Q5_0MatVecBackend};
     #[cfg(target_arch = "aarch64")]
     use super::super::q6_k::{q6_k_mul_vec_with_backend, Q6KMatVecBackend};
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
     use super::super::q8_0::{q8_0_mul_vec_with_backend, Q8_0MatVecBackend};
     use super::{
         accumulate_q4_k_block, accumulate_q6_k_block, decode_q6_k_values, q4_k_mul_vec,
@@ -157,6 +157,20 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_arch = "x86_64")]
+    fn q8_0_matvec_uses_avx2_backend_on_x86_64() -> Result<(), InferenceError> {
+        let mut bytes = Vec::new();
+        bytes.extend(q8_0_block_with_value(1));
+        bytes.extend(q8_0_block_with_value(-2));
+
+        let output = q8_0_mul_vec_with_backend(&bytes, 2, 32, &[1.0; 32])?;
+
+        assert_eq!(output.backend, Q8_0MatVecBackend::X86_64Avx2);
+        assert_eq!(output.values, vec![32.0, -64.0]);
+        Ok(())
+    }
+
+    #[test]
     fn q5_0_mul_vec_accumulates_rows_without_row_decodes() -> Result<(), InferenceError> {
         let mut bytes = Vec::new();
         bytes.extend(q5_0_block_with_value(1));
@@ -198,7 +212,7 @@ mod tests {
         block
     }
 
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
     fn q8_0_block_with_value(value: i8) -> Vec<u8> {
         let mut block = Vec::new();
         block.extend_from_slice(&0x3c00u16.to_le_bytes());
