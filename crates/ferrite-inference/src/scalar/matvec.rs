@@ -5,7 +5,10 @@ use super::{math::dot, InferenceError};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum F32MatVecBackend {
     Scalar,
+    #[cfg(target_arch = "aarch64")]
     Aarch64Neon,
+    #[cfg(target_arch = "x86_64")]
+    X86_64Avx2,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -46,6 +49,12 @@ pub(super) fn f32_mul_vec(
     {
         if std::arch::is_aarch64_feature_detected!("neon") {
             return Ok(aarch64::neon_f32_mul_vec(rows, cols, data, vector));
+        }
+    }
+    #[cfg(target_arch = "x86_64")]
+    {
+        if std::arch::is_x86_feature_detected!("avx2") {
+            return Ok(x86_64::avx2_f32_mul_vec(rows, cols, data, vector));
         }
     }
 
@@ -99,6 +108,25 @@ mod tests {
         assert_close(output.values[1], 0.75);
         Ok(())
     }
+
+    #[test]
+    #[cfg(target_arch = "x86_64")]
+    fn f32_matvec_uses_avx2_backend_on_x86_64() -> Result<(), InferenceError> {
+        let output = f32_mul_vec(
+            2,
+            8,
+            &[
+                1.0, 2.0, 3.0, 4.0, -1.0, -2.0, -3.0, -4.0, //
+                0.5, 0.25, -0.5, -0.25, 2.0, 3.0, -2.0, -3.0,
+            ],
+            &[1.0, -1.0, 2.0, -2.0, 0.5, -0.5, 1.5, -1.5],
+        )?;
+
+        assert_eq!(output.backend, F32MatVecBackend::X86_64Avx2);
+        assert_close(output.values[0], -1.0);
+        assert_close(output.values[1], 0.75);
+        Ok(())
+    }
 }
 
 #[cfg(target_arch = "aarch64")]
@@ -146,5 +174,59 @@ mod aarch64 {
             index += 4;
         }
         vaddvq_f32(lanes)
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+mod x86_64 {
+    use super::{F32MatVecBackend, F32MatVecOutput};
+    use std::arch::x86_64::{
+        _mm256_add_ps, _mm256_loadu_ps, _mm256_mul_ps, _mm256_setzero_ps, _mm256_storeu_ps,
+    };
+
+    pub(super) fn avx2_f32_mul_vec(
+        rows: usize,
+        cols: usize,
+        data: &[f32],
+        vector: &[f32],
+    ) -> F32MatVecOutput {
+        let mut values = Vec::with_capacity(rows);
+        for row in data.chunks_exact(cols) {
+            values.push(avx2_dot(row, vector));
+        }
+
+        F32MatVecOutput {
+            values,
+            backend: F32MatVecBackend::X86_64Avx2,
+        }
+    }
+
+    fn avx2_dot(left: &[f32], right: &[f32]) -> f32 {
+        let chunked_len = left.len() - (left.len() % 8);
+        // SAFETY: callers pass equally sized slices; `chunked_len` is rounded
+        // down to a multiple of eight, so every 8-lane unaligned load is in
+        // bounds. The public caller checks AVX2 support before dispatching.
+        let mut sum = unsafe { avx2_dot_chunked(left.as_ptr(), right.as_ptr(), chunked_len) };
+
+        for index in chunked_len..left.len() {
+            sum += left[index] * right[index];
+        }
+        sum
+    }
+
+    #[target_feature(enable = "avx2")]
+    unsafe fn avx2_dot_chunked(left: *const f32, right: *const f32, len: usize) -> f32 {
+        let mut lanes = _mm256_setzero_ps();
+        let mut index = 0usize;
+        while index < len {
+            let left_lanes = _mm256_loadu_ps(left.add(index));
+            let right_lanes = _mm256_loadu_ps(right.add(index));
+            lanes = _mm256_add_ps(lanes, _mm256_mul_ps(left_lanes, right_lanes));
+            index += 8;
+        }
+
+        let mut partial = [0.0f32; 8];
+        _mm256_storeu_ps(partial.as_mut_ptr(), lanes);
+        partial.iter().sum()
     }
 }

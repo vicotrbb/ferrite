@@ -11,9 +11,13 @@ use super::InferenceError;
 
 #[cfg(test)]
 mod tests {
+    #[cfg(target_arch = "aarch64")]
     use super::super::q4_k::{q4_k_mul_vec_with_backend, Q4KMatVecBackend};
+    #[cfg(target_arch = "aarch64")]
     use super::super::q5_0::{q5_0_mul_vec_with_backend, Q5_0MatVecBackend};
+    #[cfg(target_arch = "aarch64")]
     use super::super::q6_k::{q6_k_mul_vec_with_backend, Q6KMatVecBackend};
+    #[cfg(target_arch = "aarch64")]
     use super::super::q8_0::{q8_0_mul_vec_with_backend, Q8_0MatVecBackend};
     use super::{
         accumulate_q4_k_block, accumulate_q6_k_block, decode_q6_k_values, q4_k_mul_vec,
@@ -194,6 +198,7 @@ mod tests {
         block
     }
 
+    #[cfg(target_arch = "aarch64")]
     fn q8_0_block_with_value(value: i8) -> Vec<u8> {
         let mut block = Vec::new();
         block.extend_from_slice(&0x3c00u16.to_le_bytes());

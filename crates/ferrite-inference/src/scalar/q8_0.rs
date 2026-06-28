@@ -8,6 +8,7 @@ pub(super) const Q8_0_BLOCK_BYTES: usize = 34;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Q8_0MatVecBackend {
     Scalar,
+    #[cfg(target_arch = "aarch64")]
     Aarch64Neon,
 }
 

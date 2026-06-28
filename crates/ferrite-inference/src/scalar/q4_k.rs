@@ -8,6 +8,7 @@ pub(super) const Q4_K_BLOCK_BYTES: usize = 144;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Q4KMatVecBackend {
     Scalar,
+    #[cfg(target_arch = "aarch64")]
     Aarch64Neon,
 }
 
