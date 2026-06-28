@@ -77,6 +77,7 @@ The single-role probes narrow the Path B policy question:
 - `ffn_up` still needs broader prompt/model parity and repeated benchmark
   evidence before any dispatch promotion can be considered.
 
-The next evidence slice should test `ffn_up` across the existing six fixed
-SmolLM2 prompts and the Qwen2 Tier 1 prompt set, then benchmark repeated runs if
-parity holds.
+Follow-up in `documentation/dev-notes/2026-06-28-q8-k-ffn-up-six-prompt-probe.md`
+tested `ffn_up` across the existing six fixed SmolLM2 prompts. It matched four
+and diverged on two, so `ffn_up` is no longer a default-dispatch candidate for
+SmolLM2-1.7B on current evidence.

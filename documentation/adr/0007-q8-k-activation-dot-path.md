@@ -116,6 +116,9 @@ reference implementation and benchmarking baseline, not the Ferrite runtime.
 - `documentation/dev-notes/2026-06-28-q8-k-single-role-probes.md` records the
   first single-role SmolLM2 probes; only `ffn_up` matched both fixed prompts,
   and it still requires broader parity evidence.
+- `documentation/dev-notes/2026-06-28-q8-k-ffn-up-six-prompt-probe.md` records
+  the broader six-prompt `ffn_up` check; it diverged on two prompts and rejects
+  `ffn_up` as a default candidate for SmolLM2-1.7B.
 - `documentation/benchmarks/2026-06-28-tier1-qwen2-1-5b-current-profile.md`
   records the current Qwen2.5-1.5B profile and hot aggregate roles.
 - `documentation/dev-notes/2026-06-28-tier1-q4-q6-thresholded-row-parallel-regression.md`
