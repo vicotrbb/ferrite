@@ -43,7 +43,7 @@ pub(super) fn q4_k_mul_vec_with_backend(
             && cols.is_multiple_of(Q4_K_BLOCK_VALUES)
             && std::arch::is_aarch64_feature_detected!("neon")
         {
-            return aarch64::neon_q4_k_mul_vec(bytes, rows, cols, vector);
+            return super::q4_k_neon::neon_q4_k_mul_vec(bytes, rows, cols, vector);
         }
     }
     #[cfg(target_arch = "x86_64")]
@@ -222,62 +222,6 @@ fn q4_k_scale_min(index: usize, scales: &[u8]) -> (u8, u8) {
             (scales[index + 4] & 0x0f) | ((scales[index - 4] >> 6) << 4),
             (scales[index + 4] >> 4) | ((scales[index] >> 6) << 4),
         )
-    }
-}
-
-#[cfg(target_arch = "aarch64")]
-mod aarch64 {
-    use super::{
-        q4_k_block_values, Q4KMatVecBackend, Q4KMatVecOutput, Q4_K_BLOCK_BYTES, Q4_K_BLOCK_VALUES,
-    };
-    use crate::scalar::InferenceError;
-    use rayon::prelude::*;
-    use std::arch::aarch64::{vaddvq_f32, vdupq_n_f32, vfmaq_f32, vld1q_f32};
-
-    pub(super) fn neon_q4_k_mul_vec(
-        bytes: &[u8],
-        rows: usize,
-        cols: usize,
-        vector: &[f32],
-    ) -> Result<Q4KMatVecOutput, InferenceError> {
-        let blocks_per_row = cols / Q4_K_BLOCK_VALUES;
-        let row_bytes = blocks_per_row * Q4_K_BLOCK_BYTES;
-        let values = bytes
-            .par_chunks_exact(row_bytes)
-            .map(|row_chunk| {
-                let mut sum = 0.0;
-                for (block_index, block) in row_chunk.chunks_exact(Q4_K_BLOCK_BYTES).enumerate() {
-                    let block_values = q4_k_block_values(block)?;
-                    let col_base = block_index * Q4_K_BLOCK_VALUES;
-                    // SAFETY: `block_values` contains exactly 256 contiguous
-                    // f32 values and `cols` is a multiple of 256, so every
-                    // 4-lane load from the block and vector slice is in bounds.
-                    sum += unsafe {
-                        neon_f32_block_dot(block_values.as_ptr(), vector[col_base..].as_ptr())
-                    };
-                }
-                Ok(sum)
-            })
-            .collect::<Result<Vec<_>, InferenceError>>()?;
-        debug_assert_eq!(values.len(), rows);
-
-        Ok(Q4KMatVecOutput {
-            values,
-            backend: Q4KMatVecBackend::Aarch64Neon,
-        })
-    }
-
-    #[target_feature(enable = "neon")]
-    unsafe fn neon_f32_block_dot(left: *const f32, right: *const f32) -> f32 {
-        let mut lanes = vdupq_n_f32(0.0);
-        let mut offset = 0usize;
-        while offset < Q4_K_BLOCK_VALUES {
-            let left_lanes = vld1q_f32(left.add(offset));
-            let right_lanes = vld1q_f32(right.add(offset));
-            lanes = vfmaq_f32(lanes, left_lanes, right_lanes);
-            offset += 4;
-        }
-        vaddvq_f32(lanes)
     }
 }
 
