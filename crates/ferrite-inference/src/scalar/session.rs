@@ -6,6 +6,8 @@ use super::{
 };
 use std::time::{Duration, Instant};
 
+mod cache;
+
 #[derive(Debug)]
 pub struct ScalarLlamaSession<'a> {
     model: &'a ScalarLlamaModel,
@@ -15,41 +17,6 @@ pub struct ScalarLlamaSession<'a> {
 }
 
 impl<'a> ScalarLlamaSession<'a> {
-    pub(super) fn new(model: &'a ScalarLlamaModel) -> Self {
-        Self {
-            model,
-            layer_keys: vec![Vec::<Vec<f32>>::new(); model.weights.layers.len()],
-            layer_values: vec![Vec::<Vec<f32>>::new(); model.weights.layers.len()],
-            cached_token_count: 0,
-        }
-    }
-
-    pub fn cached_token_count(&self) -> usize {
-        self.cached_token_count
-    }
-
-    pub fn kv_cache_bytes(&self) -> u128 {
-        super::memory::kv_cache_bytes(&self.layer_keys, &self.layer_values)
-    }
-
-    pub fn truncate_cache(&mut self, token_count: usize) -> Result<(), InferenceError> {
-        if token_count > self.cached_token_count {
-            return Err(InferenceError::new(format!(
-                "cannot truncate kv cache from {} tokens to {token_count} tokens",
-                self.cached_token_count
-            )));
-        }
-
-        for keys in &mut self.layer_keys {
-            keys.truncate(token_count);
-        }
-        for values in &mut self.layer_values {
-            values.truncate(token_count);
-        }
-        self.cached_token_count = token_count;
-        Ok(())
-    }
-
     pub fn accept_prompt(&mut self, tokens: &[usize]) -> Result<NextToken, InferenceError> {
         if tokens.is_empty() {
             return Err(InferenceError::new(
