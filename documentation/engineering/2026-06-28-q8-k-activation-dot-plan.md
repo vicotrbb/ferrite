@@ -25,9 +25,9 @@
 - Modify `crates/ferrite-inference/src/scalar.rs`
   - Registers the focused modules.
 - Modify `crates/ferrite-inference/src/scalar/q4_k.rs`
-  - Routes eligible Q4_K matvec calls through the new adapter after tests pass.
+  - Routes eligible Q4_K matvec calls through the new path only after target-specific helpers and parity gates pass.
 - Modify `crates/ferrite-inference/src/scalar/q6_k.rs`
-  - Routes eligible Q6_K matvec and argmax-sensitive calls deliberately; argmax can stay on the existing path until separately proven.
+  - Routes eligible Q6_K matvec calls deliberately after target-specific helpers and parity gates pass; argmax can stay on the existing path until separately proven.
 - Modify `documentation/dev-notes/`
   - Records each implementation and benchmark slice.
 
@@ -175,62 +175,59 @@ Commit message:
 feat: add scalar q6 k q8 k dot
 ```
 
-## Task 4: Dispatcher Route And Model Parity
+## Task 4: Internal Row Matvec Adapters
 
 **Files:**
-- Modify: `crates/ferrite-inference/src/scalar/q4_k.rs`
-- Modify: `crates/ferrite-inference/src/scalar/q6_k.rs`
-- Add: `documentation/dev-notes/2026-06-28-q8-k-dispatch-slice.md`
+- Modify: `crates/ferrite-inference/src/scalar/q8_k.rs`
+- Modify: `crates/ferrite-inference/src/scalar/q4_k_q8_k.rs`
+- Modify: `crates/ferrite-inference/src/scalar/q6_k_q8_k.rs`
+- Add: `documentation/dev-notes/2026-06-28-q8-k-activation-adapters.md`
 
-- [ ] **Step 1: Write failing routing tests**
+- [ ] **Step 1: Write failing row adapter tests**
 
-Add tests proving eligible Q4_K/Q6_K shapes use the new adapter while invalid
-or unsupported shapes keep existing fallback behavior.
+Add tests proving `BlockQ8K::quantize_blocks` creates one activation block per
+256 columns, and Q4_K/Q6_K row adapters accumulate multiple rows and multiple
+blocks per row against those activation blocks.
 
 - [ ] **Step 2: Run red tests**
 
 Run:
 
 ```sh
-cargo test -p ferrite-inference q8_k_dispatch -- --nocapture
+cargo test -p ferrite-inference q8_k_quantizes_activation_blocks -- --nocapture
+cargo test -p ferrite-inference q4_k_q8_k_mul_vec_accumulates_rows_and_blocks -- --nocapture
+cargo test -p ferrite-inference q6_k_q8_k_mul_vec_accumulates_rows_and_blocks -- --nocapture
 ```
 
-Expected: fail because dispatch is not wired.
+Expected: fail because the block-vector quantizer and row adapters do not exist.
 
-- [ ] **Step 3: Wire conservative dispatch**
+- [ ] **Step 3: Implement internal row adapters**
 
-Route only shapes where:
+Implement:
 
-- `cols != 0`;
-- `cols.is_multiple_of(256)`;
-- input vector length equals `cols`;
-- scalar Q8_K adapter tests already pass.
-
-Leave Q6_K argmax on its existing path unless a focused argmax test proves the
-new route.
+- `BlockQ8K::quantize_blocks(values)`;
+- `q4_k_q8_k_mul_vec(bytes, rows, cols, vector)`;
+- `q6_k_q8_k_mul_vec(bytes, rows, cols, vector)`.
 
 - [ ] **Step 4: Run focused and parity tests**
 
 Run:
 
 ```sh
-cargo test -p ferrite-inference q8_k_dispatch -- --nocapture
-cargo test -p ferrite-inference --test matvec_kernel_check -- --nocapture
+cargo test -p ferrite-inference q8_k -- --nocapture
+cargo test -p ferrite-inference q4_k_q8_k -- --nocapture
+cargo test -p ferrite-inference q6_k_q8_k -- --nocapture
+cargo clippy -p ferrite-inference --all-targets -- -D warnings
 ```
 
 Expected: pass.
 
-- [ ] **Step 5: Run model parity checks**
-
-Run the established Qwen2.5-1.5B and SmolLM2-1.7B prompt checks from
-`documentation/research/2026-06-28-tier1-q4-q6-kernel-hypothesis.md`.
-
-- [ ] **Step 6: Commit**
+- [ ] **Step 5: Commit**
 
 Commit message:
 
 ```text
-feat: route q4 q6 through q8 k activations
+feat: add q8 k row matvec adapters
 ```
 
 ## Task 5: AArch64 NEON Q4_K/Q6_K x Q8_K Helpers
@@ -283,6 +280,11 @@ feat: add neon q4 q6 q8 k dots
 
 ## Task 6: Full Gates And Benchmark Evidence
 
+Run this before public dispatch is reordered. If model parity or the existing
+matvec reference harness fails outside an explicitly accepted tolerance, do not
+change default dispatch; record the failed experiment and keep the Q8_K path
+internal.
+
 **Files:**
 - Add: `documentation/benchmarks/2026-06-28-tier1-q8-k-activation-dot.md`
 - Modify: `documentation/engineering/tier1-gate-status.md`
@@ -317,6 +319,63 @@ Commit message:
 docs: record q8 k activation dot evidence
 ```
 
+## Task 7: Dispatcher Route And Model Parity
+
+**Files:**
+- Modify: `crates/ferrite-inference/src/scalar/q4_k.rs`
+- Modify: `crates/ferrite-inference/src/scalar/q6_k.rs`
+- Modify: `documentation/engineering/tier1-gate-status.md`
+- Add: `documentation/dev-notes/2026-06-28-q8-k-dispatch-slice.md`
+
+- [ ] **Step 1: Write failing routing tests**
+
+Add tests proving eligible Q4_K/Q6_K shapes use the Q8_K path only after the
+target-specific helper path is available, while argmax and unsupported shapes
+keep existing behavior.
+
+- [ ] **Step 2: Run red tests**
+
+Run:
+
+```sh
+cargo test -p ferrite-inference q8_k_dispatch -- --nocapture
+```
+
+Expected: fail because dispatch is not wired.
+
+- [ ] **Step 3: Wire conservative dispatch**
+
+Route only shapes where:
+
+- `cols != 0`;
+- `cols.is_multiple_of(256)`;
+- input vector length equals `cols`;
+- target-specific Q8_K helper tests pass;
+- model parity checks pass.
+
+Leave Q6_K argmax on its existing path unless a focused argmax test proves the
+new route.
+
+- [ ] **Step 4: Run focused and model gates**
+
+Run:
+
+```sh
+cargo test -p ferrite-inference q8_k_dispatch -- --nocapture
+cargo test -p ferrite-inference --test matvec_kernel_check -- --nocapture
+```
+
+Then run the established Qwen2.5-1.5B and SmolLM2-1.7B prompt checks from
+`documentation/research/2026-06-28-tier1-q4-q6-kernel-hypothesis.md`.
+
+- [ ] **Step 5: Commit**
+
+Commit message:
+
+```text
+feat: route q4 q6 through q8 k activations
+```
+
 ## Self-Review
 
 - The plan implements ADR 0007's approved Path B only.
@@ -324,4 +383,6 @@ docs: record q8 k activation dot evidence
 - It keeps `q8_K`, Q4_K adapter, Q6_K adapter, and NEON helpers in focused
   modules.
 - It preserves scalar/reference gates before optimized dispatch.
+- It keeps default dispatch unchanged until target-specific helpers and model
+  parity gates are available.
 - It leaves AVX2 runtime optimization for a separate future slice.

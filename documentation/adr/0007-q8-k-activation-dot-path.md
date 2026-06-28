@@ -37,8 +37,11 @@ The initial design is:
 - implement scalar Q4_K x Q8_K and Q6_K x Q8_K dot helpers as the correctness
   contract for the new arithmetic;
 - add aarch64 NEON helpers only after the scalar contract is tested;
-- route eligible Q4_K/Q6_K matrix-vector calls through the new path behind the
-  existing shape and CPU-feature checks;
+- keep public Q4_K/Q6_K dispatch on the existing exact/scoped SIMD paths until
+  a target-specific Q8_K helper path is tested against scalar Q8_K adapters,
+  existing reference-comparison gates, and real model-output checks;
+- route eligible Q4_K/Q6_K matrix-vector calls through the Q8_K path only after
+  those gates pass;
 - keep x86_64 AVX2 behavior unchanged until a separate tested slice adds a
   matching optimized path.
 
@@ -49,11 +52,13 @@ modules.
 
 ## Consequences
 
-This path introduces a numerical contract change for optimized Q4_K/Q6_K
-matvecs because the activation vector is quantized before the dot product.
-Correctness gates must compare the optimized output against Ferrite's existing
-decode-to-`f32` scalar reference with explicit tolerances, and real model-output
-checks must pass before the path can be treated as usable for Tier 1 evidence.
+This path introduces a numerical contract change for optimized Q4_K/Q6_K matvecs
+because the activation vector is quantized before the dot product. The scalar
+Q8_K adapters are an internal arithmetic contract; they are not a replacement
+for Ferrite's decode-to-`f32` scalar reference. Correctness gates must compare
+optimized output against the scalar Q8_K adapters, preserve the existing
+reference-comparison harness where applicable, and pass real model-output checks
+before the path can be treated as usable for Tier 1 evidence.
 
 Activation quantization has overhead. Benchmarks must prove that the overhead is
 amortized on real Tier 1 rows before any throughput claim is made.
