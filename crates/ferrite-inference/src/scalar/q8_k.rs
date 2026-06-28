@@ -101,6 +101,54 @@ mod tests {
     }
 
     #[test]
+    fn q8_k_quantization_matches_llama_signed_scale_for_positive_dominant_activation(
+    ) -> Result<(), InferenceError> {
+        let mut values = [0.0; Q8_K_BLOCK_VALUES];
+        values[0] = 2.0;
+        values[1] = -0.75;
+        values[2] = 0.25;
+
+        let block = BlockQ8K::quantize(&values)?;
+
+        assert_eq!(block.d, -2.0 / 127.0);
+        assert_eq!(block.qs[0], -127);
+        assert_eq!(block.qs[1], 48);
+        assert_eq!(block.qs[2], -16);
+        assert_eq!(block.bsums[0], -95);
+        assert!(block.bsums[1..].iter().all(|sum| *sum == 0));
+        Ok(())
+    }
+
+    #[test]
+    fn q8_k_quantization_matches_llama_signed_scale_for_negative_dominant_activation(
+    ) -> Result<(), InferenceError> {
+        let mut values = [0.0; Q8_K_BLOCK_VALUES];
+        values[0] = -2.0;
+        values[1] = 0.75;
+        values[2] = -0.25;
+
+        let block = BlockQ8K::quantize(&values)?;
+
+        assert_eq!(block.d, 2.0 / 127.0);
+        assert_eq!(block.qs[0], -127);
+        assert_eq!(block.qs[1], 48);
+        assert_eq!(block.qs[2], -16);
+        assert_eq!(block.bsums[0], -95);
+        assert!(block.bsums[1..].iter().all(|sum| *sum == 0));
+        Ok(())
+    }
+
+    #[test]
+    fn q8_k_quantization_matches_llama_zero_block_contract() -> Result<(), InferenceError> {
+        let block = BlockQ8K::quantize(&[0.0; Q8_K_BLOCK_VALUES])?;
+
+        assert_eq!(block.d, 0.0);
+        assert!(block.qs.iter().all(|quantized| *quantized == 0));
+        assert!(block.bsums.iter().all(|sum| *sum == 0));
+        Ok(())
+    }
+
+    #[test]
     fn q8_k_rejects_wrong_activation_length() -> Result<(), InferenceError> {
         let err = match BlockQ8K::quantize(&[1.0, 2.0, 3.0]) {
             Ok(_) => return Err(InferenceError::new("wrong activation length must fail")),
