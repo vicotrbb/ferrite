@@ -108,6 +108,8 @@ reference implementation and benchmarking baseline, not the Ferrite runtime.
   for both signed activation-scale polarities.
 - `documentation/dev-notes/2026-06-28-q8-k-benchmark-compare-guardrail.md`
   records CLI coverage for benchmark-token Q8_K comparison output.
+- `documentation/dev-notes/2026-06-28-q8-k-comparison-finite-guardrail.md`
+  records fail-closed finite-value checks for Q8_K comparison metrics.
 - `documentation/benchmarks/2026-06-28-tier1-qwen2-1-5b-current-profile.md`
   records the current Qwen2.5-1.5B profile and hot aggregate roles.
 - `documentation/dev-notes/2026-06-28-tier1-q4-q6-thresholded-row-parallel-regression.md`

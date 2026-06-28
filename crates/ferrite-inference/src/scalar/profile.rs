@@ -40,7 +40,18 @@ impl ScalarMatVecComparison {
 
         let mut max_abs_diff = 0.0f32;
         let mut max_relative_diff = 0.0f32;
-        for (reference, candidate) in reference.iter().zip(candidate) {
+        let label = label.into();
+        for (index, (reference, candidate)) in reference.iter().zip(candidate).enumerate() {
+            if !reference.is_finite() {
+                return Err(InferenceError::new(format!(
+                    "matvec comparison {label} reference value {index} is not finite"
+                )));
+            }
+            if !candidate.is_finite() {
+                return Err(InferenceError::new(format!(
+                    "matvec comparison {label} candidate value {index} is not finite"
+                )));
+            }
             let abs_diff = (reference - candidate).abs();
             max_abs_diff = max_abs_diff.max(abs_diff);
             let denominator = reference.abs().max(1.0e-6);
@@ -48,7 +59,7 @@ impl ScalarMatVecComparison {
         }
 
         Ok(Self {
-            label: label.into(),
+            label,
             storage_kind: matrix.storage_kind(),
             rows: matrix.rows(),
             cols: matrix.cols(),
@@ -153,5 +164,51 @@ impl ProfiledTokenId {
             .iter()
             .map(ScalarProfileEvent::elapsed)
             .sum::<Duration>()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ScalarMatVecComparison;
+    use crate::scalar::{InferenceError, Matrix};
+
+    #[test]
+    fn matvec_comparison_rejects_non_finite_values() -> Result<(), InferenceError> {
+        let matrix = Matrix::from_row_major(2, 2, vec![1.0, 0.0, 0.0, 1.0])?;
+
+        let err =
+            match ScalarMatVecComparison::new("q8_k_probe", &matrix, &[1.0, f32::NAN], &[1.0, 1.0])
+            {
+                Ok(_) => return Err(InferenceError::new("non-finite comparison must fail")),
+                Err(err) => err,
+            };
+
+        assert_eq!(
+            err.to_string(),
+            "matvec comparison q8_k_probe reference value 1 is not finite"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn matvec_comparison_rejects_non_finite_candidate_values() -> Result<(), InferenceError> {
+        let matrix = Matrix::from_row_major(2, 2, vec![1.0, 0.0, 0.0, 1.0])?;
+
+        let err =
+            match ScalarMatVecComparison::new("q8_k_probe", &matrix, &[1.0, 1.0], &[1.0, f32::NAN])
+            {
+                Ok(_) => {
+                    return Err(InferenceError::new(
+                        "non-finite candidate comparison must fail",
+                    ));
+                }
+                Err(err) => err,
+            };
+
+        assert_eq!(
+            err.to_string(),
+            "matvec comparison q8_k_probe candidate value 1 is not finite"
+        );
+        Ok(())
     }
 }
