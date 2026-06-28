@@ -216,7 +216,7 @@ pub(super) fn completion_stream_response(
     include_usage: bool,
     permit: OwnedSemaphorePermit,
 ) -> Response {
-    let context = CompletionStreamContext::new(model);
+    let context = CompletionStreamContext::new(model).with_usage_field(include_usage);
     let token_context = context.clone();
     stream_generated_text(
         engine,
@@ -242,7 +242,7 @@ fn chat_stream_response(
     include_usage: bool,
     permit: OwnedSemaphorePermit,
 ) -> Response {
-    let context = ChatCompletionStreamContext::new(model);
+    let context = ChatCompletionStreamContext::new(model).with_usage_field(include_usage);
     let token_context = context.clone();
     stream_generated_text(
         engine,

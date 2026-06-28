@@ -1,5 +1,6 @@
 use super::{
-    stream_options::StreamOptions, unix_timestamp, unsupported::UnsupportedFields, usage::Usage,
+    stream_options::StreamOptions, stream_usage::StreamUsage, unix_timestamp,
+    unsupported::UnsupportedFields, usage::Usage,
 };
 use crate::runtime::GeneratedText;
 use serde::{Deserialize, Serialize};
@@ -164,7 +165,7 @@ pub struct ChatCompletionStreamChunk {
     model: String,
     choices: Vec<ChatCompletionStreamChoice>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    usage: Option<Usage>,
+    usage: Option<StreamUsage>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -172,6 +173,7 @@ pub struct ChatCompletionStreamContext {
     id: String,
     created: u64,
     model: String,
+    include_usage: bool,
 }
 
 impl ChatCompletionStreamContext {
@@ -181,7 +183,13 @@ impl ChatCompletionStreamContext {
             id: format!("chatcmpl-ferrite-{created}"),
             created,
             model,
+            include_usage: false,
         }
+    }
+
+    pub fn with_usage_field(mut self, include_usage: bool) -> Self {
+        self.include_usage = include_usage;
+        self
     }
 
     pub fn token(&self, content: String) -> ChatCompletionStreamChunk {
@@ -191,7 +199,7 @@ impl ChatCompletionStreamContext {
             created: self.created,
             model: self.model.clone(),
             choices: vec![ChatCompletionStreamChoice::content(content)],
-            usage: None,
+            usage: self.null_usage(),
         }
     }
 
@@ -202,7 +210,7 @@ impl ChatCompletionStreamContext {
             created: self.created,
             model: self.model.clone(),
             choices: vec![ChatCompletionStreamChoice::stop()],
-            usage: None,
+            usage: self.null_usage(),
         }
     }
 
@@ -213,8 +221,12 @@ impl ChatCompletionStreamContext {
             created: self.created,
             model: self.model.clone(),
             choices: Vec::new(),
-            usage: Some(Usage::from_generation(generated)),
+            usage: Some(StreamUsage::value(Usage::from_generation(generated))),
         }
+    }
+
+    fn null_usage(&self) -> Option<StreamUsage> {
+        self.include_usage.then(StreamUsage::null)
     }
 }
 

@@ -27,6 +27,8 @@ async fn completions_stream_endpoint_emits_usage_when_requested(
 
     assert_eq!(response.status(), StatusCode::OK);
     let body = to_text(response.into_body()).await?;
+    assert!(body.contains("\"text\":\"winner\""));
+    assert!(body.contains("\"usage\":null"));
     assert!(body.contains("\"choices\":[]"));
     assert!(body.contains("\"usage\":{\"prompt_tokens\":"));
     assert!(body.contains("\"completion_tokens\":1"));
@@ -53,6 +55,8 @@ async fn chat_stream_endpoint_emits_usage_when_requested() -> Result<(), Box<dyn
 
     assert_eq!(response.status(), StatusCode::OK);
     let body = to_text(response.into_body()).await?;
+    assert!(body.contains("\"delta\":{\"content\":\"winner\"}"));
+    assert!(body.contains("\"usage\":null"));
     assert!(body.contains("\"choices\":[]"));
     assert!(body.contains("\"usage\":{\"prompt_tokens\":"));
     assert!(body.contains("\"completion_tokens\":1"));
