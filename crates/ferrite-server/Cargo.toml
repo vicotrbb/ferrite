@@ -20,8 +20,8 @@ ferrite-inference = { path = "../ferrite-inference" }
 ferrite-model = { path = "../ferrite-model" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-tokio = { version = "1", features = ["macros", "net", "rt-multi-thread"] }
-tokio-stream = "0.1"
+tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "sync"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
 
 [dev-dependencies]
 ferrite-fixtures = { path = "../ferrite-fixtures" }
