@@ -1,14 +1,14 @@
 use super::{
     attention::causal_attention,
     math::{add_assign, argmax, rms_norm, swiglu},
-    profile::{ProfiledNextToken, ScalarProfileEvent},
+    profile::{ProfiledNextToken, ProfiledTokenId, ScalarProfileEvent},
     InferenceError, NextToken, ScalarLlamaModel,
 };
 
 mod cache;
 mod profiling;
 
-use profiling::{profiled_layer_mul_vec, profiled_mul_vec};
+use profiling::{profiled_argmax_mul_vec, profiled_layer_mul_vec, profiled_mul_vec};
 
 #[derive(Debug)]
 pub struct ScalarLlamaSession<'a> {
@@ -48,6 +48,19 @@ impl<'a> ScalarLlamaSession<'a> {
         Ok(self
             .accept_token_inner(token_id, None, OutputMode::TokenIdOnly)?
             .token_id)
+    }
+
+    pub fn accept_token_id_profiled(
+        &mut self,
+        token_id: usize,
+    ) -> Result<ProfiledTokenId, InferenceError> {
+        let mut events = Vec::new();
+        let accepted =
+            self.accept_token_inner(token_id, Some(&mut events), OutputMode::TokenIdOnly)?;
+        Ok(ProfiledTokenId {
+            token_id: accepted.token_id,
+            events,
+        })
     }
 
     pub fn generate_token_ids(
@@ -197,7 +210,10 @@ impl<'a> ScalarLlamaSession<'a> {
                 let logits = profiled_mul_vec(output, &normed, "output", profile_events)?;
                 (argmax(&logits)?, Some(logits))
             }
-            OutputMode::TokenIdOnly => (output.argmax_mul_vec(&normed)?, None),
+            OutputMode::TokenIdOnly => (
+                profiled_argmax_mul_vec(output, &normed, "output", profile_events)?,
+                None,
+            ),
         };
         self.cached_token_count += 1;
 

@@ -63,3 +63,18 @@ impl ProfiledNextToken {
             .sum::<Duration>()
     }
 }
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ProfiledTokenId {
+    pub token_id: usize,
+    pub events: Vec<ScalarProfileEvent>,
+}
+
+impl ProfiledTokenId {
+    pub fn total_elapsed(&self) -> Duration {
+        self.events
+            .iter()
+            .map(ScalarProfileEvent::elapsed)
+            .sum::<Duration>()
+    }
+}

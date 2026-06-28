@@ -40,7 +40,7 @@ mod validation;
 pub use math::{argmax, rms_norm};
 pub use matrix::{Matrix, MatrixStorageKind};
 pub use output::ScalarLlamaOutputWeights;
-pub use profile::{ProfiledNextToken, ScalarProfileEvent};
+pub use profile::{ProfiledNextToken, ProfiledTokenId, ScalarProfileEvent};
 use rope::apply_rope_with_layout;
 pub use rope::{apply_rope, RopeLayout};
 pub use session::ScalarLlamaSession;
