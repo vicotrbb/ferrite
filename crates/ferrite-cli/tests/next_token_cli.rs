@@ -32,6 +32,7 @@ fn cli_loads_gguf_and_prints_text_prompt_next_token() -> Result<(), Box<dyn Erro
         String::from_utf8_lossy(&output.stderr)
     );
     let stdout = String::from_utf8(output.stdout)?;
+    assert!(stdout.contains("q8_k_activation_matvec_policy=default_only"));
     assert!(stdout.contains("next_token_id=2"));
     assert!(stdout.contains("next_token=winner"));
     Ok(())
@@ -90,6 +91,7 @@ fn cli_enables_experimental_q8_k_activation_matvec() -> Result<(), Box<dyn Error
     );
     let stdout = String::from_utf8(output.stdout)?;
     assert!(stdout.contains("experimental_q8_k_activation_matvec=true"));
+    assert!(stdout.contains("q8_k_activation_matvec_policy=experimental_parity_scoped"));
     assert!(stdout.contains("next_token_id=1"));
     assert!(stdout.contains("match=true"));
     Ok(())

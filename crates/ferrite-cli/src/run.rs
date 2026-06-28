@@ -2,7 +2,8 @@ use crate::args::{self, PromptSource};
 use crate::benchmark::profile_first_benchmark_token;
 use crate::profile::{print_benchmark_token_profile, print_next_token_profile};
 use ferrite_inference::scalar::{
-    NextToken, ProfiledNextToken, ScalarExecutionOptions, ScalarLlamaModel, ScalarLlamaSession,
+    NextToken, ProfiledNextToken, Q8KActivationMatvecPolicy, ScalarExecutionOptions,
+    ScalarLlamaModel, ScalarLlamaSession,
 };
 use ferrite_model::gguf::parse_gguf;
 use ferrite_model::tokenizer::GgufTokenizer;
@@ -22,8 +23,13 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
     drop(bytes);
 
     let prompt_token_ids = prompt_token_ids(&tokenizer, args.prompt)?;
+    let q8_k_activation_matvec_policy = if args.experimental_q8_k_activation_matvec {
+        Q8KActivationMatvecPolicy::ExperimentalParityScoped
+    } else {
+        Q8KActivationMatvecPolicy::DefaultOnly
+    };
     let execution_options = ScalarExecutionOptions::default()
-        .with_q8_k_activation_matvec(args.experimental_q8_k_activation_matvec)
+        .with_q8_k_activation_matvec_policy(q8_k_activation_matvec_policy)
         .with_q8_k_activation_matvec_comparison(args.compare_q8_k_activation_matvec);
     let mut session = model.start_session_with_options(execution_options);
     let (next, profile) = accept_prompt(&mut session, &prompt_token_ids, args.profile_next_token)?;
@@ -42,6 +48,10 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
     println!(
         "compare_q8_k_activation_matvec={}",
         args.compare_q8_k_activation_matvec
+    );
+    println!(
+        "q8_k_activation_matvec_policy={}",
+        q8_k_activation_matvec_policy.as_str()
     );
     println!("next_token_id={}", next.token_id);
     println!("next_token={token}");

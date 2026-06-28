@@ -40,8 +40,9 @@ The initial design is:
 - keep public Q4_K/Q6_K dispatch on the existing exact/scoped SIMD paths until
   a target-specific Q8_K helper path is tested against scalar Q8_K adapters,
   existing reference-comparison gates, and real model-output checks;
-- route eligible Q4_K/Q6_K matrix-vector calls through the Q8_K path only after
-  those gates pass;
+- represent the route as an explicit execution policy: default execution stays
+  on the existing paths, while the Q8_K route is allowed only under the
+  experimental parity-scoped policy;
 - keep x86_64 AVX2 behavior unchanged until a separate tested slice adds a
   matching optimized path.
 
@@ -94,6 +95,8 @@ reference implementation and benchmarking baseline, not the Ferrite runtime.
 - `documentation/dev-notes/2026-06-28-q8-k-reference-arithmetic.md` audits the
   implemented Path B arithmetic against llama.cpp's generic and ARM NEON Q4_K
   and Q6_K x Q8_K reference paths.
+- `documentation/dev-notes/2026-06-28-q8-k-activation-policy.md` records the
+  explicit default-only versus experimental parity-scoped execution policy.
 - `documentation/benchmarks/2026-06-28-tier1-qwen2-1-5b-current-profile.md`
   records the current Qwen2.5-1.5B profile and hot aggregate roles.
 - `documentation/dev-notes/2026-06-28-tier1-q4-q6-thresholded-row-parallel-regression.md`
