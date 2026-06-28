@@ -19,7 +19,7 @@ mod session;
 mod tensor;
 
 pub use math::{argmax, rms_norm};
-pub use matrix::Matrix;
+pub use matrix::{Matrix, MatrixStorageKind};
 pub use output::ScalarLlamaOutputWeights;
 pub use profile::{ProfiledNextToken, ScalarProfileEvent};
 pub use rope::apply_rope;

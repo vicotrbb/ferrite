@@ -1,18 +1,26 @@
 use std::time::Duration;
 
-use super::NextToken;
+use super::{matrix::MatrixStorageKind, Matrix, NextToken};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ScalarProfileEvent {
     label: String,
     elapsed: Duration,
+    storage_kind: MatrixStorageKind,
+    rows: usize,
+    cols: usize,
+    storage_bytes: u128,
 }
 
 impl ScalarProfileEvent {
-    pub(super) fn new(label: impl Into<String>, elapsed: Duration) -> Self {
+    pub(super) fn new(label: impl Into<String>, elapsed: Duration, matrix: &Matrix) -> Self {
         Self {
             label: label.into(),
             elapsed,
+            storage_kind: matrix.storage_kind(),
+            rows: matrix.rows(),
+            cols: matrix.cols(),
+            storage_bytes: matrix.storage_bytes(),
         }
     }
 
@@ -22,6 +30,22 @@ impl ScalarProfileEvent {
 
     pub fn elapsed(&self) -> Duration {
         self.elapsed
+    }
+
+    pub fn storage_kind(&self) -> MatrixStorageKind {
+        self.storage_kind
+    }
+
+    pub fn rows(&self) -> usize {
+        self.rows
+    }
+
+    pub fn cols(&self) -> usize {
+        self.cols
+    }
+
+    pub fn storage_bytes(&self) -> u128 {
+        self.storage_bytes
     }
 }
 

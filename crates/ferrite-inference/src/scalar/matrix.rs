@@ -19,6 +19,27 @@ pub struct Matrix {
     data: MatrixData,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MatrixStorageKind {
+    F32,
+    Q4K,
+    Q5_0,
+    Q6K,
+    Q8_0,
+}
+
+impl MatrixStorageKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::F32 => "F32",
+            Self::Q4K => "Q4_K",
+            Self::Q5_0 => "Q5_0",
+            Self::Q6K => "Q6_K",
+            Self::Q8_0 => "Q8_0",
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 enum MatrixData {
     F32(Vec<f32>),
@@ -159,6 +180,16 @@ impl Matrix {
 
     pub fn cols(&self) -> usize {
         self.cols
+    }
+
+    pub fn storage_kind(&self) -> MatrixStorageKind {
+        match &self.data {
+            MatrixData::F32(_) => MatrixStorageKind::F32,
+            MatrixData::Q4K(_) => MatrixStorageKind::Q4K,
+            MatrixData::Q5_0(_) => MatrixStorageKind::Q5_0,
+            MatrixData::Q6K(_) => MatrixStorageKind::Q6K,
+            MatrixData::Q8_0(_) => MatrixStorageKind::Q8_0,
+        }
     }
 
     pub fn row(&self, index: usize) -> Result<&[f32], InferenceError> {

@@ -228,7 +228,11 @@ fn profiled_mul_vec(
     let started = Instant::now();
     let output = matrix.mul_vec(vector)?;
     let elapsed = started.elapsed();
-    events.push(ScalarProfileEvent::new(label, nonzero_duration(elapsed)));
+    events.push(ScalarProfileEvent::new(
+        label,
+        nonzero_duration(elapsed),
+        matrix,
+    ));
     Ok(output)
 }
 

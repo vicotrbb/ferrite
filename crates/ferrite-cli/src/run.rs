@@ -132,6 +132,14 @@ fn print_next_token_profile(profile: &ProfiledNextToken) {
             event.label(),
             event.elapsed().as_nanos()
         );
+        println!(
+            "profile_next_token_matrix={}:{}:{}:{}:{}",
+            event.label(),
+            event.storage_kind().as_str(),
+            event.rows(),
+            event.cols(),
+            event.storage_bytes()
+        );
     }
 }
 
