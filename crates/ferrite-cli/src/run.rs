@@ -1,4 +1,5 @@
 use crate::args::{self, PromptSource};
+use crate::benchmark::profile_first_benchmark_token;
 use crate::profile::{print_benchmark_token_profile, print_next_token_profile};
 use ferrite_inference::scalar::{
     NextToken, ProfiledNextToken, ScalarLlamaModel, ScalarLlamaSession,
@@ -68,16 +69,18 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
     if let Some(runs) = args.benchmark_runs {
         let mut benchmark_token_id = next.token_id;
         let mut benchmark_token_ids = Vec::with_capacity(runs);
-        let mut benchmark_profile = None;
+        let benchmark_profile = if args.profile_benchmark_token {
+            Some(profile_first_benchmark_token(
+                &model,
+                &prompt_token_ids,
+                benchmark_token_id,
+            )?)
+        } else {
+            None
+        };
         let started = Instant::now();
-        for run_index in 0..runs {
-            if args.profile_benchmark_token && run_index == 0 {
-                let profiled = session.accept_token_id_profiled(benchmark_token_id)?;
-                benchmark_token_id = profiled.token_id;
-                benchmark_profile = Some(profiled);
-            } else {
-                benchmark_token_id = session.accept_token_id(benchmark_token_id)?;
-            }
+        for _ in 0..runs {
+            benchmark_token_id = session.accept_token_id(benchmark_token_id)?;
             benchmark_token_ids.push(benchmark_token_id);
         }
         let total_ns = started.elapsed().as_nanos();

@@ -1,4 +1,5 @@
 mod args;
+mod benchmark;
 mod profile;
 mod run;
 

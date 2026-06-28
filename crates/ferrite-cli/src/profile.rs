@@ -1,4 +1,5 @@
-use ferrite_inference::scalar::{ProfiledNextToken, ProfiledTokenId, ScalarProfileEvent};
+use crate::benchmark::BenchmarkTokenProfile;
+use ferrite_inference::scalar::{ProfiledNextToken, ScalarProfileEvent};
 use std::collections::BTreeMap;
 use std::time::Duration;
 
@@ -19,12 +20,16 @@ pub(crate) fn print_next_token_profile(profile: &ProfiledNextToken) {
     );
 }
 
-pub(crate) fn print_benchmark_token_profile(profile: &ProfiledTokenId) {
-    println!("profile_benchmark_token_id={}", profile.token_id);
+pub(crate) fn print_benchmark_token_profile(profile: &BenchmarkTokenProfile) {
+    println!(
+        "profile_benchmark_token_input_id={}",
+        profile.input_token_id
+    );
+    println!("profile_benchmark_token_id={}", profile.token.token_id);
     print_profile(
         "profile_benchmark_token",
-        profile.total_elapsed(),
-        &profile.events,
+        profile.token.total_elapsed(),
+        &profile.token.events,
     );
 }
 

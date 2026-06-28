@@ -21,10 +21,16 @@ The implementation keeps the token-id-only output path on
 `output` event. It does not force full logits materialization.
 
 The CLI now exposes this through `--profile-benchmark-token` when paired with
-`--benchmark-runs`. The flag profiles the first benchmark token-id decode and
-prints `profile_benchmark_token_id=<id>` followed by a separate
-`profile_benchmark_token_*` block using the same operation, matrix, and role
-summary shape as `--profile-next-token`.
+`--benchmark-runs`. The flag profiles the first benchmark token-id decode in a
+separate replay session before the timed benchmark loop, then prints
+`profile_benchmark_token_input_id=<id>`, `profile_benchmark_token_id=<id>`, and
+a separate `profile_benchmark_token_*` block using the same operation, matrix,
+and role summary shape as `--profile-next-token`.
+
+The replay session keeps profiling allocation and nested timing overhead out of
+`benchmark_total_ns` and `benchmark_avg_ns`. The replay also validates that the
+prompt produces the same first benchmark input token before profiling that
+decode step.
 
 ## Validation
 
@@ -60,4 +66,10 @@ Follow-up CLI exposure:
 ```text
 cargo test -p ferrite-cli cli_profiles_benchmark_token_id_decode -- --nocapture
 cargo test -p ferrite-cli --test next_token_cli -- --nocapture
+```
+
+Follow-up benchmark timing isolation:
+
+```text
+cargo test -p ferrite-cli cli_profiles_benchmark_token_id_decode -- --nocapture
 ```
