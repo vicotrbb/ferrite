@@ -19,6 +19,8 @@ mod q6_k;
 #[cfg(target_arch = "aarch64")]
 mod q6_k_neon;
 mod q8_0;
+#[cfg(target_arch = "x86_64")]
+mod q8_0_avx2;
 #[cfg(target_arch = "aarch64")]
 mod q8_0_neon;
 mod quantized;
