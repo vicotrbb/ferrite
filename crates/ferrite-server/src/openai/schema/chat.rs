@@ -2,6 +2,7 @@ use super::{unix_timestamp, usage::Usage};
 use crate::runtime::GeneratedText;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::BTreeMap;
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 pub struct ChatCompletionRequest {
@@ -49,6 +50,8 @@ pub struct ChatCompletionRequest {
     store: Option<Value>,
     #[serde(default)]
     metadata: Option<Value>,
+    #[serde(default, flatten)]
+    extra_fields: BTreeMap<String, Value>,
 }
 
 impl ChatCompletionRequest {
@@ -68,62 +71,63 @@ impl ChatCompletionRequest {
         self.max_tokens.or(self.max_completion_tokens)
     }
 
-    pub fn unsupported_fields(&self) -> Vec<&'static str> {
+    pub fn unsupported_fields(&self) -> Vec<String> {
         let mut fields = Vec::new();
         if self.tools.is_some() {
-            fields.push("tools");
+            fields.push("tools".to_owned());
         }
         if self.tool_choice.is_some() {
-            fields.push("tool_choice");
+            fields.push("tool_choice".to_owned());
         }
         if self.parallel_tool_calls.is_some() {
-            fields.push("parallel_tool_calls");
+            fields.push("parallel_tool_calls".to_owned());
         }
         if self.response_format.is_some() {
-            fields.push("response_format");
+            fields.push("response_format".to_owned());
         }
         if self.temperature.is_some() {
-            fields.push("temperature");
+            fields.push("temperature".to_owned());
         }
         if self.top_p.is_some() {
-            fields.push("top_p");
+            fields.push("top_p".to_owned());
         }
         if self.n.is_some() {
-            fields.push("n");
+            fields.push("n".to_owned());
         }
         if self.stop.is_some() {
-            fields.push("stop");
+            fields.push("stop".to_owned());
         }
         if self.presence_penalty.is_some() {
-            fields.push("presence_penalty");
+            fields.push("presence_penalty".to_owned());
         }
         if self.frequency_penalty.is_some() {
-            fields.push("frequency_penalty");
+            fields.push("frequency_penalty".to_owned());
         }
         if self.logit_bias.is_some() {
-            fields.push("logit_bias");
+            fields.push("logit_bias".to_owned());
         }
         if self.logprobs.is_some() {
-            fields.push("logprobs");
+            fields.push("logprobs".to_owned());
         }
         if self.top_logprobs.is_some() {
-            fields.push("top_logprobs");
+            fields.push("top_logprobs".to_owned());
         }
         if self.user.is_some() {
-            fields.push("user");
+            fields.push("user".to_owned());
         }
         if self.seed.is_some() {
-            fields.push("seed");
+            fields.push("seed".to_owned());
         }
         if self.stream_options.is_some() {
-            fields.push("stream_options");
+            fields.push("stream_options".to_owned());
         }
         if self.store.is_some() {
-            fields.push("store");
+            fields.push("store".to_owned());
         }
         if self.metadata.is_some() {
-            fields.push("metadata");
+            fields.push("metadata".to_owned());
         }
+        fields.extend(self.extra_fields.keys().cloned());
         fields
     }
 }

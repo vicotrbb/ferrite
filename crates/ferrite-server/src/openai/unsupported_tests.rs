@@ -88,6 +88,26 @@ async fn chat_endpoint_rejects_multiple_choice_request() -> Result<(), Box<dyn s
 }
 
 #[tokio::test]
+async fn chat_endpoint_rejects_unknown_fields() -> Result<(), Box<dyn std::error::Error>> {
+    let body = post_chat(
+        r#"{
+            "model":"fixture-model",
+            "messages":[{"role":"user","content":"hello"}],
+            "modalities":["text"]
+        }"#,
+    )
+    .await?;
+
+    assert_eq!(body.status, StatusCode::BAD_REQUEST);
+    assert_eq!(body.json["error"]["type"], "invalid_request_error");
+    assert!(body.json["error"]["message"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("modalities"));
+    Ok(())
+}
+
+#[tokio::test]
 async fn completion_endpoint_rejects_multiple_choice_request(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let body = post_completion(
@@ -125,6 +145,26 @@ async fn completion_endpoint_rejects_logprobs_request() -> Result<(), Box<dyn st
         .as_str()
         .unwrap_or_default()
         .contains("logprobs"));
+    Ok(())
+}
+
+#[tokio::test]
+async fn completion_endpoint_rejects_unknown_fields() -> Result<(), Box<dyn std::error::Error>> {
+    let body = post_completion(
+        r#"{
+            "model":"fixture-model",
+            "prompt":"hello",
+            "unsupported_option":true
+        }"#,
+    )
+    .await?;
+
+    assert_eq!(body.status, StatusCode::BAD_REQUEST);
+    assert_eq!(body.json["error"]["type"], "invalid_request_error");
+    assert!(body.json["error"]["message"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("unsupported_option"));
     Ok(())
 }
 

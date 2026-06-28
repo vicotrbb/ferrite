@@ -2,6 +2,7 @@ use super::{unix_timestamp, usage::Usage};
 use crate::runtime::GeneratedText;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::BTreeMap;
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 pub struct CompletionRequest {
@@ -35,6 +36,8 @@ pub struct CompletionRequest {
     logit_bias: Option<Value>,
     #[serde(default)]
     user: Option<Value>,
+    #[serde(default, flatten)]
+    extra_fields: BTreeMap<String, Value>,
 }
 
 impl CompletionRequest {
@@ -54,44 +57,45 @@ impl CompletionRequest {
         self.max_tokens
     }
 
-    pub fn unsupported_fields(&self) -> Vec<&'static str> {
+    pub fn unsupported_fields(&self) -> Vec<String> {
         let mut fields = Vec::new();
         if self.suffix.is_some() {
-            fields.push("suffix");
+            fields.push("suffix".to_owned());
         }
         if self.temperature.is_some() {
-            fields.push("temperature");
+            fields.push("temperature".to_owned());
         }
         if self.top_p.is_some() {
-            fields.push("top_p");
+            fields.push("top_p".to_owned());
         }
         if self.n.is_some() {
-            fields.push("n");
+            fields.push("n".to_owned());
         }
         if self.logprobs.is_some() {
-            fields.push("logprobs");
+            fields.push("logprobs".to_owned());
         }
         if self.echo.is_some() {
-            fields.push("echo");
+            fields.push("echo".to_owned());
         }
         if self.stop.is_some() {
-            fields.push("stop");
+            fields.push("stop".to_owned());
         }
         if self.presence_penalty.is_some() {
-            fields.push("presence_penalty");
+            fields.push("presence_penalty".to_owned());
         }
         if self.frequency_penalty.is_some() {
-            fields.push("frequency_penalty");
+            fields.push("frequency_penalty".to_owned());
         }
         if self.best_of.is_some() {
-            fields.push("best_of");
+            fields.push("best_of".to_owned());
         }
         if self.logit_bias.is_some() {
-            fields.push("logit_bias");
+            fields.push("logit_bias".to_owned());
         }
         if self.user.is_some() {
-            fields.push("user");
+            fields.push("user".to_owned());
         }
+        fields.extend(self.extra_fields.keys().cloned());
         fields
     }
 }
