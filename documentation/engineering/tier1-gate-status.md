@@ -77,7 +77,7 @@ still fails.
 
 ## Fresh Full-Workspace Gate
 
-Commands run after the CLI EOS generation stop slice:
+Commands run after the x86_64 AVX2 Tier 1 model-output evidence slices:
 
 ```sh
 cargo fmt --all -- --check
@@ -87,7 +87,7 @@ cargo test --workspace
 cargo check -p ferrite-inference --target x86_64-unknown-linux-gnu --tests
 ```
 
-All commands passed on commit `7d75ba4`.
+All commands passed on commit `a55ba76`.
 
 ## Fresh Tier 1 Model Probe
 
