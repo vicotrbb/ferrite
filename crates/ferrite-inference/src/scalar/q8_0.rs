@@ -12,6 +12,8 @@ pub(super) enum Q8_0MatVecBackend {
     Scalar,
     #[cfg(target_arch = "aarch64")]
     Aarch64Neon,
+    #[cfg(target_arch = "aarch64")]
+    Aarch64NeonRowParallel,
     #[cfg(target_arch = "x86_64")]
     X86_64Avx2,
 }

@@ -7,10 +7,14 @@ use super::{
         Q8_0_BLOCK_BYTES, Q8_0_BLOCK_VALUES,
     },
 };
+use rayon::prelude::*;
 use std::arch::aarch64::{
     vaddvq_f32, vcvtq_f32_s32, vdupq_n_f32, vfmaq_f32, vget_high_s16, vget_low_s16, vld1_s8,
     vld1q_f32, vmovl_s16, vmovl_s8,
 };
+
+const ROW_PARALLEL_MIN_ROWS: usize = 4096;
+const ROW_PARALLEL_MAX_COLS: usize = 2048;
 
 pub(super) fn neon_q8_0_mul_vec(
     bytes: &[u8],
@@ -19,29 +23,59 @@ pub(super) fn neon_q8_0_mul_vec(
     vector: &[f32],
 ) -> Q8_0MatVecOutput {
     let row_bytes = (cols / Q8_0_BLOCK_VALUES) * Q8_0_BLOCK_BYTES;
+    if uses_row_parallel(rows, cols) {
+        return neon_q8_0_mul_vec_row_parallel(bytes, rows, row_bytes, vector);
+    }
+
     let mut values = vec![0.0; rows];
-    for (row, row_bytes) in bytes.chunks_exact(row_bytes).enumerate() {
-        let mut sum = 0.0;
-        for (block_index, block) in row_bytes.chunks_exact(Q8_0_BLOCK_BYTES).enumerate() {
-            let scale = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
-            let col_base = block_index * Q8_0_BLOCK_VALUES;
-            // SAFETY: each Q8_0 block has exactly 32 quantized bytes and
-            // `cols` is validated as a multiple of 32, so every 8-byte
-            // quant load and matching 4-lane vector load is in bounds.
-            sum += unsafe {
-                neon_q8_0_block_dot(
-                    block[2..].as_ptr().cast::<i8>(),
-                    vector[col_base..].as_ptr(),
-                )
-            } * scale;
-        }
-        values[row] = sum;
+    for (row, row_chunk) in bytes.chunks_exact(row_bytes).enumerate() {
+        values[row] = neon_q8_0_row_dot(row_chunk, vector);
     }
 
     Q8_0MatVecOutput {
         values,
         backend: Q8_0MatVecBackend::Aarch64Neon,
     }
+}
+
+fn neon_q8_0_mul_vec_row_parallel(
+    bytes: &[u8],
+    rows: usize,
+    row_bytes: usize,
+    vector: &[f32],
+) -> Q8_0MatVecOutput {
+    let values = bytes
+        .par_chunks_exact(row_bytes)
+        .map(|row_chunk| neon_q8_0_row_dot(row_chunk, vector))
+        .collect::<Vec<_>>();
+    debug_assert_eq!(values.len(), rows);
+
+    Q8_0MatVecOutput {
+        values,
+        backend: Q8_0MatVecBackend::Aarch64NeonRowParallel,
+    }
+}
+
+fn neon_q8_0_row_dot(row_chunk: &[u8], vector: &[f32]) -> f32 {
+    let mut sum = 0.0;
+    for (block_index, block) in row_chunk.chunks_exact(Q8_0_BLOCK_BYTES).enumerate() {
+        let scale = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
+        let col_base = block_index * Q8_0_BLOCK_VALUES;
+        // SAFETY: each Q8_0 block has exactly 32 quantized bytes and
+        // `cols` is validated as a multiple of 32, so every 8-byte
+        // quant load and matching 4-lane vector load is in bounds.
+        sum += unsafe {
+            neon_q8_0_block_dot(
+                block[2..].as_ptr().cast::<i8>(),
+                vector[col_base..].as_ptr(),
+            )
+        } * scale;
+    }
+    sum
+}
+
+fn uses_row_parallel(rows: usize, cols: usize) -> bool {
+    rows >= ROW_PARALLEL_MIN_ROWS && cols <= ROW_PARALLEL_MAX_COLS
 }
 
 pub(super) fn neon_q8_0_argmax_mul_vec(
