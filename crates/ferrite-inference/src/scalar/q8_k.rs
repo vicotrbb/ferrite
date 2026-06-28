@@ -1,18 +1,18 @@
 use super::InferenceError;
 
-pub(super) const Q8_K_BLOCK_VALUES: usize = 256;
-pub(super) const Q8_K_GROUP_SIZE: usize = 16;
-pub(super) const Q8_K_GROUPS: usize = Q8_K_BLOCK_VALUES / Q8_K_GROUP_SIZE;
+pub(in crate::scalar) const Q8_K_BLOCK_VALUES: usize = 256;
+pub(in crate::scalar) const Q8_K_GROUP_SIZE: usize = 16;
+pub(in crate::scalar) const Q8_K_GROUPS: usize = Q8_K_BLOCK_VALUES / Q8_K_GROUP_SIZE;
 
 #[derive(Clone, Debug, PartialEq)]
-pub(super) struct BlockQ8K {
-    pub(super) d: f32,
-    pub(super) qs: [i8; Q8_K_BLOCK_VALUES],
-    pub(super) bsums: [i16; Q8_K_GROUPS],
+pub(in crate::scalar) struct BlockQ8K {
+    pub(in crate::scalar) d: f32,
+    pub(in crate::scalar) qs: [i8; Q8_K_BLOCK_VALUES],
+    pub(in crate::scalar) bsums: [i16; Q8_K_GROUPS],
 }
 
 impl BlockQ8K {
-    pub(super) fn quantize(values: &[f32]) -> Result<Self, InferenceError> {
+    pub(in crate::scalar) fn quantize(values: &[f32]) -> Result<Self, InferenceError> {
         if values.len() != Q8_K_BLOCK_VALUES {
             return Err(InferenceError::new(format!(
                 "Q8_K activation length {} does not match {Q8_K_BLOCK_VALUES}",
