@@ -16,6 +16,9 @@ mod q4_k_avx2;
 mod q4_k_neon;
 #[allow(dead_code)]
 mod q4_k_q8_k;
+#[cfg(target_arch = "aarch64")]
+#[allow(dead_code)]
+mod q4_k_q8_k_neon;
 mod q5_0;
 #[cfg(target_arch = "x86_64")]
 mod q5_0_avx2;
