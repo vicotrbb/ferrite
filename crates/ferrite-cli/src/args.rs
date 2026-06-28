@@ -14,6 +14,7 @@ pub struct CliArgs {
     pub profile_next_token: bool,
     pub profile_benchmark_token: bool,
     pub experimental_q8_k_activation_matvec: bool,
+    pub compare_q8_k_activation_matvec: bool,
     pub stream: bool,
 }
 
@@ -34,6 +35,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
     let mut profile_next_token = false;
     let mut profile_benchmark_token = false;
     let mut experimental_q8_k_activation_matvec = false;
+    let mut compare_q8_k_activation_matvec = false;
     let mut stream = false;
     let mut iter = args.into_iter();
     let _program = iter.next();
@@ -98,6 +100,10 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
             "--experimental-q8-k-activation-matvec" => {
                 experimental_q8_k_activation_matvec = true;
             }
+            "--compare-q8-k-activation-matvec" => {
+                compare_q8_k_activation_matvec = true;
+                experimental_q8_k_activation_matvec = true;
+            }
             "--help" | "-h" => {
                 return Err(io::Error::other(usage()).into());
             }
@@ -112,7 +118,9 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
     validate_modes(
         generate_tokens,
         benchmark_runs,
+        profile_next_token,
         profile_benchmark_token,
+        compare_q8_k_activation_matvec,
         stream,
         expected_generated_token_ids.as_deref(),
     )?;
@@ -128,6 +136,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
         profile_next_token,
         profile_benchmark_token,
         experimental_q8_k_activation_matvec,
+        compare_q8_k_activation_matvec,
         stream,
     })
 }
@@ -135,7 +144,9 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
 fn validate_modes(
     generate_tokens: Option<usize>,
     benchmark_runs: Option<usize>,
+    profile_next_token: bool,
     profile_benchmark_token: bool,
+    compare_q8_k_activation_matvec: bool,
     stream: bool,
     expected_generated_token_ids: Option<&[usize]>,
 ) -> Result<(), Box<dyn Error>> {
@@ -154,6 +165,12 @@ fn validate_modes(
     }
     if profile_benchmark_token && benchmark_runs.is_none() {
         return Err(io::Error::other("use --profile-benchmark-token with --benchmark-runs").into());
+    }
+    if compare_q8_k_activation_matvec && !profile_next_token && !profile_benchmark_token {
+        return Err(io::Error::other(
+            "use --compare-q8-k-activation-matvec with --profile-next-token or --profile-benchmark-token",
+        )
+        .into());
     }
     Ok(())
 }
@@ -221,5 +238,5 @@ fn parse_token_ids(value: OsString) -> Result<Vec<usize>, Box<dyn Error>> {
 }
 
 fn usage() -> &'static str {
-    "usage: ferrite --model <path.gguf> (--prompt <text> | --prompt-token-ids <id[,id...]>) [--expect-token-id <id>] [--top-logits <count>] [--profile-next-token] [--generate-tokens <count>] [--expect-generated-token-ids <id[,id...]>] [--stream] [--benchmark-runs <count>] [--profile-benchmark-token] [--experimental-q8-k-activation-matvec]"
+    "usage: ferrite --model <path.gguf> (--prompt <text> | --prompt-token-ids <id[,id...]>) [--expect-token-id <id>] [--top-logits <count>] [--profile-next-token] [--generate-tokens <count>] [--expect-generated-token-ids <id[,id...]>] [--stream] [--benchmark-runs <count>] [--profile-benchmark-token] [--experimental-q8-k-activation-matvec] [--compare-q8-k-activation-matvec]"
 }

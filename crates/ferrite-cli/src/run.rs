@@ -23,7 +23,8 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
 
     let prompt_token_ids = prompt_token_ids(&tokenizer, args.prompt)?;
     let execution_options = ScalarExecutionOptions::default()
-        .with_q8_k_activation_matvec(args.experimental_q8_k_activation_matvec);
+        .with_q8_k_activation_matvec(args.experimental_q8_k_activation_matvec)
+        .with_q8_k_activation_matvec_comparison(args.compare_q8_k_activation_matvec);
     let mut session = model.start_session_with_options(execution_options);
     let (next, profile) = accept_prompt(&mut session, &prompt_token_ids, args.profile_next_token)?;
     let token = tokenizer.token(next.token_id).ok_or_else(|| {
@@ -37,6 +38,10 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
     println!(
         "experimental_q8_k_activation_matvec={}",
         args.experimental_q8_k_activation_matvec
+    );
+    println!(
+        "compare_q8_k_activation_matvec={}",
+        args.compare_q8_k_activation_matvec
     );
     println!("next_token_id={}", next.token_id);
     println!("next_token={token}");

@@ -1,7 +1,7 @@
 use super::{
     attention::causal_attention,
     math::{add_assign, argmax, rms_norm, swiglu},
-    profile::{ProfiledNextToken, ProfiledTokenId, ScalarProfileEvent},
+    profile::{ProfiledNextToken, ProfiledTokenId, ScalarMatVecComparison, ScalarProfileEvent},
     InferenceError, NextToken, ScalarExecutionOptions, ScalarLlamaModel,
 };
 
@@ -36,7 +36,7 @@ impl<'a> ScalarLlamaSession<'a> {
     }
 
     pub fn accept_token(&mut self, token_id: usize) -> Result<NextToken, InferenceError> {
-        let accepted = self.accept_token_inner(token_id, None, OutputMode::Logits)?;
+        let accepted = self.accept_token_inner(token_id, None, None, OutputMode::Logits)?;
         Ok(NextToken {
             token_id: accepted.token_id,
             logits: accepted
@@ -47,7 +47,7 @@ impl<'a> ScalarLlamaSession<'a> {
 
     pub fn accept_token_id(&mut self, token_id: usize) -> Result<usize, InferenceError> {
         Ok(self
-            .accept_token_inner(token_id, None, OutputMode::TokenIdOnly)?
+            .accept_token_inner(token_id, None, None, OutputMode::TokenIdOnly)?
             .token_id)
     }
 
@@ -56,11 +56,17 @@ impl<'a> ScalarLlamaSession<'a> {
         token_id: usize,
     ) -> Result<ProfiledTokenId, InferenceError> {
         let mut events = Vec::new();
-        let accepted =
-            self.accept_token_inner(token_id, Some(&mut events), OutputMode::TokenIdOnly)?;
+        let mut comparisons = Vec::new();
+        let accepted = self.accept_token_inner(
+            token_id,
+            Some(&mut events),
+            Some(&mut comparisons),
+            OutputMode::TokenIdOnly,
+        )?;
         Ok(ProfiledTokenId {
             token_id: accepted.token_id,
             events,
+            comparisons,
         })
     }
 
@@ -83,20 +89,31 @@ impl<'a> ScalarLlamaSession<'a> {
         token_id: usize,
     ) -> Result<ProfiledNextToken, InferenceError> {
         let mut events = Vec::new();
-        let accepted = self.accept_token_inner(token_id, Some(&mut events), OutputMode::Logits)?;
+        let mut comparisons = Vec::new();
+        let accepted = self.accept_token_inner(
+            token_id,
+            Some(&mut events),
+            Some(&mut comparisons),
+            OutputMode::Logits,
+        )?;
         let next_token = NextToken {
             token_id: accepted.token_id,
             logits: accepted
                 .logits
                 .ok_or_else(|| InferenceError::new("missing logits for profiled next token"))?,
         };
-        Ok(ProfiledNextToken { next_token, events })
+        Ok(ProfiledNextToken {
+            next_token,
+            events,
+            comparisons,
+        })
     }
 
     fn accept_token_inner(
         &mut self,
         token_id: usize,
         mut profile_events: Option<&mut Vec<ScalarProfileEvent>>,
+        mut comparison_events: Option<&mut Vec<ScalarMatVecComparison>>,
         output_mode: OutputMode,
     ) -> Result<AcceptedToken, InferenceError> {
         if token_id >= self.model.config.vocab_size {
@@ -121,6 +138,7 @@ impl<'a> ScalarLlamaSession<'a> {
                 layer_index,
                 "q_proj",
                 profile_events.as_deref_mut(),
+                comparison_events.as_deref_mut(),
                 self.options,
             )?;
             add_optional_bias(&mut query, layer.q_bias.as_deref())?;
@@ -130,6 +148,7 @@ impl<'a> ScalarLlamaSession<'a> {
                 layer_index,
                 "k_proj",
                 profile_events.as_deref_mut(),
+                comparison_events.as_deref_mut(),
                 self.options,
             )?;
             add_optional_bias(&mut key, layer.k_bias.as_deref())?;
@@ -139,6 +158,7 @@ impl<'a> ScalarLlamaSession<'a> {
                 layer_index,
                 "v_proj",
                 profile_events.as_deref_mut(),
+                comparison_events.as_deref_mut(),
                 self.options,
             )?;
             add_optional_bias(&mut value, layer.v_bias.as_deref())?;
@@ -169,6 +189,7 @@ impl<'a> ScalarLlamaSession<'a> {
                 layer_index,
                 "o_proj",
                 profile_events.as_deref_mut(),
+                comparison_events.as_deref_mut(),
                 self.options,
             )?;
             add_assign(&mut hidden, &attention_output)?;
@@ -181,6 +202,7 @@ impl<'a> ScalarLlamaSession<'a> {
                 layer_index,
                 "ffn_gate",
                 profile_events.as_deref_mut(),
+                comparison_events.as_deref_mut(),
                 self.options,
             )?;
             let up = profiled_layer_mul_vec(
@@ -189,6 +211,7 @@ impl<'a> ScalarLlamaSession<'a> {
                 layer_index,
                 "ffn_up",
                 profile_events.as_deref_mut(),
+                comparison_events.as_deref_mut(),
                 self.options,
             )?;
             let activated = swiglu(&gate, &up)?;
@@ -198,6 +221,7 @@ impl<'a> ScalarLlamaSession<'a> {
                 layer_index,
                 "ffn_down",
                 profile_events.as_deref_mut(),
+                comparison_events.as_deref_mut(),
                 self.options,
             )?;
             add_assign(&mut hidden, &ffn_output)?;
@@ -215,14 +239,27 @@ impl<'a> ScalarLlamaSession<'a> {
             .logits_matrix(&self.model.weights.token_embedding);
         let (token_id, logits) = match output_mode {
             OutputMode::Logits => {
-                let logits =
-                    profiled_mul_vec(output, &normed, "output", profile_events, self.options)?;
+                let logits = profiled_mul_vec(
+                    output,
+                    &normed,
+                    "output",
+                    profile_events,
+                    comparison_events,
+                    self.options,
+                )?;
                 (argmax(&logits)?, Some(logits))
             }
-            OutputMode::TokenIdOnly => (
-                profiled_argmax_mul_vec(output, &normed, "output", profile_events, self.options)?,
-                None,
-            ),
+            OutputMode::TokenIdOnly => {
+                let token_id = profiled_argmax_mul_vec(
+                    output,
+                    &normed,
+                    "output",
+                    profile_events,
+                    comparison_events,
+                    self.options,
+                )?;
+                (token_id, None)
+            }
         };
         self.cached_token_count += 1;
 

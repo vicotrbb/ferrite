@@ -1,4 +1,7 @@
-use crate::scalar::{profile::ScalarProfileEvent, InferenceError, Matrix, ScalarExecutionOptions};
+use crate::scalar::{
+    profile::{ScalarMatVecComparison, ScalarProfileEvent},
+    InferenceError, Matrix, MatrixStorageKind, ScalarExecutionOptions,
+};
 use std::time::{Duration, Instant};
 
 pub(super) fn profiled_layer_mul_vec(
@@ -7,6 +10,7 @@ pub(super) fn profiled_layer_mul_vec(
     layer_index: usize,
     role: &str,
     profile_events: Option<&mut Vec<ScalarProfileEvent>>,
+    comparison_events: Option<&mut Vec<ScalarMatVecComparison>>,
     options: ScalarExecutionOptions,
 ) -> Result<Vec<f32>, InferenceError> {
     if profile_events.is_none() {
@@ -17,6 +21,7 @@ pub(super) fn profiled_layer_mul_vec(
         vector,
         &format!("layer.{layer_index}.{role}"),
         profile_events,
+        comparison_events,
         options,
     )
 }
@@ -26,6 +31,7 @@ pub(super) fn profiled_mul_vec(
     vector: &[f32],
     label: &str,
     profile_events: Option<&mut Vec<ScalarProfileEvent>>,
+    comparison_events: Option<&mut Vec<ScalarMatVecComparison>>,
     options: ScalarExecutionOptions,
 ) -> Result<Vec<f32>, InferenceError> {
     let Some(events) = profile_events else {
@@ -39,6 +45,7 @@ pub(super) fn profiled_mul_vec(
         nonzero_duration(elapsed),
         matrix,
     ));
+    compare_q8_k_activation_matvec(matrix, vector, label, &output, comparison_events, options)?;
     Ok(output)
 }
 
@@ -47,6 +54,7 @@ pub(super) fn profiled_argmax_mul_vec(
     vector: &[f32],
     label: &str,
     profile_events: Option<&mut Vec<ScalarProfileEvent>>,
+    comparison_events: Option<&mut Vec<ScalarMatVecComparison>>,
     options: ScalarExecutionOptions,
 ) -> Result<usize, InferenceError> {
     let Some(events) = profile_events else {
@@ -60,7 +68,45 @@ pub(super) fn profiled_argmax_mul_vec(
         nonzero_duration(elapsed),
         matrix,
     ));
+    if let Some(events) = comparison_events {
+        if options.compare_q8_k_activation_matvec() && is_q8_k_comparable(matrix.storage_kind()) {
+            let reference = matrix.mul_vec(vector)?;
+            let candidate = matrix.mul_vec_with_options(vector, options)?;
+            events.push(ScalarMatVecComparison::new(
+                label, matrix, &reference, &candidate,
+            )?);
+        }
+    }
     Ok(token_id)
+}
+
+fn compare_q8_k_activation_matvec(
+    matrix: &Matrix,
+    vector: &[f32],
+    label: &str,
+    candidate: &[f32],
+    comparison_events: Option<&mut Vec<ScalarMatVecComparison>>,
+    options: ScalarExecutionOptions,
+) -> Result<(), InferenceError> {
+    let Some(events) = comparison_events else {
+        return Ok(());
+    };
+    if !options.compare_q8_k_activation_matvec() || !is_q8_k_comparable(matrix.storage_kind()) {
+        return Ok(());
+    }
+
+    let reference = matrix.mul_vec(vector)?;
+    events.push(ScalarMatVecComparison::new(
+        label, matrix, &reference, candidate,
+    )?);
+    Ok(())
+}
+
+fn is_q8_k_comparable(storage_kind: MatrixStorageKind) -> bool {
+    matches!(
+        storage_kind,
+        MatrixStorageKind::Q4K | MatrixStorageKind::Q6K
+    )
 }
 
 fn nonzero_duration(elapsed: Duration) -> Duration {

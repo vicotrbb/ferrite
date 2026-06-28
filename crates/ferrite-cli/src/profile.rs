@@ -1,5 +1,5 @@
 use crate::benchmark::BenchmarkTokenProfile;
-use ferrite_inference::scalar::{ProfiledNextToken, ScalarProfileEvent};
+use ferrite_inference::scalar::{ProfiledNextToken, ScalarMatVecComparison, ScalarProfileEvent};
 use std::collections::BTreeMap;
 use std::time::Duration;
 
@@ -18,6 +18,7 @@ pub(crate) fn print_next_token_profile(profile: &ProfiledNextToken) {
         profile.total_elapsed(),
         &profile.events,
     );
+    print_q8_k_comparisons("profile_next_token", &profile.comparisons);
 }
 
 pub(crate) fn print_benchmark_token_profile(profile: &BenchmarkTokenProfile) {
@@ -31,6 +32,7 @@ pub(crate) fn print_benchmark_token_profile(profile: &BenchmarkTokenProfile) {
         profile.token.total_elapsed(),
         &profile.token.events,
     );
+    print_q8_k_comparisons("profile_benchmark_token", &profile.token.comparisons);
 }
 
 fn print_profile(prefix: &str, total_elapsed: Duration, events: &[ScalarProfileEvent]) {
@@ -65,6 +67,21 @@ fn print_profile(prefix: &str, total_elapsed: Duration, events: &[ScalarProfileE
         println!(
             "{prefix}_role={}:{}:{}:{}:{}:{}",
             key.role, key.storage_kind, key.rows, key.cols, key.storage_bytes, elapsed_ns
+        );
+    }
+}
+
+fn print_q8_k_comparisons(prefix: &str, comparisons: &[ScalarMatVecComparison]) {
+    for comparison in comparisons {
+        println!(
+            "{prefix}_q8_k_compare={}:{}:{}:{}:{}:{:.6}:{:.6}",
+            comparison.label(),
+            comparison.storage_kind().as_str(),
+            comparison.rows(),
+            comparison.cols(),
+            comparison.storage_bytes(),
+            comparison.max_abs_diff(),
+            comparison.max_relative_diff()
         );
     }
 }

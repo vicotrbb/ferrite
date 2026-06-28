@@ -54,7 +54,7 @@ pub use math::{argmax, rms_norm};
 pub use matrix::{Matrix, MatrixStorageKind};
 pub use options::ScalarExecutionOptions;
 pub use output::ScalarLlamaOutputWeights;
-pub use profile::{ProfiledNextToken, ProfiledTokenId, ScalarProfileEvent};
+pub use profile::{ProfiledNextToken, ProfiledTokenId, ScalarMatVecComparison, ScalarProfileEvent};
 use rope::apply_rope_with_layout;
 pub use rope::{apply_rope, RopeLayout};
 pub use session::ScalarLlamaSession;
