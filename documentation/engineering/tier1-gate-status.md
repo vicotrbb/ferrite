@@ -42,11 +42,13 @@ for each benchmark token. Generated-token loops also use token-id-only repeated
 acceptance after the first prompt next-token result. A next-token profiling CLI
 identifies per-operation matvec timings for real Tier 1 models and includes
 storage kind, shape, and storage bytes for each profiled matrix. It also emits
-aggregate role/signature summaries for profile-driven optimization. Tier 1 does
-not yet prove AVX2 runtime correctness, broad 0.5B-1.7B prompt/model coverage,
-or full-tier throughput. Qwen2.5-0.5B Q4_K_M now has local default-pool and
-two-thread cached-token benchmarks above 10 tok/s after the Q8_0 direct argmax
-slice, but Qwen2.5-1.5B and broader Tier 1 throughput remain unproven.
+aggregate role/signature summaries for profile-driven optimization. Benchmark
+token profiling now records token-id decode profiles from a replay session
+outside the timed benchmark loop. Tier 1 does not yet prove AVX2 runtime
+correctness, broad 0.5B-1.7B prompt/model coverage, or full-tier throughput.
+Qwen2.5-0.5B Q4_K_M now has local default-pool and two-thread cached-token
+benchmarks above 10 tok/s after the Q8_0 direct argmax slice, but
+Qwen2.5-1.5B and broader Tier 1 throughput remain unproven.
 
 ## Evidence Matrix
 
@@ -63,7 +65,7 @@ slice, but Qwen2.5-1.5B and broader Tier 1 throughput remain unproven.
 | Qwen2 Tier 1 model coverage | Partially proven for Qwen2.5-0.5B and 1.5B Q4_K_M | `documentation/dev-notes/2026-06-27-tier1-qwen2-0-5b-probe.md`; `documentation/dev-notes/2026-06-27-tier1-qwen2-config-parser.md`; `documentation/dev-notes/2026-06-27-scalar-qkv-projection-bias.md`; `documentation/dev-notes/2026-06-27-tier1-qwen2-loader-dispatch.md`; `documentation/dev-notes/2026-06-27-tier1-qwen2-rope-layout.md`; `documentation/dev-notes/2026-06-27-tier1-qwen2-1-5b-reference-probe.md`; Qwen2.5-0.5B-Instruct and Qwen2.5-1.5B-Instruct Q4_K_M both load, use split-half RoPE, and match three-token deterministic `llama.cpp` reference continuations |
 | Tier 1 throughput target | Partially proven for local Qwen2.5-0.5B Q4_K_M only; not proven for the full tier | `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-scalar-probe.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-q4k-row-parallel.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-q6k-row-parallel.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-q4k-fused-neon.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-q6k-fused-neon.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-token-id-benchmark.md`; `documentation/benchmarks/2026-06-27-tier1-qwen2-q4k-throughput.md`; `documentation/benchmarks/2026-06-27-tier1-qwen2-0-5b-q5-neon-block-dot.md`; `documentation/benchmarks/2026-06-27-tier1-qwen2-0-5b-q8-argmax.md`; token-id benchmark path improved the SmolLM2-1.7B local default-pool run to about 5.51 tok/s and the 2-thread run to about 3.36 tok/s; Qwen2.5-0.5B improved to about 10.64 tok/s default-pool and 10.76 tok/s with `RAYON_NUM_THREADS=2` after Q8_0 direct argmax, but Qwen2.5-1.5B and broader Tier 1 throughput remain below or unproven |
 | Generated token path | Proven for one real 1.7B parity profile | `documentation/dev-notes/2026-06-27-token-id-generation-path.md`; generated-token loops use token-id-only repeated acceptance and still matched SmolLM2-1.7B token IDs `[18, 198, 3725, 198, 198, 788]` |
-| Next-token operation profiling | Proven for CLI, one real 1.7B profile, and two Qwen2 profiles | `documentation/dev-notes/2026-06-27-tier1-next-token-profile.md`; `documentation/dev-notes/2026-06-27-tier1-profile-matrix-metadata.md`; `documentation/dev-notes/2026-06-27-tier1-qwen2-profile.md`; `--profile-next-token` emits per-operation labels, matrix storage kind/shape/bytes, and aggregate `profile_next_token_role` summaries; SmolLM2-1.7B points at Q4_K/Q6_K FFN/output roles, Qwen2.5-0.5B points at Q5_0 FFN gate/up, and Qwen2.5-1.5B points at Q4_K FFN plus Q6_K output/down roles |
+| Next-token and benchmark-token operation profiling | Proven for CLI, one real 1.7B next-token profile, and two Qwen2 next-token and benchmark-token profiles | `documentation/dev-notes/2026-06-27-tier1-next-token-profile.md`; `documentation/dev-notes/2026-06-27-tier1-profile-matrix-metadata.md`; `documentation/dev-notes/2026-06-27-tier1-qwen2-profile.md`; `documentation/benchmarks/2026-06-28-tier1-qwen2-benchmark-token-profile.md`; `--profile-next-token` emits per-operation labels, matrix storage kind/shape/bytes, and aggregate `profile_next_token_role` summaries; `--profile-benchmark-token` profiles the first token-id benchmark decode outside the timed benchmark loop; SmolLM2-1.7B points at Q4_K/Q6_K FFN/output roles, Qwen2.5-0.5B points at Q5_0 FFN gate/up, and Qwen2.5-1.5B points at Q4_K FFN plus Q6_K output/down roles |
 | Rejected optimization experiments | Q8_0 and Q5_0 naive row-level Rayon scheduling regressed and were reverted; Q6_K argmax `try_reduce` row reduction was tested and not retained | `documentation/dev-notes/2026-06-27-tier1-q8-row-parallel-regression.md`; `documentation/dev-notes/2026-06-27-tier1-q5-row-parallel-regression.md`; `documentation/dev-notes/2026-06-27-tier1-q6-argmax-reduction-regression.md`; Q8_0 was implemented in `3b12756` and reverted in `1ae4275`; Q5_0 was implemented in `f318e3b` and reverted in `a5d9382`; Q6_K argmax row reduction regressed Qwen2.5-1.5B from `295,683,141` ns to `302,361,766` ns default-pool and from `378,677,558` ns to `593,748,308` ns with `RAYON_NUM_THREADS=2` |
 
 ## Fresh Full-Workspace Gate
