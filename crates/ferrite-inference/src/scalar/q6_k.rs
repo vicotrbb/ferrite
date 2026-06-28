@@ -52,6 +52,15 @@ pub(super) fn q6_k_argmax_mul_vec(
             return super::q6_k_neon::neon_q6_k_argmax_mul_vec(bytes, rows, cols, vector);
         }
     }
+    #[cfg(target_arch = "x86_64")]
+    {
+        if cols != 0
+            && cols.is_multiple_of(Q6_K_BLOCK_VALUES)
+            && std::arch::is_x86_feature_detected!("avx2")
+        {
+            return super::q6_k_avx2::avx2_q6_k_argmax_mul_vec(bytes, rows, cols, vector);
+        }
+    }
 
     scalar_q6_k_argmax_mul_vec(bytes, rows, cols, vector)
 }

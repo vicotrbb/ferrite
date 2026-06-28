@@ -170,6 +170,20 @@ the amd64 pod before changing kernels. That follow-up profile is recorded in
 In particular, this run does not justify promoting the experimental Q8_K
 activation matvec path or changing default dispatch policy.
 
+## Post Q6_K AVX2 Argmax Route
+
+After `documentation/dev-notes/2026-06-28-q6-k-avx2-argmax.md`, the bounded
+x86_64 AVX2 Q6_K benchmark improved but remained below target:
+
+| Model | Thread setting | benchmark_avg_ns | Approx tok/s |
+| --- | --- | ---: | ---: |
+| Q6_K | default pool | 1,086,706,040 | 0.92 |
+| Q6_K | `RAYON_NUM_THREADS=2` | 1,111,777,214 | 0.90 |
+
+The default-pool average improved by about 19.9% compared with the earlier
+`1,356,563,424 ns` run. The two-thread average improved by about 17.6% compared
+with the earlier `1,348,577,646 ns` run.
+
 ## Cleanup
 
 The pod was deleted after the checks. A final cleanup check:

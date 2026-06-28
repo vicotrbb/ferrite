@@ -203,6 +203,22 @@ than Q8_0 in FFN roles and dramatically slower in the final output projection.
 The next Q6_K x86_64 implementation hypothesis should therefore start with the
 Q6_K output projection path, not broad dispatch changes.
 
+## Post Q6_K AVX2 Argmax Route
+
+After `documentation/dev-notes/2026-06-28-q6-k-avx2-argmax.md`, the Q6_K
+benchmark-token profile on the bounded x86_64 AVX2 pod reported:
+
+```text
+benchmark_total_ns=1115774978
+benchmark_avg_ns=1115774978
+profile_benchmark_token_total_ns=535634397
+profile_benchmark_token_role=output:Q6_K:151936:1536:191439360:82575971
+```
+
+The output role improved from `327,882,205 ns` to `82,575,971 ns`, about a
+74.8% reduction. Q6_K still remains below the Tier 1 throughput target because
+the transformer-layer FFN roles remain large.
+
 This profile does not justify promoting the experimental Q8_K activation matvec
 path or changing default dispatch policy.
 
