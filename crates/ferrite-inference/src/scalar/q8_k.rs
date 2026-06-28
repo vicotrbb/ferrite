@@ -12,6 +12,20 @@ pub(in crate::scalar) struct BlockQ8K {
 }
 
 impl BlockQ8K {
+    pub(in crate::scalar) fn quantize_blocks(values: &[f32]) -> Result<Vec<Self>, InferenceError> {
+        if !values.len().is_multiple_of(Q8_K_BLOCK_VALUES) {
+            return Err(InferenceError::new(format!(
+                "Q8_K activation length {} must be divisible by {Q8_K_BLOCK_VALUES}",
+                values.len()
+            )));
+        }
+
+        values
+            .chunks_exact(Q8_K_BLOCK_VALUES)
+            .map(Self::quantize)
+            .collect()
+    }
+
     pub(in crate::scalar) fn quantize(values: &[f32]) -> Result<Self, InferenceError> {
         if values.len() != Q8_K_BLOCK_VALUES {
             return Err(InferenceError::new(format!(
@@ -111,6 +125,20 @@ mod tests {
         };
 
         assert_eq!(err.to_string(), "Q8_K activation value 7 is not finite");
+        Ok(())
+    }
+
+    #[test]
+    fn q8_k_quantizes_activation_blocks() -> Result<(), InferenceError> {
+        let values = (0..Q8_K_BLOCK_VALUES * 2)
+            .map(|index| index as f32 / 31.0 - 4.0)
+            .collect::<Vec<_>>();
+
+        let blocks = BlockQ8K::quantize_blocks(&values)?;
+
+        assert_eq!(blocks.len(), 2);
+        assert_eq!(blocks[0], BlockQ8K::quantize(&values[..Q8_K_BLOCK_VALUES])?);
+        assert_eq!(blocks[1], BlockQ8K::quantize(&values[Q8_K_BLOCK_VALUES..])?);
         Ok(())
     }
 
