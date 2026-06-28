@@ -137,6 +137,55 @@ async fn chat_endpoint_streams_openai_sse_chunks() -> Result<(), Box<dyn std::er
 }
 
 #[tokio::test]
+async fn chat_endpoint_honors_max_completion_tokens() -> Result<(), Box<dyn std::error::Error>> {
+    let model_path = write_chat_fixture_model()?;
+    let engine = InferenceEngine::load(&model_path)?;
+    let app = router(ServerState::with_engine("fixture-model".to_owned(), engine));
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/chat/completions")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            r#"{"model":"fixture-model","messages":[{"role":"user","content":"hello"}],"max_completion_tokens":1}"#,
+        ))?;
+    let response = app.oneshot(request).await?;
+    remove_fixture_model(&model_path)?;
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_json(response.into_body()).await?;
+    assert_eq!(body["choices"][0]["message"]["content"], "winner");
+    assert_eq!(body["usage"]["completion_tokens"], 1);
+    Ok(())
+}
+
+#[tokio::test]
+async fn chat_stream_endpoint_honors_max_completion_tokens(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let model_path = write_chat_fixture_model()?;
+    let engine = InferenceEngine::load(&model_path)?;
+    let app = router(ServerState::with_engine("fixture-model".to_owned(), engine));
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/chat/completions")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            r#"{"model":"fixture-model","messages":[{"role":"user","content":"hello"}],"max_completion_tokens":1,"stream":true}"#,
+        ))?;
+    let response = app.oneshot(request).await?;
+    remove_fixture_model(&model_path)?;
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_text(response.into_body()).await?;
+    assert!(body.contains("\"delta\":{\"content\":\"winner\"}"));
+    assert_eq!(
+        body.matches("\"delta\":{\"content\":\"winner\"}").count(),
+        1
+    );
+    assert!(body.contains("data: [DONE]"));
+    Ok(())
+}
+
+#[tokio::test]
 async fn completion_stream_helper_emits_tokens_from_generation_callback(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let model_path = write_fixture_model()?;

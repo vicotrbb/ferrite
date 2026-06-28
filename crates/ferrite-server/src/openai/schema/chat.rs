@@ -10,6 +10,8 @@ pub struct ChatCompletionRequest {
     stream: bool,
     #[serde(default)]
     max_tokens: Option<usize>,
+    #[serde(default)]
+    max_completion_tokens: Option<usize>,
 }
 
 impl ChatCompletionRequest {
@@ -26,7 +28,7 @@ impl ChatCompletionRequest {
     }
 
     pub fn max_tokens(&self) -> Option<usize> {
-        self.max_tokens
+        self.max_tokens.or(self.max_completion_tokens)
     }
 }
 
