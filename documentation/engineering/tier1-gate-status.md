@@ -78,7 +78,7 @@ still fails.
 
 ## Fresh Full-Workspace Gate
 
-Commands run after the x86_64 AVX2 Tier 1 model-output evidence slices:
+Commands run after the x86_64 AVX2 fixed-prompt closure evidence slice:
 
 ```sh
 cargo fmt --all -- --check
@@ -88,7 +88,7 @@ cargo test --workspace
 cargo check -p ferrite-inference --target x86_64-unknown-linux-gnu --tests
 ```
 
-All commands passed on commit `a55ba76`.
+All commands passed on commit `ebff88c`.
 
 ## Fresh Tier 1 Model Probe
 
