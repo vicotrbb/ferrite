@@ -29,7 +29,8 @@ curl http://127.0.0.1:8080/v1/completions \
 ```
 
 Point OpenAI-compatible clients at `http://127.0.0.1:8080/v1` as the base URL.
-The server supports non-streaming text generation and OpenAI-style SSE streams:
+The server supports non-streaming text generation and OpenAI-style SSE streams.
+Streaming responses send token chunks as generation progresses:
 
 ```sh
 curl -N http://127.0.0.1:8080/v1/chat/completions \
