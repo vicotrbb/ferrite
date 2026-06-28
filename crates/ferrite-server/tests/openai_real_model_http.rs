@@ -74,6 +74,70 @@ async fn live_http_server_streams_with_real_tier0_model() -> Result<(), Box<dyn 
     Ok(())
 }
 
+#[tokio::test]
+#[ignore = "requires local Tier 0 GGUF model artifact"]
+async fn live_http_server_chats_with_real_tier0_model() -> Result<(), Box<dyn std::error::Error>> {
+    let model_path = real_model_path()?;
+    let server = support::LiveServer::start_with_existing_model(REAL_MODEL_ID, model_path).await?;
+    let request_body = format!(
+        r#"{{"model":"{REAL_MODEL_ID}","messages":[{{"role":"user","content":"hello world"}}],"max_completion_tokens":1}}"#
+    );
+    let response = send_http_request(
+        server.addr(),
+        "POST",
+        "/v1/chat/completions",
+        request_body.as_bytes(),
+    )
+    .await?;
+
+    assert!(
+        response.starts_with("HTTP/1.1 200 OK"),
+        "unexpected response: {response}"
+    );
+    let body = response_json(&response)?;
+    assert_eq!(body["object"], "chat.completion");
+    assert_eq!(body["model"], REAL_MODEL_ID);
+    assert_eq!(body["choices"][0]["message"]["content"], "\n");
+    assert_eq!(body["usage"]["prompt_tokens"], 9);
+    assert_eq!(body["usage"]["completion_tokens"], 1);
+    assert_eq!(body["usage"]["total_tokens"], 10);
+    Ok(())
+}
+
+#[tokio::test]
+#[ignore = "requires local Tier 0 GGUF model artifact"]
+async fn live_http_server_streams_chat_with_real_tier0_model(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let model_path = real_model_path()?;
+    let server = support::LiveServer::start_with_existing_model(REAL_MODEL_ID, model_path).await?;
+    let request_body = format!(
+        r#"{{"model":"{REAL_MODEL_ID}","messages":[{{"role":"user","content":"hello world"}}],"max_completion_tokens":1,"stream":true}}"#
+    );
+    let response = send_http_request(
+        server.addr(),
+        "POST",
+        "/v1/chat/completions",
+        request_body.as_bytes(),
+    )
+    .await?;
+
+    assert!(
+        response.starts_with("HTTP/1.1 200 OK"),
+        "unexpected response: {response}"
+    );
+    assert!(
+        response
+            .to_ascii_lowercase()
+            .contains("content-type: text/event-stream"),
+        "unexpected response headers: {response}"
+    );
+    assert!(response.contains("data: {\"id\":\"chatcmpl-ferrite-"));
+    assert!(response.contains("\"object\":\"chat.completion.chunk\""));
+    assert!(response.contains("\"delta\":{\"content\":\"\\n\"}"));
+    assert!(response.contains("data: [DONE]"));
+    Ok(())
+}
+
 fn real_model_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
     let model_path = std::env::var_os("FERRITE_REAL_MODEL")
         .map(PathBuf::from)
