@@ -240,6 +240,28 @@ mod tests {
     }
 
     #[test]
+    fn neon_q6_k_q8_k_block_dot_matches_scalar_for_signed_q8_k_scales() -> Result<(), InferenceError>
+    {
+        let block = patterned_q6_k_block();
+
+        for vector in [
+            positive_dominant_activation(),
+            negative_dominant_activation(),
+        ] {
+            let activation = BlockQ8K::quantize(&vector)?;
+            let actual = neon_q6_k_q8_k_block_dot(&block, &activation)?;
+            let expected = q6_k_q8_k_block_dot(&block, &activation)?;
+
+            assert!(
+                (actual - expected).abs() < 0.001,
+                "actual={actual} expected={expected}"
+            );
+        }
+
+        Ok(())
+    }
+
+    #[test]
     fn neon_q6_k_q8_k_mul_vec_matches_scalar_q8_k_adapter() -> Result<(), InferenceError> {
         let cols = Q6_K_BLOCK_VALUES * 2;
         let rows = 2;
@@ -306,6 +328,20 @@ mod tests {
             let wave = (index % 43) as f32 - 21.0;
             *value = wave / 17.0;
         }
+        values
+    }
+
+    fn positive_dominant_activation() -> [f32; Q6_K_BLOCK_VALUES] {
+        let mut values = patterned_activation();
+        values[0] = 3.25;
+        values[1] = -1.5;
+        values
+    }
+
+    fn negative_dominant_activation() -> [f32; Q6_K_BLOCK_VALUES] {
+        let mut values = patterned_activation();
+        values[0] = -3.25;
+        values[1] = 1.5;
         values
     }
 }
