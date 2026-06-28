@@ -30,6 +30,8 @@ mod q8_0_avx2;
 #[cfg(target_arch = "aarch64")]
 mod q8_0_neon;
 mod quantized;
+#[cfg(test)]
+mod quantized_tests;
 mod rope;
 mod session;
 mod tensor;
