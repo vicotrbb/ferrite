@@ -58,6 +58,7 @@ async fn chat_completions(
     OpenAiJson(request): OpenAiJson<ChatCompletionRequest>,
 ) -> Result<Response, OpenAiHttpError> {
     ensure_model(&state, request.model())?;
+    ensure_supported_chat_request(&request)?;
     let prompt = render_chat_prompt(request.messages())?;
     let max_tokens = normalized_max_tokens(request.max_tokens())?;
     let permit = acquire_inference_permit(&state)?;
@@ -111,6 +112,18 @@ async fn completions(
         generated,
     ))
     .into_response())
+}
+
+fn ensure_supported_chat_request(request: &ChatCompletionRequest) -> Result<(), OpenAiHttpError> {
+    let unsupported = request.unsupported_fields();
+    if unsupported.is_empty() {
+        return Ok(());
+    }
+
+    Err(OpenAiHttpError::invalid_request(format!(
+        "unsupported chat completion field(s): {}",
+        unsupported.join(", ")
+    )))
 }
 
 fn ensure_model(state: &ServerState, requested_model: &str) -> Result<(), OpenAiHttpError> {

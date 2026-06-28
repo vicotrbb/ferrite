@@ -1,6 +1,7 @@
 use super::{unix_timestamp, usage::Usage};
 use crate::runtime::GeneratedText;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 pub struct ChatCompletionRequest {
@@ -12,6 +13,14 @@ pub struct ChatCompletionRequest {
     max_tokens: Option<usize>,
     #[serde(default)]
     max_completion_tokens: Option<usize>,
+    #[serde(default)]
+    tools: Option<Value>,
+    #[serde(default)]
+    tool_choice: Option<Value>,
+    #[serde(default)]
+    parallel_tool_calls: Option<Value>,
+    #[serde(default)]
+    response_format: Option<Value>,
 }
 
 impl ChatCompletionRequest {
@@ -29,6 +38,23 @@ impl ChatCompletionRequest {
 
     pub fn max_tokens(&self) -> Option<usize> {
         self.max_tokens.or(self.max_completion_tokens)
+    }
+
+    pub fn unsupported_fields(&self) -> Vec<&'static str> {
+        let mut fields = Vec::new();
+        if self.tools.is_some() {
+            fields.push("tools");
+        }
+        if self.tool_choice.is_some() {
+            fields.push("tool_choice");
+        }
+        if self.parallel_tool_calls.is_some() {
+            fields.push("parallel_tool_calls");
+        }
+        if self.response_format.is_some() {
+            fields.push("response_format");
+        }
+        fields
     }
 }
 
