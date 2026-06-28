@@ -2,28 +2,30 @@ use super::{
     tensor, InferenceError, Matrix, ScalarLlamaConfig, ScalarLlamaLayerWeights,
     ScalarLlamaOutputWeights, ScalarLlamaWeights,
 };
-use ferrite_model::gguf::{GgmlType, GgufFile, TensorInfo};
+use ferrite_model::gguf::{GgmlType, GgufFile, ModelConfig, TensorInfo};
 
 pub(super) fn load_scalar(
     file: &GgufFile,
     bytes: &[u8],
 ) -> Result<(ScalarLlamaConfig, ScalarLlamaWeights), InferenceError> {
-    let llama = file.llama_config()?;
-    let hidden_size = usize_from_u64(llama.embedding_length, "llama.embedding_length")?;
-    let intermediate_size = usize_from_u64(llama.feed_forward_length, "llama.feed_forward_length")?;
+    let model = match file.model_config()? {
+        ModelConfig::Llama(config) | ModelConfig::Qwen2(config) => config,
+    };
+    let hidden_size = usize_from_u64(model.embedding_length, "model.embedding_length")?;
+    let intermediate_size = usize_from_u64(model.feed_forward_length, "model.feed_forward_length")?;
     let attention_head_count =
-        usize_from_u64(llama.attention_head_count, "llama.attention.head_count")?;
+        usize_from_u64(model.attention_head_count, "model.attention.head_count")?;
     let attention_head_count_kv = usize_from_u64(
-        llama.attention_head_count_kv,
-        "llama.attention.head_count_kv",
+        model.attention_head_count_kv,
+        "model.attention.head_count_kv",
     )?;
-    let head_dim = usize_from_u64(llama.key_length, "llama.attention.key_length")?;
-    let block_count = usize_from_u64(llama.block_count, "llama.block_count")?;
+    let head_dim = usize_from_u64(model.key_length, "model.attention.key_length")?;
+    let block_count = usize_from_u64(model.block_count, "model.block_count")?;
 
-    if llama.key_length != llama.value_length {
+    if model.key_length != model.value_length {
         return Err(InferenceError::new(format!(
             "scalar GGUF loader requires key length {} to equal value length {}",
-            llama.key_length, llama.value_length
+            model.key_length, model.value_length
         )));
     }
 
@@ -45,11 +47,11 @@ pub(super) fn load_scalar(
         attention_head_count_kv,
         head_dim,
         rope_dimension_count: usize_from_u64(
-            llama.rope_dimension_count,
-            "llama.rope.dimension_count",
+            model.rope_dimension_count,
+            "model.rope.dimension_count",
         )?,
-        rope_freq_base: llama.rope_freq_base.unwrap_or(10_000.0),
-        rms_norm_epsilon: llama.attention_layer_norm_rms_epsilon.unwrap_or(0.0),
+        rope_freq_base: model.rope_freq_base.unwrap_or(10_000.0),
+        rms_norm_epsilon: model.attention_layer_norm_rms_epsilon.unwrap_or(0.0),
     };
 
     let mut layers = Vec::with_capacity(block_count);

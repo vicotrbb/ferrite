@@ -20,6 +20,15 @@ fn assert_close(actual: f32, expected: f32) {
     );
 }
 
+fn qwen2_fixture_from_llama_fixture(mut bytes: Vec<u8>) -> Vec<u8> {
+    for index in 0..bytes.len().saturating_sub(4) {
+        if &bytes[index..index + 5] == b"llama" {
+            bytes[index..index + 5].copy_from_slice(b"qwen2");
+        }
+    }
+    bytes
+}
+
 #[test]
 fn rms_norm_uses_scalar_root_mean_square_reference() -> Result<(), Box<dyn Error>> {
     let output = rms_norm(&[3.0, 4.0], &[1.0, 0.5], 0.0)?;
@@ -526,6 +535,21 @@ fn scalar_model_reports_weight_and_session_kv_cache_bytes() -> Result<(), Box<dy
 #[test]
 fn loads_scalar_llama_reference_weights_from_f32_gguf_fixture() -> Result<(), Box<dyn Error>> {
     let bytes = scalar_llama_f32_gguf_fixture();
+    let gguf = parse_gguf(&bytes)?;
+
+    let model = ScalarLlamaModel::from_gguf_scalar(&gguf, &bytes)?;
+    let next = model.next_token(0)?;
+
+    assert_eq!(next.token_id, 2);
+    assert_close(next.logits[0], 0.2);
+    assert_close(next.logits[1], 0.2);
+    assert_close(next.logits[2], 1.5);
+    Ok(())
+}
+
+#[test]
+fn loads_scalar_qwen2_reference_weights_from_f32_gguf_fixture() -> Result<(), Box<dyn Error>> {
+    let bytes = qwen2_fixture_from_llama_fixture(scalar_llama_f32_gguf_fixture());
     let gguf = parse_gguf(&bytes)?;
 
     let model = ScalarLlamaModel::from_gguf_scalar(&gguf, &bytes)?;
