@@ -146,6 +146,11 @@ records a fix for the experimental token-id-only Q6_K output argmax path so it
 honors Q8_K activation execution options instead of silently using default Q6_K
 argmax semantics.
 
+`documentation/benchmarks/2026-06-28-tier1-q8-k-activation-dot.md` was refreshed
+after that fix. Qwen2.5-1.5B still matches both fixed opt-in Q8_K prompts, while
+SmolLM2-1.7B still diverges on both fixed opt-in Q8_K prompts and still matches
+both fixed default-path prompts on the same current release binary.
+
 ## Verification
 
 Focused checks passed for the diagnostic implementation:
