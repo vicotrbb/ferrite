@@ -1,10 +1,74 @@
 #![allow(unsafe_code)]
 
-use super::{float::f16_bits_to_f32, q4_k::Q4_K_BLOCK_BYTES, q8_k::BlockQ8K, InferenceError};
+use super::{
+    float::f16_bits_to_f32,
+    q4_k::{q4_k_storage_bytes, Q4_K_BLOCK_BYTES, Q4_K_BLOCK_VALUES},
+    q8_k::BlockQ8K,
+    InferenceError,
+};
+use rayon::prelude::*;
 use std::arch::aarch64::{
     int32x4_t, int8x16_t, uint8x16_t, vaddq_s32, vaddvq_s32, vandq_u8, vdupq_n_u8, vget_high_s8,
     vget_low_s8, vld1q_s8, vld1q_u8, vmull_s8, vpaddlq_s16, vreinterpretq_s8_u8, vshrq_n_u8,
 };
+
+pub(in crate::scalar) fn neon_q4_k_q8_k_mul_vec(
+    bytes: &[u8],
+    rows: usize,
+    cols: usize,
+    vector: &[f32],
+) -> Result<Vec<f32>, InferenceError> {
+    validate_neon_q4_k_q8_k_mul_vec(bytes, rows, cols, vector)?;
+    let activation_blocks = BlockQ8K::quantize_blocks(vector)?;
+    let blocks_per_row = cols / Q4_K_BLOCK_VALUES;
+    let row_bytes = blocks_per_row
+        .checked_mul(Q4_K_BLOCK_BYTES)
+        .ok_or_else(|| InferenceError::new("Q4_K row byte length overflow"))?;
+
+    let values = bytes
+        .par_chunks_exact(row_bytes)
+        .map(|row| {
+            row.chunks_exact(Q4_K_BLOCK_BYTES)
+                .enumerate()
+                .map(|(block_index, block)| {
+                    neon_q4_k_q8_k_block_dot(block, &activation_blocks[block_index])
+                })
+                .collect::<Result<Vec<_>, InferenceError>>()
+                .map(|parts| parts.iter().sum())
+        })
+        .collect::<Result<Vec<_>, InferenceError>>()?;
+    debug_assert_eq!(values.len(), rows);
+
+    Ok(values)
+}
+
+fn validate_neon_q4_k_q8_k_mul_vec(
+    bytes: &[u8],
+    rows: usize,
+    cols: usize,
+    vector: &[f32],
+) -> Result<(), InferenceError> {
+    if cols == 0 {
+        return Err(InferenceError::new("Q4_K Q8_K columns must not be zero"));
+    }
+    if vector.len() != cols {
+        return Err(InferenceError::new(format!(
+            "matrix columns {cols} do not match vector length {}",
+            vector.len()
+        )));
+    }
+    let value_count = rows
+        .checked_mul(cols)
+        .ok_or_else(|| InferenceError::new("Q4_K matrix value count overflow"))?;
+    let expected = q4_k_storage_bytes(value_count)?;
+    if bytes.len() != expected {
+        return Err(InferenceError::new(format!(
+            "Q4_K byte length {} does not match {expected}",
+            bytes.len()
+        )));
+    }
+    Ok(())
+}
 
 pub(in crate::scalar) fn neon_q4_k_q8_k_block_dot(
     block: &[u8],
@@ -110,9 +174,12 @@ fn q4_k_scale_min(index: usize, scales: &[u8]) -> (u8, u8) {
 
 #[cfg(test)]
 mod tests {
-    use super::neon_q4_k_q8_k_block_dot;
+    use super::{neon_q4_k_q8_k_block_dot, neon_q4_k_q8_k_mul_vec};
     use crate::scalar::{
-        q4_k::Q4_K_BLOCK_VALUES, q4_k_q8_k::q4_k_q8_k_block_dot, q8_k::BlockQ8K, InferenceError,
+        q4_k::Q4_K_BLOCK_VALUES,
+        q4_k_q8_k::{q4_k_q8_k_block_dot, q4_k_q8_k_mul_vec},
+        q8_k::BlockQ8K,
+        InferenceError,
     };
 
     #[test]
@@ -131,14 +198,54 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn neon_q4_k_q8_k_mul_vec_matches_scalar_q8_k_adapter() -> Result<(), InferenceError> {
+        let cols = Q4_K_BLOCK_VALUES * 2;
+        let rows = 2;
+        let vector = (0..cols)
+            .map(|index| (index % 47) as f32 / 15.0 - 1.6)
+            .collect::<Vec<_>>();
+        let bytes = [
+            patterned_q4_k_block_with_seed(0),
+            patterned_q4_k_block_with_seed(1),
+            patterned_q4_k_block_with_seed(2),
+            patterned_q4_k_block_with_seed(3),
+        ]
+        .concat();
+
+        let actual = neon_q4_k_q8_k_mul_vec(&bytes, rows, cols, &vector)?;
+        let expected = q4_k_q8_k_mul_vec(&bytes, rows, cols, &vector)?;
+
+        assert_eq!(actual.len(), rows);
+        for (actual, expected) in actual.iter().zip(&expected) {
+            assert!(
+                (actual - expected).abs() < 0.001,
+                "actual={actual} expected={expected}"
+            );
+        }
+        Ok(())
+    }
+
     fn patterned_q4_k_block() -> Vec<u8> {
+        patterned_q4_k_block_with_seed(0)
+    }
+
+    fn patterned_q4_k_block_with_seed(seed: u8) -> Vec<u8> {
         let mut block = Vec::new();
         block.extend_from_slice(&0x3c00u16.to_le_bytes());
         block.extend_from_slice(&0x3800u16.to_le_bytes());
-        block.extend_from_slice(&[3, 5, 7, 9, 11, 13, 15, 17, 2, 4, 6, 8]);
+        block.extend(
+            [3, 5, 7, 9, 11, 13, 15, 17, 2, 4, 6, 8]
+                .into_iter()
+                .map(|value| value + seed),
+        );
         for index in 0..128 {
-            let low = (index as u8).wrapping_mul(3) & 0x0f;
-            let high = (index as u8).wrapping_mul(5).wrapping_add(1) & 0x0f;
+            let low = (index as u8).wrapping_mul(3).wrapping_add(seed) & 0x0f;
+            let high = (index as u8)
+                .wrapping_mul(5)
+                .wrapping_add(1)
+                .wrapping_add(seed)
+                & 0x0f;
             block.push(low | (high << 4));
         }
         block
