@@ -69,7 +69,7 @@ Output:
 Command:
 
 ```sh
-target/release/ferrite --model target/models/SmolLM2-1.7B-Instruct-Q4_K_M.gguf --prompt 'The capital of France is' --generate-tokens 3 --expect-generated-token-ids 7042,30,2
+target/release/ferrite --model target/models/SmolLM2-1.7B-Instruct-Q4_K_M.gguf --prompt 'The capital of France is' --generate-tokens 6 --expect-generated-token-ids 7042,30,2
 ```
 
 Output:
@@ -78,19 +78,23 @@ Output:
 prompt_token_ids=504,3575,282,4649,314
 next_token_id=7042
 next_token=ĠParis
+generated_cached_tokens=7
 generated_token_ids=7042,30,2
+generated_stopped_on_eos=true
 generated_text= Paris.<|im_end|>
 expected_generated_token_ids=7042,30,2
 generated_match=true
 model_file_bytes=1055609824
 model_file_retained_bytes=0
 scalar_weight_bytes=1053827072
-kv_cache_bytes=3145728
+kv_cache_bytes=2752512
 ```
 
 ## Result
 
 Ferrite matched the fixed local `llama.cpp` deterministic reference for a
-second SmolLM2-1.7B-Instruct Q4_K_M prompt. SmolLM2 Tier 1 output coverage now
-has two fixed prompt profiles, but remains partial and should not be treated as
-broad prompt coverage.
+second SmolLM2-1.7B-Instruct Q4_K_M prompt. After the CLI EOS-stop slice, the
+same check can request six generated tokens and still stop at the three-token
+reference continuation. SmolLM2 Tier 1 output coverage now has two fixed prompt
+profiles, but remains partial and should not be treated as broad prompt
+coverage.

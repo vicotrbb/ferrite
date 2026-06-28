@@ -7,19 +7,23 @@ use crate::gguf_writer::{
 };
 
 pub fn scalar_llama_f32_gguf_fixture() -> Vec<u8> {
-    scalar_llama_gguf_fixture(GGML_TYPE_F32, true)
+    scalar_llama_gguf_fixture(GGML_TYPE_F32, true, None)
+}
+
+pub fn scalar_llama_f32_gguf_fixture_with_eos_token_id(eos_token_id: u64) -> Vec<u8> {
+    scalar_llama_gguf_fixture(GGML_TYPE_F32, true, Some(eos_token_id))
 }
 
 pub fn scalar_llama_tied_output_f32_gguf_fixture() -> Vec<u8> {
-    scalar_llama_gguf_fixture(GGML_TYPE_F32, false)
+    scalar_llama_gguf_fixture(GGML_TYPE_F32, false, None)
 }
 
 pub fn scalar_llama_f16_gguf_fixture() -> Vec<u8> {
-    scalar_llama_gguf_fixture(GGML_TYPE_F16, true)
+    scalar_llama_gguf_fixture(GGML_TYPE_F16, true, None)
 }
 
 pub fn scalar_llama_bf16_gguf_fixture() -> Vec<u8> {
-    scalar_llama_gguf_fixture(GGML_TYPE_BF16, true)
+    scalar_llama_gguf_fixture(GGML_TYPE_BF16, true, None)
 }
 
 pub fn scalar_llama_q8_0_gguf_fixture() -> Vec<u8> {
@@ -214,7 +218,11 @@ pub fn scalar_llama_q6_k_gguf_fixture() -> Vec<u8> {
     bytes
 }
 
-fn scalar_llama_gguf_fixture(tensor_type: u32, include_output_weight: bool) -> Vec<u8> {
+fn scalar_llama_gguf_fixture(
+    tensor_type: u32,
+    include_output_weight: bool,
+    eos_token_id: Option<u64>,
+) -> Vec<u8> {
     let alignment = 64u64;
     let mut tensors = vec![
         F32TensorFixture {
@@ -306,7 +314,7 @@ fn scalar_llama_gguf_fixture(tensor_type: u32, include_output_weight: bool) -> V
     bytes.extend_from_slice(b"GGUF");
     push_u32(&mut bytes, 3);
     push_u64(&mut bytes, tensors.len() as u64);
-    push_u64(&mut bytes, 13);
+    push_u64(&mut bytes, if eos_token_id.is_some() { 14 } else { 13 });
     push_kv_string(&mut bytes, "general.architecture", "llama");
     push_kv_u64(&mut bytes, "general.alignment", alignment);
     push_kv_u64(&mut bytes, "llama.context_length", 1);
@@ -324,6 +332,9 @@ fn scalar_llama_gguf_fixture(tensor_type: u32, include_output_weight: bool) -> V
         "tokenizer.ggml.tokens",
         &["<unk>", "hello", "winner"],
     );
+    if let Some(eos_token_id) = eos_token_id {
+        push_kv_u64(&mut bytes, "tokenizer.ggml.eos_token_id", eos_token_id);
+    }
 
     for tensor in &tensors {
         push_tensor_info_with_type(&mut bytes, tensor, tensor_type);

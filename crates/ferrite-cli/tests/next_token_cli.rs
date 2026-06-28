@@ -1,4 +1,6 @@
-use ferrite_fixtures::scalar_llama_f32_gguf_fixture;
+use ferrite_fixtures::{
+    scalar_llama_f32_gguf_fixture, scalar_llama_f32_gguf_fixture_with_eos_token_id,
+};
 use std::error::Error;
 use std::ffi::OsString;
 use std::fs;
@@ -290,6 +292,35 @@ fn cli_generates_token_ids_and_decoded_text() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+fn cli_stops_generation_after_eos_token() -> Result<(), Box<dyn Error>> {
+    let model_path = write_fixture_model_with_eos_token_id(2)?;
+    let binary = cli_binary()?;
+
+    let output = Command::new(binary)
+        .arg("--model")
+        .arg(&model_path)
+        .arg("--prompt")
+        .arg("hello")
+        .arg("--generate-tokens")
+        .arg("3")
+        .output()?;
+
+    remove_fixture_model(&model_path)?;
+
+    assert!(
+        output.status.success(),
+        "cli failed with stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout)?;
+    assert!(stdout.contains("generated_cached_tokens=1"));
+    assert!(stdout.contains("generated_token_ids=2"));
+    assert!(stdout.contains("generated_stopped_on_eos=true"));
+    assert!(stdout.contains("generated_text=winner"));
+    Ok(())
+}
+
+#[test]
 fn cli_succeeds_when_generated_tokens_match_expected_ids() -> Result<(), Box<dyn Error>> {
     let model_path = write_fixture_model()?;
     let binary = cli_binary()?;
@@ -472,13 +503,23 @@ fn cli_binary() -> Result<OsString, Box<dyn Error>> {
 }
 
 fn write_fixture_model() -> Result<PathBuf, Box<dyn Error>> {
+    write_fixture_model_bytes(scalar_llama_f32_gguf_fixture())
+}
+
+fn write_fixture_model_with_eos_token_id(eos_token_id: u64) -> Result<PathBuf, Box<dyn Error>> {
+    write_fixture_model_bytes(scalar_llama_f32_gguf_fixture_with_eos_token_id(
+        eos_token_id,
+    ))
+}
+
+fn write_fixture_model_bytes(bytes: Vec<u8>) -> Result<PathBuf, Box<dyn Error>> {
     let mut path = std::env::temp_dir();
     path.push(format!(
         "ferrite-cli-fixture-{}-{}.gguf",
         std::process::id(),
         unique_suffix()
     ));
-    fs::write(&path, scalar_llama_f32_gguf_fixture())?;
+    fs::write(&path, bytes)?;
     Ok(path)
 }
 

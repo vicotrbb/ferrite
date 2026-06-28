@@ -5,6 +5,7 @@ use std::io;
 
 const VALUE_STRING: u32 = 8;
 const VALUE_ARRAY: u32 = 9;
+const VALUE_UINT32: u32 = 4;
 const VALUE_INT32: u32 = 5;
 
 fn push_u32(bytes: &mut Vec<u8>, value: u32) {
@@ -28,6 +29,12 @@ fn push_kv_string(bytes: &mut Vec<u8>, key: &str, value: &str) {
     push_string(bytes, key);
     push_u32(bytes, VALUE_STRING);
     push_string(bytes, value);
+}
+
+fn push_kv_u32(bytes: &mut Vec<u8>, key: &str, value: u32) {
+    push_string(bytes, key);
+    push_u32(bytes, VALUE_UINT32);
+    push_u32(bytes, value);
 }
 
 fn push_kv_string_array(bytes: &mut Vec<u8>, key: &str, values: &[&str]) {
@@ -75,6 +82,18 @@ fn atomic_tokenizer_fixture() -> Vec<u8> {
     )
 }
 
+fn eos_tokenizer_fixture() -> Vec<u8> {
+    let mut bytes = atomic_tokenizer_fixture();
+    let metadata_count_offset = 4 + 4 + 8;
+    let mut metadata_count_bytes = [0; 8];
+    metadata_count_bytes.copy_from_slice(&bytes[metadata_count_offset..metadata_count_offset + 8]);
+    let metadata_count = u64::from_le_bytes(metadata_count_bytes);
+    bytes[metadata_count_offset..metadata_count_offset + 8]
+        .copy_from_slice(&(metadata_count + 1).to_le_bytes());
+    push_kv_u32(&mut bytes, "tokenizer.ggml.eos_token_id", 4);
+    bytes
+}
+
 fn bpe_tokenizer_fixture() -> Vec<u8> {
     tokenizer_gguf_fixture(
         &[
@@ -110,7 +129,19 @@ fn extracts_gguf_tokenizer_metadata_and_decodes_tokens() -> Result<(), Box<dyn E
     assert_eq!(tokenizer.token(0), Some("<unk>"));
     assert_eq!(tokenizer.token_type(0), Some(TokenType::Unknown));
     assert_eq!(tokenizer.token_type(1), Some(TokenType::Normal));
+    assert_eq!(tokenizer.eos_token_id(), None);
     assert_eq!(tokenizer.decode(&[1, 2, 3, 4])?, "hello world!");
+    Ok(())
+}
+
+#[test]
+fn extracts_eos_token_id_from_gguf_metadata() -> Result<(), Box<dyn Error>> {
+    let bytes = eos_tokenizer_fixture();
+    let file = parse_gguf(&bytes)?;
+
+    let tokenizer = GgufTokenizer::from_gguf(&file)?;
+
+    assert_eq!(tokenizer.eos_token_id(), Some(4));
     Ok(())
 }
 

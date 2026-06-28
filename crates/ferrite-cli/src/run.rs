@@ -41,25 +41,26 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
         println!("top_logits={}", format_top_logits(&next.logits, count));
     }
     if let Some(count) = args.generate_tokens {
-        let generated_token_ids =
+        let generated =
             generate_tokens(&mut session, &tokenizer, next.clone(), count, args.stream)?;
         println!("generated_cached_tokens={}", session.cached_token_count());
         println!(
             "generated_token_ids={}",
-            join_token_ids(&generated_token_ids)
+            join_token_ids(&generated.token_ids)
         );
-        println!("generated_text={}", tokenizer.decode(&generated_token_ids)?);
+        println!("generated_stopped_on_eos={}", generated.stopped_on_eos);
+        println!("generated_text={}", tokenizer.decode(&generated.token_ids)?);
         if let Some(expected_token_ids) = args.expected_generated_token_ids {
             println!(
                 "expected_generated_token_ids={}",
                 join_token_ids(&expected_token_ids)
             );
-            let matches = generated_token_ids == expected_token_ids;
+            let matches = generated.token_ids == expected_token_ids;
             println!("generated_match={matches}");
             if !matches {
                 return Err(io::Error::other(format!(
                     "generated token ids {} did not match expected token ids {}",
-                    join_token_ids(&generated_token_ids),
+                    join_token_ids(&generated.token_ids),
                     join_token_ids(&expected_token_ids)
                 ))
                 .into());
@@ -141,15 +142,35 @@ fn generate_tokens(
     next: NextToken,
     count: usize,
     stream: bool,
-) -> Result<Vec<usize>, Box<dyn Error>> {
-    let generated_token_ids = session.generate_token_ids(next.token_id, count)?;
-    if stream {
-        for token_id in &generated_token_ids {
+) -> Result<GeneratedTokens, Box<dyn Error>> {
+    let eos_token_id = tokenizer.eos_token_id();
+    let mut token_id = next.token_id;
+    let mut token_ids = Vec::with_capacity(count);
+    let mut stopped_on_eos = false;
+
+    for _ in 0..count {
+        token_ids.push(token_id);
+        if stream {
             println!("stream_token_id={token_id}");
-            println!("stream_text={}", tokenizer.decode(&[*token_id])?);
+            println!("stream_text={}", tokenizer.decode(&[token_id])?);
         }
+
+        if Some(token_id) == eos_token_id {
+            stopped_on_eos = true;
+            break;
+        }
+
+        token_id = session.accept_token_id(token_id)?;
     }
-    Ok(generated_token_ids)
+    Ok(GeneratedTokens {
+        token_ids,
+        stopped_on_eos,
+    })
+}
+
+struct GeneratedTokens {
+    token_ids: Vec<usize>,
+    stopped_on_eos: bool,
 }
 
 fn format_top_logits(logits: &[f32], count: usize) -> String {

@@ -9,6 +9,7 @@ pub struct GgufTokenizer {
     tokens: Vec<String>,
     token_types: Vec<TokenType>,
     merges: Vec<String>,
+    eos_token_id: Option<usize>,
 }
 
 impl GgufTokenizer {
@@ -37,6 +38,7 @@ impl GgufTokenizer {
             tokens,
             token_types,
             merges: metadata_optional_string_array(file, "tokenizer.ggml.merges")?,
+            eos_token_id: metadata_optional_usize(file, "tokenizer.ggml.eos_token_id")?,
         })
     }
 
@@ -58,6 +60,10 @@ impl GgufTokenizer {
 
     pub fn token_type(&self, id: usize) -> Option<TokenType> {
         self.token_types.get(id).copied()
+    }
+
+    pub fn eos_token_id(&self) -> Option<usize> {
+        self.eos_token_id
     }
 
     pub fn decode(&self, ids: &[usize]) -> Result<String, TokenizerError> {
@@ -238,4 +244,22 @@ fn metadata_i32_array(file: &GgufFile, key: &str) -> Result<Option<Vec<i32>>, To
         ))),
         None => Ok(None),
     }
+}
+
+fn metadata_optional_usize(file: &GgufFile, key: &str) -> Result<Option<usize>, TokenizerError> {
+    let Some(value) = file.metadata.get(key) else {
+        return Ok(None);
+    };
+    let value = match value {
+        MetadataValue::UInt32(value) => u64::from(*value),
+        MetadataValue::UInt64(value) => *value,
+        other => {
+            return Err(TokenizerError::new(format!(
+                "{key} must be a uint32 or uint64, found {other:?}"
+            )));
+        }
+    };
+    usize::try_from(value)
+        .map(Some)
+        .map_err(|_| TokenizerError::new(format!("{key} value {value} does not fit usize")))
 }
