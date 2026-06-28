@@ -36,6 +36,15 @@ impl LiveServer {
         Self::start_with_loaded_model(model_id, &model_path, None, |state| state).await
     }
 
+    pub async fn start_with_existing_model_configured(
+        model_id: &str,
+        model_path: impl Into<PathBuf>,
+        configure: impl FnOnce(ServerState) -> ServerState,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        let model_path = model_path.into();
+        Self::start_with_loaded_model(model_id, &model_path, None, configure).await
+    }
+
     async fn start_with_state(
         configure: impl FnOnce(ServerState) -> ServerState,
     ) -> Result<Self, Box<dyn std::error::Error>> {
