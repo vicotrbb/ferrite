@@ -22,9 +22,9 @@ complete.
 The current implementation proves scalar GQA ratio coverage, scalar RoPE
 coverage for `head_dim=64` and `head_dim=128`, session cache truncation, a
 matvec reference-comparison gate, and aarch64 NEON F32, Q8_0, Q5_0, Q6_K, and
-Q4_K matvec paths checked against scalar oracles. It also has compile-checked
-x86_64 AVX2 dispatch for all currently supported matvec formats, but no x86_64
-host runtime evidence yet.
+Q4_K matvec paths checked against scalar oracles. It also has focused x86_64
+AVX2 runtime backend evidence for F32, Q8_0, Q5_0, Q4_K, and Q6_K matvec paths
+on a bounded homelab amd64 pod.
 
 Ferrite now has several real Tier 1 model-output proofs: SmolLM2-1.7B-Instruct
 Q4_K_M matched fixed local `llama.cpp` deterministic reference profiles for
@@ -44,8 +44,9 @@ per-operation matvec timings for real Tier 1 models and includes storage kind,
 shape, and storage bytes for each profiled matrix. It also emits aggregate
 role/signature summaries for profile-driven optimization. Benchmark token
 profiling now records token-id decode profiles from a replay session outside
-the timed benchmark loop. Tier 1 does not yet prove AVX2 runtime
-correctness, broad 0.5B-1.7B prompt/model coverage, or full-tier throughput.
+the timed benchmark loop. Tier 1 does not yet prove real x86_64 AVX2
+model-output parity, x86_64 throughput, broad 0.5B-1.7B prompt/model coverage,
+or full-tier throughput.
 Qwen2.5-0.5B Q4_K_M now has local default-pool and two-thread cached-token
 benchmarks above 10 tok/s after the Q8_0 direct argmax and thresholded Q5_0
 row-parallel slices. The opt-in Q4_K/Q6_K x Q8_K activation matvec path improves
@@ -62,7 +63,7 @@ still fails.
 | KV cache grows and shrinks across turns | Proven for scalar session cache | `documentation/dev-notes/2026-06-27-tier1-session-cache-truncation.md`; `cargo test -p ferrite-inference --test scalar_session_cache -- --nocapture` |
 | Matvec kernels compare against scalar reference within explicit tolerance | Harness covers F32, Q8_0, Q5_0, Q4_K, and Q6_K public matrix paths | `documentation/dev-notes/2026-06-27-tier1-matvec-kernel-check.md`; `cargo test -p ferrite-inference --test matvec_kernel_check -- --nocapture` |
 | AArch64 SIMD correctness | Partially proven for F32, Q8_0, Q5_0, Q6_K, and Q4_K matvec on local NEON host | `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-f32-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q8-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q5-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q6-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q4-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-q4k-row-parallel-simd.md`; `documentation/dev-notes/2026-06-27-tier1-q6k-row-parallel-simd.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-q4k-fused-neon.md`; `documentation/benchmarks/2026-06-27-tier1-qwen2-0-5b-q5-neon-block-dot.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-q6k-fused-neon.md`; targeted aarch64 backend tests |
-| AVX2 correctness | Compile-only F32, Q8_0, Q5_0, Q6_K, and Q4_K bring-up exists; runtime correctness not proven | `documentation/dev-notes/2026-06-27-tier1-x86-64-avx2-f32-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-x86-64-avx2-q8-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-x86-64-avx2-q5-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-x86-64-avx2-q6-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-x86-64-avx2-q4-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-q4k-row-parallel-simd.md`; `documentation/dev-notes/2026-06-27-tier1-q6k-row-parallel-simd.md`; `cargo check -p ferrite-inference --target x86_64-unknown-linux-gnu --tests`; no x86_64 AVX2 host run yet |
+| AVX2 correctness | Focused runtime backend tests passed for F32, Q8_0, Q5_0, Q6_K, and Q4_K on an x86_64 AVX2 homelab pod; real x86_64 model-output and throughput still unproven | `documentation/dev-notes/2026-06-27-tier1-x86-64-avx2-f32-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-x86-64-avx2-q8-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-x86-64-avx2-q5-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-x86-64-avx2-q6-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-x86-64-avx2-q4-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-q4k-row-parallel-simd.md`; `documentation/dev-notes/2026-06-27-tier1-q6k-row-parallel-simd.md`; `documentation/dev-notes/2026-06-28-tier1-avx2-runtime-check.md`; `cargo check -p ferrite-inference --target x86_64-unknown-linux-gnu --tests`; `cargo test -p ferrite-inference avx2 -- --nocapture`; `cargo test -p ferrite-inference simd_matvec_preserves_parallel_row_order -- --nocapture`; `cargo test -p ferrite-inference q8_0_argmax_mul_vec_matches_full_matvec_argmax -- --nocapture` |
 | Quantized SIMD correctness | Partially proven for Q8_0, Q5_0, Q6_K, and Q4_K on local NEON host | `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q8-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q5-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q6-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q4-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-q4k-row-parallel-simd.md`; `documentation/dev-notes/2026-06-27-tier1-q6k-row-parallel-simd.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-q4k-fused-neon.md`; `documentation/benchmarks/2026-06-27-tier1-qwen2-0-5b-q5-neon-block-dot.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-q6k-fused-neon.md`; Q4_K and Q6_K dispatch is scoped to rows whose column count is a whole number of K-blocks |
 | Real 0.5B-1.7B model output | Partially proven for three fixed 1.7B Llama-family prompts and three fixed Qwen2 prompts | `documentation/dev-notes/2026-06-27-tier1-smollm2-1-7b-reference-probe.md`; `documentation/dev-notes/2026-06-28-tier1-smollm2-second-prompt-reference.md`; `documentation/dev-notes/2026-06-28-tier1-third-prompt-reference.md`; `documentation/dev-notes/2026-06-27-tier1-qwen2-rope-layout.md`; `documentation/dev-notes/2026-06-27-tier1-qwen2-1-5b-reference-probe.md`; `documentation/dev-notes/2026-06-28-tier1-qwen2-second-prompt-reference.md`; Ferrite matched local `llama.cpp` token IDs `[18, 198, 3725, 198, 198, 788]`, `[7042,30,2]`, and `[28,281,253,1165,6560,32047]` for SmolLM2-1.7B-Instruct Q4_K_M; both Qwen2.5 Q4_K_M models matched `[198,9707,11]` for `hello world`, their documented France continuations, and `[11,1052,572]` for `Once upon a time` |
 | Qwen2 Tier 1 model coverage | Partially proven for Qwen2.5-0.5B and 1.5B Q4_K_M over three fixed prompts | `documentation/dev-notes/2026-06-27-tier1-qwen2-0-5b-probe.md`; `documentation/dev-notes/2026-06-27-tier1-qwen2-config-parser.md`; `documentation/dev-notes/2026-06-27-scalar-qkv-projection-bias.md`; `documentation/dev-notes/2026-06-27-tier1-qwen2-loader-dispatch.md`; `documentation/dev-notes/2026-06-27-tier1-qwen2-rope-layout.md`; `documentation/dev-notes/2026-06-27-tier1-qwen2-1-5b-reference-probe.md`; `documentation/dev-notes/2026-06-28-tier1-qwen2-second-prompt-reference.md`; `documentation/dev-notes/2026-06-28-tier1-third-prompt-reference.md`; Qwen2.5-0.5B-Instruct and Qwen2.5-1.5B-Instruct Q4_K_M both load, use split-half RoPE, and match deterministic local `llama.cpp` reference continuations for `hello world`, `The capital of France is`, and `Once upon a time` |
@@ -211,7 +212,7 @@ match=true
 
 ## Remaining Work
 
-- Run AVX2 runtime correctness checks on an x86_64 host behind ADR 0006's
+- Run real x86_64 AVX2 model-output and throughput checks behind ADR 0006's
   unsafe-boundary rules.
 - Expand Tier 1 model coverage beyond the three fixed SmolLM2-1.7B-Instruct
   Q4_K_M local reference profiles recorded so far.
