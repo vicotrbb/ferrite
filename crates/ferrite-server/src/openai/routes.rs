@@ -2,11 +2,16 @@ use super::{
     error::OpenAiHttpError,
     prompt::render_chat_prompt,
     schema::{
-        ChatCompletionRequest, CompletionRequest, HealthResponse, ModelObject, ModelsResponse,
+        ChatCompletionRequest, ChatCompletionResponse, CompletionRequest, CompletionResponse,
+        HealthResponse, ModelObject, ModelsResponse,
     },
 };
 use crate::state::ServerState;
 use axum::{extract::State, routing::get, routing::post, Json, Router};
+use std::sync::{Arc, Mutex};
+
+const DEFAULT_MAX_TOKENS: usize = 16;
+const HARD_MAX_TOKENS: usize = 256;
 
 pub fn router(state: ServerState) -> Router {
     Router::new()
@@ -28,96 +33,91 @@ async fn models(State(state): State<ServerState>) -> Json<ModelsResponse> {
 }
 
 async fn chat_completions(
+    State(state): State<ServerState>,
     Json(request): Json<ChatCompletionRequest>,
-) -> Result<Json<()>, OpenAiHttpError> {
+) -> Result<Json<ChatCompletionResponse>, OpenAiHttpError> {
     if request.stream() {
         return Err(OpenAiHttpError::not_implemented(
             "chat completion streaming is not implemented yet",
         ));
     }
-    let _prompt = render_chat_prompt(request.messages())?;
-    Err(OpenAiHttpError::not_implemented(
-        "chat completion generation is not wired to Ferrite inference yet",
-    ))
+    ensure_model(&state, request.model())?;
+    let prompt = render_chat_prompt(request.messages())?;
+    let max_tokens = normalized_max_tokens(request.max_tokens())?;
+    let generated = generate_text(state.engine(), prompt, max_tokens).await?;
+    Ok(Json(ChatCompletionResponse::from_generation(
+        state.model_id().to_owned(),
+        generated,
+    )))
 }
 
-async fn completions(Json(request): Json<CompletionRequest>) -> Result<Json<()>, OpenAiHttpError> {
+async fn completions(
+    State(state): State<ServerState>,
+    Json(request): Json<CompletionRequest>,
+) -> Result<Json<CompletionResponse>, OpenAiHttpError> {
     if request.stream() {
         return Err(OpenAiHttpError::not_implemented(
             "completion streaming is not implemented yet",
         ));
     }
+    ensure_model(&state, request.model())?;
     if request.prompt().trim().is_empty() {
         return Err(OpenAiHttpError::invalid_request(
             "prompt must contain non-whitespace text",
         ));
     }
-    Err(OpenAiHttpError::not_implemented(
-        "completion generation is not wired to Ferrite inference yet",
-    ))
+    let max_tokens = normalized_max_tokens(request.max_tokens())?;
+    let generated = generate_text(state.engine(), request.prompt().to_owned(), max_tokens).await?;
+    Ok(Json(CompletionResponse::from_generation(
+        state.model_id().to_owned(),
+        generated,
+    )))
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use axum::{
-        body::{to_bytes, Body},
-        http::{Request, StatusCode},
+fn ensure_model(state: &ServerState, requested_model: &str) -> Result<(), OpenAiHttpError> {
+    if requested_model == state.model_id() {
+        Ok(())
+    } else {
+        Err(OpenAiHttpError::invalid_request(format!(
+            "model {requested_model} is not loaded"
+        )))
+    }
+}
+
+fn normalized_max_tokens(value: Option<usize>) -> Result<usize, OpenAiHttpError> {
+    let tokens = value.unwrap_or(DEFAULT_MAX_TOKENS);
+    if tokens == 0 {
+        return Err(OpenAiHttpError::invalid_request(
+            "max_tokens must be greater than zero",
+        ));
+    }
+    if tokens > HARD_MAX_TOKENS {
+        return Err(OpenAiHttpError::invalid_request(format!(
+            "max_tokens must be less than or equal to {HARD_MAX_TOKENS}"
+        )));
+    }
+    Ok(tokens)
+}
+
+async fn generate_text(
+    engine: Option<Arc<Mutex<crate::runtime::InferenceEngine>>>,
+    prompt: String,
+    max_tokens: usize,
+) -> Result<crate::runtime::GeneratedText, OpenAiHttpError> {
+    let Some(engine) = engine else {
+        return Err(OpenAiHttpError::service_unavailable(
+            "no model is loaded; start ferrite-server with --model",
+        ));
     };
-    use serde_json::Value;
-    use tower::ServiceExt;
 
-    #[tokio::test]
-    async fn health_endpoint_reports_ready_model() -> Result<(), Box<dyn std::error::Error>> {
-        let app = router(ServerState::new("test-model".to_owned()));
-        let response = app
-            .oneshot(Request::builder().uri("/health").body(Body::empty())?)
-            .await?;
-
-        assert_eq!(response.status(), StatusCode::OK);
-        let body = to_json(response.into_body()).await?;
-        assert_eq!(body["status"], "ok");
-        assert_eq!(body["model"], "test-model");
-        assert_eq!(body["ready"], true);
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn models_endpoint_returns_openai_list_shape() -> Result<(), Box<dyn std::error::Error>> {
-        let app = router(ServerState::new("test-model".to_owned()));
-        let response = app
-            .oneshot(Request::builder().uri("/v1/models").body(Body::empty())?)
-            .await?;
-
-        assert_eq!(response.status(), StatusCode::OK);
-        let body = to_json(response.into_body()).await?;
-        assert_eq!(body["object"], "list");
-        assert_eq!(body["data"][0]["id"], "test-model");
-        assert_eq!(body["data"][0]["object"], "model");
-        Ok(())
-    }
-
-    #[tokio::test]
-    async fn chat_endpoint_returns_openai_error_until_generation_is_wired(
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let app = router(ServerState::new("test-model".to_owned()));
-        let request = Request::builder()
-            .method("POST")
-            .uri("/v1/chat/completions")
-            .header("content-type", "application/json")
-            .body(Body::from(
-                r#"{"model":"test-model","messages":[{"role":"user","content":"Hello"}]}"#,
-            ))?;
-        let response = app.oneshot(request).await?;
-
-        assert_eq!(response.status(), StatusCode::NOT_IMPLEMENTED);
-        let body = to_json(response.into_body()).await?;
-        assert_eq!(body["error"]["type"], "server_error");
-        Ok(())
-    }
-
-    async fn to_json(body: Body) -> Result<Value, Box<dyn std::error::Error>> {
-        let bytes = to_bytes(body, usize::MAX).await?;
-        Ok(serde_json::from_slice(&bytes)?)
-    }
+    tokio::task::spawn_blocking(move || {
+        let engine = engine
+            .lock()
+            .map_err(|_| OpenAiHttpError::internal("inference engine lock is poisoned"))?;
+        engine
+            .generate(&prompt, max_tokens)
+            .map_err(|error| OpenAiHttpError::internal(error.to_string()))
+    })
+    .await
+    .map_err(|error| OpenAiHttpError::internal(format!("inference task failed: {error}")))?
 }

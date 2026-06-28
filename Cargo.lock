@@ -142,6 +142,9 @@ name = "ferrite-server"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "ferrite-fixtures",
+ "ferrite-inference",
+ "ferrite-model",
  "serde",
  "serde_json",
  "tokio",

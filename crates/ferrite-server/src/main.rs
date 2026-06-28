@@ -1,4 +1,4 @@
-use ferrite_server::{config::ServerConfig, state::ServerState};
+use ferrite_server::{config::ServerConfig, runtime::InferenceEngine, state::ServerState};
 use std::error::Error;
 
 #[tokio::main]
@@ -12,7 +12,14 @@ async fn main() {
 async fn run() -> Result<(), Box<dyn Error>> {
     let config = ServerConfig::parse(std::env::args_os())?;
     let listener = tokio::net::TcpListener::bind(config.bind_addr()).await?;
-    let app = ferrite_server::router(ServerState::new(config.model_id().to_owned()));
+    let state = match config.model_path() {
+        Some(path) => {
+            let engine = InferenceEngine::load(path)?;
+            ServerState::with_engine(config.model_id().to_owned(), engine)
+        }
+        None => ServerState::new(config.model_id().to_owned()),
+    };
+    let app = ferrite_server::router(state);
     axum::serve(listener, app).await?;
     Ok(())
 }

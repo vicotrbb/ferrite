@@ -2,11 +2,13 @@ use std::error::Error;
 use std::ffi::OsString;
 use std::fmt;
 use std::net::SocketAddr;
+use std::path::{Path, PathBuf};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ServerConfig {
     bind_addr: SocketAddr,
     model_id: String,
+    model_path: Option<PathBuf>,
 }
 
 impl ServerConfig {
@@ -32,6 +34,9 @@ impl ServerConfig {
                         return Err(ConfigError::new("--model-id must not be empty"));
                     }
                 }
+                "--model" => {
+                    config.model_path = Some(PathBuf::from(next_value(&mut iter, "--model")?));
+                }
                 "--help" | "-h" => {
                     return Err(ConfigError::new(usage()));
                 }
@@ -54,6 +59,10 @@ impl ServerConfig {
     pub fn model_id(&self) -> &str {
         &self.model_id
     }
+
+    pub fn model_path(&self) -> Option<&Path> {
+        self.model_path.as_deref()
+    }
 }
 
 impl Default for ServerConfig {
@@ -61,6 +70,7 @@ impl Default for ServerConfig {
         Self {
             bind_addr: SocketAddr::from(([127, 0, 0, 1], 8080)),
             model_id: "ferrite-local".to_owned(),
+            model_path: None,
         }
     }
 }
@@ -101,7 +111,7 @@ fn os_string_to_string(value: OsString) -> Result<String, ConfigError> {
 }
 
 fn usage() -> &'static str {
-    "usage: ferrite-server [--bind 127.0.0.1:8080] [--model-id ferrite-local]"
+    "usage: ferrite-server [--bind 127.0.0.1:8080] [--model-id ferrite-local] [--model path/to/model.gguf]"
 }
 
 #[cfg(test)]

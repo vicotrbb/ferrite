@@ -57,6 +57,20 @@ impl OpenAiHttpError {
             body: OpenAiErrorResponse::new(OpenAiErrorBody::new(message, "server_error")),
         }
     }
+
+    pub fn service_unavailable(message: impl Into<String>) -> Self {
+        Self {
+            status: StatusCode::SERVICE_UNAVAILABLE,
+            body: OpenAiErrorResponse::new(OpenAiErrorBody::new(message, "server_error")),
+        }
+    }
+
+    pub fn internal(message: impl Into<String>) -> Self {
+        Self {
+            status: StatusCode::INTERNAL_SERVER_ERROR,
+            body: OpenAiErrorResponse::new(OpenAiErrorBody::new(message, "server_error")),
+        }
+    }
 }
 
 impl IntoResponse for OpenAiHttpError {

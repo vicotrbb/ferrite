@@ -16,10 +16,13 @@ path = "src/main.rs"
 
 [dependencies]
 axum = "0.7"
+ferrite-inference = { path = "../ferrite-inference" }
+ferrite-model = { path = "../ferrite-model" }
 serde = { version = "1", features = ["derive"] }
 tokio = { version = "1", features = ["macros", "net", "rt-multi-thread"] }
 
 [dev-dependencies]
+ferrite-fixtures = { path = "../ferrite-fixtures" }
 serde_json = "1"
 tower = { version = "0.5", features = ["util"] }
 
