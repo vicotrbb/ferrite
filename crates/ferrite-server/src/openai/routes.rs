@@ -1,5 +1,6 @@
 use super::{
     error::OpenAiHttpError,
+    json::OpenAiJson,
     prompt::render_chat_prompt,
     schema::{
         ChatCompletionRequest, ChatCompletionResponse, ChatCompletionStreamContext,
@@ -42,7 +43,7 @@ async fn models(State(state): State<ServerState>) -> Json<ModelsResponse> {
 
 async fn chat_completions(
     State(state): State<ServerState>,
-    Json(request): Json<ChatCompletionRequest>,
+    OpenAiJson(request): OpenAiJson<ChatCompletionRequest>,
 ) -> Result<Response, OpenAiHttpError> {
     ensure_model(&state, request.model())?;
     let prompt = render_chat_prompt(request.messages())?;
@@ -65,7 +66,7 @@ async fn chat_completions(
 
 async fn completions(
     State(state): State<ServerState>,
-    Json(request): Json<CompletionRequest>,
+    OpenAiJson(request): OpenAiJson<CompletionRequest>,
 ) -> Result<Response, OpenAiHttpError> {
     ensure_model(&state, request.model())?;
     if request.prompt().trim().is_empty() {

@@ -1,4 +1,5 @@
 pub mod error;
+mod json;
 pub mod prompt;
 pub mod routes;
 pub mod schema;
