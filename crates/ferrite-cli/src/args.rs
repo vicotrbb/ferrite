@@ -14,6 +14,7 @@ pub struct CliArgs {
     pub profile_next_token: bool,
     pub profile_benchmark_token: bool,
     pub experimental_q8_k_activation_matvec: bool,
+    pub experimental_q8_k_activation_roles: Option<String>,
     pub compare_q8_k_activation_matvec: bool,
     pub stream: bool,
 }
@@ -35,6 +36,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
     let mut profile_next_token = false;
     let mut profile_benchmark_token = false;
     let mut experimental_q8_k_activation_matvec = false;
+    let mut experimental_q8_k_activation_roles = None;
     let mut compare_q8_k_activation_matvec = false;
     let mut stream = false;
     let mut iter = args.into_iter();
@@ -100,6 +102,13 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
             "--experimental-q8-k-activation-matvec" => {
                 experimental_q8_k_activation_matvec = true;
             }
+            "--experimental-q8-k-activation-roles" => {
+                experimental_q8_k_activation_roles = Some(os_string_to_string(next_value(
+                    &mut iter,
+                    "--experimental-q8-k-activation-roles",
+                )?)?);
+                experimental_q8_k_activation_matvec = true;
+            }
             "--compare-q8-k-activation-matvec" => {
                 compare_q8_k_activation_matvec = true;
                 experimental_q8_k_activation_matvec = true;
@@ -136,6 +145,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
         profile_next_token,
         profile_benchmark_token,
         experimental_q8_k_activation_matvec,
+        experimental_q8_k_activation_roles,
         compare_q8_k_activation_matvec,
         stream,
     })
@@ -238,5 +248,5 @@ fn parse_token_ids(value: OsString) -> Result<Vec<usize>, Box<dyn Error>> {
 }
 
 fn usage() -> &'static str {
-    "usage: ferrite --model <path.gguf> (--prompt <text> | --prompt-token-ids <id[,id...]>) [--expect-token-id <id>] [--top-logits <count>] [--profile-next-token] [--generate-tokens <count>] [--expect-generated-token-ids <id[,id...]>] [--stream] [--benchmark-runs <count>] [--profile-benchmark-token] [--experimental-q8-k-activation-matvec] [--compare-q8-k-activation-matvec]"
+    "usage: ferrite --model <path.gguf> (--prompt <text> | --prompt-token-ids <id[,id...]>) [--expect-token-id <id>] [--top-logits <count>] [--profile-next-token] [--generate-tokens <count>] [--expect-generated-token-ids <id[,id...]>] [--stream] [--benchmark-runs <count>] [--profile-benchmark-token] [--experimental-q8-k-activation-matvec] [--experimental-q8-k-activation-roles <role[,role...]>] [--compare-q8-k-activation-matvec]"
 }

@@ -2,7 +2,7 @@ use super::{
     attention::causal_attention,
     math::{add_assign, argmax, rms_norm, swiglu},
     profile::{ProfiledNextToken, ProfiledTokenId, ScalarMatVecComparison, ScalarProfileEvent},
-    InferenceError, NextToken, ScalarExecutionOptions, ScalarLlamaModel,
+    InferenceError, NextToken, Q8KActivationMatvecRole, ScalarExecutionOptions, ScalarLlamaModel,
 };
 
 mod cache;
@@ -139,7 +139,8 @@ impl<'a> ScalarLlamaSession<'a> {
                 "q_proj",
                 profile_events.as_deref_mut(),
                 comparison_events.as_deref_mut(),
-                self.options,
+                self.options
+                    .scoped_to_q8_k_activation_role(Q8KActivationMatvecRole::QProj),
             )?;
             add_optional_bias(&mut query, layer.q_bias.as_deref())?;
             let mut key = profiled_layer_mul_vec(
@@ -149,7 +150,8 @@ impl<'a> ScalarLlamaSession<'a> {
                 "k_proj",
                 profile_events.as_deref_mut(),
                 comparison_events.as_deref_mut(),
-                self.options,
+                self.options
+                    .scoped_to_q8_k_activation_role(Q8KActivationMatvecRole::KProj),
             )?;
             add_optional_bias(&mut key, layer.k_bias.as_deref())?;
             let mut value = profiled_layer_mul_vec(
@@ -159,7 +161,8 @@ impl<'a> ScalarLlamaSession<'a> {
                 "v_proj",
                 profile_events.as_deref_mut(),
                 comparison_events.as_deref_mut(),
-                self.options,
+                self.options
+                    .scoped_to_q8_k_activation_role(Q8KActivationMatvecRole::VProj),
             )?;
             add_optional_bias(&mut value, layer.v_bias.as_deref())?;
 
@@ -190,7 +193,8 @@ impl<'a> ScalarLlamaSession<'a> {
                 "o_proj",
                 profile_events.as_deref_mut(),
                 comparison_events.as_deref_mut(),
-                self.options,
+                self.options
+                    .scoped_to_q8_k_activation_role(Q8KActivationMatvecRole::OProj),
             )?;
             add_assign(&mut hidden, &attention_output)?;
 
@@ -203,7 +207,8 @@ impl<'a> ScalarLlamaSession<'a> {
                 "ffn_gate",
                 profile_events.as_deref_mut(),
                 comparison_events.as_deref_mut(),
-                self.options,
+                self.options
+                    .scoped_to_q8_k_activation_role(Q8KActivationMatvecRole::FfnGate),
             )?;
             let up = profiled_layer_mul_vec(
                 &layer.ffn_up,
@@ -212,7 +217,8 @@ impl<'a> ScalarLlamaSession<'a> {
                 "ffn_up",
                 profile_events.as_deref_mut(),
                 comparison_events.as_deref_mut(),
-                self.options,
+                self.options
+                    .scoped_to_q8_k_activation_role(Q8KActivationMatvecRole::FfnUp),
             )?;
             let activated = swiglu(&gate, &up)?;
             let ffn_output = profiled_layer_mul_vec(
@@ -222,7 +228,8 @@ impl<'a> ScalarLlamaSession<'a> {
                 "ffn_down",
                 profile_events.as_deref_mut(),
                 comparison_events.as_deref_mut(),
-                self.options,
+                self.options
+                    .scoped_to_q8_k_activation_role(Q8KActivationMatvecRole::FfnDown),
             )?;
             add_assign(&mut hidden, &ffn_output)?;
         }
@@ -245,7 +252,8 @@ impl<'a> ScalarLlamaSession<'a> {
                     "output",
                     profile_events,
                     comparison_events,
-                    self.options,
+                    self.options
+                        .scoped_to_q8_k_activation_role(Q8KActivationMatvecRole::Output),
                 )?;
                 (argmax(&logits)?, Some(logits))
             }
@@ -256,7 +264,8 @@ impl<'a> ScalarLlamaSession<'a> {
                     "output",
                     profile_events,
                     comparison_events,
-                    self.options,
+                    self.options
+                        .scoped_to_q8_k_activation_role(Q8KActivationMatvecRole::Output),
                 )?;
                 (token_id, None)
             }

@@ -54,7 +54,7 @@ mod validation;
 
 pub use math::{argmax, rms_norm};
 pub use matrix::{Matrix, MatrixStorageKind};
-pub use options::{Q8KActivationMatvecPolicy, ScalarExecutionOptions};
+pub use options::{Q8KActivationMatvecPolicy, Q8KActivationMatvecRole, ScalarExecutionOptions};
 pub use output::ScalarLlamaOutputWeights;
 pub use profile::{ProfiledNextToken, ProfiledTokenId, ScalarMatVecComparison, ScalarProfileEvent};
 use rope::apply_rope_with_layout;

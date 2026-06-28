@@ -110,6 +110,9 @@ reference implementation and benchmarking baseline, not the Ferrite runtime.
   records CLI coverage for benchmark-token Q8_K comparison output.
 - `documentation/dev-notes/2026-06-28-q8-k-comparison-finite-guardrail.md`
   records fail-closed finite-value checks for Q8_K comparison metrics.
+- `documentation/dev-notes/2026-06-28-q8-k-role-scoped-policy.md` records the
+  role-scoped experimental policy used to isolate Q8_K drift without temporary
+  source edits.
 - `documentation/benchmarks/2026-06-28-tier1-qwen2-1-5b-current-profile.md`
   records the current Qwen2.5-1.5B profile and hot aggregate roles.
 - `documentation/dev-notes/2026-06-28-tier1-q4-q6-thresholded-row-parallel-regression.md`
