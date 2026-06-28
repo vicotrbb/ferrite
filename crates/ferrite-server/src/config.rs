@@ -9,6 +9,7 @@ pub struct ServerConfig {
     bind_addr: SocketAddr,
     model_id: String,
     model_path: Option<PathBuf>,
+    api_key: Option<String>,
 }
 
 impl ServerConfig {
@@ -37,6 +38,13 @@ impl ServerConfig {
                 "--model" => {
                     config.model_path = Some(PathBuf::from(next_value(&mut iter, "--model")?));
                 }
+                "--api-key" => {
+                    let api_key = os_string_to_string(next_value(&mut iter, "--api-key")?)?;
+                    if api_key.trim().is_empty() {
+                        return Err(ConfigError::new("--api-key must not be empty"));
+                    }
+                    config.api_key = Some(api_key);
+                }
                 "--help" | "-h" => {
                     return Err(ConfigError::new(usage()));
                 }
@@ -63,6 +71,10 @@ impl ServerConfig {
     pub fn model_path(&self) -> Option<&Path> {
         self.model_path.as_deref()
     }
+
+    pub fn api_key(&self) -> Option<&str> {
+        self.api_key.as_deref()
+    }
 }
 
 impl Default for ServerConfig {
@@ -71,6 +83,7 @@ impl Default for ServerConfig {
             bind_addr: SocketAddr::from(([127, 0, 0, 1], 8080)),
             model_id: "ferrite-local".to_owned(),
             model_path: None,
+            api_key: None,
         }
     }
 }
@@ -111,7 +124,7 @@ fn os_string_to_string(value: OsString) -> Result<String, ConfigError> {
 }
 
 fn usage() -> &'static str {
-    "usage: ferrite-server [--bind 127.0.0.1:8080] [--model-id ferrite-local] [--model path/to/model.gguf]"
+    "usage: ferrite-server [--bind 127.0.0.1:8080] [--model-id ferrite-local] [--model path/to/model.gguf] [--api-key local-secret]"
 }
 
 #[cfg(test)]
@@ -133,6 +146,34 @@ mod tests {
             SocketAddr::from(([127, 0, 0, 1], 18181))
         );
         assert_eq!(config.model_id(), "smollm2");
+        Ok(())
+    }
+
+    #[test]
+    fn parses_optional_api_key() -> Result<(), Box<dyn Error>> {
+        let config = ServerConfig::parse([
+            OsString::from("ferrite-server"),
+            OsString::from("--api-key"),
+            OsString::from("local-secret"),
+        ])?;
+
+        assert_eq!(config.api_key(), Some("local-secret"));
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_empty_api_key() -> Result<(), Box<dyn Error>> {
+        let result = ServerConfig::parse([
+            OsString::from("ferrite-server"),
+            OsString::from("--api-key"),
+            OsString::from("  "),
+        ]);
+        let error = match result {
+            Ok(_) => return Err("empty api key should be rejected".into()),
+            Err(error) => error,
+        };
+
+        assert_eq!(error.to_string(), "--api-key must not be empty");
         Ok(())
     }
 }

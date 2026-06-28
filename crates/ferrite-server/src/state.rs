@@ -9,6 +9,7 @@ pub struct ServerState {
     model_id: String,
     engine: Option<Arc<Mutex<InferenceEngine>>>,
     inference_permits: Arc<Semaphore>,
+    api_key: Option<Arc<str>>,
 }
 
 impl ServerState {
@@ -17,6 +18,7 @@ impl ServerState {
             model_id,
             engine: None,
             inference_permits: Arc::new(Semaphore::new(INFERENCE_PERMITS)),
+            api_key: None,
         }
     }
 
@@ -25,7 +27,13 @@ impl ServerState {
             model_id,
             engine: Some(Arc::new(Mutex::new(engine))),
             inference_permits: Arc::new(Semaphore::new(INFERENCE_PERMITS)),
+            api_key: None,
         }
+    }
+
+    pub fn with_api_key(mut self, api_key: impl Into<String>) -> Self {
+        self.api_key = Some(Arc::from(api_key.into()));
+        self
     }
 
     pub fn model_id(&self) -> &str {
@@ -34,6 +42,10 @@ impl ServerState {
 
     pub fn engine(&self) -> Option<Arc<Mutex<InferenceEngine>>> {
         self.engine.clone()
+    }
+
+    pub fn api_key(&self) -> Option<&str> {
+        self.api_key.as_deref()
     }
 
     pub fn try_acquire_inference_permit(&self) -> Option<OwnedSemaphorePermit> {

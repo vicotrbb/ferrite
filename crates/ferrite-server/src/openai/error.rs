@@ -76,6 +76,13 @@ impl OpenAiHttpError {
         }
     }
 
+    pub fn authentication_required(message: impl Into<String>) -> Self {
+        Self {
+            status: StatusCode::UNAUTHORIZED,
+            body: OpenAiErrorResponse::new(OpenAiErrorBody::new(message, "authentication_error")),
+        }
+    }
+
     pub fn not_implemented(message: impl Into<String>) -> Self {
         Self {
             status: StatusCode::NOT_IMPLEMENTED,

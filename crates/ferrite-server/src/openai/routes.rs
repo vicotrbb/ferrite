@@ -12,6 +12,7 @@ use super::{
 use crate::state::ServerState;
 use axum::{
     extract::{Path, State},
+    http::HeaderMap,
     response::{IntoResponse, Response},
     routing::get,
     routing::post,
@@ -37,16 +38,22 @@ async fn health(State(state): State<ServerState>) -> Json<HealthResponse> {
     Json(HealthResponse::ready(state.model_id().to_owned()))
 }
 
-async fn models(State(state): State<ServerState>) -> Json<ModelsResponse> {
-    Json(ModelsResponse::new(vec![ModelObject::local(
+async fn models(
+    State(state): State<ServerState>,
+    headers: HeaderMap,
+) -> Result<Json<ModelsResponse>, OpenAiHttpError> {
+    ensure_authorized(&state, &headers)?;
+    Ok(Json(ModelsResponse::new(vec![ModelObject::local(
         state.model_id().to_owned(),
-    )]))
+    )])))
 }
 
 async fn model(
     State(state): State<ServerState>,
+    headers: HeaderMap,
     Path(model): Path<String>,
 ) -> Result<Json<ModelObject>, OpenAiHttpError> {
+    ensure_authorized(&state, &headers)?;
     if model != state.model_id() {
         return Err(OpenAiHttpError::model_not_found(model));
     }
@@ -55,8 +62,10 @@ async fn model(
 
 async fn chat_completions(
     State(state): State<ServerState>,
+    headers: HeaderMap,
     OpenAiJson(request): OpenAiJson<ChatCompletionRequest>,
 ) -> Result<Response, OpenAiHttpError> {
+    ensure_authorized(&state, &headers)?;
     ensure_model(&state, request.model())?;
     ensure_supported_chat_request(&request)?;
     let prompt = render_chat_prompt(request.messages())?;
@@ -81,8 +90,10 @@ async fn chat_completions(
 
 async fn completions(
     State(state): State<ServerState>,
+    headers: HeaderMap,
     OpenAiJson(request): OpenAiJson<CompletionRequest>,
 ) -> Result<Response, OpenAiHttpError> {
+    ensure_authorized(&state, &headers)?;
     ensure_model(&state, request.model())?;
     if request.prompt().trim().is_empty() {
         return Err(OpenAiHttpError::invalid_request(
@@ -112,6 +123,29 @@ async fn completions(
         generated,
     ))
     .into_response())
+}
+
+fn ensure_authorized(state: &ServerState, headers: &HeaderMap) -> Result<(), OpenAiHttpError> {
+    let Some(api_key) = state.api_key() else {
+        return Ok(());
+    };
+    let Some(header) = headers.get(axum::http::header::AUTHORIZATION) else {
+        return Err(OpenAiHttpError::authentication_required(
+            "missing Authorization bearer token",
+        ));
+    };
+    let Ok(header) = header.to_str() else {
+        return Err(OpenAiHttpError::authentication_required(
+            "invalid Authorization bearer token",
+        ));
+    };
+    if header == format!("Bearer {api_key}") {
+        Ok(())
+    } else {
+        Err(OpenAiHttpError::authentication_required(
+            "invalid Authorization bearer token",
+        ))
+    }
 }
 
 fn ensure_supported_chat_request(request: &ChatCompletionRequest) -> Result<(), OpenAiHttpError> {

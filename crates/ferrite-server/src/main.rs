@@ -19,6 +19,10 @@ async fn run() -> Result<(), Box<dyn Error>> {
         }
         None => ServerState::new(config.model_id().to_owned()),
     };
+    let state = match config.api_key() {
+        Some(api_key) => state.with_api_key(api_key),
+        None => state,
+    };
     let app = ferrite_server::router(state);
     axum::serve(listener, app).await?;
     Ok(())
