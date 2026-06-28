@@ -37,6 +37,9 @@ fn validate_q6_k_q8_k_mul_vec(
     cols: usize,
     vector: &[f32],
 ) -> Result<(), InferenceError> {
+    if cols == 0 {
+        return Err(InferenceError::new("Q6_K Q8_K columns must not be zero"));
+    }
     if vector.len() != cols {
         return Err(InferenceError::new(format!(
             "matrix columns {cols} do not match vector length {}",
@@ -134,6 +137,17 @@ mod tests {
                 "actual={actual} expected={expected}"
             );
         }
+        Ok(())
+    }
+
+    #[test]
+    fn q6_k_q8_k_mul_vec_rejects_zero_columns() -> Result<(), InferenceError> {
+        let err = match q6_k_q8_k_mul_vec(&[], 1, 0, &[]) {
+            Ok(_) => return Err(InferenceError::new("zero columns must fail")),
+            Err(err) => err,
+        };
+
+        assert_eq!(err.to_string(), "Q6_K Q8_K columns must not be zero");
         Ok(())
     }
 
