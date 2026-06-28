@@ -205,6 +205,10 @@ pub fn q4k_dot(weights: &[u8], scales: &[u8], x: &[f16], n: usize) -> f32 {
 
 **Goal:** Production-ready OpenAI-compatible HTTP API with SSE streaming.
 
+This phase is a required product milestone, not optional polish. See
+`documentation/adr/0008-openai-compatible-http-api.md` for the durable
+compatibility contract and server module boundaries.
+
 **Deliverables:**
 1. `axum`-based HTTP server with SSE streaming support
 2. OpenAI-compatible endpoints: `POST /v1/chat/completions`, `POST /v1/completions`, `GET /v1/models`, `GET /health`

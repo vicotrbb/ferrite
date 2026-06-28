@@ -8,6 +8,14 @@ progressively runs increasingly larger open-weight language models, starting
 from tiny Tier 0 models and moving toward 7B-9B models on constrained CPU
 hardware.
 
+Ferrite must also be usable as a local model service. A production-grade
+OpenAI-compatible HTTP server is a required product milestone, so common
+OpenAI clients and curl workflows can target Ferrite with a local base URL in
+the same style people use local runtimes such as Ollama. The HTTP surface must
+not compromise the core inference goal: server code is generic infrastructure,
+while model loading, tokenization, session execution, sampling, and
+optimization remain Ferrite-owned.
+
 This is not only an implementation project. Ferrite is also a research project
 for CPU inference innovation. Use the existing research corpus as baseline
 context, but do not treat it as an implementation contract. Improve it with new
@@ -114,6 +122,18 @@ Every meaningful iteration must leave an evidence trail. If no code changes are
 made, document the research or planning progress. If code changes are made,
 document what changed and how it was validated. If a decision is made, write or
 update an ADR.
+
+HTTP API progression:
+
+- Provide an OpenAI-compatible local server as a first-class product path, not
+  an afterthought attached to the CLI.
+- Start with `GET /health`, `GET /v1/models`,
+  `POST /v1/chat/completions`, and `POST /v1/completions`.
+- Make non-streaming text generation correct before adding SSE token streaming.
+- Keep request/response schemas and endpoint routing in focused server modules;
+  do not let HTTP-specific types leak into the inference core.
+- Test compatibility with direct HTTP requests and at least one standard
+  OpenAI client configured with Ferrite as the base URL.
 
 Model progression:
 

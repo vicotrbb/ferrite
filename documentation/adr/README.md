@@ -17,6 +17,7 @@ Write or update an ADR when Ferrite changes:
 - Runtime architecture.
 - Model format support.
 - Dependency policy.
+- HTTP API compatibility surface.
 - Unsafe-code boundary.
 - Kernel strategy.
 - KV cache layout.

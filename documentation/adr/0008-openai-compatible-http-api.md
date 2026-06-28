@@ -1,0 +1,108 @@
+# ADR 0008: OpenAI-Compatible HTTP API
+
+Date: 2026-06-28
+
+Status: Accepted
+
+## Context
+
+Ferrite is a CPU-native inference runtime, not only a CLI benchmark tool. Users
+should be able to point common local-LLM and OpenAI client workflows at Ferrite
+with a custom base URL, similar to how people use local servers such as Ollama
+or llama-server.
+
+The research corpus already names an OpenAI-compatible API server as a product
+milestone, but the documents were inconsistent about implementation shape:
+some sections favored `axum` and `tokio`, while others suggested a custom
+HTTP/JSON stack. The project goal already allows normal Rust crates for
+generic infrastructure while keeping inference machinery Ferrite-owned.
+
+The current OpenAI API reference keeps Chat Completions, legacy Completions,
+and Models resources available. The compatibility target is therefore the
+stable local-serving subset that mainstream clients expect:
+
+- `GET /health`
+- `GET /v1/models`
+- `POST /v1/chat/completions`
+- `POST /v1/completions`
+
+## Decision
+
+Ferrite will ship a focused HTTP server crate for OpenAI-compatible local
+inference. The initial implementation should use standard Rust infrastructure
+crates for HTTP, async I/O, JSON, CLI/config parsing, and logging. The server
+must not wrap another inference runtime; it calls Ferrite-owned model loading,
+tokenization, session, sampling, and generation code.
+
+The first server slice is intentionally narrow:
+
+- single local model loaded at startup;
+- local bind address defaults to `127.0.0.1`;
+- `GET /health` reports process readiness;
+- `GET /v1/models` returns one OpenAI-shaped model entry for the loaded model;
+- `POST /v1/chat/completions` accepts text chat messages and returns an
+  OpenAI-shaped non-streaming response;
+- `POST /v1/completions` accepts a text prompt and returns an OpenAI-shaped
+  non-streaming response;
+- unsupported OpenAI fields are either ignored only when harmless or rejected
+  with an OpenAI-shaped error object when honoring them would be misleading;
+- request execution is serialized or bounded until batching/concurrency has
+  evidence-backed design;
+- streaming is implemented as a follow-up slice using SSE chunks and
+  `data: [DONE]`, not bolted onto the first response path.
+
+The server code should stay modular. A future `crates/ferrite-server` crate
+should use focused modules such as:
+
+- `config` for bind address, model path, model id, context, token limits, and
+  optional bearer-token policy;
+- `state` for loaded-model/session ownership and bounded execution;
+- `openai::schema` for request, response, chunk, and error JSON structs;
+- `openai::routes` for endpoint handlers;
+- `openai::prompt` for chat-message-to-prompt rendering;
+- `openai::streaming` for SSE support once token streaming is available.
+
+## Consequences
+
+Ferrite's product surface is no longer CLI-only. Server compatibility becomes
+a required milestone, and regressions should be tested with both direct HTTP
+requests and at least one standard OpenAI client configured with Ferrite as
+the base URL.
+
+The server may depend on infrastructure crates because HTTP, JSON, SSE,
+configuration, and logging are not Ferrite's inference differentiators. The
+inference crates should remain independent of HTTP-specific types.
+
+OpenAI compatibility does not mean full OpenAI API parity. The first supported
+contract is local text generation. Tool calls, multimodal input, audio,
+hosted-file APIs, fine-tuning APIs, remote auth administration, and the newer
+Responses API are out of scope until explicit ADRs or plans add them.
+
+## Alternatives Considered
+
+- **Custom HTTP/JSON/SSE stack.** Rejected for the product server because it
+  adds protocol risk and distracts from CPU inference work. It remains valid
+  only as a constrained experiment if future evidence shows a real deployment
+  need.
+- **CLI-only runtime.** Rejected because it blocks common integration paths
+  and makes Ferrite harder to use as a local model service.
+- **Full OpenAI API clone.** Rejected because Ferrite needs a reliable local
+  inference subset before it grows into broader API coverage.
+- **Ollama-native API first.** Deferred. OpenAI compatibility covers the
+  largest client ecosystem and also matches the common Ollama workflow of
+  configuring OpenAI clients with a local base URL.
+
+## Evidence
+
+- `documentation/engineering/ferrite-goal-prompt.md` permits normal Rust
+  crates for generic infrastructure while keeping inference machinery custom.
+- `research/08-implementation-roadmap.md` already lists an OpenAI-compatible
+  API phase with `/v1/chat/completions`, `/v1/completions`, `/v1/models`, and
+  `/health`.
+- OpenAI API reference, retrieved 2026-06-28:
+  - Chat Completions create endpoint:
+    <https://platform.openai.com/docs/api-reference/chat/create>
+  - Completions create endpoint:
+    <https://platform.openai.com/docs/api-reference/completions/create>
+  - Models list endpoint:
+    <https://platform.openai.com/docs/api-reference/models/list>

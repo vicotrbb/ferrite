@@ -6,6 +6,9 @@ Ferrite is a CPU-native LLM inference engine written primarily in Rust. It aims
 to run progressively larger open-weight language models on commodity CPUs while
 researching and validating improvements in CPU inference, memory management,
 quantization, KV cache strategy, scheduling, and instruction-set utilization.
+Ferrite also needs a local OpenAI-compatible HTTP server so existing client
+workflows can call it with a custom base URL, while the inference core remains
+Ferrite-owned.
 
 The project is not only an implementation effort. It is a research and
 engineering loop whose outputs are working code, verified measurements,
@@ -20,6 +23,9 @@ architecture decisions, development notes, research notes, and tested theories.
   have validation evidence.
 - Do not run risky, host-stressing, or resource-heavy tests on the local Mac
   when a homelab pod is the safer target.
+- Do not treat OpenAI compatibility as full OpenAI API parity; unsupported
+  hosted, multimodal, tool, or administrative APIs must be explicit future
+  scope.
 
 ## Iteration Loop
 
@@ -68,6 +74,26 @@ Ferrite code must be written as production Rust:
 - Require property tests or fuzz tests for binary parsers and unsafe boundaries
   where practical.
 - Treat `unsafe` as an architecture decision, not an implementation detail.
+
+## HTTP API Standards
+
+Ferrite's server surface must follow ADR 0008. The initial compatibility
+contract is local text generation through:
+
+- `GET /health`
+- `GET /v1/models`
+- `POST /v1/chat/completions`
+- `POST /v1/completions`
+
+Server code should be isolated from inference code. HTTP handlers own protocol
+concerns such as JSON schemas, OpenAI-shaped errors, bearer-token policy,
+SSE framing, status codes, and request backpressure. Inference crates own
+model format, tokenization, session state, sampling, KV cache behavior, and
+numeric kernels.
+
+Non-streaming responses must be correct before token streaming is added.
+Streaming support must use Server-Sent Events and be verified with clients that
+expect OpenAI-style stream chunks.
 
 ## Unsafe-Code Policy
 
