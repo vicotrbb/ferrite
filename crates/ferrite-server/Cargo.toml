@@ -24,7 +24,7 @@ tokio = { version = "1", features = ["io-util", "macros", "net", "rt-multi-threa
 tokio-stream = { version = "0.1", features = ["sync"] }
 
 [dev-dependencies]
-async-openai = { version = "0.41.1", default-features = false, features = ["chat-completion", "model"] }
+async-openai = { version = "0.41.1", default-features = false, features = ["chat-completion", "completions", "model"] }
 ferrite-fixtures = { path = "../ferrite-fixtures" }
 tower = { version = "0.5", features = ["util"] }
 

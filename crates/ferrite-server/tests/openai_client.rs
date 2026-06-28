@@ -4,8 +4,9 @@ use async_openai::{
     config::OpenAIConfig,
     types::chat::{
         ChatCompletionRequestMessage, ChatCompletionRequestUserMessage,
-        ChatCompletionStreamOptions, CreateChatCompletionRequest,
+        ChatCompletionStreamOptions, CreateChatCompletionRequest, Prompt,
     },
+    types::completions::CreateCompletionRequest,
     Client,
 };
 use tokio_stream::StreamExt;
@@ -41,6 +42,34 @@ async fn async_openai_client_retrieves_ferrite_model() -> Result<(), Box<dyn std
     assert_eq!(response.id, support::MODEL_ID);
     assert_eq!(response.object, "model");
     assert_eq!(response.owned_by, "ferrite");
+    Ok(())
+}
+
+#[tokio::test]
+async fn async_openai_client_creates_legacy_completion() -> Result<(), Box<dyn std::error::Error>> {
+    let server = support::LiveServer::start().await?;
+    let config = OpenAIConfig::new()
+        .with_api_base(format!("http://{}/v1", server.addr()))
+        .with_api_key("local-test");
+    let client = Client::with_config(config);
+
+    let response = client
+        .completions()
+        .create(CreateCompletionRequest {
+            model: support::MODEL_ID.to_owned(),
+            prompt: Prompt::String("hello".to_owned()),
+            max_tokens: Some(1),
+            ..Default::default()
+        })
+        .await?;
+
+    assert_eq!(response.object, "text_completion");
+    assert_eq!(response.model, support::MODEL_ID);
+    assert_eq!(response.choices[0].text, "winner");
+    assert_eq!(
+        response.usage.as_ref().map(|usage| usage.completion_tokens),
+        Some(1)
+    );
     Ok(())
 }
 
