@@ -97,6 +97,9 @@ reference implementation and benchmarking baseline, not the Ferrite runtime.
   and Q6_K x Q8_K reference paths.
 - `documentation/dev-notes/2026-06-28-q8-k-activation-policy.md` records the
   explicit default-only versus experimental parity-scoped execution policy.
+- `documentation/dev-notes/2026-06-28-q8-k-row-shape-guardrail.md` records the
+  explicit whole-K-block row-shape invariant for scalar and aarch64 NEON Q8_K
+  row adapters.
 - `documentation/benchmarks/2026-06-28-tier1-qwen2-1-5b-current-profile.md`
   records the current Qwen2.5-1.5B profile and hot aggregate roles.
 - `documentation/dev-notes/2026-06-28-tier1-q4-q6-thresholded-row-parallel-regression.md`

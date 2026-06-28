@@ -51,6 +51,11 @@ fn validate_neon_q4_k_q8_k_mul_vec(
     if cols == 0 {
         return Err(InferenceError::new("Q4_K Q8_K columns must not be zero"));
     }
+    if !cols.is_multiple_of(Q4_K_BLOCK_VALUES) {
+        return Err(InferenceError::new(format!(
+            "Q4_K Q8_K columns {cols} must be divisible by {Q4_K_BLOCK_VALUES}"
+        )));
+    }
     if vector.len() != cols {
         return Err(InferenceError::new(format!(
             "matrix columns {cols} do not match vector length {}",
@@ -223,6 +228,23 @@ mod tests {
                 "actual={actual} expected={expected}"
             );
         }
+        Ok(())
+    }
+
+    #[test]
+    fn neon_q4_k_q8_k_mul_vec_rejects_partial_block_columns() -> Result<(), InferenceError> {
+        let bytes = patterned_q4_k_block();
+        let vector = vec![1.0; Q4_K_BLOCK_VALUES / 2];
+
+        let err = match neon_q4_k_q8_k_mul_vec(&bytes, 2, Q4_K_BLOCK_VALUES / 2, &vector) {
+            Ok(_) => return Err(InferenceError::new("partial-block columns must fail")),
+            Err(err) => err,
+        };
+
+        assert_eq!(
+            err.to_string(),
+            "Q4_K Q8_K columns 128 must be divisible by 256"
+        );
         Ok(())
     }
 
