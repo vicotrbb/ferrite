@@ -20,6 +20,7 @@ pub(crate) fn print_next_token_profile(profile: &ProfiledNextToken) {
 }
 
 pub(crate) fn print_benchmark_token_profile(profile: &ProfiledTokenId) {
+    println!("profile_benchmark_token_id={}", profile.token_id);
     print_profile(
         "profile_benchmark_token",
         profile.total_elapsed(),

@@ -22,8 +22,9 @@ The implementation keeps the token-id-only output path on
 
 The CLI now exposes this through `--profile-benchmark-token` when paired with
 `--benchmark-runs`. The flag profiles the first benchmark token-id decode and
-prints a separate `profile_benchmark_token_*` block using the same operation,
-matrix, and role summary shape as `--profile-next-token`.
+prints `profile_benchmark_token_id=<id>` followed by a separate
+`profile_benchmark_token_*` block using the same operation, matrix, and role
+summary shape as `--profile-next-token`.
 
 ## Validation
 

@@ -181,6 +181,7 @@ fn cli_profiles_benchmark_token_id_decode() -> Result<(), Box<dyn Error>> {
         .ok_or("missing profile_benchmark_token_total_ns")?;
     assert!(profile_total_ns.parse::<u128>()? > 0);
     assert!(stdout.contains("benchmark_runs=2"));
+    assert!(stdout.contains("profile_benchmark_token_id=2"));
     assert!(stdout.contains("profile_benchmark_token_op=output:"));
     assert!(stdout.contains("profile_benchmark_token_matrix=output:F32:3:2:24"));
     assert!(stdout.contains("profile_benchmark_token_role=output:F32:3:2:24:"));
