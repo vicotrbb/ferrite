@@ -165,9 +165,10 @@ two-thread runs. This is worse than the local aarch64 Q6_K measurement and
 keeps Q6_K out of the current Tier 1 throughput path for Qwen2.5-1.5B.
 
 The next x86_64 optimization slice should profile Q6_K and Q8_0 hot roles on
-the amd64 pod before changing kernels. In particular, this run does not justify
-promoting the experimental Q8_K activation matvec path or changing default
-dispatch policy.
+the amd64 pod before changing kernels. That follow-up profile is recorded in
+`documentation/benchmarks/2026-06-28-tier1-avx2-qwen2-1-5b-q8-q6-profile.md`.
+In particular, this run does not justify promoting the experimental Q8_K
+activation matvec path or changing default dispatch policy.
 
 ## Cleanup
 
