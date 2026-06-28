@@ -2,6 +2,8 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::ops::Range;
 
+pub use crate::gguf_config::{LlamaConfig, ModelArchitecture, ModelConfig};
+
 const GGUF_MAGIC: &[u8; 4] = b"GGUF";
 const GGUF_VERSION: u32 = 3;
 const DEFAULT_ALIGNMENT: u64 = 32;
@@ -19,39 +21,80 @@ impl GgufFile {
         self.tensors.iter().find(|tensor| tensor.name == name)
     }
 
+    pub fn model_config(&self) -> Result<ModelConfig, GgufError> {
+        let architecture = self.model_architecture()?;
+        let config = self.transformer_config(architecture)?;
+
+        match architecture {
+            ModelArchitecture::Llama => Ok(ModelConfig::Llama(config)),
+            ModelArchitecture::Qwen2 => Ok(ModelConfig::Qwen2(config)),
+        }
+    }
+
     pub fn llama_config(&self) -> Result<LlamaConfig, GgufError> {
-        match self.metadata.get("general.architecture") {
-            Some(MetadataValue::String(architecture)) if architecture == "llama" => {}
-            Some(MetadataValue::String(architecture)) => {
-                return Err(GgufError::new(format!(
-                    "expected llama architecture, found {architecture}"
-                )));
-            }
-            _ => return Err(GgufError::new("missing general.architecture metadata")),
+        let architecture = self.model_architecture()?;
+        if architecture != ModelArchitecture::Llama {
+            return Err(GgufError::new(format!(
+                "expected llama architecture, found {}",
+                architecture.metadata_value()
+            )));
         }
 
-        let embedding_length = self.required_count("llama.embedding_length")?;
-        let attention_head_count = self.required_count("llama.attention.head_count")?;
+        self.transformer_config(ModelArchitecture::Llama)
+    }
+
+    fn model_architecture(&self) -> Result<ModelArchitecture, GgufError> {
+        match self.metadata.get("general.architecture") {
+            Some(MetadataValue::String(architecture)) => {
+                ModelArchitecture::from_metadata(architecture).ok_or_else(|| {
+                    GgufError::new(format!("unsupported architecture {architecture}"))
+                })
+            }
+            _ => Err(GgufError::new("missing general.architecture metadata")),
+        }
+    }
+
+    fn transformer_config(
+        &self,
+        architecture: ModelArchitecture,
+    ) -> Result<LlamaConfig, GgufError> {
+        let prefix = architecture.metadata_prefix();
+        let embedding_length = self.required_count(&format!("{prefix}.embedding_length"))?;
+        let attention_head_count =
+            self.required_count(&format!("{prefix}.attention.head_count"))?;
+        let key_length = self
+            .optional_count(&format!("{prefix}.attention.key_length"))?
+            .unwrap_or(embedding_length / attention_head_count);
+        let value_length = self
+            .optional_count(&format!("{prefix}.attention.value_length"))?
+            .unwrap_or(embedding_length / attention_head_count);
+        let rope_dimension_count =
+            match self.optional_count(&format!("{prefix}.rope.dimension_count"))? {
+                Some(value) => value,
+                None if architecture == ModelArchitecture::Qwen2 => key_length,
+                None => {
+                    return Err(GgufError::new(format!(
+                        "missing required metadata {prefix}.rope.dimension_count"
+                    )));
+                }
+            };
 
         Ok(LlamaConfig {
-            context_length: self.required_count("llama.context_length")?,
+            architecture,
+            context_length: self.required_count(&format!("{prefix}.context_length"))?,
             embedding_length,
-            block_count: self.required_count("llama.block_count")?,
-            feed_forward_length: self.required_count("llama.feed_forward_length")?,
+            block_count: self.required_count(&format!("{prefix}.block_count"))?,
+            feed_forward_length: self.required_count(&format!("{prefix}.feed_forward_length"))?,
             attention_head_count,
             attention_head_count_kv: self
-                .optional_count("llama.attention.head_count_kv")?
+                .optional_count(&format!("{prefix}.attention.head_count_kv"))?
                 .unwrap_or(attention_head_count),
-            key_length: self
-                .optional_count("llama.attention.key_length")?
-                .unwrap_or(embedding_length / attention_head_count),
-            value_length: self
-                .optional_count("llama.attention.value_length")?
-                .unwrap_or(embedding_length / attention_head_count),
+            key_length,
+            value_length,
             attention_layer_norm_rms_epsilon: self
-                .optional_f32("llama.attention.layer_norm_rms_epsilon")?,
-            rope_dimension_count: self.required_count("llama.rope.dimension_count")?,
-            rope_freq_base: self.optional_f32("llama.rope.freq_base")?,
+                .optional_f32(&format!("{prefix}.attention.layer_norm_rms_epsilon"))?,
+            rope_dimension_count,
+            rope_freq_base: self.optional_f32(&format!("{prefix}.rope.freq_base"))?,
         })
     }
 
@@ -72,38 +115,6 @@ impl GgufFile {
             .get(key)
             .map(MetadataValue::as_f32)
             .transpose()
-    }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct LlamaConfig {
-    pub context_length: u64,
-    pub embedding_length: u64,
-    pub block_count: u64,
-    pub feed_forward_length: u64,
-    pub attention_head_count: u64,
-    pub attention_head_count_kv: u64,
-    pub key_length: u64,
-    pub value_length: u64,
-    pub attention_layer_norm_rms_epsilon: Option<f32>,
-    pub rope_dimension_count: u64,
-    pub rope_freq_base: Option<f32>,
-}
-
-impl LlamaConfig {
-    pub fn gqa_ratio(&self) -> Option<u64> {
-        if self.attention_head_count_kv == 0 {
-            return None;
-        }
-
-        if self
-            .attention_head_count
-            .is_multiple_of(self.attention_head_count_kv)
-        {
-            Some(self.attention_head_count / self.attention_head_count_kv)
-        } else {
-            None
-        }
     }
 }
 

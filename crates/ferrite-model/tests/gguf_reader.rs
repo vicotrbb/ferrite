@@ -1,4 +1,4 @@
-use ferrite_model::gguf::{parse_gguf, GgmlType, MetadataValue};
+use ferrite_model::gguf::{parse_gguf, GgmlType, MetadataValue, ModelArchitecture, ModelConfig};
 use std::error::Error;
 use std::io;
 
@@ -78,6 +78,40 @@ fn align_len(bytes: &mut Vec<u8>, alignment: usize) {
 
 fn minimal_llama_gguf() -> Vec<u8> {
     minimal_llama_gguf_with_tensor_offset(0)
+}
+
+fn minimal_qwen2_gguf() -> Vec<u8> {
+    let mut bytes = Vec::new();
+    bytes.extend_from_slice(b"GGUF");
+    push_u32(&mut bytes, 3);
+    push_u64(&mut bytes, 1);
+    push_u64(&mut bytes, 12);
+
+    push_kv_string(&mut bytes, "general.architecture", "qwen2");
+    push_kv_u32(&mut bytes, "general.quantization_version", 2);
+    push_kv_u32(&mut bytes, "general.alignment", 64);
+    push_kv_u64(&mut bytes, "qwen2.context_length", 32768);
+    push_kv_u64(&mut bytes, "qwen2.embedding_length", 896);
+    push_kv_u64(&mut bytes, "qwen2.block_count", 24);
+    push_kv_u64(&mut bytes, "qwen2.feed_forward_length", 4864);
+    push_kv_u64(&mut bytes, "qwen2.attention.head_count", 14);
+    push_kv_u64(&mut bytes, "qwen2.attention.head_count_kv", 2);
+    push_kv_f32(
+        &mut bytes,
+        "qwen2.attention.layer_norm_rms_epsilon",
+        0.000001,
+    );
+    push_kv_f32(&mut bytes, "qwen2.rope.freq_base", 1_000_000.0);
+    push_kv_string_array(&mut bytes, "tokenizer.ggml.tokens", &["<unk>", "hello"]);
+
+    push_tensor_info(&mut bytes, "token_embd.weight", &[896, 2], GgmlType::F32, 0);
+    align_len(&mut bytes, 64);
+
+    for value in 0..1792u32 {
+        bytes.extend_from_slice(&(value as f32).to_le_bytes());
+    }
+
+    bytes
 }
 
 fn minimal_llama_gguf_with_tensor_offset(tensor_offset: u64) -> Vec<u8> {
@@ -180,6 +214,52 @@ fn derives_llama_config_from_uint32_or_uint64_metadata() -> Result<(), Box<dyn E
     assert_eq!(config.rope_freq_base, Some(10000.0));
     assert_eq!(config.attention_layer_norm_rms_epsilon, Some(0.00001));
     assert_eq!(config.gqa_ratio(), Some(2));
+    Ok(())
+}
+
+#[test]
+fn derives_architecture_aware_llama_config() -> Result<(), Box<dyn Error>> {
+    let bytes = minimal_llama_gguf();
+    let file = parse_gguf(&bytes)?;
+
+    let ModelConfig::Llama(config) = file.model_config()? else {
+        return Err(io::Error::other("expected llama config").into());
+    };
+
+    assert_eq!(config.architecture, ModelArchitecture::Llama);
+    assert_eq!(config.context_length, 2048);
+    assert_eq!(config.embedding_length, 8);
+    assert_eq!(config.attention_head_count, 2);
+    assert_eq!(config.attention_head_count_kv, 1);
+    assert_eq!(config.key_length, 4);
+    assert_eq!(config.value_length, 4);
+    assert_eq!(config.rope_dimension_count, 4);
+    assert_eq!(config.gqa_ratio(), Some(2));
+    Ok(())
+}
+
+#[test]
+fn derives_qwen2_config_from_qwen2_metadata() -> Result<(), Box<dyn Error>> {
+    let bytes = minimal_qwen2_gguf();
+    let file = parse_gguf(&bytes)?;
+
+    let ModelConfig::Qwen2(config) = file.model_config()? else {
+        return Err(io::Error::other("expected qwen2 config").into());
+    };
+
+    assert_eq!(config.architecture, ModelArchitecture::Qwen2);
+    assert_eq!(config.context_length, 32768);
+    assert_eq!(config.embedding_length, 896);
+    assert_eq!(config.block_count, 24);
+    assert_eq!(config.feed_forward_length, 4864);
+    assert_eq!(config.attention_head_count, 14);
+    assert_eq!(config.attention_head_count_kv, 2);
+    assert_eq!(config.key_length, 64);
+    assert_eq!(config.value_length, 64);
+    assert_eq!(config.rope_dimension_count, 64);
+    assert_eq!(config.rope_freq_base, Some(1_000_000.0));
+    assert_eq!(config.attention_layer_norm_rms_epsilon, Some(0.000001));
+    assert_eq!(config.gqa_ratio(), Some(7));
     Ok(())
 }
 
