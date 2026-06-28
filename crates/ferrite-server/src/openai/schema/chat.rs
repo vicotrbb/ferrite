@@ -83,27 +83,52 @@ pub struct ChatCompletionStreamChunk {
     choices: Vec<ChatCompletionStreamChoice>,
 }
 
-impl ChatCompletionStreamChunk {
-    pub fn from_generation(model: String, generated: &GeneratedText) -> Vec<Self> {
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ChatCompletionStreamContext {
+    id: String,
+    created: u64,
+    model: String,
+}
+
+impl ChatCompletionStreamContext {
+    pub fn new(model: String) -> Self {
         let created = unix_timestamp();
-        let id = format!("chatcmpl-ferrite-{created}");
-        let mut chunks = Vec::new();
-        for text in generated.token_texts() {
-            chunks.push(Self {
-                id: id.clone(),
-                object: "chat.completion.chunk",
-                created,
-                model: model.clone(),
-                choices: vec![ChatCompletionStreamChoice::content(text.clone())],
-            });
-        }
-        chunks.push(Self {
-            id,
-            object: "chat.completion.chunk",
+        Self {
+            id: format!("chatcmpl-ferrite-{created}"),
             created,
             model,
+        }
+    }
+
+    pub fn token(&self, content: String) -> ChatCompletionStreamChunk {
+        ChatCompletionStreamChunk {
+            id: self.id.clone(),
+            object: "chat.completion.chunk",
+            created: self.created,
+            model: self.model.clone(),
+            choices: vec![ChatCompletionStreamChoice::content(content)],
+        }
+    }
+
+    pub fn stop(&self) -> ChatCompletionStreamChunk {
+        ChatCompletionStreamChunk {
+            id: self.id.clone(),
+            object: "chat.completion.chunk",
+            created: self.created,
+            model: self.model.clone(),
             choices: vec![ChatCompletionStreamChoice::stop()],
-        });
+        }
+    }
+}
+
+impl ChatCompletionStreamChunk {
+    pub fn from_generation(model: String, generated: &GeneratedText) -> Vec<Self> {
+        let context = ChatCompletionStreamContext::new(model);
+        let mut chunks = Vec::new();
+        for text in generated.token_texts() {
+            chunks.push(context.token(text.clone()));
+        }
+        chunks.push(context.stop());
         chunks
     }
 }

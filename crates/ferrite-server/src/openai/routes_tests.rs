@@ -136,6 +136,26 @@ async fn chat_endpoint_streams_openai_sse_chunks() -> Result<(), Box<dyn std::er
     Ok(())
 }
 
+#[tokio::test]
+async fn completion_stream_helper_emits_tokens_from_generation_callback(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let model_path = write_fixture_model()?;
+    let engine = InferenceEngine::load(&model_path)?;
+    remove_fixture_model(&model_path)?;
+
+    let response = super::routes::completion_stream_response(
+        std::sync::Arc::new(std::sync::Mutex::new(engine)),
+        "fixture-model".to_owned(),
+        "hello".to_owned(),
+        1,
+    );
+    let body = to_text(response.into_body()).await?;
+
+    assert!(body.contains("\"text\":\"winner\""));
+    assert!(body.contains("data: [DONE]"));
+    Ok(())
+}
+
 async fn to_json(body: Body) -> Result<Value, Box<dyn std::error::Error>> {
     Ok(serde_json::from_str(&to_text(body).await?)?)
 }

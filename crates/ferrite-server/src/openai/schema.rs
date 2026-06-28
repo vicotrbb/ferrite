@@ -5,9 +5,12 @@ mod usage;
 
 pub use catalog::{HealthResponse, ModelObject, ModelsResponse};
 pub use chat::{
-    ChatCompletionRequest, ChatCompletionResponse, ChatCompletionStreamChunk, ChatMessage, ChatRole,
+    ChatCompletionRequest, ChatCompletionResponse, ChatCompletionStreamChunk,
+    ChatCompletionStreamContext, ChatMessage, ChatRole,
 };
-pub use completion::{CompletionRequest, CompletionResponse, CompletionStreamChunk};
+pub use completion::{
+    CompletionRequest, CompletionResponse, CompletionStreamChunk, CompletionStreamContext,
+};
 
 use std::time::{SystemTime, UNIX_EPOCH};
 

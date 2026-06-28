@@ -49,27 +49,52 @@ pub struct CompletionStreamChunk {
     choices: Vec<CompletionStreamChoice>,
 }
 
-impl CompletionStreamChunk {
-    pub fn from_generation(model: String, generated: &GeneratedText) -> Vec<Self> {
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CompletionStreamContext {
+    id: String,
+    created: u64,
+    model: String,
+}
+
+impl CompletionStreamContext {
+    pub fn new(model: String) -> Self {
         let created = unix_timestamp();
-        let id = format!("cmpl-ferrite-{created}");
-        let mut chunks = Vec::new();
-        for text in generated.token_texts() {
-            chunks.push(Self {
-                id: id.clone(),
-                object: "text_completion",
-                created,
-                model: model.clone(),
-                choices: vec![CompletionStreamChoice::content(text.clone())],
-            });
-        }
-        chunks.push(Self {
-            id,
-            object: "text_completion",
+        Self {
+            id: format!("cmpl-ferrite-{created}"),
             created,
             model,
+        }
+    }
+
+    pub fn token(&self, text: String) -> CompletionStreamChunk {
+        CompletionStreamChunk {
+            id: self.id.clone(),
+            object: "text_completion",
+            created: self.created,
+            model: self.model.clone(),
+            choices: vec![CompletionStreamChoice::content(text)],
+        }
+    }
+
+    pub fn stop(&self) -> CompletionStreamChunk {
+        CompletionStreamChunk {
+            id: self.id.clone(),
+            object: "text_completion",
+            created: self.created,
+            model: self.model.clone(),
             choices: vec![CompletionStreamChoice::stop()],
-        });
+        }
+    }
+}
+
+impl CompletionStreamChunk {
+    pub fn from_generation(model: String, generated: &GeneratedText) -> Vec<Self> {
+        let context = CompletionStreamContext::new(model);
+        let mut chunks = Vec::new();
+        for text in generated.token_texts() {
+            chunks.push(context.token(text.clone()));
+        }
+        chunks.push(context.stop());
         chunks
     }
 }

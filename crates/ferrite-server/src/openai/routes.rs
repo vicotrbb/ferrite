@@ -2,9 +2,9 @@ use super::{
     error::OpenAiHttpError,
     prompt::render_chat_prompt,
     schema::{
-        ChatCompletionRequest, ChatCompletionResponse, ChatCompletionStreamChunk,
-        CompletionRequest, CompletionResponse, CompletionStreamChunk, HealthResponse, ModelObject,
-        ModelsResponse,
+        ChatCompletionRequest, ChatCompletionResponse, ChatCompletionStreamContext,
+        CompletionRequest, CompletionResponse, CompletionStreamContext, HealthResponse,
+        ModelObject, ModelsResponse,
     },
     streaming,
 };
@@ -47,13 +47,15 @@ async fn chat_completions(
     ensure_model(&state, request.model())?;
     let prompt = render_chat_prompt(request.messages())?;
     let max_tokens = normalized_max_tokens(request.max_tokens())?;
-    let generated = generate_text(state.engine(), prompt, max_tokens).await?;
     if request.stream() {
-        return streaming::response(ChatCompletionStreamChunk::from_generation(
+        return Ok(chat_stream_response(
+            required_engine(&state)?,
             state.model_id().to_owned(),
-            &generated,
+            prompt,
+            max_tokens,
         ));
     }
+    let generated = generate_text(state.engine(), prompt, max_tokens).await?;
     Ok(Json(ChatCompletionResponse::from_generation(
         state.model_id().to_owned(),
         generated,
@@ -72,13 +74,15 @@ async fn completions(
         ));
     }
     let max_tokens = normalized_max_tokens(request.max_tokens())?;
-    let generated = generate_text(state.engine(), request.prompt().to_owned(), max_tokens).await?;
     if request.stream() {
-        return streaming::response(CompletionStreamChunk::from_generation(
+        return Ok(completion_stream_response(
+            required_engine(&state)?,
             state.model_id().to_owned(),
-            &generated,
+            request.prompt().to_owned(),
+            max_tokens,
         ));
     }
+    let generated = generate_text(state.engine(), request.prompt().to_owned(), max_tokens).await?;
     Ok(Json(CompletionResponse::from_generation(
         state.model_id().to_owned(),
         generated,
@@ -96,6 +100,16 @@ fn ensure_model(state: &ServerState, requested_model: &str) -> Result<(), OpenAi
     }
 }
 
+fn required_engine(
+    state: &ServerState,
+) -> Result<Arc<Mutex<crate::runtime::InferenceEngine>>, OpenAiHttpError> {
+    state.engine().ok_or_else(|| {
+        OpenAiHttpError::service_unavailable(
+            "no model is loaded; start ferrite-server with --model",
+        )
+    })
+}
+
 fn normalized_max_tokens(value: Option<usize>) -> Result<usize, OpenAiHttpError> {
     let tokens = value.unwrap_or(DEFAULT_MAX_TOKENS);
     if tokens == 0 {
@@ -109,6 +123,74 @@ fn normalized_max_tokens(value: Option<usize>) -> Result<usize, OpenAiHttpError>
         )));
     }
     Ok(tokens)
+}
+
+pub(super) fn completion_stream_response(
+    engine: Arc<Mutex<crate::runtime::InferenceEngine>>,
+    model: String,
+    prompt: String,
+    max_tokens: usize,
+) -> Response {
+    let context = CompletionStreamContext::new(model);
+    let stop_chunk = context.stop();
+    stream_generated_text(
+        engine,
+        prompt,
+        max_tokens,
+        move |piece| context.token(piece.to_owned()),
+        stop_chunk,
+    )
+}
+
+fn chat_stream_response(
+    engine: Arc<Mutex<crate::runtime::InferenceEngine>>,
+    model: String,
+    prompt: String,
+    max_tokens: usize,
+) -> Response {
+    let context = ChatCompletionStreamContext::new(model);
+    let stop_chunk = context.stop();
+    stream_generated_text(
+        engine,
+        prompt,
+        max_tokens,
+        move |piece| context.token(piece.to_owned()),
+        stop_chunk,
+    )
+}
+
+fn stream_generated_text<T>(
+    engine: Arc<Mutex<crate::runtime::InferenceEngine>>,
+    prompt: String,
+    max_tokens: usize,
+    mut token_chunk: impl FnMut(&str) -> T + Send + 'static,
+    stop_chunk: T,
+) -> Response
+where
+    T: serde::Serialize + Send + 'static,
+{
+    let (sender, response) = streaming::channel_response();
+    tokio::task::spawn_blocking(move || {
+        let result = (|| -> Result<(), OpenAiHttpError> {
+            let engine = engine
+                .lock()
+                .map_err(|_| OpenAiHttpError::internal("inference engine lock is poisoned"))?;
+            engine
+                .generate_with_token_callback(&prompt, max_tokens, |piece| {
+                    sender
+                        .send_json_blocking(&token_chunk(piece))
+                        .map_err(|error| crate::runtime::RuntimeError::new(error.to_string()))?;
+                    Ok(())
+                })
+                .map_err(|error| OpenAiHttpError::internal(error.to_string()))?;
+            sender.send_json_blocking(&stop_chunk)?;
+            sender.send_done_blocking()
+        })();
+        if result.is_err() {
+            let _ = sender.send_done_blocking();
+        }
+    });
+    response
 }
 
 async fn generate_text(
