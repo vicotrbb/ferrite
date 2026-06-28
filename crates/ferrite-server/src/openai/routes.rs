@@ -11,7 +11,7 @@ use super::{
 };
 use crate::state::ServerState;
 use axum::{
-    extract::State,
+    extract::{Path, State},
     response::{IntoResponse, Response},
     routing::get,
     routing::post,
@@ -27,6 +27,7 @@ pub fn router(state: ServerState) -> Router {
     Router::new()
         .route("/health", get(health))
         .route("/v1/models", get(models))
+        .route("/v1/models/:model", get(model))
         .route("/v1/chat/completions", post(chat_completions))
         .route("/v1/completions", post(completions))
         .with_state(state)
@@ -40,6 +41,16 @@ async fn models(State(state): State<ServerState>) -> Json<ModelsResponse> {
     Json(ModelsResponse::new(vec![ModelObject::local(
         state.model_id().to_owned(),
     )]))
+}
+
+async fn model(
+    State(state): State<ServerState>,
+    Path(model): Path<String>,
+) -> Result<Json<ModelObject>, OpenAiHttpError> {
+    if model != state.model_id() {
+        return Err(OpenAiHttpError::model_not_found(model));
+    }
+    Ok(Json(ModelObject::local(state.model_id().to_owned())))
 }
 
 async fn chat_completions(

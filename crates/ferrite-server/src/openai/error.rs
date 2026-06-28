@@ -24,6 +24,19 @@ impl OpenAiErrorBody {
             code: None,
         }
     }
+
+    pub fn with_code(
+        message: impl Into<String>,
+        error_type: impl Into<String>,
+        code: impl Into<String>,
+    ) -> Self {
+        Self {
+            message: message.into(),
+            error_type: error_type.into(),
+            param: None,
+            code: Some(code.into()),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -48,6 +61,18 @@ impl OpenAiHttpError {
         Self {
             status: StatusCode::BAD_REQUEST,
             body: OpenAiErrorResponse::new(OpenAiErrorBody::new(message, "invalid_request_error")),
+        }
+    }
+
+    pub fn model_not_found(model: impl AsRef<str>) -> Self {
+        let model = model.as_ref();
+        Self {
+            status: StatusCode::NOT_FOUND,
+            body: OpenAiErrorResponse::new(OpenAiErrorBody::with_code(
+                format!("model {model} is not loaded"),
+                "invalid_request_error",
+                "model_not_found",
+            )),
         }
     }
 

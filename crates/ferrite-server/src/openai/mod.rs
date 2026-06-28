@@ -6,4 +6,6 @@ pub mod schema;
 pub mod streaming;
 
 #[cfg(test)]
+mod catalog_tests;
+#[cfg(test)]
 mod routes_tests;
