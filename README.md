@@ -48,5 +48,8 @@ Streaming responses send token chunks as generation progresses:
 curl -N http://127.0.0.1:8080/v1/chat/completions \
   -H 'content-type: application/json' \
   -H 'authorization: Bearer local-secret' \
-  -d '{"model":"ferrite-local","messages":[{"role":"user","content":"hello world"}],"max_tokens":16,"stream":true}'
+  -d '{"model":"ferrite-local","messages":[{"role":"user","content":"hello world"}],"max_tokens":16,"stream":true,"stream_options":{"include_usage":true}}'
 ```
+
+When `stream_options.include_usage` is true, Ferrite emits a final usage chunk
+before `data: [DONE]`.
