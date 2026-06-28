@@ -13,7 +13,7 @@ use super::InferenceError;
 mod tests {
     #[cfg(target_arch = "aarch64")]
     use super::super::q4_k::{q4_k_mul_vec_with_backend, Q4KMatVecBackend};
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
     use super::super::q5_0::{q5_0_mul_vec_with_backend, Q5_0MatVecBackend};
     #[cfg(target_arch = "aarch64")]
     use super::super::q6_k::{q6_k_mul_vec_with_backend, Q6KMatVecBackend};
@@ -192,6 +192,20 @@ mod tests {
         let output = q5_0_mul_vec_with_backend(&bytes, 2, 32, &[1.0; 32])?;
 
         assert_eq!(output.backend, Q5_0MatVecBackend::Aarch64Neon);
+        assert_eq!(output.values, vec![32.0, -64.0]);
+        Ok(())
+    }
+
+    #[test]
+    #[cfg(target_arch = "x86_64")]
+    fn q5_0_matvec_uses_avx2_backend_on_x86_64() -> Result<(), InferenceError> {
+        let mut bytes = Vec::new();
+        bytes.extend(q5_0_block_with_value(1));
+        bytes.extend(q5_0_block_with_value(-2));
+
+        let output = q5_0_mul_vec_with_backend(&bytes, 2, 32, &[1.0; 32])?;
+
+        assert_eq!(output.backend, Q5_0MatVecBackend::X86_64Avx2);
         assert_eq!(output.values, vec![32.0, -64.0]);
         Ok(())
     }
