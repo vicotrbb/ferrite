@@ -11,6 +11,24 @@ use async_openai::{
 use tokio_stream::StreamExt;
 
 #[tokio::test]
+async fn async_openai_client_lists_ferrite_model() -> Result<(), Box<dyn std::error::Error>> {
+    let server = support::LiveServer::start().await?;
+    let config = OpenAIConfig::new()
+        .with_api_base(format!("http://{}/v1", server.addr()))
+        .with_api_key("local-test");
+    let client = Client::with_config(config);
+
+    let response = client.models().list().await?;
+
+    assert_eq!(response.object, "list");
+    assert_eq!(response.data.len(), 1);
+    assert_eq!(response.data[0].id, support::MODEL_ID);
+    assert_eq!(response.data[0].object, "model");
+    assert_eq!(response.data[0].owned_by, "ferrite");
+    Ok(())
+}
+
+#[tokio::test]
 async fn async_openai_client_uses_ferrite_base_url() -> Result<(), Box<dyn std::error::Error>> {
     let server = support::LiveServer::start().await?;
     let config = OpenAIConfig::new()
