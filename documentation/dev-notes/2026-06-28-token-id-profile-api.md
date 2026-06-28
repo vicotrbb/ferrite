@@ -20,6 +20,11 @@ The implementation keeps the token-id-only output path on
 `Matrix::argmax_mul_vec` and profiles that optimized argmax operation as the
 `output` event. It does not force full logits materialization.
 
+The CLI now exposes this through `--profile-benchmark-token` when paired with
+`--benchmark-runs`. The flag profiles the first benchmark token-id decode and
+prints a separate `profile_benchmark_token_*` block using the same operation,
+matrix, and role summary shape as `--profile-next-token`.
+
 ## Validation
 
 Red check:
@@ -47,4 +52,11 @@ cargo test -p ferrite-inference --test matvec_kernel_check -- --nocapture
 cargo test -p ferrite-inference quantized_tests -- --nocapture
 cargo check -p ferrite-inference --target x86_64-unknown-linux-gnu --tests
 cargo clippy -p ferrite-inference --all-targets -- -D warnings
+```
+
+Follow-up CLI exposure:
+
+```text
+cargo test -p ferrite-cli cli_profiles_benchmark_token_id_decode -- --nocapture
+cargo test -p ferrite-cli --test next_token_cli -- --nocapture
 ```

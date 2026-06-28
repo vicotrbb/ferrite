@@ -12,6 +12,7 @@ pub struct CliArgs {
     pub generate_tokens: Option<usize>,
     pub top_logits: Option<usize>,
     pub profile_next_token: bool,
+    pub profile_benchmark_token: bool,
     pub stream: bool,
 }
 
@@ -30,6 +31,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
     let mut generate_tokens = None;
     let mut top_logits = None;
     let mut profile_next_token = false;
+    let mut profile_benchmark_token = false;
     let mut stream = false;
     let mut iter = args.into_iter();
     let _program = iter.next();
@@ -88,6 +90,9 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
             "--profile-next-token" => {
                 profile_next_token = true;
             }
+            "--profile-benchmark-token" => {
+                profile_benchmark_token = true;
+            }
             "--help" | "-h" => {
                 return Err(io::Error::other(usage()).into());
             }
@@ -102,6 +107,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
     validate_modes(
         generate_tokens,
         benchmark_runs,
+        profile_benchmark_token,
         stream,
         expected_generated_token_ids.as_deref(),
     )?;
@@ -115,6 +121,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
         generate_tokens,
         top_logits,
         profile_next_token,
+        profile_benchmark_token,
         stream,
     })
 }
@@ -122,6 +129,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
 fn validate_modes(
     generate_tokens: Option<usize>,
     benchmark_runs: Option<usize>,
+    profile_benchmark_token: bool,
     stream: bool,
     expected_generated_token_ids: Option<&[usize]>,
 ) -> Result<(), Box<dyn Error>> {
@@ -137,6 +145,9 @@ fn validate_modes(
         return Err(
             io::Error::other("use --expect-generated-token-ids with --generate-tokens").into(),
         );
+    }
+    if profile_benchmark_token && benchmark_runs.is_none() {
+        return Err(io::Error::other("use --profile-benchmark-token with --benchmark-runs").into());
     }
     Ok(())
 }
@@ -204,5 +215,5 @@ fn parse_token_ids(value: OsString) -> Result<Vec<usize>, Box<dyn Error>> {
 }
 
 fn usage() -> &'static str {
-    "usage: ferrite --model <path.gguf> (--prompt <text> | --prompt-token-ids <id[,id...]>) [--expect-token-id <id>] [--top-logits <count>] [--profile-next-token] [--generate-tokens <count>] [--expect-generated-token-ids <id[,id...]>] [--stream] [--benchmark-runs <count>]"
+    "usage: ferrite --model <path.gguf> (--prompt <text> | --prompt-token-ids <id[,id...]>) [--expect-token-id <id>] [--top-logits <count>] [--profile-next-token] [--generate-tokens <count>] [--expect-generated-token-ids <id[,id...]>] [--stream] [--benchmark-runs <count>] [--profile-benchmark-token]"
 }

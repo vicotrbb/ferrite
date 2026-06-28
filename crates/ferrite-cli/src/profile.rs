@@ -1,5 +1,6 @@
-use ferrite_inference::scalar::ProfiledNextToken;
+use ferrite_inference::scalar::{ProfiledNextToken, ProfiledTokenId, ScalarProfileEvent};
 use std::collections::BTreeMap;
+use std::time::Duration;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct ProfileRoleKey {
@@ -11,20 +12,33 @@ struct ProfileRoleKey {
 }
 
 pub(crate) fn print_next_token_profile(profile: &ProfiledNextToken) {
-    println!(
-        "profile_next_token_total_ns={}",
-        profile.total_elapsed().as_nanos()
+    print_profile(
+        "profile_next_token",
+        profile.total_elapsed(),
+        &profile.events,
     );
+}
+
+pub(crate) fn print_benchmark_token_profile(profile: &ProfiledTokenId) {
+    print_profile(
+        "profile_benchmark_token",
+        profile.total_elapsed(),
+        &profile.events,
+    );
+}
+
+fn print_profile(prefix: &str, total_elapsed: Duration, events: &[ScalarProfileEvent]) {
+    println!("{prefix}_total_ns={}", total_elapsed.as_nanos());
 
     let mut role_totals = BTreeMap::<ProfileRoleKey, u128>::new();
-    for event in &profile.events {
+    for event in events {
         println!(
-            "profile_next_token_op={}:{}",
+            "{prefix}_op={}:{}",
             event.label(),
             event.elapsed().as_nanos()
         );
         println!(
-            "profile_next_token_matrix={}:{}:{}:{}:{}",
+            "{prefix}_matrix={}:{}:{}:{}:{}",
             event.label(),
             event.storage_kind().as_str(),
             event.rows(),
@@ -43,7 +57,7 @@ pub(crate) fn print_next_token_profile(profile: &ProfiledNextToken) {
 
     for (key, elapsed_ns) in role_totals {
         println!(
-            "profile_next_token_role={}:{}:{}:{}:{}:{}",
+            "{prefix}_role={}:{}:{}:{}:{}:{}",
             key.role, key.storage_kind, key.rows, key.cols, key.storage_bytes, elapsed_ns
         );
     }
