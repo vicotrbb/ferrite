@@ -22,8 +22,9 @@ complete.
 The current implementation proves scalar GQA ratio coverage, scalar RoPE
 coverage for `head_dim=64` and `head_dim=128`, session cache truncation, a
 matvec reference-comparison gate, and aarch64 NEON F32, Q8_0, Q5_0, Q6_K, and
-Q4_K matvec paths checked against scalar oracles. It does not yet prove AVX2
-correctness, real 0.5B-1.7B model output, or Tier 1 throughput.
+Q4_K matvec paths checked against scalar oracles. It also has compile-checked
+x86_64 AVX2 F32 dispatch, but no x86_64 host runtime evidence yet. Tier 1 does
+not yet prove AVX2 correctness, real 0.5B-1.7B model output, or throughput.
 
 ## Evidence Matrix
 
@@ -34,7 +35,7 @@ correctness, real 0.5B-1.7B model output, or Tier 1 throughput.
 | KV cache grows and shrinks across turns | Proven for scalar session cache | `documentation/dev-notes/2026-06-27-tier1-session-cache-truncation.md`; `cargo test -p ferrite-inference --test scalar_session_cache -- --nocapture` |
 | Matvec kernels compare against scalar reference within explicit tolerance | Harness covers F32, Q8_0, Q5_0, Q4_K, and Q6_K public matrix paths | `documentation/dev-notes/2026-06-27-tier1-matvec-kernel-check.md`; `cargo test -p ferrite-inference --test matvec_kernel_check -- --nocapture` |
 | AArch64 SIMD correctness | Partially proven for F32, Q8_0, Q5_0, Q6_K, and Q4_K matvec on local NEON host | `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-f32-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q8-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q5-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q6-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q4-matvec.md`; targeted aarch64 backend tests |
-| AVX2 correctness | Not proven | No x86_64 AVX2 kernel or x86 host evidence yet |
+| AVX2 correctness | Compile-only F32 bring-up exists; runtime correctness not proven | `documentation/dev-notes/2026-06-27-tier1-x86-64-avx2-f32-matvec.md`; `cargo check -p ferrite-inference --target x86_64-unknown-linux-gnu --tests`; no x86_64 AVX2 host run yet |
 | Quantized SIMD correctness | Partially proven for Q8_0, Q5_0, Q6_K, and Q4_K on local NEON host | `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q8-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q5-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q6-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q4-matvec.md`; Q4_K and Q6_K dispatch is scoped to rows whose column count is a whole number of K-blocks |
 | Real 0.5B-1.7B model output | Not proven | No Tier 1 model reference run recorded yet |
 | Tier 1 throughput target | Not proven | No benchmark note proving `>= 10 tok/s` on 2 vCPU Q4_K_M |
@@ -48,13 +49,15 @@ cargo fmt --all -- --check
 git diff --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
+cargo check -p ferrite-inference --target x86_64-unknown-linux-gnu --tests
 ```
 
 All commands passed.
 
 ## Remaining Work
 
-- Add x86_64 AVX2 matvec behind ADR 0006's unsafe-boundary rules.
+- Run AVX2 runtime correctness checks on an x86_64 host and add AVX2 quantized
+  kernels behind ADR 0006's unsafe-boundary rules.
 - Run a Tier 1 model from `research/11-testing-model-registry.md` with a fixed
   reference profile and record parser, output, memory, and latency evidence.
 - Benchmark Tier 1 decode throughput with hardware, model, quantization,
