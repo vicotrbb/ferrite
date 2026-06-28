@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+pub mod http;
+
 use ferrite_server::{runtime::InferenceEngine, state::ServerState};
 use std::{
     net::{Ipv4Addr, SocketAddr},
