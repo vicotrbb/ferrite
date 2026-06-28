@@ -8,6 +8,24 @@ use tokio::{
 };
 
 #[tokio::test]
+async fn live_http_server_accepts_openai_style_model_list() -> Result<(), Box<dyn std::error::Error>>
+{
+    let server = support::LiveServer::start().await?;
+    let response = send_http_request(server.addr(), "GET", "/v1/models", &[]).await?;
+
+    assert!(
+        response.starts_with("HTTP/1.1 200 OK"),
+        "unexpected response: {response}"
+    );
+    let body = response_json(&response)?;
+    assert_eq!(body["object"], "list");
+    assert_eq!(body["data"][0]["id"], support::MODEL_ID);
+    assert_eq!(body["data"][0]["object"], "model");
+    assert_eq!(body["data"][0]["owned_by"], "ferrite");
+    Ok(())
+}
+
+#[tokio::test]
 async fn live_http_server_accepts_openai_style_chat_request(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let server = support::LiveServer::start().await?;
@@ -27,13 +45,38 @@ async fn live_http_server_accepts_openai_style_chat_request(
         response.starts_with("HTTP/1.1 200 OK"),
         "unexpected response: {response}"
     );
-    let (_, body) = response
-        .split_once("\r\n\r\n")
-        .ok_or("expected HTTP response body")?;
-    let body: Value = serde_json::from_str(body)?;
+    let body = response_json(&response)?;
     assert_eq!(body["object"], "chat.completion");
     assert_eq!(body["model"], support::MODEL_ID);
     assert_eq!(body["choices"][0]["message"]["content"], "winner");
+    assert_eq!(body["usage"]["completion_tokens"], 1);
+    Ok(())
+}
+
+#[tokio::test]
+async fn live_http_server_accepts_openai_style_legacy_completion(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let server = support::LiveServer::start().await?;
+    let request_body = format!(
+        r#"{{"model":"{}","prompt":"hello","max_tokens":1}}"#,
+        support::MODEL_ID
+    );
+    let response = send_http_request(
+        server.addr(),
+        "POST",
+        "/v1/completions",
+        request_body.as_bytes(),
+    )
+    .await?;
+
+    assert!(
+        response.starts_with("HTTP/1.1 200 OK"),
+        "unexpected response: {response}"
+    );
+    let body = response_json(&response)?;
+    assert_eq!(body["object"], "text_completion");
+    assert_eq!(body["model"], support::MODEL_ID);
+    assert_eq!(body["choices"][0]["text"], "winner");
     assert_eq!(body["usage"]["completion_tokens"], 1);
     Ok(())
 }
@@ -59,10 +102,7 @@ async fn live_http_server_accepts_matching_bearer_token() -> Result<(), Box<dyn 
         response.starts_with("HTTP/1.1 200 OK"),
         "unexpected response: {response}"
     );
-    let (_, body) = response
-        .split_once("\r\n\r\n")
-        .ok_or("expected HTTP response body")?;
-    let body: Value = serde_json::from_str(body)?;
+    let body = response_json(&response)?;
     assert_eq!(body["choices"][0]["message"]["content"], "winner");
     Ok(())
 }
@@ -145,4 +185,11 @@ fn parse_content_length(headers: &[u8]) -> Result<Option<usize>, Box<dyn std::er
         }
     }
     Ok(None)
+}
+
+fn response_json(response: &str) -> Result<Value, Box<dyn std::error::Error>> {
+    let (_, body) = response
+        .split_once("\r\n\r\n")
+        .ok_or("expected HTTP response body")?;
+    Ok(serde_json::from_str(body)?)
 }
