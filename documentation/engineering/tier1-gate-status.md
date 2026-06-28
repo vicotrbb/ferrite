@@ -33,11 +33,13 @@ also have row-level Rayon parallelism on aarch64 NEON and compile-checked x86_64
 AVX2, and the Q4_K and Q6_K aarch64 paths now use fused NEON block-dot helpers.
 Local SmolLM2-1.7B benchmark improvements are recorded, and `--benchmark-runs`
 now uses a token-id-only repeated-token path instead of returning unused logits
-for each benchmark token. A next-token profiling CLI identifies per-operation
-matvec timings for real Tier 1 models and includes storage kind, shape, and
-storage bytes for each profiled matrix. It also emits aggregate role/signature
-summaries for profile-driven optimization. Tier 1 does not yet prove AVX2
-runtime correctness, broad 0.5B-1.7B model coverage, or throughput.
+for each benchmark token. Generated-token loops also use token-id-only repeated
+acceptance after the first prompt next-token result. A next-token profiling CLI
+identifies per-operation matvec timings for real Tier 1 models and includes
+storage kind, shape, and storage bytes for each profiled matrix. It also emits
+aggregate role/signature summaries for profile-driven optimization. Tier 1 does
+not yet prove AVX2 runtime correctness, broad 0.5B-1.7B model coverage, or
+throughput.
 
 ## Evidence Matrix
 
@@ -52,12 +54,13 @@ runtime correctness, broad 0.5B-1.7B model coverage, or throughput.
 | Quantized SIMD correctness | Partially proven for Q8_0, Q5_0, Q6_K, and Q4_K on local NEON host | `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q8-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q5-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q6-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q4-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-q4k-row-parallel-simd.md`; `documentation/dev-notes/2026-06-27-tier1-q6k-row-parallel-simd.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-q4k-fused-neon.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-q6k-fused-neon.md`; Q4_K and Q6_K dispatch is scoped to rows whose column count is a whole number of K-blocks |
 | Real 0.5B-1.7B model output | Partially proven for one 1.7B model/reference profile | `documentation/dev-notes/2026-06-27-tier1-smollm2-1-7b-reference-probe.md`; Ferrite matched local `llama.cpp` token IDs `[18, 198, 3725, 198, 198, 788]` for SmolLM2-1.7B-Instruct Q4_K_M |
 | Tier 1 throughput target | Not proven | `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-scalar-probe.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-q4k-row-parallel.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-q6k-row-parallel.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-q4k-fused-neon.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-q6k-fused-neon.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-token-id-benchmark.md`; token-id benchmark path improved the local default-pool run to about 5.51 tok/s and the 2-thread run to about 3.36 tok/s, still below `>= 10 tok/s` |
+| Generated token path | Proven for one real 1.7B parity profile | `documentation/dev-notes/2026-06-27-token-id-generation-path.md`; generated-token loops use token-id-only repeated acceptance and still matched SmolLM2-1.7B token IDs `[18, 198, 3725, 198, 198, 788]` |
 | Next-token operation profiling | Proven for CLI and one real 1.7B profile | `documentation/dev-notes/2026-06-27-tier1-next-token-profile.md`; `documentation/dev-notes/2026-06-27-tier1-profile-matrix-metadata.md`; `--profile-next-token` emits per-operation labels, matrix storage kind/shape/bytes, and aggregate `profile_next_token_role` summaries; latest SmolLM2-1.7B profile showed Q4_K/Q6_K FFN roles as the largest aggregate matvec group |
 | Rejected optimization experiments | Q8_0 and Q5_0 naive row-level Rayon scheduling regressed and were reverted | `documentation/dev-notes/2026-06-27-tier1-q8-row-parallel-regression.md`; `documentation/dev-notes/2026-06-27-tier1-q5-row-parallel-regression.md`; Q8_0 was implemented in `3b12756` and reverted in `1ae4275`; Q5_0 was implemented in `f318e3b` and reverted in `a5d9382` |
 
 ## Fresh Full-Workspace Gate
 
-Commands run after the token-id benchmark path slice:
+Commands run after the token-id generation path slice:
 
 ```sh
 cargo fmt --all -- --check
@@ -183,6 +186,15 @@ benchmark_avg_ns=181434575
 RAYON_NUM_THREADS=2 benchmark_avg_ns=297401758
 ```
 
+After changing `--generate-tokens` to use token-id-only repeated acceptance, the
+real six-token parity check still matched:
+
+```text
+generated_token_ids=18,198,3725,198,198,788
+generated_match=true
+match=true
+```
+
 ## Remaining Work
 
 - Run AVX2 runtime correctness checks on an x86_64 host behind ADR 0006's
@@ -190,7 +202,7 @@ RAYON_NUM_THREADS=2 benchmark_avg_ns=297401758
 - Expand Tier 1 model coverage beyond the single SmolLM2-1.7B-Instruct Q4_K_M
   fixed local reference profile recorded so far.
 - Continue optimizing hot matvec formats and decode scheduling; Q4_K plus Q6_K
-  row parallelism, fused NEON dot paths, and token-id-only benchmark acceptance
+  row parallelism, fused NEON dot paths, and token-id-only repeated acceptance
   are still below the Tier 1 throughput target.
 - Use `--profile-next-token` to isolate hot operation labels and matrix
   metadata before the next optimization slice. The latest SmolLM2-1.7B profile
