@@ -83,8 +83,11 @@ fn cache_model() -> Result<ScalarLlamaModel, Box<dyn Error>> {
             layers: vec![ScalarLlamaLayerWeights {
                 attn_norm: vec![1.0, 1.0],
                 q_proj: identity.clone(),
+                q_bias: None,
                 k_proj: identity.clone(),
+                k_bias: None,
                 v_proj: identity.clone(),
+                v_bias: None,
                 o_proj: identity.clone(),
                 ffn_norm: vec![1.0, 1.0],
                 ffn_gate: Matrix::from_row_major(2, 2, vec![0.0; 4])?,

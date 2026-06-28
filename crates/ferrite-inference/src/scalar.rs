@@ -59,8 +59,11 @@ pub struct ScalarLlamaWeights {
 pub struct ScalarLlamaLayerWeights {
     pub attn_norm: Vec<f32>,
     pub q_proj: Matrix,
+    pub q_bias: Option<Vec<f32>>,
     pub k_proj: Matrix,
+    pub k_bias: Option<Vec<f32>>,
     pub v_proj: Matrix,
+    pub v_bias: Option<Vec<f32>>,
     pub o_proj: Matrix,
     pub ffn_norm: Vec<f32>,
     pub ffn_gate: Matrix,
@@ -279,17 +282,32 @@ fn validate_weights(
             config.hidden_size,
             config.hidden_size,
         )?;
+        ensure_optional_len(
+            &format!("{prefix} q_bias"),
+            layer.q_bias.as_deref(),
+            config.hidden_size,
+        )?;
         ensure_matrix_shape(
             &format!("{prefix} k_proj"),
             &layer.k_proj,
             kv_width,
             config.hidden_size,
         )?;
+        ensure_optional_len(
+            &format!("{prefix} k_bias"),
+            layer.k_bias.as_deref(),
+            kv_width,
+        )?;
         ensure_matrix_shape(
             &format!("{prefix} v_proj"),
             &layer.v_proj,
             kv_width,
             config.hidden_size,
+        )?;
+        ensure_optional_len(
+            &format!("{prefix} v_bias"),
+            layer.v_bias.as_deref(),
+            kv_width,
         )?;
         ensure_matrix_shape(
             &format!("{prefix} o_proj"),
@@ -318,6 +336,17 @@ fn validate_weights(
     }
 
     Ok(())
+}
+
+fn ensure_optional_len(
+    name: &str,
+    values: Option<&[f32]>,
+    expected: usize,
+) -> Result<(), InferenceError> {
+    match values {
+        Some(values) => ensure_len(name, values, expected),
+        None => Ok(()),
+    }
 }
 
 fn ensure_matrix_shape(

@@ -16,8 +16,11 @@ pub(super) fn kv_cache_bytes(keys: &[Vec<Vec<f32>>], values: &[Vec<Vec<f32>>]) -
 fn layer_bytes(layer: &ScalarLlamaLayerWeights) -> u128 {
     vector_bytes(&layer.attn_norm)
         + matrix_bytes(&layer.q_proj)
+        + optional_vector_bytes(&layer.q_bias)
         + matrix_bytes(&layer.k_proj)
+        + optional_vector_bytes(&layer.k_bias)
         + matrix_bytes(&layer.v_proj)
+        + optional_vector_bytes(&layer.v_bias)
         + matrix_bytes(&layer.o_proj)
         + vector_bytes(&layer.ffn_norm)
         + matrix_bytes(&layer.ffn_gate)
@@ -31,6 +34,10 @@ fn matrix_bytes(matrix: &Matrix) -> u128 {
 
 fn vector_bytes(values: &[f32]) -> u128 {
     values.len() as u128 * F32_BYTES
+}
+
+fn optional_vector_bytes(values: &Option<Vec<f32>>) -> u128 {
+    values.as_deref().map_or(0, vector_bytes)
 }
 
 fn nested_vector_bytes(values: &[Vec<Vec<f32>>]) -> u128 {

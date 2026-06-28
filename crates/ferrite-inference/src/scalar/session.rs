@@ -139,6 +139,7 @@ impl<'a> ScalarLlamaSession<'a> {
                 "q_proj",
                 profile_events.as_deref_mut(),
             )?;
+            add_optional_bias(&mut query, layer.q_bias.as_deref())?;
             let mut key = profiled_layer_mul_vec(
                 &layer.k_proj,
                 &normed,
@@ -146,13 +147,15 @@ impl<'a> ScalarLlamaSession<'a> {
                 "k_proj",
                 profile_events.as_deref_mut(),
             )?;
-            let value = profiled_layer_mul_vec(
+            add_optional_bias(&mut key, layer.k_bias.as_deref())?;
+            let mut value = profiled_layer_mul_vec(
                 &layer.v_proj,
                 &normed,
                 layer_index,
                 "v_proj",
                 profile_events.as_deref_mut(),
             )?;
+            add_optional_bias(&mut value, layer.v_bias.as_deref())?;
 
             query = self.model.apply_rope_to_heads(
                 &query,
@@ -261,6 +264,18 @@ fn profiled_layer_mul_vec(
         &format!("layer.{layer_index}.{role}"),
         profile_events,
     )
+}
+
+fn add_optional_bias(values: &mut [f32], bias: Option<&[f32]>) -> Result<(), InferenceError> {
+    let Some(bias) = bias else {
+        return Ok(());
+    };
+
+    super::math::ensure_len("projection bias", bias, values.len())?;
+    for (value, bias) in values.iter_mut().zip(bias.iter()) {
+        *value += bias;
+    }
+    Ok(())
 }
 
 fn profiled_mul_vec(

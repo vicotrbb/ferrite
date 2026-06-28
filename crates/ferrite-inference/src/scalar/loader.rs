@@ -68,6 +68,12 @@ pub(super) fn load_scalar(
                 hidden_size,
                 hidden_size,
             )?,
+            q_bias: optional_f32_vector(
+                file,
+                bytes,
+                &format!("blk.{layer_index}.attn_q.bias"),
+                hidden_size,
+            )?,
             k_proj: f32_matrix(
                 file,
                 bytes,
@@ -75,12 +81,24 @@ pub(super) fn load_scalar(
                 attention_head_count_kv * head_dim,
                 hidden_size,
             )?,
+            k_bias: optional_f32_vector(
+                file,
+                bytes,
+                &format!("blk.{layer_index}.attn_k.bias"),
+                attention_head_count_kv * head_dim,
+            )?,
             v_proj: f32_matrix(
                 file,
                 bytes,
                 &format!("blk.{layer_index}.attn_v.weight"),
                 attention_head_count_kv * head_dim,
                 hidden_size,
+            )?,
+            v_bias: optional_f32_vector(
+                file,
+                bytes,
+                &format!("blk.{layer_index}.attn_v.bias"),
+                attention_head_count_kv * head_dim,
             )?,
             o_proj: f32_matrix(
                 file,
@@ -213,6 +231,19 @@ fn f32_vector(
     }
 
     tensor::f32_values(tensor, bytes)
+}
+
+fn optional_f32_vector(
+    file: &GgufFile,
+    bytes: &[u8],
+    name: &str,
+    len: usize,
+) -> Result<Option<Vec<f32>>, InferenceError> {
+    if file.tensor(name).is_none() {
+        return Ok(None);
+    }
+
+    f32_vector(file, bytes, name, len).map(Some)
 }
 
 fn usize_from_u64(value: u64, name: &str) -> Result<usize, InferenceError> {

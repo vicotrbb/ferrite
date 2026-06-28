@@ -84,8 +84,11 @@ fn single_token_llama_reference_path_produces_documented_argmax() -> Result<(), 
             layers: vec![ScalarLlamaLayerWeights {
                 attn_norm: vec![1.0, 1.0],
                 q_proj: identity.clone(),
+                q_bias: None,
                 k_proj: identity.clone(),
+                k_bias: None,
                 v_proj: identity.clone(),
+                v_bias: None,
                 o_proj: identity.clone(),
                 ffn_norm: vec![1.0, 1.0],
                 ffn_gate: identity.clone(),
@@ -102,6 +105,67 @@ fn single_token_llama_reference_path_produces_documented_argmax() -> Result<(), 
     assert_close(next.logits[1], 0.2);
     assert_close(next.logits[2], 1.5);
     assert_eq!(argmax(&next.logits)?, 2);
+    Ok(())
+}
+
+#[test]
+fn attention_value_projection_bias_contributes_to_hidden_state() -> Result<(), Box<dyn Error>> {
+    let zero = Matrix::from_row_major(2, 2, vec![0.0; 4])?;
+    let identity = Matrix::from_row_major(2, 2, vec![1.0, 0.0, 0.0, 1.0])?;
+    let config = ScalarLlamaConfig {
+        vocab_size: 3,
+        hidden_size: 2,
+        intermediate_size: 2,
+        attention_head_count: 1,
+        attention_head_count_kv: 1,
+        head_dim: 2,
+        rope_dimension_count: 0,
+        rope_freq_base: 10_000.0,
+        rms_norm_epsilon: 0.0,
+    };
+    let model = ScalarLlamaModel::new(
+        config,
+        ScalarLlamaWeights {
+            token_embedding: Matrix::from_row_major(
+                3,
+                2,
+                vec![
+                    1.0, 0.0, // token 0
+                    0.0, 0.0, // token 1
+                    0.0, 0.0, // token 2
+                ],
+            )?,
+            output_norm: vec![1.0, 1.0],
+            output: ScalarLlamaOutputWeights::untied(Matrix::from_row_major(
+                3,
+                2,
+                vec![
+                    0.0, 0.0, // token 0
+                    1.0, 0.0, // token 1 follows the original hidden state
+                    0.0, 1.0, // token 2 follows the value bias contribution
+                ],
+            )?),
+            layers: vec![ScalarLlamaLayerWeights {
+                attn_norm: vec![1.0, 1.0],
+                q_proj: zero.clone(),
+                q_bias: None,
+                k_proj: zero.clone(),
+                k_bias: None,
+                v_proj: zero.clone(),
+                v_bias: Some(vec![0.0, 3.0]),
+                o_proj: identity.clone(),
+                ffn_norm: vec![1.0, 1.0],
+                ffn_gate: zero.clone(),
+                ffn_up: identity,
+                ffn_down: zero,
+            }],
+        },
+    )?;
+
+    let next = model.next_token(0)?;
+
+    assert_eq!(next.token_id, 2);
+    assert!(next.logits[2] > next.logits[1]);
     Ok(())
 }
 
@@ -157,8 +221,11 @@ fn prompt_path_uses_causal_kv_attention_for_latest_token() -> Result<(), Box<dyn
             layers: vec![ScalarLlamaLayerWeights {
                 attn_norm: vec![1.0, 1.0],
                 q_proj: identity.clone(),
+                q_bias: None,
                 k_proj: identity.clone(),
+                k_bias: None,
                 v_proj: identity.clone(),
+                v_bias: None,
                 o_proj: identity.clone(),
                 ffn_norm: vec![1.0, 1.0],
                 ffn_gate: Matrix::from_row_major(2, 2, vec![0.0; 4])?,
@@ -216,8 +283,11 @@ fn scalar_session_reuses_cached_prompt_state_incrementally() -> Result<(), Box<d
             layers: vec![ScalarLlamaLayerWeights {
                 attn_norm: vec![1.0, 1.0],
                 q_proj: identity.clone(),
+                q_bias: None,
                 k_proj: identity.clone(),
+                k_bias: None,
                 v_proj: identity.clone(),
+                v_bias: None,
                 o_proj: identity.clone(),
                 ffn_norm: vec![1.0, 1.0],
                 ffn_gate: Matrix::from_row_major(2, 2, vec![0.0; 4])?,
@@ -283,8 +353,11 @@ fn scalar_session_accepts_token_id_without_returning_logits() -> Result<(), Box<
             layers: vec![ScalarLlamaLayerWeights {
                 attn_norm: vec![1.0, 1.0],
                 q_proj: identity.clone(),
+                q_bias: None,
                 k_proj: identity.clone(),
+                k_bias: None,
                 v_proj: identity.clone(),
+                v_bias: None,
                 o_proj: identity.clone(),
                 ffn_norm: vec![1.0, 1.0],
                 ffn_gate: Matrix::from_row_major(2, 2, vec![0.0; 4])?,
@@ -348,8 +421,11 @@ fn scalar_session_generates_token_ids_without_returning_logits() -> Result<(), B
             layers: vec![ScalarLlamaLayerWeights {
                 attn_norm: vec![1.0, 1.0],
                 q_proj: identity.clone(),
+                q_bias: None,
                 k_proj: identity.clone(),
+                k_bias: None,
                 v_proj: identity.clone(),
+                v_bias: None,
                 o_proj: identity.clone(),
                 ffn_norm: vec![1.0, 1.0],
                 ffn_gate: Matrix::from_row_major(2, 2, vec![0.0; 4])?,
@@ -420,8 +496,11 @@ fn scalar_model_reports_weight_and_session_kv_cache_bytes() -> Result<(), Box<dy
             layers: vec![ScalarLlamaLayerWeights {
                 attn_norm: vec![1.0, 1.0],
                 q_proj: identity.clone(),
+                q_bias: None,
                 k_proj: identity.clone(),
+                k_bias: None,
                 v_proj: identity.clone(),
+                v_bias: None,
                 o_proj: identity.clone(),
                 ffn_norm: vec![1.0, 1.0],
                 ffn_gate: Matrix::from_row_major(2, 2, vec![0.0; 4])?,
