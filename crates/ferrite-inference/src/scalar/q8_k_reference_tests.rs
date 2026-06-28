@@ -21,6 +21,24 @@ fn q4_k_q8_k_matches_llama_integer_identity() -> Result<(), InferenceError> {
 }
 
 #[test]
+fn q4_k_q8_k_identity_holds_for_signed_q8_k_scales() -> Result<(), InferenceError> {
+    let block = patterned_q4_k_block();
+
+    for activation_values in [
+        positive_dominant_activation::<Q4_K_BLOCK_VALUES>(),
+        negative_dominant_activation::<Q4_K_BLOCK_VALUES>(),
+    ] {
+        let activation = BlockQ8K::quantize(&activation_values)?;
+        let actual = q4_k_q8_k_block_dot(&block, &activation)?;
+        let expected = reference_q4_k_q8_k_dot(&block, &activation)?;
+
+        assert_close(actual, expected);
+    }
+
+    Ok(())
+}
+
+#[test]
 fn q6_k_q8_k_matches_llama_arm_split_identity() -> Result<(), InferenceError> {
     let block = patterned_q6_k_block();
     let activation = BlockQ8K::quantize(&patterned_activation::<Q6_K_BLOCK_VALUES>())?;
@@ -29,6 +47,24 @@ fn q6_k_q8_k_matches_llama_arm_split_identity() -> Result<(), InferenceError> {
     let expected = reference_q6_k_q8_k_dot(&block, &activation)?;
 
     assert_close(actual, expected);
+    Ok(())
+}
+
+#[test]
+fn q6_k_q8_k_identity_holds_for_signed_q8_k_scales() -> Result<(), InferenceError> {
+    let block = patterned_q6_k_block();
+
+    for activation_values in [
+        positive_dominant_activation::<Q6_K_BLOCK_VALUES>(),
+        negative_dominant_activation::<Q6_K_BLOCK_VALUES>(),
+    ] {
+        let activation = BlockQ8K::quantize(&activation_values)?;
+        let actual = q6_k_q8_k_block_dot(&block, &activation)?;
+        let expected = reference_q6_k_q8_k_dot(&block, &activation)?;
+
+        assert_close(actual, expected);
+    }
+
     Ok(())
 }
 
@@ -230,6 +266,20 @@ fn patterned_activation<const N: usize>() -> [f32; N] {
         let wave = (index % 31) as f32 - 15.0;
         *value = wave / 9.0;
     }
+    values
+}
+
+fn positive_dominant_activation<const N: usize>() -> [f32; N] {
+    let mut values = patterned_activation::<N>();
+    values[0] = 3.25;
+    values[1] = -1.5;
+    values
+}
+
+fn negative_dominant_activation<const N: usize>() -> [f32; N] {
+    let mut values = patterned_activation::<N>();
+    values[0] = -3.25;
+    values[1] = 1.5;
     values
 }
 
