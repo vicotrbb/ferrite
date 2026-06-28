@@ -1,0 +1,74 @@
+use axum::{
+    http::StatusCode,
+    response::{IntoResponse, Response},
+    Json,
+};
+use serde::Serialize;
+use std::{error::Error, fmt};
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct OpenAiErrorBody {
+    message: String,
+    #[serde(rename = "type")]
+    error_type: String,
+    param: Option<String>,
+    code: Option<String>,
+}
+
+impl OpenAiErrorBody {
+    pub fn new(message: impl Into<String>, error_type: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+            error_type: error_type.into(),
+            param: None,
+            code: None,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct OpenAiErrorResponse {
+    error: OpenAiErrorBody,
+}
+
+impl OpenAiErrorResponse {
+    pub fn new(error: OpenAiErrorBody) -> Self {
+        Self { error }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OpenAiHttpError {
+    status: StatusCode,
+    body: OpenAiErrorResponse,
+}
+
+impl OpenAiHttpError {
+    pub fn invalid_request(message: impl Into<String>) -> Self {
+        Self {
+            status: StatusCode::BAD_REQUEST,
+            body: OpenAiErrorResponse::new(OpenAiErrorBody::new(message, "invalid_request_error")),
+        }
+    }
+
+    pub fn not_implemented(message: impl Into<String>) -> Self {
+        Self {
+            status: StatusCode::NOT_IMPLEMENTED,
+            body: OpenAiErrorResponse::new(OpenAiErrorBody::new(message, "server_error")),
+        }
+    }
+}
+
+impl IntoResponse for OpenAiHttpError {
+    fn into_response(self) -> Response {
+        (self.status, Json(self.body)).into_response()
+    }
+}
+
+impl fmt::Display for OpenAiHttpError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(&self.body.error.message)
+    }
+}
+
+impl Error for OpenAiHttpError {}

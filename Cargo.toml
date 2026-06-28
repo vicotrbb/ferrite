@@ -4,6 +4,7 @@ members = [
     "crates/ferrite-fixtures",
     "crates/ferrite-inference",
     "crates/ferrite-model",
+    "crates/ferrite-server",
 ]
 resolver = "2"
 
