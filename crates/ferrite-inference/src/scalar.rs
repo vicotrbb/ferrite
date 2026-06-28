@@ -8,6 +8,7 @@ mod matvec;
 mod memory;
 mod output;
 mod prompt;
+mod q4_k;
 mod q5_0;
 mod q6_k;
 mod q8_0;

@@ -1,203 +1,17 @@
-use super::{float::f16_bits_to_f32, InferenceError};
-
+#[cfg(test)]
+pub(super) use super::q4_k::{accumulate_q4_k_block, q4_k_mul_vec};
+pub(super) use super::q4_k::{decode_q4_k_values, q4_k_storage_bytes};
 pub(super) use super::q5_0::{decode_q5_0_row, q5_0_mul_vec, q5_0_row_bytes, Q5_0_BLOCK_VALUES};
 #[cfg(test)]
 pub(super) use super::q6_k::{accumulate_q6_k_block, q6_k_mul_vec};
 pub(super) use super::q6_k::{decode_q6_k_values, q6_k_storage_bytes};
 pub(super) use super::q8_0::{decode_q8_0_row, q8_0_mul_vec, q8_0_row_bytes, Q8_0_BLOCK_VALUES};
-
-pub(super) const Q4_K_BLOCK_VALUES: usize = 256;
-pub(super) const Q4_K_BLOCK_BYTES: usize = 144;
-pub(super) fn q4_k_storage_bytes(value_count: usize) -> Result<usize, InferenceError> {
-    storage_bytes(value_count, Q4_K_BLOCK_VALUES, Q4_K_BLOCK_BYTES, "Q4_K")
-}
-
-pub(super) fn decode_q4_k_values(
-    bytes: &[u8],
-    value_count: usize,
-) -> Result<Vec<f32>, InferenceError> {
-    let expected = q4_k_storage_bytes(value_count)?;
-    if bytes.len() != expected {
-        return Err(InferenceError::new(format!(
-            "Q4_K byte length {} does not match {expected}",
-            bytes.len()
-        )));
-    }
-
-    let mut values = Vec::with_capacity(value_count);
-    for block in bytes.chunks_exact(Q4_K_BLOCK_BYTES) {
-        let d = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
-        let dmin = f16_bits_to_f32(u16::from_le_bytes([block[2], block[3]]));
-        let scales = &block[4..16];
-        let quants = &block[16..];
-        let mut scale_index = 0usize;
-
-        for quant_chunk in quants.chunks_exact(32) {
-            let (scale_low, min_low) = q4_k_scale_min(scale_index, scales);
-            let (scale_high, min_high) = q4_k_scale_min(scale_index + 1, scales);
-            let d_low = d * f32::from(scale_low);
-            let d_high = d * f32::from(scale_high);
-            let min_low = dmin * f32::from(min_low);
-            let min_high = dmin * f32::from(min_high);
-
-            for quant in quant_chunk {
-                values.push(d_low * f32::from(quant & 0x0f) - min_low);
-            }
-            for quant in quant_chunk {
-                values.push(d_high * f32::from(quant >> 4) - min_high);
-            }
-            scale_index += 2;
-        }
-    }
-    Ok(values)
-}
-
-pub(super) fn q4_k_mul_vec(
-    bytes: &[u8],
-    rows: usize,
-    cols: usize,
-    vector: &[f32],
-) -> Result<Vec<f32>, InferenceError> {
-    if vector.len() != cols {
-        return Err(InferenceError::new(format!(
-            "matrix columns {cols} do not match vector length {}",
-            vector.len()
-        )));
-    }
-    let value_count = rows
-        .checked_mul(cols)
-        .ok_or_else(|| InferenceError::new("Q4_K matrix value count overflow"))?;
-    let expected = q4_k_storage_bytes(value_count)?;
-    if bytes.len() != expected {
-        return Err(InferenceError::new(format!(
-            "Q4_K byte length {} does not match {expected}",
-            bytes.len()
-        )));
-    }
-    let mut output = vec![0.0; rows];
-
-    for (block_index, block) in bytes.chunks_exact(Q4_K_BLOCK_BYTES).enumerate() {
-        let value_offset = block_index
-            .checked_mul(Q4_K_BLOCK_VALUES)
-            .ok_or_else(|| InferenceError::new("Q4_K block value offset overflow"))?;
-        accumulate_q4_k_block(block, value_offset, rows, cols, vector, &mut output)?;
-    }
-
-    Ok(output)
-}
-
-fn accumulate_q4_k_block(
-    block: &[u8],
-    value_offset: usize,
-    rows: usize,
-    cols: usize,
-    vector: &[f32],
-    output: &mut [f32],
-) -> Result<(), InferenceError> {
-    if block.len() != Q4_K_BLOCK_BYTES {
-        return Err(InferenceError::new(format!(
-            "Q4_K block byte length {} does not match {Q4_K_BLOCK_BYTES}",
-            block.len()
-        )));
-    }
-    if output.len() != rows {
-        return Err(InferenceError::new(format!(
-            "Q4_K output rows {} do not match {rows}",
-            output.len()
-        )));
-    }
-
-    let d = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
-    let dmin = f16_bits_to_f32(u16::from_le_bytes([block[2], block[3]]));
-    let scales = &block[4..16];
-    let quants = &block[16..];
-    let mut scale_index = 0usize;
-    let mut local_offset = 0usize;
-
-    for quant_chunk in quants.chunks_exact(32) {
-        let (scale_low, min_low) = q4_k_scale_min(scale_index, scales);
-        let (scale_high, min_high) = q4_k_scale_min(scale_index + 1, scales);
-        let d_low = d * f32::from(scale_low);
-        let d_high = d * f32::from(scale_high);
-        let min_low = dmin * f32::from(min_low);
-        let min_high = dmin * f32::from(min_high);
-
-        for quant in quant_chunk {
-            accumulate_matrix_value(
-                value_offset + local_offset,
-                d_low * f32::from(quant & 0x0f) - min_low,
-                cols,
-                vector,
-                output,
-            )?;
-            local_offset += 1;
-        }
-        for quant in quant_chunk {
-            accumulate_matrix_value(
-                value_offset + local_offset,
-                d_high * f32::from(quant >> 4) - min_high,
-                cols,
-                vector,
-                output,
-            )?;
-            local_offset += 1;
-        }
-        scale_index += 2;
-    }
-
-    Ok(())
-}
-
-fn accumulate_matrix_value(
-    index: usize,
-    value: f32,
-    cols: usize,
-    vector: &[f32],
-    output: &mut [f32],
-) -> Result<(), InferenceError> {
-    let row = index / cols;
-    let col = index % cols;
-    let target = output
-        .get_mut(row)
-        .ok_or_else(|| InferenceError::new("quantized matrix row index out of bounds"))?;
-    let vector_value = vector
-        .get(col)
-        .ok_or_else(|| InferenceError::new("quantized matrix column index out of bounds"))?;
-    *target += value * vector_value;
-    Ok(())
-}
-
-fn storage_bytes(
-    value_count: usize,
-    block_values: usize,
-    block_bytes: usize,
-    name: &str,
-) -> Result<usize, InferenceError> {
-    if !value_count.is_multiple_of(block_values) {
-        return Err(InferenceError::new(format!(
-            "{name} value count {value_count} must be divisible by {block_values}"
-        )));
-    }
-
-    value_count
-        .checked_div(block_values)
-        .and_then(|blocks| blocks.checked_mul(block_bytes))
-        .ok_or_else(|| InferenceError::new(format!("{name} byte length overflow")))
-}
-
-fn q4_k_scale_min(index: usize, scales: &[u8]) -> (u8, u8) {
-    if index < 4 {
-        (scales[index] & 63, scales[index + 4] & 63)
-    } else {
-        (
-            (scales[index + 4] & 0x0f) | ((scales[index - 4] >> 6) << 4),
-            (scales[index + 4] >> 4) | ((scales[index] >> 6) << 4),
-        )
-    }
-}
+#[cfg(test)]
+use super::InferenceError;
 
 #[cfg(test)]
 mod tests {
+    use super::super::q4_k::{q4_k_mul_vec_with_backend, Q4KMatVecBackend};
     use super::super::q5_0::{q5_0_mul_vec_with_backend, Q5_0MatVecBackend};
     use super::super::q6_k::{q6_k_mul_vec_with_backend, Q6KMatVecBackend};
     use super::super::q8_0::{q8_0_mul_vec_with_backend, Q8_0MatVecBackend};
@@ -233,6 +47,22 @@ mod tests {
         accumulate_q4_k_block(&block, 0, 2, 128, &[1.0; 128], &mut output)?;
 
         assert_eq!(output, vec![128.0, 256.0]);
+        Ok(())
+    }
+
+    #[test]
+    #[cfg(target_arch = "aarch64")]
+    fn q4_k_matvec_uses_neon_backend_on_aarch64() -> Result<(), InferenceError> {
+        let mut block = Vec::new();
+        block.extend_from_slice(&0x3c00u16.to_le_bytes());
+        block.extend_from_slice(&0u16.to_le_bytes());
+        block.extend_from_slice(&[1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1]);
+        block.extend_from_slice(&[0x11; 128]);
+
+        let output = q4_k_mul_vec_with_backend(&block, 1, 256, &[1.0; 256])?;
+
+        assert_eq!(output.backend, Q4KMatVecBackend::Aarch64Neon);
+        assert_eq!(output.values, vec![256.0]);
         Ok(())
     }
 
