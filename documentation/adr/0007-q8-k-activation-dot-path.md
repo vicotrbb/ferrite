@@ -91,6 +91,9 @@ reference implementation and benchmarking baseline, not the Ferrite runtime.
 
 - `documentation/research/2026-06-28-tier1-q4-q6-kernel-hypothesis.md`
   compares Ferrite's current kernels with llama.cpp's Q4_K/Q6_K x Q8_K paths.
+- `documentation/dev-notes/2026-06-28-q8-k-reference-arithmetic.md` audits the
+  implemented Path B arithmetic against llama.cpp's generic and ARM NEON Q4_K
+  and Q6_K x Q8_K reference paths.
 - `documentation/benchmarks/2026-06-28-tier1-qwen2-1-5b-current-profile.md`
   records the current Qwen2.5-1.5B profile and hot aggregate roles.
 - `documentation/dev-notes/2026-06-28-tier1-q4-q6-thresholded-row-parallel-regression.md`
