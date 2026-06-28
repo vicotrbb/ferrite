@@ -1,6 +1,7 @@
 mod catalog;
 mod chat;
 mod completion;
+mod unsupported;
 mod usage;
 
 pub use catalog::{HealthResponse, ModelObject, ModelsResponse};

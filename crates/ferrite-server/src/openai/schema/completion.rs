@@ -1,4 +1,4 @@
-use super::{unix_timestamp, usage::Usage};
+use super::{unix_timestamp, unsupported::UnsupportedFields, usage::Usage};
 use crate::runtime::GeneratedText;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -58,45 +58,21 @@ impl CompletionRequest {
     }
 
     pub fn unsupported_fields(&self) -> Vec<String> {
-        let mut fields = Vec::new();
-        if self.suffix.is_some() {
-            fields.push("suffix".to_owned());
-        }
-        if self.temperature.is_some() {
-            fields.push("temperature".to_owned());
-        }
-        if self.top_p.is_some() {
-            fields.push("top_p".to_owned());
-        }
-        if self.n.is_some() {
-            fields.push("n".to_owned());
-        }
-        if self.logprobs.is_some() {
-            fields.push("logprobs".to_owned());
-        }
-        if self.echo.is_some() {
-            fields.push("echo".to_owned());
-        }
-        if self.stop.is_some() {
-            fields.push("stop".to_owned());
-        }
-        if self.presence_penalty.is_some() {
-            fields.push("presence_penalty".to_owned());
-        }
-        if self.frequency_penalty.is_some() {
-            fields.push("frequency_penalty".to_owned());
-        }
-        if self.best_of.is_some() {
-            fields.push("best_of".to_owned());
-        }
-        if self.logit_bias.is_some() {
-            fields.push("logit_bias".to_owned());
-        }
-        if self.user.is_some() {
-            fields.push("user".to_owned());
-        }
-        fields.extend(self.extra_fields.keys().cloned());
-        fields
+        UnsupportedFields::new()
+            .with_present("suffix", self.suffix.is_some())
+            .with_present("temperature", self.temperature.is_some())
+            .with_present("top_p", self.top_p.is_some())
+            .with_present("n", self.n.is_some())
+            .with_present("logprobs", self.logprobs.is_some())
+            .with_present("echo", self.echo.is_some())
+            .with_present("stop", self.stop.is_some())
+            .with_present("presence_penalty", self.presence_penalty.is_some())
+            .with_present("frequency_penalty", self.frequency_penalty.is_some())
+            .with_present("best_of", self.best_of.is_some())
+            .with_present("logit_bias", self.logit_bias.is_some())
+            .with_present("user", self.user.is_some())
+            .with_extra_keys(&self.extra_fields)
+            .into_vec()
     }
 }
 

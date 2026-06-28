@@ -1,4 +1,4 @@
-use super::{unix_timestamp, usage::Usage};
+use super::{unix_timestamp, unsupported::UnsupportedFields, usage::Usage};
 use crate::runtime::GeneratedText;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -72,63 +72,27 @@ impl ChatCompletionRequest {
     }
 
     pub fn unsupported_fields(&self) -> Vec<String> {
-        let mut fields = Vec::new();
-        if self.tools.is_some() {
-            fields.push("tools".to_owned());
-        }
-        if self.tool_choice.is_some() {
-            fields.push("tool_choice".to_owned());
-        }
-        if self.parallel_tool_calls.is_some() {
-            fields.push("parallel_tool_calls".to_owned());
-        }
-        if self.response_format.is_some() {
-            fields.push("response_format".to_owned());
-        }
-        if self.temperature.is_some() {
-            fields.push("temperature".to_owned());
-        }
-        if self.top_p.is_some() {
-            fields.push("top_p".to_owned());
-        }
-        if self.n.is_some() {
-            fields.push("n".to_owned());
-        }
-        if self.stop.is_some() {
-            fields.push("stop".to_owned());
-        }
-        if self.presence_penalty.is_some() {
-            fields.push("presence_penalty".to_owned());
-        }
-        if self.frequency_penalty.is_some() {
-            fields.push("frequency_penalty".to_owned());
-        }
-        if self.logit_bias.is_some() {
-            fields.push("logit_bias".to_owned());
-        }
-        if self.logprobs.is_some() {
-            fields.push("logprobs".to_owned());
-        }
-        if self.top_logprobs.is_some() {
-            fields.push("top_logprobs".to_owned());
-        }
-        if self.user.is_some() {
-            fields.push("user".to_owned());
-        }
-        if self.seed.is_some() {
-            fields.push("seed".to_owned());
-        }
-        if self.stream_options.is_some() {
-            fields.push("stream_options".to_owned());
-        }
-        if self.store.is_some() {
-            fields.push("store".to_owned());
-        }
-        if self.metadata.is_some() {
-            fields.push("metadata".to_owned());
-        }
-        fields.extend(self.extra_fields.keys().cloned());
-        fields
+        UnsupportedFields::new()
+            .with_present("tools", self.tools.is_some())
+            .with_present("tool_choice", self.tool_choice.is_some())
+            .with_present("parallel_tool_calls", self.parallel_tool_calls.is_some())
+            .with_present("response_format", self.response_format.is_some())
+            .with_present("temperature", self.temperature.is_some())
+            .with_present("top_p", self.top_p.is_some())
+            .with_present("n", self.n.is_some())
+            .with_present("stop", self.stop.is_some())
+            .with_present("presence_penalty", self.presence_penalty.is_some())
+            .with_present("frequency_penalty", self.frequency_penalty.is_some())
+            .with_present("logit_bias", self.logit_bias.is_some())
+            .with_present("logprobs", self.logprobs.is_some())
+            .with_present("top_logprobs", self.top_logprobs.is_some())
+            .with_present("user", self.user.is_some())
+            .with_present("seed", self.seed.is_some())
+            .with_present("stream_options", self.stream_options.is_some())
+            .with_present("store", self.store.is_some())
+            .with_present("metadata", self.metadata.is_some())
+            .with_extra_keys(&self.extra_fields)
+            .into_vec()
     }
 }
 
