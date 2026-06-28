@@ -33,8 +33,9 @@ also have row-level Rayon parallelism on aarch64 NEON and compile-checked x86_64
 AVX2, with local SmolLM2-1.7B benchmark improvements recorded. A next-token
 profiling CLI now identifies per-operation matvec timings for real Tier 1
 models and includes storage kind, shape, and storage bytes for each profiled
-matrix. Tier 1 does not yet prove AVX2 runtime correctness, broad 0.5B-1.7B
-model coverage, or throughput.
+matrix. It also emits aggregate role/signature summaries for profile-driven
+optimization. Tier 1 does not yet prove AVX2 runtime correctness, broad
+0.5B-1.7B model coverage, or throughput.
 
 ## Evidence Matrix
 
@@ -49,7 +50,7 @@ model coverage, or throughput.
 | Quantized SIMD correctness | Partially proven for Q8_0, Q5_0, Q6_K, and Q4_K on local NEON host | `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q8-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q5-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q6-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q4-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-q4k-row-parallel-simd.md`; `documentation/dev-notes/2026-06-27-tier1-q6k-row-parallel-simd.md`; Q4_K and Q6_K dispatch is scoped to rows whose column count is a whole number of K-blocks |
 | Real 0.5B-1.7B model output | Partially proven for one 1.7B model/reference profile | `documentation/dev-notes/2026-06-27-tier1-smollm2-1-7b-reference-probe.md`; Ferrite matched local `llama.cpp` token IDs `[18, 198, 3725, 198, 198, 788]` for SmolLM2-1.7B-Instruct Q4_K_M |
 | Tier 1 throughput target | Not proven | `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-scalar-probe.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-q4k-row-parallel.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-q6k-row-parallel.md`; Q4_K+Q6_K row parallelism improved the local default-pool run to about 3.15 tok/s and the 2-thread run to about 1.82 tok/s, still below `>= 10 tok/s` |
-| Next-token operation profiling | Proven for CLI and one real 1.7B profile | `documentation/dev-notes/2026-06-27-tier1-next-token-profile.md`; `documentation/dev-notes/2026-06-27-tier1-profile-matrix-metadata.md`; `--profile-next-token` emits per-operation labels plus matrix storage kind, shape, and storage bytes; latest SmolLM2-1.7B profile showed Q4_K/Q6_K FFN roles as the largest aggregate matvec group |
+| Next-token operation profiling | Proven for CLI and one real 1.7B profile | `documentation/dev-notes/2026-06-27-tier1-next-token-profile.md`; `documentation/dev-notes/2026-06-27-tier1-profile-matrix-metadata.md`; `--profile-next-token` emits per-operation labels, matrix storage kind/shape/bytes, and aggregate `profile_next_token_role` summaries; latest SmolLM2-1.7B profile showed Q4_K/Q6_K FFN roles as the largest aggregate matvec group |
 | Rejected optimization experiments | Q8_0 and Q5_0 naive row-level Rayon scheduling regressed and were reverted | `documentation/dev-notes/2026-06-27-tier1-q8-row-parallel-regression.md`; `documentation/dev-notes/2026-06-27-tier1-q5-row-parallel-regression.md`; Q8_0 was implemented in `3b12756` and reverted in `1ae4275`; Q5_0 was implemented in `f318e3b` and reverted in `a5d9382` |
 
 ## Fresh Full-Workspace Gate
@@ -130,6 +131,16 @@ profile_next_token_matrix=layer.0.ffn_gate:Q4_K:8192:2048:9437184
 profile_next_token_matrix=layer.0.ffn_up:Q4_K:8192:2048:9437184
 profile_next_token_matrix=layer.0.ffn_down:Q6_K:2048:8192:13762560
 profile_next_token_matrix=output:Q6_K:49152:2048:82575360
+```
+
+The built-in role/signature summary reported:
+
+```text
+profile_next_token_role=ffn_down:Q4_K:2048:8192:9437184:20790920
+profile_next_token_role=ffn_down:Q6_K:2048:8192:13762560:22756834
+profile_next_token_role=ffn_gate:Q4_K:8192:2048:9437184:44502790
+profile_next_token_role=ffn_up:Q4_K:8192:2048:9437184:42504875
+profile_next_token_role=output:Q6_K:49152:2048:82575360:9603708
 ```
 
 The same slice kept normal benchmark checks in the retained range, but still

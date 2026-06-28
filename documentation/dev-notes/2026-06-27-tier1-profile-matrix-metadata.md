@@ -25,6 +25,13 @@ profile_next_token_matrix=<label>:<storage_kind>:<rows>:<cols>:<storage_bytes>
 The normal non-profiled path still bypasses profile event allocation and calls
 `Matrix::mul_vec` directly.
 
+Commit `c9ea8f7` moved profile printing into `crates/ferrite-cli/src/profile.rs`
+and added aggregate role/signature summaries:
+
+```text
+profile_next_token_role=<role>:<storage_kind>:<rows>:<cols>:<storage_bytes>:<elapsed_ns>
+```
+
 ## TDD Evidence
 
 Red:
@@ -91,6 +98,17 @@ role_sum_ns=q_proj:19280083
 role_sum_ns=output:12309875
 ```
 
+After adding built-in role summaries, the CLI emitted:
+
+```text
+profile_next_token_total_ns=193750337
+profile_next_token_role=ffn_down:Q4_K:2048:8192:9437184:20790920
+profile_next_token_role=ffn_down:Q6_K:2048:8192:13762560:22756834
+profile_next_token_role=ffn_gate:Q4_K:8192:2048:9437184:44502790
+profile_next_token_role=ffn_up:Q4_K:8192:2048:9437184:42504875
+profile_next_token_role=output:Q6_K:49152:2048:82575360:9603708
+```
+
 ## Non-Profile Benchmark Check
 
 Default pool:
@@ -109,4 +127,3 @@ benchmark_avg_ns=559712483
 
 These are normal decode-path checks after adding profile metadata, not new
 throughput pass evidence.
-
