@@ -2,10 +2,11 @@ use super::{
     kernel_check::ensure_within_relative_error,
     math::dot,
     matvec::f32_mul_vec,
+    q6_k::q6_k_mul_vec,
     quantized::{
         decode_q4_k_values, decode_q5_0_row, decode_q6_k_values, decode_q8_0_row, q4_k_mul_vec,
-        q4_k_storage_bytes, q5_0_mul_vec, q5_0_row_bytes, q6_k_mul_vec, q6_k_storage_bytes,
-        q8_0_mul_vec, q8_0_row_bytes, Q5_0_BLOCK_VALUES, Q8_0_BLOCK_VALUES,
+        q4_k_storage_bytes, q5_0_mul_vec, q5_0_row_bytes, q6_k_storage_bytes, q8_0_mul_vec,
+        q8_0_row_bytes, Q5_0_BLOCK_VALUES, Q8_0_BLOCK_VALUES,
     },
     InferenceError,
 };

@@ -9,6 +9,7 @@ mod memory;
 mod output;
 mod prompt;
 mod q5_0;
+mod q6_k;
 mod q8_0;
 mod quantized;
 mod rope;
