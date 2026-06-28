@@ -10,12 +10,8 @@ pub(super) enum Q5_0MatVecBackend {
     Scalar,
     #[cfg(target_arch = "aarch64")]
     Aarch64Neon,
-    #[cfg(target_arch = "aarch64")]
-    Aarch64NeonRowParallel,
     #[cfg(target_arch = "x86_64")]
     X86_64Avx2,
-    #[cfg(target_arch = "x86_64")]
-    X86_64Avx2RowParallel,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -162,7 +158,6 @@ mod aarch64 {
         f16_bits_to_f32, q5_0_signed_values, Q5_0MatVecBackend, Q5_0MatVecOutput, Q5_0_BLOCK_BYTES,
         Q5_0_BLOCK_VALUES,
     };
-    use rayon::prelude::*;
     use std::arch::aarch64::{
         vaddvq_f32, vcvtq_f32_s32, vdupq_n_f32, vfmaq_f32, vld1_s8, vld1q_f32, vmovl_s16, vmovl_s8,
     };
@@ -174,40 +169,27 @@ mod aarch64 {
         vector: &[f32],
     ) -> Q5_0MatVecOutput {
         let row_bytes = (cols / Q5_0_BLOCK_VALUES) * Q5_0_BLOCK_BYTES;
-        let backend = if rows > 1 {
-            Q5_0MatVecBackend::Aarch64NeonRowParallel
-        } else {
-            Q5_0MatVecBackend::Aarch64Neon
-        };
-        let values: Vec<f32> = if rows > 1 {
-            bytes
-                .par_chunks_exact(row_bytes)
-                .map(|row_bytes| neon_q5_0_row_dot(row_bytes, vector))
-                .collect()
-        } else {
-            bytes
-                .chunks_exact(row_bytes)
-                .map(|row_bytes| neon_q5_0_row_dot(row_bytes, vector))
-                .collect()
-        };
-        debug_assert_eq!(values.len(), rows);
-
-        Q5_0MatVecOutput { values, backend }
-    }
-
-    fn neon_q5_0_row_dot(row_bytes: &[u8], vector: &[f32]) -> f32 {
-        let mut sum = 0.0;
-        for (block_index, block) in row_bytes.chunks_exact(Q5_0_BLOCK_BYTES).enumerate() {
-            let scale = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
-            let signed = q5_0_signed_values(block);
-            let col_base = block_index * Q5_0_BLOCK_VALUES;
-            // SAFETY: `signed` contains 32 decoded Q5_0 values and `cols`
-            // is validated as a multiple of 32, so every 8-byte signed load
-            // and matching 4-lane vector load is in bounds.
-            sum += unsafe { neon_i8_f32_block_dot(signed.as_ptr(), vector[col_base..].as_ptr()) }
-                * scale;
+        let mut values = vec![0.0; rows];
+        for (row, row_bytes) in bytes.chunks_exact(row_bytes).enumerate() {
+            let mut sum = 0.0;
+            for (block_index, block) in row_bytes.chunks_exact(Q5_0_BLOCK_BYTES).enumerate() {
+                let scale = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
+                let signed = q5_0_signed_values(block);
+                let col_base = block_index * Q5_0_BLOCK_VALUES;
+                // SAFETY: `signed` contains 32 decoded Q5_0 values and `cols`
+                // is validated as a multiple of 32, so every 8-byte signed load
+                // and matching 4-lane vector load is in bounds.
+                sum +=
+                    unsafe { neon_i8_f32_block_dot(signed.as_ptr(), vector[col_base..].as_ptr()) }
+                        * scale;
+            }
+            values[row] = sum;
         }
-        sum
+
+        Q5_0MatVecOutput {
+            values,
+            backend: Q5_0MatVecBackend::Aarch64Neon,
+        }
     }
 
     #[target_feature(enable = "neon")]
@@ -240,7 +222,6 @@ mod x86_64 {
         f16_bits_to_f32, q5_0_signed_values, Q5_0MatVecBackend, Q5_0MatVecOutput, Q5_0_BLOCK_BYTES,
         Q5_0_BLOCK_VALUES,
     };
-    use rayon::prelude::*;
     use std::arch::x86_64::{
         __m128i, _mm256_add_ps, _mm256_cvtepi32_ps, _mm256_cvtepi8_epi32, _mm256_loadu_ps,
         _mm256_mul_ps, _mm256_setzero_ps, _mm256_storeu_ps, _mm_loadl_epi64,
@@ -253,40 +234,27 @@ mod x86_64 {
         vector: &[f32],
     ) -> Q5_0MatVecOutput {
         let row_bytes = (cols / Q5_0_BLOCK_VALUES) * Q5_0_BLOCK_BYTES;
-        let backend = if rows > 1 {
-            Q5_0MatVecBackend::X86_64Avx2RowParallel
-        } else {
-            Q5_0MatVecBackend::X86_64Avx2
-        };
-        let values: Vec<f32> = if rows > 1 {
-            bytes
-                .par_chunks_exact(row_bytes)
-                .map(|row_bytes| avx2_q5_0_row_dot(row_bytes, vector))
-                .collect()
-        } else {
-            bytes
-                .chunks_exact(row_bytes)
-                .map(|row_bytes| avx2_q5_0_row_dot(row_bytes, vector))
-                .collect()
-        };
-        debug_assert_eq!(values.len(), rows);
-
-        Q5_0MatVecOutput { values, backend }
-    }
-
-    fn avx2_q5_0_row_dot(row_bytes: &[u8], vector: &[f32]) -> f32 {
-        let mut sum = 0.0;
-        for (block_index, block) in row_bytes.chunks_exact(Q5_0_BLOCK_BYTES).enumerate() {
-            let scale = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
-            let signed = q5_0_signed_values(block);
-            let col_base = block_index * Q5_0_BLOCK_VALUES;
-            // SAFETY: `signed` contains exactly 32 decoded Q5_0 values and
-            // `cols` is validated as a multiple of 32, so every 8-byte
-            // signed load and matching 8-lane vector load is in bounds.
-            sum += unsafe { avx2_i8_f32_block_dot(signed.as_ptr(), vector[col_base..].as_ptr()) }
-                * scale;
+        let mut values = vec![0.0; rows];
+        for (row, row_bytes) in bytes.chunks_exact(row_bytes).enumerate() {
+            let mut sum = 0.0;
+            for (block_index, block) in row_bytes.chunks_exact(Q5_0_BLOCK_BYTES).enumerate() {
+                let scale = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
+                let signed = q5_0_signed_values(block);
+                let col_base = block_index * Q5_0_BLOCK_VALUES;
+                // SAFETY: `signed` contains exactly 32 decoded Q5_0 values and
+                // `cols` is validated as a multiple of 32, so every 8-byte
+                // signed load and matching 8-lane vector load is in bounds.
+                sum +=
+                    unsafe { avx2_i8_f32_block_dot(signed.as_ptr(), vector[col_base..].as_ptr()) }
+                        * scale;
+            }
+            values[row] = sum;
         }
-        sum
+
+        Q5_0MatVecOutput {
+            values,
+            backend: Q5_0MatVecBackend::X86_64Avx2,
+        }
     }
 
     #[target_feature(enable = "avx2")]
