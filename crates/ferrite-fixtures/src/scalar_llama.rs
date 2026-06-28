@@ -447,7 +447,7 @@ fn q4_k_scalar_tensors() -> Vec<TypedTensorFixture> {
         q4_k_tensor(
             "token_embd.weight",
             matrix_dims(hidden as u64, 4),
-            four_row_values(hidden, &[1.0, 0.0, 0.0, 0.0]),
+            four_row_values(hidden, &[1.0, 1.0, 0.0, 0.0]),
         ),
         f32_tensor("output_norm.weight", vec![hidden as u64], vec![1.0; hidden]),
         q4_k_tensor(

@@ -106,6 +106,8 @@ reference implementation and benchmarking baseline, not the Ferrite runtime.
 - `documentation/dev-notes/2026-06-28-q8-k-neon-signed-scale-guardrail.md`
   records target-specific aarch64 NEON parity against the scalar Q8_K helpers
   for both signed activation-scale polarities.
+- `documentation/dev-notes/2026-06-28-q8-k-benchmark-compare-guardrail.md`
+  records CLI coverage for benchmark-token Q8_K comparison output.
 - `documentation/benchmarks/2026-06-28-tier1-qwen2-1-5b-current-profile.md`
   records the current Qwen2.5-1.5B profile and hot aggregate roles.
 - `documentation/dev-notes/2026-06-28-tier1-q4-q6-thresholded-row-parallel-regression.md`
