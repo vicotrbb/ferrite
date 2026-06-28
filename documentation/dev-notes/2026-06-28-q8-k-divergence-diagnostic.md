@@ -136,6 +136,13 @@ late output projection; the route introduces measurable differences from the
 first layer, and those differences accumulate enough to flip a narrow top-logit
 margin.
 
+Follow-up boundary probes in
+`documentation/dev-notes/2026-06-28-q8-k-smollm-boundary-probes.md` did not find
+a localized output-projection or Q6_K-only formula hole. Blocking Q4_K from the
+Q8_K route restored the `hello world` prompt but not the EOS-sensitive France
+prompt, which supports the activation-drift conclusion rather than a single
+kernel arithmetic bug.
+
 Next work should add a role or tolerance policy before any default routing:
 either selectively enable Q8_K only where model-output parity is proven, or
 tighten the activation quantization/accumulation strategy so SmolLM parity

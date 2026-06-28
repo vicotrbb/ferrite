@@ -183,6 +183,9 @@ the local default-pool benchmark average from 261,316,083 ns to 226,673,736 ns.
 That does not change the default-dispatch verdict because SmolLM2-1.7B still
 fails real model-output parity.
 
-Next work should isolate whether the divergence comes from expected activation
-quantization drift, a Q4_K/Q6_K x Q8_K arithmetic bug, or a missing precision
-gate for specific matrix roles.
+Follow-up boundary probes in
+`documentation/dev-notes/2026-06-28-q8-k-smollm-boundary-probes.md` did not find
+a localized output-projection or Q6_K-only formula hole. The current evidence
+supports expected activation-quantization drift crossing narrow SmolLM2 output
+margins, so next work should focus on a deliberate role/model parity policy or
+a tighter activation quantization strategy.
