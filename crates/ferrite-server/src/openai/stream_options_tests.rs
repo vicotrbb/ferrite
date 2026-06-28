@@ -65,6 +65,48 @@ async fn chat_stream_endpoint_emits_usage_when_requested() -> Result<(), Box<dyn
     Ok(())
 }
 
+#[tokio::test]
+async fn chat_stream_endpoint_accepts_disabled_obfuscation(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let model_path = write_chat_fixture_model()?;
+    let engine = InferenceEngine::load(&model_path)?;
+    let app = router(ServerState::with_engine("fixture-model".to_owned(), engine));
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/chat/completions")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            r#"{"model":"fixture-model","messages":[{"role":"user","content":"hello"}],"max_completion_tokens":1,"stream":true,"stream_options":{"include_obfuscation":false}}"#,
+        ))?;
+    let response = app.oneshot(request).await?;
+    remove_fixture_model(&model_path)?;
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_text(response.into_body()).await?;
+    assert!(body.contains("\"delta\":{\"content\":\"winner\"}"));
+    assert!(body.contains("data: [DONE]"));
+    Ok(())
+}
+
+#[tokio::test]
+async fn completion_stream_endpoint_rejects_enabled_obfuscation(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let app = router(ServerState::new("fixture-model".to_owned()));
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/completions")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            r#"{"model":"fixture-model","prompt":"hello","stream":true,"stream_options":{"include_obfuscation":true}}"#,
+        ))?;
+    let response = app.oneshot(request).await?;
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let body = to_text(response.into_body()).await?;
+    assert!(body.contains("stream_options.include_obfuscation"));
+    Ok(())
+}
+
 async fn to_text(body: Body) -> Result<String, Box<dyn std::error::Error>> {
     let bytes = to_bytes(body, usize::MAX).await?;
     Ok(String::from_utf8(bytes.to_vec())?)
