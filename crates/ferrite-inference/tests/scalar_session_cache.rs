@@ -1,6 +1,6 @@
 use ferrite_inference::scalar::{
-    Matrix, ScalarLlamaConfig, ScalarLlamaLayerWeights, ScalarLlamaModel, ScalarLlamaOutputWeights,
-    ScalarLlamaWeights,
+    Matrix, RopeLayout, ScalarLlamaConfig, ScalarLlamaLayerWeights, ScalarLlamaModel,
+    ScalarLlamaOutputWeights, ScalarLlamaWeights,
 };
 use std::error::Error;
 use std::io;
@@ -53,6 +53,7 @@ fn cache_model() -> Result<ScalarLlamaModel, Box<dyn Error>> {
         head_dim: 2,
         rope_dimension_count: 0,
         rope_freq_base: 10_000.0,
+        rope_layout: RopeLayout::AdjacentPairs,
         rms_norm_epsilon: 0.0,
     };
 

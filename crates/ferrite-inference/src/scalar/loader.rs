@@ -2,7 +2,7 @@ use super::{
     tensor, InferenceError, Matrix, ScalarLlamaConfig, ScalarLlamaLayerWeights,
     ScalarLlamaOutputWeights, ScalarLlamaWeights,
 };
-use ferrite_model::gguf::{GgmlType, GgufFile, ModelConfig, TensorInfo};
+use ferrite_model::gguf::{GgmlType, GgufFile, ModelArchitecture, ModelConfig, TensorInfo};
 
 pub(super) fn load_scalar(
     file: &GgufFile,
@@ -51,6 +51,10 @@ pub(super) fn load_scalar(
             "model.rope.dimension_count",
         )?,
         rope_freq_base: model.rope_freq_base.unwrap_or(10_000.0),
+        rope_layout: match model.architecture {
+            ModelArchitecture::Llama => super::RopeLayout::AdjacentPairs,
+            ModelArchitecture::Qwen2 => super::RopeLayout::SplitHalf,
+        },
         rms_norm_epsilon: model.attention_layer_norm_rms_epsilon.unwrap_or(0.0),
     };
 

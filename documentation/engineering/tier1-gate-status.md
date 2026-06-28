@@ -26,10 +26,12 @@ Q4_K matvec paths checked against scalar oracles. It also has compile-checked
 x86_64 AVX2 dispatch for all currently supported matvec formats, but no x86_64
 host runtime evidence yet.
 
-Ferrite now has one real Tier 1 model-output proof: SmolLM2-1.7B-Instruct
+Ferrite now has two real Tier 1 model-output proofs: SmolLM2-1.7B-Instruct
 Q4_K_M matched a fixed local `llama.cpp` deterministic reference profile for
-six generated tokens from the prompt `hello world`. The Q4_K and Q6_K SIMD paths
-also have row-level Rayon parallelism on aarch64 NEON and compile-checked x86_64
+six generated tokens from the prompt `hello world`, and Qwen2.5-0.5B-Instruct
+Q4_K_M matched a fixed local `llama.cpp` deterministic reference profile for
+three generated tokens from the same prompt. The Q4_K and Q6_K SIMD paths also
+have row-level Rayon parallelism on aarch64 NEON and compile-checked x86_64
 AVX2, and the Q4_K and Q6_K aarch64 paths now use fused NEON block-dot helpers.
 Local SmolLM2-1.7B benchmark improvements are recorded, and `--benchmark-runs`
 now uses a token-id-only repeated-token path instead of returning unused logits
@@ -52,8 +54,8 @@ architecture support, or throughput.
 | AArch64 SIMD correctness | Partially proven for F32, Q8_0, Q5_0, Q6_K, and Q4_K matvec on local NEON host | `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-f32-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q8-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q5-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q6-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q4-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-q4k-row-parallel-simd.md`; `documentation/dev-notes/2026-06-27-tier1-q6k-row-parallel-simd.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-q4k-fused-neon.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-q6k-fused-neon.md`; targeted aarch64 backend tests |
 | AVX2 correctness | Compile-only F32, Q8_0, Q5_0, Q6_K, and Q4_K bring-up exists; runtime correctness not proven | `documentation/dev-notes/2026-06-27-tier1-x86-64-avx2-f32-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-x86-64-avx2-q8-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-x86-64-avx2-q5-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-x86-64-avx2-q6-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-x86-64-avx2-q4-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-q4k-row-parallel-simd.md`; `documentation/dev-notes/2026-06-27-tier1-q6k-row-parallel-simd.md`; `cargo check -p ferrite-inference --target x86_64-unknown-linux-gnu --tests`; no x86_64 AVX2 host run yet |
 | Quantized SIMD correctness | Partially proven for Q8_0, Q5_0, Q6_K, and Q4_K on local NEON host | `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q8-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q5-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q6-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q4-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-q4k-row-parallel-simd.md`; `documentation/dev-notes/2026-06-27-tier1-q6k-row-parallel-simd.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-q4k-fused-neon.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-q6k-fused-neon.md`; Q4_K and Q6_K dispatch is scoped to rows whose column count is a whole number of K-blocks |
-| Real 0.5B-1.7B model output | Partially proven for one 1.7B model/reference profile | `documentation/dev-notes/2026-06-27-tier1-smollm2-1-7b-reference-probe.md`; Ferrite matched local `llama.cpp` token IDs `[18, 198, 3725, 198, 198, 788]` for SmolLM2-1.7B-Instruct Q4_K_M |
-| Qwen2 Tier 1 model coverage | Loads and executes; correctness not proven | `documentation/dev-notes/2026-06-27-tier1-qwen2-0-5b-probe.md`; `documentation/dev-notes/2026-06-27-tier1-qwen2-config-parser.md`; `documentation/dev-notes/2026-06-27-scalar-qkv-projection-bias.md`; `documentation/dev-notes/2026-06-27-tier1-qwen2-loader-dispatch.md`; Qwen2.5-0.5B-Instruct Q4_K_M now loads and generates from token-id and text prompts, but deterministic `llama.cpp` reference parity failed: Ferrite generated `[2857,25,16]` where the reference continuation tokenized to `[198,9707,11]` |
+| Real 0.5B-1.7B model output | Partially proven for one 1.7B Llama-family profile and one 0.5B Qwen2 profile | `documentation/dev-notes/2026-06-27-tier1-smollm2-1-7b-reference-probe.md`; `documentation/dev-notes/2026-06-27-tier1-qwen2-rope-layout.md`; Ferrite matched local `llama.cpp` token IDs `[18, 198, 3725, 198, 198, 788]` for SmolLM2-1.7B-Instruct Q4_K_M and `[198, 9707, 11]` for Qwen2.5-0.5B-Instruct Q4_K_M |
+| Qwen2 Tier 1 model coverage | Partially proven for Qwen2.5-0.5B Q4_K_M | `documentation/dev-notes/2026-06-27-tier1-qwen2-0-5b-probe.md`; `documentation/dev-notes/2026-06-27-tier1-qwen2-config-parser.md`; `documentation/dev-notes/2026-06-27-scalar-qkv-projection-bias.md`; `documentation/dev-notes/2026-06-27-tier1-qwen2-loader-dispatch.md`; `documentation/dev-notes/2026-06-27-tier1-qwen2-rope-layout.md`; Qwen2.5-0.5B-Instruct Q4_K_M now loads, uses split-half RoPE, and matches a three-token deterministic `llama.cpp` reference continuation |
 | Tier 1 throughput target | Not proven | `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-scalar-probe.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-q4k-row-parallel.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-q6k-row-parallel.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-q4k-fused-neon.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-q6k-fused-neon.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-token-id-benchmark.md`; token-id benchmark path improved the local default-pool run to about 5.51 tok/s and the 2-thread run to about 3.36 tok/s, still below `>= 10 tok/s` |
 | Generated token path | Proven for one real 1.7B parity profile | `documentation/dev-notes/2026-06-27-token-id-generation-path.md`; generated-token loops use token-id-only repeated acceptance and still matched SmolLM2-1.7B token IDs `[18, 198, 3725, 198, 198, 788]` |
 | Next-token operation profiling | Proven for CLI and one real 1.7B profile | `documentation/dev-notes/2026-06-27-tier1-next-token-profile.md`; `documentation/dev-notes/2026-06-27-tier1-profile-matrix-metadata.md`; `--profile-next-token` emits per-operation labels, matrix storage kind/shape/bytes, and aggregate `profile_next_token_role` summaries; latest SmolLM2-1.7B profile showed Q4_K/Q6_K FFN roles as the largest aggregate matvec group |
@@ -202,10 +204,9 @@ match=true
   unsafe-boundary rules.
 - Expand Tier 1 model coverage beyond the single SmolLM2-1.7B-Instruct Q4_K_M
   fixed local reference profile recorded so far.
-- Continue first-class Qwen2 architecture handling before claiming coverage for
-  the Qwen2.5 Tier 1 models. Config parsing, Q/K/V projection bias support, and
-  runtime loader dispatch exist, but Qwen2.5-0.5B Q4_K_M deterministic
-  reference-token parity currently fails.
+- Expand Qwen2 coverage beyond Qwen2.5-0.5B Q4_K_M. The 0.5B model now has a
+  three-token deterministic reference proof, but Qwen2.5-1.5B, head_dim=128
+  behavior, throughput, and broader prompt coverage remain unproven.
 - Continue optimizing hot matvec formats and decode scheduling; Q4_K plus Q6_K
   row parallelism, fused NEON dot paths, and token-id-only repeated acceptance
   are still below the Tier 1 throughput target.

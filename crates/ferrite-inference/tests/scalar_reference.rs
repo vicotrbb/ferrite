@@ -4,7 +4,7 @@ use ferrite_fixtures::{
     scalar_llama_q8_0_gguf_fixture, scalar_llama_tied_output_f32_gguf_fixture,
 };
 use ferrite_inference::scalar::{
-    apply_rope, argmax, rms_norm, Matrix, ScalarLlamaConfig, ScalarLlamaLayerWeights,
+    apply_rope, argmax, rms_norm, Matrix, RopeLayout, ScalarLlamaConfig, ScalarLlamaLayerWeights,
     ScalarLlamaModel, ScalarLlamaOutputWeights, ScalarLlamaWeights,
 };
 use ferrite_model::gguf::parse_gguf;
@@ -66,6 +66,7 @@ fn single_token_llama_reference_path_produces_documented_argmax() -> Result<(), 
         head_dim: 2,
         rope_dimension_count: 2,
         rope_freq_base: 10_000.0,
+        rope_layout: RopeLayout::AdjacentPairs,
         rms_norm_epsilon: 0.0,
     };
     let model = ScalarLlamaModel::new(
@@ -130,6 +131,7 @@ fn attention_value_projection_bias_contributes_to_hidden_state() -> Result<(), B
         head_dim: 2,
         rope_dimension_count: 0,
         rope_freq_base: 10_000.0,
+        rope_layout: RopeLayout::AdjacentPairs,
         rms_norm_epsilon: 0.0,
     };
     let model = ScalarLlamaModel::new(
@@ -201,6 +203,7 @@ fn prompt_path_uses_causal_kv_attention_for_latest_token() -> Result<(), Box<dyn
         head_dim: 2,
         rope_dimension_count: 0,
         rope_freq_base: 10_000.0,
+        rope_layout: RopeLayout::AdjacentPairs,
         rms_norm_epsilon: 0.0,
     };
     let model = ScalarLlamaModel::new(
@@ -263,6 +266,7 @@ fn scalar_session_reuses_cached_prompt_state_incrementally() -> Result<(), Box<d
         head_dim: 2,
         rope_dimension_count: 0,
         rope_freq_base: 10_000.0,
+        rope_layout: RopeLayout::AdjacentPairs,
         rms_norm_epsilon: 0.0,
     };
     let model = ScalarLlamaModel::new(
@@ -333,6 +337,7 @@ fn scalar_session_accepts_token_id_without_returning_logits() -> Result<(), Box<
         head_dim: 2,
         rope_dimension_count: 0,
         rope_freq_base: 10_000.0,
+        rope_layout: RopeLayout::AdjacentPairs,
         rms_norm_epsilon: 0.0,
     };
     let model = ScalarLlamaModel::new(
@@ -401,6 +406,7 @@ fn scalar_session_generates_token_ids_without_returning_logits() -> Result<(), B
         head_dim: 2,
         rope_dimension_count: 0,
         rope_freq_base: 10_000.0,
+        rope_layout: RopeLayout::AdjacentPairs,
         rms_norm_epsilon: 0.0,
     };
     let model = ScalarLlamaModel::new(
@@ -476,6 +482,7 @@ fn scalar_model_reports_weight_and_session_kv_cache_bytes() -> Result<(), Box<dy
         head_dim: 2,
         rope_dimension_count: 0,
         rope_freq_base: 10_000.0,
+        rope_layout: RopeLayout::AdjacentPairs,
         rms_norm_epsilon: 0.0,
     };
     let model = ScalarLlamaModel::new(

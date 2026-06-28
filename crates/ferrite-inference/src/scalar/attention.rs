@@ -58,6 +58,7 @@ pub(super) fn causal_attention(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::scalar::RopeLayout;
 
     fn config_for_ratio(heads_per_kv: usize) -> ScalarLlamaConfig {
         let kv_heads = 2;
@@ -71,6 +72,7 @@ mod tests {
             head_dim,
             rope_dimension_count: 0,
             rope_freq_base: 10_000.0,
+            rope_layout: RopeLayout::AdjacentPairs,
             rms_norm_epsilon: 0.0,
         }
     }

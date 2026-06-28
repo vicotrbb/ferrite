@@ -26,7 +26,8 @@ pub use math::{argmax, rms_norm};
 pub use matrix::{Matrix, MatrixStorageKind};
 pub use output::ScalarLlamaOutputWeights;
 pub use profile::{ProfiledNextToken, ScalarProfileEvent};
-pub use rope::apply_rope;
+use rope::apply_rope_with_layout;
+pub use rope::{apply_rope, RopeLayout};
 pub use session::ScalarLlamaSession;
 
 use ferrite_model::gguf::{GgufError, GgufFile};
@@ -44,6 +45,7 @@ pub struct ScalarLlamaConfig {
     pub head_dim: usize,
     pub rope_dimension_count: usize,
     pub rope_freq_base: f32,
+    pub rope_layout: RopeLayout,
     pub rms_norm_epsilon: f32,
 }
 
@@ -144,11 +146,12 @@ impl ScalarLlamaModel {
         for head in 0..head_count {
             let start = head * self.config.head_dim;
             let end = start + self.config.head_dim;
-            output.extend(apply_rope(
+            output.extend(apply_rope_with_layout(
                 &values[start..end],
                 position,
                 self.config.rope_dimension_count,
                 self.config.rope_freq_base,
+                self.config.rope_layout,
             )?);
         }
         Ok(output)
