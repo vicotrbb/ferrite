@@ -213,11 +213,12 @@ mod tests {
     fn q8_0_matvec_uses_neon_backend_on_aarch64() -> Result<(), InferenceError> {
         let mut bytes = Vec::new();
         bytes.extend(q8_0_block_with_value(1));
+        bytes.extend(q8_0_block_with_value(-2));
 
-        let output = q8_0_mul_vec_with_backend(&bytes, 1, 32, &[1.0; 32])?;
+        let output = q8_0_mul_vec_with_backend(&bytes, 2, 32, &[1.0; 32])?;
 
         assert_eq!(output.backend, Q8_0MatVecBackend::Aarch64Neon);
-        assert_eq!(output.values, vec![32.0]);
+        assert_eq!(output.values, vec![32.0, -64.0]);
         Ok(())
     }
 
@@ -226,29 +227,12 @@ mod tests {
     fn q8_0_matvec_uses_avx2_backend_on_x86_64() -> Result<(), InferenceError> {
         let mut bytes = Vec::new();
         bytes.extend(q8_0_block_with_value(1));
+        bytes.extend(q8_0_block_with_value(-2));
 
-        let output = q8_0_mul_vec_with_backend(&bytes, 1, 32, &[1.0; 32])?;
+        let output = q8_0_mul_vec_with_backend(&bytes, 2, 32, &[1.0; 32])?;
 
         assert_eq!(output.backend, Q8_0MatVecBackend::X86_64Avx2);
-        assert_eq!(output.values, vec![32.0]);
-        Ok(())
-    }
-
-    #[test]
-    #[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
-    fn q8_0_simd_matvec_uses_row_parallel_backend() -> Result<(), InferenceError> {
-        let mut bytes = Vec::new();
-        bytes.extend(q8_0_block_with_value(1));
-        bytes.extend(q8_0_block_with_value(2));
-        bytes.extend(q8_0_block_with_value(-3));
-
-        let output = q8_0_mul_vec_with_backend(&bytes, 3, 32, &[1.0; 32])?;
-
-        #[cfg(target_arch = "aarch64")]
-        assert_eq!(output.backend, Q8_0MatVecBackend::Aarch64NeonRowParallel);
-        #[cfg(target_arch = "x86_64")]
-        assert_eq!(output.backend, Q8_0MatVecBackend::X86_64Avx2RowParallel);
-        assert_eq!(output.values, vec![32.0, 64.0, -96.0]);
+        assert_eq!(output.values, vec![32.0, -64.0]);
         Ok(())
     }
 
