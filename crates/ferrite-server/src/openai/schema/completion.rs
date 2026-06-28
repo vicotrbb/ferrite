@@ -1,6 +1,7 @@
 use super::{unix_timestamp, usage::Usage};
 use crate::runtime::GeneratedText;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 pub struct CompletionRequest {
@@ -10,6 +11,30 @@ pub struct CompletionRequest {
     stream: bool,
     #[serde(default)]
     max_tokens: Option<usize>,
+    #[serde(default)]
+    suffix: Option<Value>,
+    #[serde(default)]
+    temperature: Option<Value>,
+    #[serde(default)]
+    top_p: Option<Value>,
+    #[serde(default)]
+    n: Option<Value>,
+    #[serde(default)]
+    logprobs: Option<Value>,
+    #[serde(default)]
+    echo: Option<Value>,
+    #[serde(default)]
+    stop: Option<Value>,
+    #[serde(default)]
+    presence_penalty: Option<Value>,
+    #[serde(default)]
+    frequency_penalty: Option<Value>,
+    #[serde(default)]
+    best_of: Option<Value>,
+    #[serde(default)]
+    logit_bias: Option<Value>,
+    #[serde(default)]
+    user: Option<Value>,
 }
 
 impl CompletionRequest {
@@ -27,6 +52,47 @@ impl CompletionRequest {
 
     pub fn max_tokens(&self) -> Option<usize> {
         self.max_tokens
+    }
+
+    pub fn unsupported_fields(&self) -> Vec<&'static str> {
+        let mut fields = Vec::new();
+        if self.suffix.is_some() {
+            fields.push("suffix");
+        }
+        if self.temperature.is_some() {
+            fields.push("temperature");
+        }
+        if self.top_p.is_some() {
+            fields.push("top_p");
+        }
+        if self.n.is_some() {
+            fields.push("n");
+        }
+        if self.logprobs.is_some() {
+            fields.push("logprobs");
+        }
+        if self.echo.is_some() {
+            fields.push("echo");
+        }
+        if self.stop.is_some() {
+            fields.push("stop");
+        }
+        if self.presence_penalty.is_some() {
+            fields.push("presence_penalty");
+        }
+        if self.frequency_penalty.is_some() {
+            fields.push("frequency_penalty");
+        }
+        if self.best_of.is_some() {
+            fields.push("best_of");
+        }
+        if self.logit_bias.is_some() {
+            fields.push("logit_bias");
+        }
+        if self.user.is_some() {
+            fields.push("user");
+        }
+        fields
     }
 }
 

@@ -95,6 +95,7 @@ async fn completions(
 ) -> Result<Response, OpenAiHttpError> {
     ensure_authorized(&state, &headers)?;
     ensure_model(&state, request.model())?;
+    ensure_supported_completion_request(&request)?;
     if request.prompt().trim().is_empty() {
         return Err(OpenAiHttpError::invalid_request(
             "prompt must contain non-whitespace text",
@@ -123,6 +124,18 @@ async fn completions(
         generated,
     ))
     .into_response())
+}
+
+fn ensure_supported_completion_request(request: &CompletionRequest) -> Result<(), OpenAiHttpError> {
+    let unsupported = request.unsupported_fields();
+    if unsupported.is_empty() {
+        return Ok(());
+    }
+
+    Err(OpenAiHttpError::invalid_request(format!(
+        "unsupported completion field(s): {}",
+        unsupported.join(", ")
+    )))
 }
 
 fn ensure_authorized(state: &ServerState, headers: &HeaderMap) -> Result<(), OpenAiHttpError> {
