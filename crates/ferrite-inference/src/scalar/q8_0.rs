@@ -40,6 +40,33 @@ pub(super) fn q8_0_mul_vec(
     Ok(q8_0_mul_vec_with_backend(bytes, rows, cols, vector)?.values)
 }
 
+pub(super) fn q8_0_argmax_mul_vec(
+    bytes: &[u8],
+    rows: usize,
+    cols: usize,
+    vector: &[f32],
+) -> Result<usize, InferenceError> {
+    validate_q8_0_mul_vec(bytes, rows, cols, vector)?;
+    if rows == 0 {
+        return Err(InferenceError::new("argmax input must not be empty"));
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    {
+        if std::arch::is_aarch64_feature_detected!("neon") {
+            return Ok(aarch64::neon_q8_0_argmax_mul_vec(bytes, rows, cols, vector));
+        }
+    }
+    #[cfg(target_arch = "x86_64")]
+    {
+        if std::arch::is_x86_feature_detected!("avx2") {
+            return Ok(x86_64::avx2_q8_0_argmax_mul_vec(bytes, rows, cols, vector));
+        }
+    }
+
+    scalar_q8_0_argmax_mul_vec(bytes, rows, cols, vector)
+}
+
 pub(super) fn q8_0_mul_vec_with_backend(
     bytes: &[u8],
     rows: usize,
@@ -134,6 +161,44 @@ fn scalar_q8_0_mul_vec(
     })
 }
 
+fn scalar_q8_0_argmax_mul_vec(
+    bytes: &[u8],
+    _rows: usize,
+    cols: usize,
+    vector: &[f32],
+) -> Result<usize, InferenceError> {
+    let row_bytes = q8_0_row_bytes(cols)?;
+    Ok(argmax_q8_0_rows(bytes, row_bytes, |row_bytes| {
+        let mut sum = 0.0;
+        for (block_index, block) in row_bytes.chunks_exact(Q8_0_BLOCK_BYTES).enumerate() {
+            let scale = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
+            let col_base = block_index * Q8_0_BLOCK_VALUES;
+            for (offset, quantized) in block[2..].iter().enumerate() {
+                sum += scale * f32::from(*quantized as i8) * vector[col_base + offset];
+            }
+        }
+        sum
+    }))
+}
+
+fn argmax_q8_0_rows<F>(bytes: &[u8], row_bytes: usize, mut row_dot: F) -> usize
+where
+    F: FnMut(&[u8]) -> f32,
+{
+    let mut best_index = 0usize;
+    let mut best_value = f32::NEG_INFINITY;
+
+    for (row_index, row_chunk) in bytes.chunks_exact(row_bytes).enumerate() {
+        let sum = row_dot(row_chunk);
+        if row_index == 0 || sum > best_value {
+            best_index = row_index;
+            best_value = sum;
+        }
+    }
+
+    best_index
+}
+
 #[cfg(target_arch = "aarch64")]
 mod aarch64 {
     use super::{
@@ -174,6 +239,32 @@ mod aarch64 {
             values,
             backend: Q8_0MatVecBackend::Aarch64Neon,
         }
+    }
+
+    pub(super) fn neon_q8_0_argmax_mul_vec(
+        bytes: &[u8],
+        _rows: usize,
+        cols: usize,
+        vector: &[f32],
+    ) -> usize {
+        let row_bytes = (cols / Q8_0_BLOCK_VALUES) * Q8_0_BLOCK_BYTES;
+        super::argmax_q8_0_rows(bytes, row_bytes, |row_bytes| {
+            let mut sum = 0.0;
+            for (block_index, block) in row_bytes.chunks_exact(Q8_0_BLOCK_BYTES).enumerate() {
+                let scale = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
+                let col_base = block_index * Q8_0_BLOCK_VALUES;
+                // SAFETY: each Q8_0 block has exactly 32 quantized bytes and
+                // `cols` is validated as a multiple of 32, so every 8-byte
+                // quant load and matching 4-lane vector load is in bounds.
+                sum += unsafe {
+                    neon_q8_0_block_dot(
+                        block[2..].as_ptr().cast::<i8>(),
+                        vector[col_base..].as_ptr(),
+                    )
+                } * scale;
+            }
+            sum
+        })
     }
 
     #[target_feature(enable = "neon")]
@@ -240,6 +331,32 @@ mod x86_64 {
             values,
             backend: Q8_0MatVecBackend::X86_64Avx2,
         }
+    }
+
+    pub(super) fn avx2_q8_0_argmax_mul_vec(
+        bytes: &[u8],
+        _rows: usize,
+        cols: usize,
+        vector: &[f32],
+    ) -> usize {
+        let row_bytes = (cols / Q8_0_BLOCK_VALUES) * Q8_0_BLOCK_BYTES;
+        super::argmax_q8_0_rows(bytes, row_bytes, |row_bytes| {
+            let mut sum = 0.0;
+            for (block_index, block) in row_bytes.chunks_exact(Q8_0_BLOCK_BYTES).enumerate() {
+                let scale = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
+                let col_base = block_index * Q8_0_BLOCK_VALUES;
+                // SAFETY: each Q8_0 block has exactly 32 quantized bytes and
+                // `cols` is validated as a multiple of 32, so every 8-byte
+                // quant load and matching 8-lane vector load is in bounds.
+                sum += unsafe {
+                    avx2_q8_0_block_dot(
+                        block[2..].as_ptr().cast::<i8>(),
+                        vector[col_base..].as_ptr(),
+                    )
+                } * scale;
+            }
+            sum
+        })
     }
 
     #[target_feature(enable = "avx2")]

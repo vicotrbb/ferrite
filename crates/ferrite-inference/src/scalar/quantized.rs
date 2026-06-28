@@ -5,7 +5,9 @@ pub(super) use super::q5_0::{decode_q5_0_row, q5_0_mul_vec, q5_0_row_bytes, Q5_0
 #[cfg(test)]
 pub(super) use super::q6_k::{accumulate_q6_k_block, q6_k_argmax_mul_vec, q6_k_mul_vec};
 pub(super) use super::q6_k::{decode_q6_k_values, q6_k_storage_bytes};
-pub(super) use super::q8_0::{decode_q8_0_row, q8_0_mul_vec, q8_0_row_bytes, Q8_0_BLOCK_VALUES};
+pub(super) use super::q8_0::{
+    decode_q8_0_row, q8_0_argmax_mul_vec, q8_0_mul_vec, q8_0_row_bytes, Q8_0_BLOCK_VALUES,
+};
 #[cfg(test)]
 use super::InferenceError;
 
@@ -21,7 +23,8 @@ mod tests {
     use super::super::q8_0::{q8_0_mul_vec_with_backend, Q8_0MatVecBackend};
     use super::{
         accumulate_q4_k_block, accumulate_q6_k_block, decode_q6_k_values, q4_k_mul_vec,
-        q5_0_mul_vec, q6_k_argmax_mul_vec, q6_k_mul_vec, q8_0_mul_vec, InferenceError,
+        q5_0_mul_vec, q6_k_argmax_mul_vec, q6_k_mul_vec, q8_0_argmax_mul_vec, q8_0_mul_vec,
+        InferenceError,
     };
 
     #[test]
@@ -230,6 +233,26 @@ mod tests {
         let actual = q8_0_mul_vec(&bytes, 2, 32, &[1.0; 32])?;
 
         assert_eq!(actual, vec![32.0, 64.0]);
+        Ok(())
+    }
+
+    #[test]
+    fn q8_0_argmax_mul_vec_matches_full_matvec_argmax() -> Result<(), InferenceError> {
+        let mut bytes = Vec::new();
+        bytes.extend(q8_0_block_with_value(-1));
+        bytes.extend(q8_0_block_with_value(3));
+        bytes.extend(q8_0_block_with_value(2));
+        let vector = [1.0; 32];
+
+        let values = q8_0_mul_vec(&bytes, 3, 32, &vector)?;
+        let expected = values
+            .iter()
+            .enumerate()
+            .max_by(|(_, left), (_, right)| left.total_cmp(right))
+            .map(|(index, _)| index)
+            .ok_or_else(|| InferenceError::new("expected non-empty Q8_0 output"))?;
+
+        assert_eq!(q8_0_argmax_mul_vec(&bytes, 3, 32, &vector)?, expected);
         Ok(())
     }
 
