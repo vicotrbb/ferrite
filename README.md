@@ -29,5 +29,10 @@ curl http://127.0.0.1:8080/v1/completions \
 ```
 
 Point OpenAI-compatible clients at `http://127.0.0.1:8080/v1` as the base URL.
-The first server slice supports non-streaming text generation. SSE streaming is
-tracked as the next compatibility slice.
+The server supports non-streaming text generation and OpenAI-style SSE streams:
+
+```sh
+curl -N http://127.0.0.1:8080/v1/chat/completions \
+  -H 'content-type: application/json' \
+  -d '{"model":"ferrite-local","messages":[{"role":"user","content":"hello world"}],"max_tokens":16,"stream":true}'
+```
