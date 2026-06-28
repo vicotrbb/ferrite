@@ -22,6 +22,15 @@ impl InferenceEngine {
     }
 
     pub fn generate(&self, prompt: &str, max_tokens: usize) -> Result<GeneratedText, RuntimeError> {
+        self.generate_with_token_callback(prompt, max_tokens, |_| Ok(()))
+    }
+
+    pub fn generate_with_token_callback(
+        &self,
+        prompt: &str,
+        max_tokens: usize,
+        mut on_token: impl FnMut(&str) -> Result<(), RuntimeError>,
+    ) -> Result<GeneratedText, RuntimeError> {
         let prompt_token_ids = self
             .tokenizer
             .encode(prompt)
@@ -40,7 +49,9 @@ impl InferenceEngine {
 
         for _ in 0..max_tokens {
             generated_token_ids.push(token_id);
-            token_texts.push(self.decode_token(token_id)?);
+            let token_text = self.decode_token(token_id)?;
+            on_token(&token_text)?;
+            token_texts.push(token_text);
             if Some(token_id) == self.tokenizer.eos_token_id() {
                 break;
             }
@@ -128,3 +139,49 @@ impl fmt::Display for RuntimeError {
 }
 
 impl Error for RuntimeError {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    static FIXTURE_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+    #[test]
+    fn generate_with_token_callback_reports_each_token_piece(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let model_path = write_fixture_model()?;
+        let engine = InferenceEngine::load(&model_path)?;
+        remove_fixture_model(&model_path)?;
+
+        let mut pieces = Vec::new();
+        let generated = engine.generate_with_token_callback("hello", 1, |piece| {
+            pieces.push(piece.to_owned());
+            Ok(())
+        })?;
+
+        assert_eq!(pieces, ["winner"]);
+        assert_eq!(generated.text(), "winner");
+        assert_eq!(generated.token_texts(), pieces);
+        Ok(())
+    }
+
+    fn write_fixture_model() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+        let mut path = std::env::temp_dir();
+        path.push(format!(
+            "ferrite-runtime-fixture-{}-{}.gguf",
+            std::process::id(),
+            FIXTURE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::write(&path, ferrite_fixtures::scalar_llama_f32_gguf_fixture())?;
+        Ok(path)
+    }
+
+    fn remove_fixture_model(path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
+        match std::fs::remove_file(path) {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(error) => Err(error.into()),
+        }
+    }
+}
