@@ -109,6 +109,27 @@ fn q6_k_matvec_accepts_q8_k_execution_options() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+#[cfg(target_arch = "aarch64")]
+fn q6_k_argmax_honors_q8_k_execution_options() -> Result<(), Box<dyn Error>> {
+    let mut bytes = Vec::new();
+    bytes.extend(q6_k_block_with_unit_at(0));
+    bytes.extend(q6_k_block_with_unit_at(1));
+    let matrix = Matrix::from_q6_k_row_major_bytes(2, 256, bytes)?;
+    let mut vector = vec![0.0; 256];
+    vector[0] = 1.0;
+    vector[1] = 1.003;
+
+    assert_eq!(matrix.argmax_mul_vec(&vector)?, 1);
+    let q8_k_argmax = matrix.argmax_mul_vec_with_options(
+        &vector,
+        ScalarExecutionOptions::default().with_q8_k_activation_matvec(true),
+    )?;
+
+    assert_eq!(q8_k_argmax, 0);
+    Ok(())
+}
+
+#[test]
 fn matvec_check_rejects_negative_relative_tolerance() -> Result<(), Box<dyn Error>> {
     let matrix = Matrix::from_row_major(1, 1, vec![1.0])?;
 
@@ -164,6 +185,44 @@ fn q6_k_block_with_value(value: i32) -> Vec<u8> {
     );
 
     let mut block = vec![0u8; 128 + 64];
+    block.extend(vec![1u8; 16]);
+    block.extend_from_slice(&0x3c00u16.to_le_bytes());
+    block
+}
+
+#[cfg(target_arch = "aarch64")]
+fn q6_k_block_with_unit_at(index: usize) -> Vec<u8> {
+    let mut raw_values = [32u8; 256];
+    raw_values[index] = 33;
+    q6_k_block_from_raw_values(&raw_values)
+}
+
+#[cfg(target_arch = "aarch64")]
+fn q6_k_block_from_raw_values(raw_values: &[u8; 256]) -> Vec<u8> {
+    let mut low_bits = vec![0u8; 128];
+    let mut high_bits = vec![0u8; 64];
+
+    for half in 0..2 {
+        let value_base = half * 128;
+        let low_base = half * 64;
+        let high_base = half * 32;
+        for index in 0..32 {
+            let q1 = raw_values[value_base + index];
+            let q2 = raw_values[value_base + index + 32];
+            let q3 = raw_values[value_base + index + 64];
+            let q4 = raw_values[value_base + index + 96];
+
+            low_bits[low_base + index] = (q1 & 0x0f) | ((q3 & 0x0f) << 4);
+            low_bits[low_base + index + 32] = (q2 & 0x0f) | ((q4 & 0x0f) << 4);
+            high_bits[high_base + index] = ((q1 >> 4) & 3)
+                | (((q2 >> 4) & 3) << 2)
+                | (((q3 >> 4) & 3) << 4)
+                | (((q4 >> 4) & 3) << 6);
+        }
+    }
+
+    let mut block = low_bits;
+    block.extend(high_bits);
     block.extend(vec![1u8; 16]);
     block.extend_from_slice(&0x3c00u16.to_le_bytes());
     block

@@ -141,6 +141,11 @@ either selectively enable Q8_K only where model-output parity is proven, or
 tighten the activation quantization/accumulation strategy so SmolLM parity
 survives.
 
+Follow-up: `documentation/dev-notes/2026-06-28-q8-k-q6-argmax-options.md`
+records a fix for the experimental token-id-only Q6_K output argmax path so it
+honors Q8_K activation execution options instead of silently using default Q6_K
+argmax semantics.
+
 ## Verification
 
 Focused checks passed for the diagnostic implementation:

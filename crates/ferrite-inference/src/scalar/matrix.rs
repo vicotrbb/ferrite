@@ -168,6 +168,10 @@ impl Matrix {
             return Err(InferenceError::new("argmax input must not be empty"));
         }
 
+        #[cfg(target_arch = "aarch64")]
+        if matches!(&self.data, MatrixData::Q6K(_)) && options.q8_k_activation_matvec() {
+            return argmax(&self.mul_vec_with_options(vector, options)?);
+        }
         if let MatrixData::Q6K(data) = &self.data {
             return super::q6_k::q6_k_argmax_mul_vec(data, self.rows, self.cols, vector);
         }
