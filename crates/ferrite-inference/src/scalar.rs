@@ -14,6 +14,8 @@ mod q4_k;
 mod q4_k_neon;
 mod q5_0;
 mod q6_k;
+#[cfg(target_arch = "aarch64")]
+mod q6_k_neon;
 mod q8_0;
 mod quantized;
 mod rope;
