@@ -1,37 +1,27 @@
-use ferrite_server::{runtime::InferenceEngine, state::ServerState};
+mod support;
+
 use serde_json::Value;
-use std::{
-    net::{Ipv4Addr, SocketAddr},
-    sync::atomic::{AtomicU64, Ordering},
-};
+use std::net::SocketAddr;
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
-    net::{TcpListener, TcpStream},
+    net::TcpStream,
 };
-
-static FIXTURE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[tokio::test]
 async fn live_http_server_accepts_openai_style_chat_request(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let model_path = write_fixture_model()?;
-    let engine = InferenceEngine::load(&model_path)?;
-    let listener = TcpListener::bind(SocketAddr::from((Ipv4Addr::LOCALHOST, 0))).await?;
-    let addr = listener.local_addr()?;
-    let app = ferrite_server::router(ServerState::with_engine("fixture-model".to_owned(), engine));
-    let server = tokio::spawn(async move { axum::serve(listener, app).await });
-
-    let request_body = r#"{"model":"fixture-model","messages":[{"role":"user","content":"hello"}],"max_completion_tokens":1}"#;
+    let server = support::LiveServer::start().await?;
+    let request_body = format!(
+        r#"{{"model":"{}","messages":[{{"role":"user","content":"hello"}}],"max_completion_tokens":1}}"#,
+        support::MODEL_ID
+    );
     let response = send_http_request(
-        addr,
+        server.addr(),
         "POST",
         "/v1/chat/completions",
         request_body.as_bytes(),
     )
     .await?;
-
-    server.abort();
-    remove_fixture_model(&model_path)?;
 
     assert!(
         response.starts_with("HTTP/1.1 200 OK"),
@@ -42,7 +32,7 @@ async fn live_http_server_accepts_openai_style_chat_request(
         .ok_or("expected HTTP response body")?;
     let body: Value = serde_json::from_str(body)?;
     assert_eq!(body["object"], "chat.completion");
-    assert_eq!(body["model"], "fixture-model");
+    assert_eq!(body["model"], support::MODEL_ID);
     assert_eq!(body["choices"][0]["message"]["content"], "winner");
     assert_eq!(body["usage"]["completion_tokens"], 1);
     Ok(())
@@ -116,26 +106,4 @@ fn parse_content_length(headers: &[u8]) -> Result<Option<usize>, Box<dyn std::er
         }
     }
     Ok(None)
-}
-
-fn write_fixture_model() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
-    let mut path = std::env::temp_dir();
-    path.push(format!(
-        "ferrite-server-http-fixture-{}-{}.gguf",
-        std::process::id(),
-        FIXTURE_COUNTER.fetch_add(1, Ordering::Relaxed)
-    ));
-    std::fs::write(
-        &path,
-        ferrite_fixtures::scalar_llama_chat_f32_gguf_fixture(),
-    )?;
-    Ok(path)
-}
-
-fn remove_fixture_model(path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
-    match std::fs::remove_file(path) {
-        Ok(()) => Ok(()),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(error) => Err(error.into()),
-    }
 }
