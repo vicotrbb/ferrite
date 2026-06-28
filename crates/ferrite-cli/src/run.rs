@@ -129,15 +129,12 @@ fn generate_tokens(
     count: usize,
     stream: bool,
 ) -> Result<Vec<usize>, Box<dyn Error>> {
-    let mut next = next;
-    let mut generated_token_ids = Vec::with_capacity(count);
-    for _ in 0..count {
-        if stream {
-            println!("stream_token_id={}", next.token_id);
-            println!("stream_text={}", tokenizer.decode(&[next.token_id])?);
+    let generated_token_ids = session.generate_token_ids(next.token_id, count)?;
+    if stream {
+        for token_id in &generated_token_ids {
+            println!("stream_token_id={token_id}");
+            println!("stream_text={}", tokenizer.decode(&[*token_id])?);
         }
-        generated_token_ids.push(next.token_id);
-        next = session.accept_token(next.token_id)?;
     }
     Ok(generated_token_ids)
 }

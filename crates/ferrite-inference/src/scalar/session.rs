@@ -81,6 +81,20 @@ impl<'a> ScalarLlamaSession<'a> {
             .token_id)
     }
 
+    pub fn generate_token_ids(
+        &mut self,
+        first_token_id: usize,
+        count: usize,
+    ) -> Result<Vec<usize>, InferenceError> {
+        let mut token_id = first_token_id;
+        let mut token_ids = Vec::with_capacity(count);
+        for _ in 0..count {
+            token_ids.push(token_id);
+            token_id = self.accept_token_id(token_id)?;
+        }
+        Ok(token_ids)
+    }
+
     pub fn accept_token_profiled(
         &mut self,
         token_id: usize,
