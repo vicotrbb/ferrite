@@ -174,8 +174,14 @@ The Qwen2.5-1.5B checks are encouraging but insufficient. SmolLM2-1.7B
 multi-token parity fails on both documented prompts, while the default path
 continues to match. The post-Q6_K-argmax-option refresh confirms that this
 verdict still holds after experimental token-id-only decoding honors Q8_K
-execution options. No throughput benchmark was run after the SmolLM failures,
-and no throughput claim is made.
+execution options.
+
+A follow-up Qwen2.5-1.5B benchmark in
+`documentation/benchmarks/2026-06-28-tier1-qwen2-1-5b-q8-k-opt-in-benchmark.md`
+shows that the opt-in route has real throughput value for that model, improving
+the local default-pool benchmark average from 261,316,083 ns to 226,673,736 ns.
+That does not change the default-dispatch verdict because SmolLM2-1.7B still
+fails real model-output parity.
 
 Next work should isolate whether the divergence comes from expected activation
 quantization drift, a Q4_K/Q6_K x Q8_K arithmetic bug, or a missing precision
