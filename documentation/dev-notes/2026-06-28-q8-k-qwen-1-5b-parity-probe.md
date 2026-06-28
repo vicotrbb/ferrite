@@ -53,3 +53,6 @@ The existing Qwen2.5-1.5B benchmark improvement remains useful opt-in research
 evidence, but it is not enough to justify a model-specific default or automatic
 policy. Any future Qwen-specific policy still needs either a tighter activation
 quantization strategy or broader parity evidence under a narrower policy.
+
+Follow-up divergence profiling is recorded in
+`documentation/dev-notes/2026-06-28-q8-k-qwen-1-5b-divergence-profile.md`.
