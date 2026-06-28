@@ -42,6 +42,8 @@ mod q8_0_avx2;
 mod q8_0_neon;
 #[allow(dead_code)]
 mod q8_k;
+#[cfg(test)]
+mod q8_k_reference_tests;
 mod quantized;
 #[cfg(test)]
 mod quantized_tests;
