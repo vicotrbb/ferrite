@@ -71,8 +71,7 @@ unproven.
 
 ## Fresh Full-Workspace Gate
 
-Commands run after the benchmark-token profiling, thresholded Q5_0 row-parallel,
-Q4_K/Q6_K regression documentation, and second Qwen2 prompt evidence slices:
+Commands run after the CLI EOS generation stop slice:
 
 ```sh
 cargo fmt --all -- --check
@@ -82,7 +81,7 @@ cargo test --workspace
 cargo check -p ferrite-inference --target x86_64-unknown-linux-gnu --tests
 ```
 
-All commands passed on commit `655c33c`.
+All commands passed on commit `7d75ba4`.
 
 ## Fresh Tier 1 Model Probe
 
