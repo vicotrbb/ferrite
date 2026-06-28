@@ -22,6 +22,7 @@ pub(super) struct Q6KMatVecOutput {
     pub(super) backend: Q6KMatVecBackend,
 }
 
+#[cfg(test)]
 pub(super) fn q6_k_mul_vec(
     bytes: &[u8],
     rows: usize,
@@ -55,6 +56,7 @@ pub(super) fn q6_k_argmax_mul_vec(
     scalar_q6_k_argmax_mul_vec(bytes, rows, cols, vector)
 }
 
+#[cfg(test)]
 pub(super) fn q6_k_mul_vec_with_backend(
     bytes: &[u8],
     rows: usize,

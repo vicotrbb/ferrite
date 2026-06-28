@@ -131,6 +131,13 @@ impl ScalarLlamaModel {
         ScalarLlamaSession::new(self)
     }
 
+    pub fn start_session_with_options(
+        &self,
+        options: ScalarExecutionOptions,
+    ) -> ScalarLlamaSession<'_> {
+        ScalarLlamaSession::new_with_options(self, options)
+    }
+
     pub fn scalar_weight_bytes(&self) -> u128 {
         memory::weights_bytes(&self.weights)
     }

@@ -2,7 +2,7 @@ use super::{
     attention::causal_attention,
     math::{add_assign, argmax, rms_norm, swiglu},
     profile::{ProfiledNextToken, ProfiledTokenId, ScalarProfileEvent},
-    InferenceError, NextToken, ScalarLlamaModel,
+    InferenceError, NextToken, ScalarExecutionOptions, ScalarLlamaModel,
 };
 
 mod cache;
@@ -16,6 +16,7 @@ pub struct ScalarLlamaSession<'a> {
     layer_keys: Vec<Vec<Vec<f32>>>,
     layer_values: Vec<Vec<Vec<f32>>>,
     cached_token_count: usize,
+    options: ScalarExecutionOptions,
 }
 
 impl<'a> ScalarLlamaSession<'a> {
@@ -120,6 +121,7 @@ impl<'a> ScalarLlamaSession<'a> {
                 layer_index,
                 "q_proj",
                 profile_events.as_deref_mut(),
+                self.options,
             )?;
             add_optional_bias(&mut query, layer.q_bias.as_deref())?;
             let mut key = profiled_layer_mul_vec(
@@ -128,6 +130,7 @@ impl<'a> ScalarLlamaSession<'a> {
                 layer_index,
                 "k_proj",
                 profile_events.as_deref_mut(),
+                self.options,
             )?;
             add_optional_bias(&mut key, layer.k_bias.as_deref())?;
             let mut value = profiled_layer_mul_vec(
@@ -136,6 +139,7 @@ impl<'a> ScalarLlamaSession<'a> {
                 layer_index,
                 "v_proj",
                 profile_events.as_deref_mut(),
+                self.options,
             )?;
             add_optional_bias(&mut value, layer.v_bias.as_deref())?;
 
@@ -165,6 +169,7 @@ impl<'a> ScalarLlamaSession<'a> {
                 layer_index,
                 "o_proj",
                 profile_events.as_deref_mut(),
+                self.options,
             )?;
             add_assign(&mut hidden, &attention_output)?;
 
@@ -176,6 +181,7 @@ impl<'a> ScalarLlamaSession<'a> {
                 layer_index,
                 "ffn_gate",
                 profile_events.as_deref_mut(),
+                self.options,
             )?;
             let up = profiled_layer_mul_vec(
                 &layer.ffn_up,
@@ -183,6 +189,7 @@ impl<'a> ScalarLlamaSession<'a> {
                 layer_index,
                 "ffn_up",
                 profile_events.as_deref_mut(),
+                self.options,
             )?;
             let activated = swiglu(&gate, &up)?;
             let ffn_output = profiled_layer_mul_vec(
@@ -191,6 +198,7 @@ impl<'a> ScalarLlamaSession<'a> {
                 layer_index,
                 "ffn_down",
                 profile_events.as_deref_mut(),
+                self.options,
             )?;
             add_assign(&mut hidden, &ffn_output)?;
         }
@@ -207,11 +215,12 @@ impl<'a> ScalarLlamaSession<'a> {
             .logits_matrix(&self.model.weights.token_embedding);
         let (token_id, logits) = match output_mode {
             OutputMode::Logits => {
-                let logits = profiled_mul_vec(output, &normed, "output", profile_events)?;
+                let logits =
+                    profiled_mul_vec(output, &normed, "output", profile_events, self.options)?;
                 (argmax(&logits)?, Some(logits))
             }
             OutputMode::TokenIdOnly => (
-                profiled_argmax_mul_vec(output, &normed, "output", profile_events)?,
+                profiled_argmax_mul_vec(output, &normed, "output", profile_events, self.options)?,
                 None,
             ),
         };

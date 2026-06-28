@@ -1,13 +1,21 @@
 use super::ScalarLlamaSession;
-use crate::scalar::{InferenceError, ScalarLlamaModel};
+use crate::scalar::{InferenceError, ScalarExecutionOptions, ScalarLlamaModel};
 
 impl<'a> ScalarLlamaSession<'a> {
     pub(in crate::scalar) fn new(model: &'a ScalarLlamaModel) -> Self {
+        Self::new_with_options(model, ScalarExecutionOptions::default())
+    }
+
+    pub(in crate::scalar) fn new_with_options(
+        model: &'a ScalarLlamaModel,
+        options: ScalarExecutionOptions,
+    ) -> Self {
         Self {
             model,
             layer_keys: vec![Vec::<Vec<f32>>::new(); model.weights.layers.len()],
             layer_values: vec![Vec::<Vec<f32>>::new(); model.weights.layers.len()],
             cached_token_count: 0,
+            options,
         }
     }
 

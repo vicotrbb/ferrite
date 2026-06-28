@@ -2,10 +2,10 @@ use super::{
     kernel_check::ensure_within_relative_error,
     math::{argmax, dot},
     matvec::f32_mul_vec,
-    q4_k::q4_k_mul_vec,
-    q6_k::q6_k_mul_vec,
+    q4_k::q4_k_mul_vec_with_options,
+    q6_k::q6_k_mul_vec_with_options,
     quantized::{q5_0_mul_vec, q8_0_argmax_mul_vec, q8_0_mul_vec},
-    InferenceError,
+    InferenceError, ScalarExecutionOptions,
 };
 
 mod constructors;
@@ -104,6 +104,14 @@ impl Matrix {
     }
 
     pub fn mul_vec(&self, vector: &[f32]) -> Result<Vec<f32>, InferenceError> {
+        self.mul_vec_with_options(vector, ScalarExecutionOptions::default())
+    }
+
+    pub fn mul_vec_with_options(
+        &self,
+        vector: &[f32],
+        options: ScalarExecutionOptions,
+    ) -> Result<Vec<f32>, InferenceError> {
         if self.cols != vector.len() {
             return Err(InferenceError::new(format!(
                 "matrix columns {} do not match vector length {}",
@@ -113,10 +121,14 @@ impl Matrix {
         }
 
         if let MatrixData::Q4K(data) = &self.data {
-            return q4_k_mul_vec(data, self.rows, self.cols, vector);
+            return Ok(
+                q4_k_mul_vec_with_options(data, self.rows, self.cols, vector, options)?.values,
+            );
         }
         if let MatrixData::Q6K(data) = &self.data {
-            return q6_k_mul_vec(data, self.rows, self.cols, vector);
+            return Ok(
+                q6_k_mul_vec_with_options(data, self.rows, self.cols, vector, options)?.values,
+            );
         }
         if let MatrixData::Q8_0(data) = &self.data {
             return q8_0_mul_vec(data, self.rows, self.cols, vector);
@@ -137,6 +149,14 @@ impl Matrix {
     }
 
     pub fn argmax_mul_vec(&self, vector: &[f32]) -> Result<usize, InferenceError> {
+        self.argmax_mul_vec_with_options(vector, ScalarExecutionOptions::default())
+    }
+
+    pub fn argmax_mul_vec_with_options(
+        &self,
+        vector: &[f32],
+        options: ScalarExecutionOptions,
+    ) -> Result<usize, InferenceError> {
         if self.cols != vector.len() {
             return Err(InferenceError::new(format!(
                 "matrix columns {} do not match vector length {}",
@@ -155,7 +175,7 @@ impl Matrix {
             return q8_0_argmax_mul_vec(data, self.rows, self.cols, vector);
         }
 
-        argmax(&self.mul_vec(vector)?)
+        argmax(&self.mul_vec_with_options(vector, options)?)
     }
 
     pub fn mul_vec_checked_against_reference(

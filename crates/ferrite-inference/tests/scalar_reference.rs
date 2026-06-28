@@ -4,8 +4,8 @@ use ferrite_fixtures::{
     scalar_llama_q8_0_gguf_fixture, scalar_llama_tied_output_f32_gguf_fixture,
 };
 use ferrite_inference::scalar::{
-    apply_rope, argmax, rms_norm, Matrix, RopeLayout, ScalarLlamaConfig, ScalarLlamaLayerWeights,
-    ScalarLlamaModel, ScalarLlamaOutputWeights, ScalarLlamaWeights,
+    apply_rope, argmax, rms_norm, Matrix, RopeLayout, ScalarExecutionOptions, ScalarLlamaConfig,
+    ScalarLlamaLayerWeights, ScalarLlamaModel, ScalarLlamaOutputWeights, ScalarLlamaWeights,
 };
 use ferrite_model::gguf::parse_gguf;
 use ferrite_model::tokenizer::GgufTokenizer;
@@ -656,6 +656,22 @@ fn loads_scalar_llama_reference_weights_from_q4_k_gguf_fixture() -> Result<(), B
 }
 
 #[test]
+fn q4_k_fixture_accepts_q8_k_session_options() -> Result<(), Box<dyn Error>> {
+    let bytes = scalar_llama_q4_k_gguf_fixture();
+    let gguf = parse_gguf(&bytes)?;
+    let model = ScalarLlamaModel::from_gguf_scalar(&gguf, &bytes)?;
+    let mut session = model.start_session_with_options(
+        ScalarExecutionOptions::default().with_q8_k_activation_matvec(true),
+    );
+
+    let next = session.accept_token(0)?;
+
+    assert_eq!(next.token_id, 1);
+    assert!(next.logits[1] > next.logits[0]);
+    Ok(())
+}
+
+#[test]
 fn loads_scalar_llama_reference_weights_from_q6_k_gguf_fixture() -> Result<(), Box<dyn Error>> {
     let bytes = scalar_llama_q6_k_gguf_fixture();
     let gguf = parse_gguf(&bytes)?;
@@ -664,6 +680,22 @@ fn loads_scalar_llama_reference_weights_from_q6_k_gguf_fixture() -> Result<(), B
     let next = model.next_token(0)?;
 
     assert_eq!(model.scalar_weight_bytes(), 24_708);
+    assert_eq!(next.token_id, 1);
+    assert!(next.logits[1] > next.logits[0]);
+    Ok(())
+}
+
+#[test]
+fn q6_k_fixture_accepts_q8_k_session_options() -> Result<(), Box<dyn Error>> {
+    let bytes = scalar_llama_q6_k_gguf_fixture();
+    let gguf = parse_gguf(&bytes)?;
+    let model = ScalarLlamaModel::from_gguf_scalar(&gguf, &bytes)?;
+    let mut session = model.start_session_with_options(
+        ScalarExecutionOptions::default().with_q8_k_activation_matvec(true),
+    );
+
+    let next = session.accept_token(0)?;
+
     assert_eq!(next.token_id, 1);
     assert!(next.logits[1] > next.logits[0]);
     Ok(())

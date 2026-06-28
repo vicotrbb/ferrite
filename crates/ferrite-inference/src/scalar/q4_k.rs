@@ -22,6 +22,7 @@ pub(super) struct Q4KMatVecOutput {
     pub(super) backend: Q4KMatVecBackend,
 }
 
+#[cfg(test)]
 pub(super) fn q4_k_mul_vec(
     bytes: &[u8],
     rows: usize,
@@ -31,6 +32,7 @@ pub(super) fn q4_k_mul_vec(
     Ok(q4_k_mul_vec_with_backend(bytes, rows, cols, vector)?.values)
 }
 
+#[cfg(test)]
 pub(super) fn q4_k_mul_vec_with_backend(
     bytes: &[u8],
     rows: usize,

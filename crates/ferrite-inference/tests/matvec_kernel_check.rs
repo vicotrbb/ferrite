@@ -1,4 +1,4 @@
-use ferrite_inference::scalar::Matrix;
+use ferrite_inference::scalar::{Matrix, ScalarExecutionOptions};
 use std::error::Error;
 use std::io;
 
@@ -70,12 +70,41 @@ fn q4_k_matvec_check_uses_decoded_scalar_reference() -> Result<(), Box<dyn Error
 }
 
 #[test]
+fn q4_k_matvec_accepts_q8_k_execution_options() -> Result<(), Box<dyn Error>> {
+    let matrix = Matrix::from_q4_k_row_major_bytes(1, 256, q4_k_block_with_value(1))?;
+    let vector: Vec<f32> = (1..=256).map(|value| value as f32).collect();
+
+    let output = matrix.mul_vec_with_options(
+        &vector,
+        ScalarExecutionOptions::default().with_q8_k_activation_matvec(true),
+    )?;
+
+    assert_eq!(output.len(), 1);
+    assert!(output[0].is_finite());
+    Ok(())
+}
+
+#[test]
 fn q6_k_matvec_check_uses_decoded_scalar_reference() -> Result<(), Box<dyn Error>> {
     let matrix = Matrix::from_q6_k_row_major_bytes(1, 256, q6_k_block_with_value(-32))?;
 
     let output = matrix.mul_vec_checked_against_reference(&[1.0; 256], 0.001)?;
 
     assert_close(output[0], -8192.0);
+    Ok(())
+}
+
+#[test]
+fn q6_k_matvec_accepts_q8_k_execution_options() -> Result<(), Box<dyn Error>> {
+    let matrix = Matrix::from_q6_k_row_major_bytes(1, 256, q6_k_block_with_value(-32))?;
+
+    let output = matrix.mul_vec_with_options(
+        &[1.0; 256],
+        ScalarExecutionOptions::default().with_q8_k_activation_matvec(true),
+    )?;
+
+    assert_eq!(output.len(), 1);
+    assert!(output[0].is_finite());
     Ok(())
 }
 
