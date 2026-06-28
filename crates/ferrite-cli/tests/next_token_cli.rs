@@ -1,5 +1,6 @@
 use ferrite_fixtures::{
     scalar_llama_f32_gguf_fixture, scalar_llama_f32_gguf_fixture_with_eos_token_id,
+    scalar_llama_q4_k_gguf_fixture,
 };
 use std::error::Error;
 use std::ffi::OsString;
@@ -61,6 +62,35 @@ fn cli_loads_gguf_and_prints_token_id_prompt_next_token() -> Result<(), Box<dyn 
     assert!(stdout.contains("prompt_token_ids=1"));
     assert!(stdout.contains("next_token_id=2"));
     assert!(stdout.contains("next_token=winner"));
+    assert!(stdout.contains("match=true"));
+    Ok(())
+}
+
+#[test]
+fn cli_enables_experimental_q8_k_activation_matvec() -> Result<(), Box<dyn Error>> {
+    let model_path = write_q4_k_fixture_model()?;
+    let binary = cli_binary()?;
+
+    let output = Command::new(binary)
+        .arg("--model")
+        .arg(&model_path)
+        .arg("--prompt-token-ids")
+        .arg("0")
+        .arg("--expect-token-id")
+        .arg("1")
+        .arg("--experimental-q8-k-activation-matvec")
+        .output()?;
+
+    remove_fixture_model(&model_path)?;
+
+    assert!(
+        output.status.success(),
+        "cli failed with stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout)?;
+    assert!(stdout.contains("experimental_q8_k_activation_matvec=true"));
+    assert!(stdout.contains("next_token_id=1"));
     assert!(stdout.contains("match=true"));
     Ok(())
 }
@@ -504,6 +534,10 @@ fn cli_binary() -> Result<OsString, Box<dyn Error>> {
 
 fn write_fixture_model() -> Result<PathBuf, Box<dyn Error>> {
     write_fixture_model_bytes(scalar_llama_f32_gguf_fixture())
+}
+
+fn write_q4_k_fixture_model() -> Result<PathBuf, Box<dyn Error>> {
+    write_fixture_model_bytes(scalar_llama_q4_k_gguf_fixture())
 }
 
 fn write_fixture_model_with_eos_token_id(eos_token_id: u64) -> Result<PathBuf, Box<dyn Error>> {

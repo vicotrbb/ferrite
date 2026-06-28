@@ -13,6 +13,7 @@ pub struct CliArgs {
     pub top_logits: Option<usize>,
     pub profile_next_token: bool,
     pub profile_benchmark_token: bool,
+    pub experimental_q8_k_activation_matvec: bool,
     pub stream: bool,
 }
 
@@ -32,6 +33,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
     let mut top_logits = None;
     let mut profile_next_token = false;
     let mut profile_benchmark_token = false;
+    let mut experimental_q8_k_activation_matvec = false;
     let mut stream = false;
     let mut iter = args.into_iter();
     let _program = iter.next();
@@ -93,6 +95,9 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
             "--profile-benchmark-token" => {
                 profile_benchmark_token = true;
             }
+            "--experimental-q8-k-activation-matvec" => {
+                experimental_q8_k_activation_matvec = true;
+            }
             "--help" | "-h" => {
                 return Err(io::Error::other(usage()).into());
             }
@@ -122,6 +127,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
         top_logits,
         profile_next_token,
         profile_benchmark_token,
+        experimental_q8_k_activation_matvec,
         stream,
     })
 }
@@ -215,5 +221,5 @@ fn parse_token_ids(value: OsString) -> Result<Vec<usize>, Box<dyn Error>> {
 }
 
 fn usage() -> &'static str {
-    "usage: ferrite --model <path.gguf> (--prompt <text> | --prompt-token-ids <id[,id...]>) [--expect-token-id <id>] [--top-logits <count>] [--profile-next-token] [--generate-tokens <count>] [--expect-generated-token-ids <id[,id...]>] [--stream] [--benchmark-runs <count>] [--profile-benchmark-token]"
+    "usage: ferrite --model <path.gguf> (--prompt <text> | --prompt-token-ids <id[,id...]>) [--expect-token-id <id>] [--top-logits <count>] [--profile-next-token] [--generate-tokens <count>] [--expect-generated-token-ids <id[,id...]>] [--stream] [--benchmark-runs <count>] [--profile-benchmark-token] [--experimental-q8-k-activation-matvec]"
 }

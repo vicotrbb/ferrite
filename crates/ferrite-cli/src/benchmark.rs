@@ -1,4 +1,4 @@
-use ferrite_inference::scalar::{ProfiledTokenId, ScalarLlamaModel};
+use ferrite_inference::scalar::{ProfiledTokenId, ScalarExecutionOptions, ScalarLlamaModel};
 use std::error::Error;
 use std::io;
 
@@ -11,8 +11,9 @@ pub(crate) fn profile_first_benchmark_token(
     model: &ScalarLlamaModel,
     prompt_token_ids: &[usize],
     input_token_id: usize,
+    options: ScalarExecutionOptions,
 ) -> Result<BenchmarkTokenProfile, Box<dyn Error>> {
-    let mut session = model.start_session();
+    let mut session = model.start_session_with_options(options);
     let replayed_next = session.accept_prompt(prompt_token_ids)?;
     if replayed_next.token_id != input_token_id {
         return Err(io::Error::other(format!(
