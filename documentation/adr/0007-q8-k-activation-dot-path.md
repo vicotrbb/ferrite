@@ -113,6 +113,9 @@ reference implementation and benchmarking baseline, not the Ferrite runtime.
 - `documentation/dev-notes/2026-06-28-q8-k-role-scoped-policy.md` records the
   role-scoped experimental policy used to isolate Q8_K drift without temporary
   source edits.
+- `documentation/dev-notes/2026-06-28-q8-k-single-role-probes.md` records the
+  first single-role SmolLM2 probes; only `ffn_up` matched both fixed prompts,
+  and it still requires broader parity evidence.
 - `documentation/benchmarks/2026-06-28-tier1-qwen2-1-5b-current-profile.md`
   records the current Qwen2.5-1.5B profile and hot aggregate roles.
 - `documentation/dev-notes/2026-06-28-tier1-q4-q6-thresholded-row-parallel-regression.md`
