@@ -1,9 +1,13 @@
+#[cfg(target_arch = "aarch64")]
+use super::q4_k::q4_k_mul_vec_with_options;
 use super::q4_k::{accumulate_q4_k_block, q4_k_mul_vec};
 #[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
 use super::q4_k::{q4_k_mul_vec_with_backend, Q4KMatVecBackend};
 use super::q5_0::q5_0_mul_vec;
 #[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
 use super::q5_0::{q5_0_mul_vec_with_backend, Q5_0MatVecBackend};
+#[cfg(target_arch = "aarch64")]
+use super::q6_k::q6_k_mul_vec_with_options;
 use super::q6_k::{accumulate_q6_k_block, decode_q6_k_values, q6_k_argmax_mul_vec, q6_k_mul_vec};
 #[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
 use super::q6_k::{q6_k_mul_vec_with_backend, Q6KMatVecBackend};
@@ -11,6 +15,8 @@ use super::q8_0::{q8_0_argmax_mul_vec, q8_0_mul_vec};
 #[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
 use super::q8_0::{q8_0_mul_vec_with_backend, Q8_0MatVecBackend};
 use super::InferenceError;
+#[cfg(target_arch = "aarch64")]
+use super::ScalarExecutionOptions;
 
 #[test]
 fn q4_k_mul_vec_accumulates_rows_without_full_row_decodes() -> Result<(), InferenceError> {
@@ -54,6 +60,28 @@ fn q4_k_matvec_uses_neon_backend_on_aarch64() -> Result<(), InferenceError> {
     let output = q4_k_mul_vec_with_backend(&block, 1, 256, &[1.0; 256])?;
 
     assert_eq!(output.backend, Q4KMatVecBackend::Aarch64Neon);
+    assert_eq!(output.values, vec![256.0]);
+    Ok(())
+}
+
+#[test]
+#[cfg(target_arch = "aarch64")]
+fn q4_k_matvec_uses_q8_k_backend_when_enabled_on_aarch64() -> Result<(), InferenceError> {
+    let mut block = Vec::new();
+    block.extend_from_slice(&0x3c00u16.to_le_bytes());
+    block.extend_from_slice(&0u16.to_le_bytes());
+    block.extend_from_slice(&[1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1]);
+    block.extend_from_slice(&[0x11; 128]);
+
+    let output = q4_k_mul_vec_with_options(
+        &block,
+        1,
+        256,
+        &[1.0; 256],
+        ScalarExecutionOptions::default().with_q8_k_activation_matvec(true),
+    )?;
+
+    assert_eq!(output.backend, Q4KMatVecBackend::Aarch64NeonQ8K);
     assert_eq!(output.values, vec![256.0]);
     Ok(())
 }
@@ -171,6 +199,26 @@ fn q6_k_matvec_uses_neon_backend_on_aarch64() -> Result<(), InferenceError> {
     let output = q6_k_mul_vec_with_backend(&block, 1, 256, &[1.0; 256])?;
 
     assert_eq!(output.backend, Q6KMatVecBackend::Aarch64Neon);
+    assert_eq!(output.values, vec![-8192.0]);
+    Ok(())
+}
+
+#[test]
+#[cfg(target_arch = "aarch64")]
+fn q6_k_matvec_uses_q8_k_backend_when_enabled_on_aarch64() -> Result<(), InferenceError> {
+    let mut block = vec![0u8; 128 + 64];
+    block.extend(vec![1u8; 16]);
+    block.extend_from_slice(&0x3c00u16.to_le_bytes());
+
+    let output = q6_k_mul_vec_with_options(
+        &block,
+        1,
+        256,
+        &[1.0; 256],
+        ScalarExecutionOptions::default().with_q8_k_activation_matvec(true),
+    )?;
+
+    assert_eq!(output.backend, Q6KMatVecBackend::Aarch64NeonQ8K);
     assert_eq!(output.values, vec![-8192.0]);
     Ok(())
 }

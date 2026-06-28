@@ -1,6 +1,6 @@
 #![allow(unsafe_code)]
 
-use super::{float::f16_bits_to_f32, InferenceError};
+use super::{float::f16_bits_to_f32, InferenceError, ScalarExecutionOptions};
 
 pub(super) const Q6_K_BLOCK_VALUES: usize = 256;
 pub(super) const Q6_K_BLOCK_BYTES: usize = 210;
@@ -10,6 +10,8 @@ pub(super) enum Q6KMatVecBackend {
     Scalar,
     #[cfg(target_arch = "aarch64")]
     Aarch64Neon,
+    #[cfg(target_arch = "aarch64")]
+    Aarch64NeonQ8K,
     #[cfg(target_arch = "x86_64")]
     X86_64Avx2,
 }
@@ -59,10 +61,32 @@ pub(super) fn q6_k_mul_vec_with_backend(
     cols: usize,
     vector: &[f32],
 ) -> Result<Q6KMatVecOutput, InferenceError> {
+    q6_k_mul_vec_with_options(bytes, rows, cols, vector, ScalarExecutionOptions::default())
+}
+
+pub(super) fn q6_k_mul_vec_with_options(
+    bytes: &[u8],
+    rows: usize,
+    cols: usize,
+    vector: &[f32],
+    options: ScalarExecutionOptions,
+) -> Result<Q6KMatVecOutput, InferenceError> {
     validate_q6_k_mul_vec(bytes, rows, cols, vector)?;
+    #[cfg(not(target_arch = "aarch64"))]
+    let _ = options;
 
     #[cfg(target_arch = "aarch64")]
     {
+        if options.q8_k_activation_matvec()
+            && cols != 0
+            && cols.is_multiple_of(Q6_K_BLOCK_VALUES)
+            && std::arch::is_aarch64_feature_detected!("neon")
+        {
+            return Ok(Q6KMatVecOutput {
+                values: super::q6_k_q8_k_neon::neon_q6_k_q8_k_mul_vec(bytes, rows, cols, vector)?,
+                backend: Q6KMatVecBackend::Aarch64NeonQ8K,
+            });
+        }
         if cols != 0
             && cols.is_multiple_of(Q6_K_BLOCK_VALUES)
             && std::arch::is_aarch64_feature_detected!("neon")

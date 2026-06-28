@@ -6,6 +6,7 @@ mod math;
 mod matrix;
 mod matvec;
 mod memory;
+mod options;
 mod output;
 mod profile;
 mod prompt;
@@ -51,6 +52,7 @@ mod validation;
 
 pub use math::{argmax, rms_norm};
 pub use matrix::{Matrix, MatrixStorageKind};
+pub use options::ScalarExecutionOptions;
 pub use output::ScalarLlamaOutputWeights;
 pub use profile::{ProfiledNextToken, ProfiledTokenId, ScalarProfileEvent};
 use rope::apply_rope_with_layout;
