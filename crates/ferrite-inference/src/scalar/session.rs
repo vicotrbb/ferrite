@@ -2,11 +2,13 @@ use super::{
     attention::causal_attention,
     math::{add_assign, argmax, rms_norm, swiglu},
     profile::{ProfiledNextToken, ScalarProfileEvent},
-    InferenceError, Matrix, NextToken, ScalarLlamaModel,
+    InferenceError, NextToken, ScalarLlamaModel,
 };
-use std::time::{Duration, Instant};
 
 mod cache;
+mod profiling;
+
+use profiling::{profiled_layer_mul_vec, profiled_mul_vec};
 
 #[derive(Debug)]
 pub struct ScalarLlamaSession<'a> {
@@ -215,24 +217,6 @@ struct AcceptedToken {
     logits: Option<Vec<f32>>,
 }
 
-fn profiled_layer_mul_vec(
-    matrix: &Matrix,
-    vector: &[f32],
-    layer_index: usize,
-    role: &str,
-    profile_events: Option<&mut Vec<ScalarProfileEvent>>,
-) -> Result<Vec<f32>, InferenceError> {
-    if profile_events.is_none() {
-        return matrix.mul_vec(vector);
-    }
-    profiled_mul_vec(
-        matrix,
-        vector,
-        &format!("layer.{layer_index}.{role}"),
-        profile_events,
-    )
-}
-
 fn add_optional_bias(values: &mut [f32], bias: Option<&[f32]>) -> Result<(), InferenceError> {
     let Some(bias) = bias else {
         return Ok(());
@@ -243,32 +227,4 @@ fn add_optional_bias(values: &mut [f32], bias: Option<&[f32]>) -> Result<(), Inf
         *value += bias;
     }
     Ok(())
-}
-
-fn profiled_mul_vec(
-    matrix: &Matrix,
-    vector: &[f32],
-    label: &str,
-    profile_events: Option<&mut Vec<ScalarProfileEvent>>,
-) -> Result<Vec<f32>, InferenceError> {
-    let Some(events) = profile_events else {
-        return matrix.mul_vec(vector);
-    };
-    let started = Instant::now();
-    let output = matrix.mul_vec(vector)?;
-    let elapsed = started.elapsed();
-    events.push(ScalarProfileEvent::new(
-        label,
-        nonzero_duration(elapsed),
-        matrix,
-    ));
-    Ok(output)
-}
-
-fn nonzero_duration(elapsed: Duration) -> Duration {
-    if elapsed.is_zero() {
-        Duration::from_nanos(1)
-    } else {
-        elapsed
-    }
 }
