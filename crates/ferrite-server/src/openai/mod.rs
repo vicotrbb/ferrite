@@ -12,4 +12,6 @@ mod catalog_tests;
 #[cfg(test)]
 mod routes_tests;
 #[cfg(test)]
+mod stream_options_tests;
+#[cfg(test)]
 mod unsupported_tests;

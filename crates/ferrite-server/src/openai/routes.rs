@@ -74,6 +74,7 @@ async fn chat_completions(
             state.model_id().to_owned(),
             prompt,
             max_tokens,
+            request.stream_include_usage(),
             permit,
         ));
     }
@@ -106,6 +107,7 @@ async fn completions(
             state.model_id().to_owned(),
             request.prompt().to_owned(),
             max_tokens,
+            request.stream_include_usage(),
             permit,
         ));
     }
@@ -211,16 +213,23 @@ pub(super) fn completion_stream_response(
     model: String,
     prompt: String,
     max_tokens: usize,
+    include_usage: bool,
     permit: OwnedSemaphorePermit,
 ) -> Response {
     let context = CompletionStreamContext::new(model);
-    let stop_chunk = context.stop();
+    let token_context = context.clone();
     stream_generated_text(
         engine,
         prompt,
         max_tokens,
-        move |piece| context.token(piece.to_owned()),
-        stop_chunk,
+        move |piece| token_context.token(piece.to_owned()),
+        move |generated| {
+            let mut chunks = vec![context.stop()];
+            if include_usage {
+                chunks.push(context.usage(generated));
+            }
+            chunks
+        },
         permit,
     )
 }
@@ -230,16 +239,23 @@ fn chat_stream_response(
     model: String,
     prompt: String,
     max_tokens: usize,
+    include_usage: bool,
     permit: OwnedSemaphorePermit,
 ) -> Response {
     let context = ChatCompletionStreamContext::new(model);
-    let stop_chunk = context.stop();
+    let token_context = context.clone();
     stream_generated_text(
         engine,
         prompt,
         max_tokens,
-        move |piece| context.token(piece.to_owned()),
-        stop_chunk,
+        move |piece| token_context.token(piece.to_owned()),
+        move |generated| {
+            let mut chunks = vec![context.stop()];
+            if include_usage {
+                chunks.push(context.usage(generated));
+            }
+            chunks
+        },
         permit,
     )
 }
@@ -249,7 +265,7 @@ fn stream_generated_text<T>(
     prompt: String,
     max_tokens: usize,
     mut token_chunk: impl FnMut(&str) -> T + Send + 'static,
-    stop_chunk: T,
+    final_chunks: impl FnOnce(&crate::runtime::GeneratedText) -> Vec<T> + Send + 'static,
     permit: OwnedSemaphorePermit,
 ) -> Response
 where
@@ -262,7 +278,7 @@ where
             let engine = engine
                 .lock()
                 .map_err(|_| OpenAiHttpError::internal("inference engine lock is poisoned"))?;
-            engine
+            let generated = engine
                 .generate_with_token_callback(&prompt, max_tokens, |piece| {
                     sender
                         .send_json_blocking(&token_chunk(piece))
@@ -270,7 +286,9 @@ where
                     Ok(())
                 })
                 .map_err(|error| OpenAiHttpError::internal(error.to_string()))?;
-            sender.send_json_blocking(&stop_chunk)?;
+            for chunk in final_chunks(&generated) {
+                sender.send_json_blocking(&chunk)?;
+            }
             sender.send_done_blocking()
         })();
         if result.is_err() {

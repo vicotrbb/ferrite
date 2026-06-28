@@ -1,4 +1,6 @@
-use super::{unix_timestamp, unsupported::UnsupportedFields, usage::Usage};
+use super::{
+    stream_options::StreamOptions, unix_timestamp, unsupported::UnsupportedFields, usage::Usage,
+};
 use crate::runtime::GeneratedText;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -45,7 +47,7 @@ pub struct ChatCompletionRequest {
     #[serde(default)]
     seed: Option<Value>,
     #[serde(default)]
-    stream_options: Option<Value>,
+    stream_options: Option<StreamOptions>,
     #[serde(default)]
     store: Option<Value>,
     #[serde(default)]
@@ -71,8 +73,14 @@ impl ChatCompletionRequest {
         self.max_tokens.or(self.max_completion_tokens)
     }
 
+    pub fn stream_include_usage(&self) -> bool {
+        self.stream_options
+            .as_ref()
+            .is_some_and(StreamOptions::include_usage)
+    }
+
     pub fn unsupported_fields(&self) -> Vec<String> {
-        UnsupportedFields::new()
+        let mut fields = UnsupportedFields::new()
             .with_present("tools", self.tools.is_some())
             .with_present("tool_choice", self.tool_choice.is_some())
             .with_present("parallel_tool_calls", self.parallel_tool_calls.is_some())
@@ -88,11 +96,19 @@ impl ChatCompletionRequest {
             .with_present("top_logprobs", self.top_logprobs.is_some())
             .with_present("user", self.user.is_some())
             .with_present("seed", self.seed.is_some())
-            .with_present("stream_options", self.stream_options.is_some())
             .with_present("store", self.store.is_some())
             .with_present("metadata", self.metadata.is_some())
             .with_extra_keys(&self.extra_fields)
-            .into_vec()
+            .into_vec();
+        if let Some(stream_options) = &self.stream_options {
+            fields.extend(
+                stream_options
+                    .unsupported_fields()
+                    .into_iter()
+                    .map(|field| format!("stream_options.{field}")),
+            );
+        }
+        fields
     }
 }
 
@@ -147,6 +163,8 @@ pub struct ChatCompletionStreamChunk {
     created: u64,
     model: String,
     choices: Vec<ChatCompletionStreamChoice>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    usage: Option<Usage>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -173,6 +191,7 @@ impl ChatCompletionStreamContext {
             created: self.created,
             model: self.model.clone(),
             choices: vec![ChatCompletionStreamChoice::content(content)],
+            usage: None,
         }
     }
 
@@ -183,6 +202,18 @@ impl ChatCompletionStreamContext {
             created: self.created,
             model: self.model.clone(),
             choices: vec![ChatCompletionStreamChoice::stop()],
+            usage: None,
+        }
+    }
+
+    pub fn usage(&self, generated: &GeneratedText) -> ChatCompletionStreamChunk {
+        ChatCompletionStreamChunk {
+            id: self.id.clone(),
+            object: "chat.completion.chunk",
+            created: self.created,
+            model: self.model.clone(),
+            choices: Vec::new(),
+            usage: Some(Usage::from_generation(generated)),
         }
     }
 }

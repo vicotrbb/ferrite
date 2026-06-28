@@ -1,4 +1,6 @@
-use super::{unix_timestamp, unsupported::UnsupportedFields, usage::Usage};
+use super::{
+    stream_options::StreamOptions, unix_timestamp, unsupported::UnsupportedFields, usage::Usage,
+};
 use crate::runtime::GeneratedText;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -12,6 +14,8 @@ pub struct CompletionRequest {
     stream: bool,
     #[serde(default)]
     max_tokens: Option<usize>,
+    #[serde(default)]
+    stream_options: Option<StreamOptions>,
     #[serde(default)]
     suffix: Option<Value>,
     #[serde(default)]
@@ -57,8 +61,14 @@ impl CompletionRequest {
         self.max_tokens
     }
 
+    pub fn stream_include_usage(&self) -> bool {
+        self.stream_options
+            .as_ref()
+            .is_some_and(StreamOptions::include_usage)
+    }
+
     pub fn unsupported_fields(&self) -> Vec<String> {
-        UnsupportedFields::new()
+        let mut fields = UnsupportedFields::new()
             .with_present("suffix", self.suffix.is_some())
             .with_present("temperature", self.temperature.is_some())
             .with_present("top_p", self.top_p.is_some())
@@ -72,7 +82,16 @@ impl CompletionRequest {
             .with_present("logit_bias", self.logit_bias.is_some())
             .with_present("user", self.user.is_some())
             .with_extra_keys(&self.extra_fields)
-            .into_vec()
+            .into_vec();
+        if let Some(stream_options) = &self.stream_options {
+            fields.extend(
+                stream_options
+                    .unsupported_fields()
+                    .into_iter()
+                    .map(|field| format!("stream_options.{field}")),
+            );
+        }
+        fields
     }
 }
 
@@ -93,6 +112,8 @@ pub struct CompletionStreamChunk {
     created: u64,
     model: String,
     choices: Vec<CompletionStreamChoice>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    usage: Option<Usage>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -119,6 +140,7 @@ impl CompletionStreamContext {
             created: self.created,
             model: self.model.clone(),
             choices: vec![CompletionStreamChoice::content(text)],
+            usage: None,
         }
     }
 
@@ -129,6 +151,18 @@ impl CompletionStreamContext {
             created: self.created,
             model: self.model.clone(),
             choices: vec![CompletionStreamChoice::stop()],
+            usage: None,
+        }
+    }
+
+    pub fn usage(&self, generated: &GeneratedText) -> CompletionStreamChunk {
+        CompletionStreamChunk {
+            id: self.id.clone(),
+            object: "text_completion",
+            created: self.created,
+            model: self.model.clone(),
+            choices: Vec::new(),
+            usage: Some(Usage::from_generation(generated)),
         }
     }
 }

@@ -1,6 +1,7 @@
 mod catalog;
 mod chat;
 mod completion;
+mod stream_options;
 mod unsupported;
 mod usage;
 
