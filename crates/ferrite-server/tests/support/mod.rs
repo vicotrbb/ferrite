@@ -17,11 +17,22 @@ pub struct LiveServer {
 
 impl LiveServer {
     pub async fn start() -> Result<Self, Box<dyn std::error::Error>> {
+        Self::start_with_state(|state| state).await
+    }
+
+    pub async fn start_with_api_key(api_key: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        Self::start_with_state(|state| state.with_api_key(api_key)).await
+    }
+
+    async fn start_with_state(
+        configure: impl FnOnce(ServerState) -> ServerState,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         let model_path = write_fixture_model()?;
         let engine = InferenceEngine::load(&model_path)?;
         let listener = TcpListener::bind(SocketAddr::from((Ipv4Addr::LOCALHOST, 0))).await?;
         let addr = listener.local_addr()?;
-        let app = ferrite_server::router(ServerState::with_engine(MODEL_ID.to_owned(), engine));
+        let state = configure(ServerState::with_engine(MODEL_ID.to_owned(), engine));
+        let app = ferrite_server::router(state);
         let server = tokio::spawn(async move { axum::serve(listener, app).await });
 
         Ok(Self {

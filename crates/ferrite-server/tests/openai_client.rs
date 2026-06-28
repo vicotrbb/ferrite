@@ -43,3 +43,36 @@ async fn async_openai_client_uses_ferrite_base_url() -> Result<(), Box<dyn std::
     );
     Ok(())
 }
+
+#[tokio::test]
+async fn async_openai_client_uses_api_key_as_ferrite_bearer_token(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let server = support::LiveServer::start_with_api_key("local-secret").await?;
+    let config = OpenAIConfig::new()
+        .with_api_base(format!("http://{}/v1", server.addr()))
+        .with_api_key("local-secret");
+    let client = Client::with_config(config);
+
+    let response = client
+        .chat()
+        .create(CreateChatCompletionRequest {
+            model: support::MODEL_ID.to_owned(),
+            messages: vec![ChatCompletionRequestMessage::User(
+                ChatCompletionRequestUserMessage {
+                    content: "hello".into(),
+                    ..Default::default()
+                },
+            )],
+            max_completion_tokens: Some(1),
+            ..Default::default()
+        })
+        .await?;
+
+    assert_eq!(response.object, "chat.completion");
+    assert_eq!(response.model, support::MODEL_ID);
+    assert_eq!(
+        response.choices[0].message.content.as_deref(),
+        Some("winner")
+    );
+    Ok(())
+}

@@ -38,17 +38,56 @@ async fn live_http_server_accepts_openai_style_chat_request(
     Ok(())
 }
 
+#[tokio::test]
+async fn live_http_server_accepts_matching_bearer_token() -> Result<(), Box<dyn std::error::Error>>
+{
+    let server = support::LiveServer::start_with_api_key("local-secret").await?;
+    let request_body = format!(
+        r#"{{"model":"{}","messages":[{{"role":"user","content":"hello"}}],"max_completion_tokens":1}}"#,
+        support::MODEL_ID
+    );
+    let response = send_http_request_with_bearer(
+        server.addr(),
+        "POST",
+        "/v1/chat/completions",
+        request_body.as_bytes(),
+        "local-secret",
+    )
+    .await?;
+
+    assert!(
+        response.starts_with("HTTP/1.1 200 OK"),
+        "unexpected response: {response}"
+    );
+    let (_, body) = response
+        .split_once("\r\n\r\n")
+        .ok_or("expected HTTP response body")?;
+    let body: Value = serde_json::from_str(body)?;
+    assert_eq!(body["choices"][0]["message"]["content"], "winner");
+    Ok(())
+}
+
 async fn send_http_request(
     addr: SocketAddr,
     method: &str,
     path: &str,
     body: &[u8],
 ) -> Result<String, Box<dyn std::error::Error>> {
+    send_http_request_with_bearer(addr, method, path, body, "local-test").await
+}
+
+async fn send_http_request_with_bearer(
+    addr: SocketAddr,
+    method: &str,
+    path: &str,
+    body: &[u8],
+    bearer_token: &str,
+) -> Result<String, Box<dyn std::error::Error>> {
     let mut stream = TcpStream::connect(addr).await?;
     let request = format!(
         "{method} {path} HTTP/1.1\r\n\
 Host: {addr}\r\n\
-Authorization: Bearer local-test\r\n\
+Authorization: Bearer {bearer_token}\r\n\
 Content-Type: application/json\r\n\
 Content-Length: {}\r\n\
 Connection: close\r\n\
