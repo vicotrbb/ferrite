@@ -60,6 +60,19 @@ Ferrite's Q6_K NEON helper uses that same split form:
 activation.d * super_scale * (weighted_sum - 32 * correction_sum)
 ```
 
+## Follow-up Guardrail
+
+The follow-up guard `test: cover q8 k q6 bitplane lanes` adds
+`q6_k_q8_k_identity_covers_every_q6_bitplane_lane` in
+`crates/ferrite-inference/src/scalar/q8_k_reference_tests.rs`.
+
+That test builds a Q6_K block fixture whose packed low-bit and high-bit planes
+cover every raw 6-bit lane value across the Q1, Q2, Q3, and Q4 lane routes,
+then compares Ferrite's Q6_K x Q8_K block dot with the local reference split
+identity. This tightens the "no formula hole" claim around the most fragile
+part of the design: Q6_K bitplane reconstruction plus signed Q8_K activation
+group sums.
+
 ## Source Anchors
 
 - `target/reference/llama.cpp/ggml/src/ggml-quants.c:2696`
@@ -79,8 +92,8 @@ No reference-arithmetic hole was found in Ferrite's Path B design.
 
 The Q8_K activation quantizer, Q4_K formula, and Q6_K formula line up with
 llama.cpp's generic and ARM NEON contracts. Ferrite's tests pin the quantizer
-contract and compare target-specific Q8_K helpers against the scalar Q8_K
-adapters. The SmolLM2 failures documented in
+contract, cover Q6_K's packed bitplane lane routes, and compare target-specific
+Q8_K helpers against the scalar Q8_K adapters. The SmolLM2 failures documented in
 `documentation/dev-notes/2026-06-28-q8-k-divergence-diagnostic.md` therefore
 remain best explained as activation-quantization drift crossing a narrow output
 margin, not as a proven Q4_K/Q6_K x Q8_K formula bug.

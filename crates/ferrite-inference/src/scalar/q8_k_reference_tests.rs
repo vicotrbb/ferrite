@@ -68,6 +68,18 @@ fn q6_k_q8_k_identity_holds_for_signed_q8_k_scales() -> Result<(), InferenceErro
     Ok(())
 }
 
+#[test]
+fn q6_k_q8_k_identity_covers_every_q6_bitplane_lane() -> Result<(), InferenceError> {
+    let block = raw_lane_sweep_q6_k_block();
+    let activation = BlockQ8K::quantize(&patterned_activation::<Q6_K_BLOCK_VALUES>())?;
+
+    let actual = q6_k_q8_k_block_dot(&block, &activation)?;
+    let expected = reference_q6_k_q8_k_dot(&block, &activation)?;
+
+    assert_close(actual, expected);
+    Ok(())
+}
+
 fn reference_q4_k_q8_k_dot(block: &[u8], activation: &BlockQ8K) -> Result<f32, InferenceError> {
     if block.len() != Q4_K_BLOCK_BYTES {
         return Err(InferenceError::new(format!(
@@ -258,6 +270,58 @@ fn patterned_q6_k_block() -> Vec<u8> {
     );
     block.extend_from_slice(&0x3c00u16.to_le_bytes());
     block
+}
+
+fn raw_lane_sweep_q6_k_block() -> Vec<u8> {
+    let mut block = vec![0u8; Q6_K_BLOCK_BYTES];
+    let scales = [-8i8, 7, -6, 5, -4, 3, -2, 1, 2, -3, 4, -5, 6, -7, 8, -9];
+
+    for group in 0..16 {
+        for lane in 0..16 {
+            let raw = ((group * 16 + lane) % 64) as u8;
+            set_q6_raw_lane(&mut block, group, lane, raw);
+        }
+    }
+    for (index, scale) in scales.iter().enumerate() {
+        block[192 + index] = *scale as u8;
+    }
+    block[208..210].copy_from_slice(&0x3c00u16.to_le_bytes());
+
+    block
+}
+
+fn set_q6_raw_lane(block: &mut [u8], group: usize, lane: usize, raw: u8) {
+    debug_assert!(group < 16);
+    debug_assert!(lane < 16);
+    debug_assert!(raw < 64);
+
+    let half = group / 8;
+    let group_in_half = group % 8;
+    let low_base = half * 64;
+    let high_base = 128 + half * 32;
+    let index_base = group_in_half % 2 * 16;
+    let offset = index_base + lane;
+    let low = raw & 0x0f;
+    let high = raw >> 4;
+
+    match group_in_half / 2 {
+        0 => {
+            block[low_base + offset] = (block[low_base + offset] & 0xf0) | low;
+            block[high_base + offset] = (block[high_base + offset] & !0x03) | high;
+        }
+        1 => {
+            block[low_base + offset + 32] = (block[low_base + offset + 32] & 0xf0) | low;
+            block[high_base + offset] = (block[high_base + offset] & !0x0c) | (high << 2);
+        }
+        2 => {
+            block[low_base + offset] = (block[low_base + offset] & 0x0f) | (low << 4);
+            block[high_base + offset] = (block[high_base + offset] & !0x30) | (high << 4);
+        }
+        _ => {
+            block[low_base + offset + 32] = (block[low_base + offset + 32] & 0x0f) | (low << 4);
+            block[high_base + offset] = (block[high_base + offset] & !0xc0) | (high << 6);
+        }
+    }
 }
 
 fn patterned_activation<const N: usize>() -> [f32; N] {
