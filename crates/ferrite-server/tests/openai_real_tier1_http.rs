@@ -36,6 +36,40 @@ async fn live_http_server_generates_with_real_tier1_model() -> Result<(), Box<dy
     Ok(())
 }
 
+#[tokio::test]
+#[ignore = "requires local Tier 1 GGUF model artifact"]
+async fn live_http_server_streams_with_real_tier1_model() -> Result<(), Box<dyn std::error::Error>>
+{
+    let model_path = real_model_path()?;
+    let server = support::LiveServer::start_with_existing_model(REAL_MODEL_ID, model_path).await?;
+    let request_body = format!(
+        r#"{{"model":"{REAL_MODEL_ID}","prompt":"hello world","max_tokens":1,"stream":true}}"#
+    );
+    let response = send_http_request(
+        server.addr(),
+        "POST",
+        "/v1/completions",
+        request_body.as_bytes(),
+    )
+    .await?;
+
+    assert!(
+        response.starts_with("HTTP/1.1 200 OK"),
+        "unexpected response: {response}"
+    );
+    assert!(
+        response
+            .to_ascii_lowercase()
+            .contains("content-type: text/event-stream"),
+        "unexpected response headers: {response}"
+    );
+    assert!(response.contains("data: {\"id\":\"cmpl-ferrite-"));
+    assert!(response.contains("\"object\":\"text_completion\""));
+    assert!(response.contains("\"text\":\"\\n\""));
+    assert!(response.contains("data: [DONE]"));
+    Ok(())
+}
+
 fn real_model_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
     let model_path = std::env::var_os("FERRITE_REAL_TIER1_MODEL")
         .map(PathBuf::from)
