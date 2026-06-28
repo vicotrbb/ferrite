@@ -1,6 +1,6 @@
 # Tier 1 Gate Status
 
-Date: 2026-06-27
+Date: 2026-06-28
 
 ## Scope
 
@@ -27,14 +27,13 @@ x86_64 AVX2 dispatch for all currently supported matvec formats, but no x86_64
 host runtime evidence yet.
 
 Ferrite now has several real Tier 1 model-output proofs: SmolLM2-1.7B-Instruct
-Q4_K_M matched a fixed local `llama.cpp` deterministic reference profile for
-six generated tokens from the prompt `hello world`, and Qwen2.5-0.5B-Instruct
-Q4_K_M plus Qwen2.5-1.5B-Instruct Q4_K_M matched fixed local `llama.cpp`
-deterministic reference profiles for two prompts. The Qwen2.5-1.5B proof
-exercises the Tier 1 head_dim=128 model. The Q4_K and Q6_K SIMD paths also
-have row-level Rayon parallelism on aarch64 NEON and compile-checked x86_64
-AVX2, and the Q4_K, Q5_0, and Q6_K aarch64 paths now use fused NEON block-dot
-helpers.
+Q4_K_M matched fixed local `llama.cpp` deterministic reference profiles for
+two prompts, and Qwen2.5-0.5B-Instruct Q4_K_M plus Qwen2.5-1.5B-Instruct
+Q4_K_M matched fixed local `llama.cpp` deterministic reference profiles for
+two prompts. The Qwen2.5-1.5B proof exercises the Tier 1 head_dim=128 model.
+The Q4_K and Q6_K SIMD paths also have row-level Rayon parallelism on aarch64
+NEON and compile-checked x86_64 AVX2, and the Q4_K, Q5_0, and Q6_K aarch64
+paths now use fused NEON block-dot helpers.
 Local SmolLM2-1.7B benchmark improvements are recorded, and `--benchmark-runs`
 now uses a token-id-only repeated-token path instead of returning unused logits
 for each benchmark token. Generated-token loops also use token-id-only repeated
@@ -61,7 +60,7 @@ unproven.
 | AArch64 SIMD correctness | Partially proven for F32, Q8_0, Q5_0, Q6_K, and Q4_K matvec on local NEON host | `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-f32-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q8-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q5-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q6-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q4-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-q4k-row-parallel-simd.md`; `documentation/dev-notes/2026-06-27-tier1-q6k-row-parallel-simd.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-q4k-fused-neon.md`; `documentation/benchmarks/2026-06-27-tier1-qwen2-0-5b-q5-neon-block-dot.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-q6k-fused-neon.md`; targeted aarch64 backend tests |
 | AVX2 correctness | Compile-only F32, Q8_0, Q5_0, Q6_K, and Q4_K bring-up exists; runtime correctness not proven | `documentation/dev-notes/2026-06-27-tier1-x86-64-avx2-f32-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-x86-64-avx2-q8-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-x86-64-avx2-q5-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-x86-64-avx2-q6-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-x86-64-avx2-q4-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-q4k-row-parallel-simd.md`; `documentation/dev-notes/2026-06-27-tier1-q6k-row-parallel-simd.md`; `cargo check -p ferrite-inference --target x86_64-unknown-linux-gnu --tests`; no x86_64 AVX2 host run yet |
 | Quantized SIMD correctness | Partially proven for Q8_0, Q5_0, Q6_K, and Q4_K on local NEON host | `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q8-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q5-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q6-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-aarch64-neon-q4-matvec.md`; `documentation/dev-notes/2026-06-27-tier1-q4k-row-parallel-simd.md`; `documentation/dev-notes/2026-06-27-tier1-q6k-row-parallel-simd.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-q4k-fused-neon.md`; `documentation/benchmarks/2026-06-27-tier1-qwen2-0-5b-q5-neon-block-dot.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-q6k-fused-neon.md`; Q4_K and Q6_K dispatch is scoped to rows whose column count is a whole number of K-blocks |
-| Real 0.5B-1.7B model output | Partially proven for one 1.7B Llama-family profile and two fixed Qwen2 prompts | `documentation/dev-notes/2026-06-27-tier1-smollm2-1-7b-reference-probe.md`; `documentation/dev-notes/2026-06-27-tier1-qwen2-rope-layout.md`; `documentation/dev-notes/2026-06-27-tier1-qwen2-1-5b-reference-probe.md`; `documentation/dev-notes/2026-06-28-tier1-qwen2-second-prompt-reference.md`; Ferrite matched local `llama.cpp` token IDs `[18, 198, 3725, 198, 198, 788]` for SmolLM2-1.7B-Instruct Q4_K_M, `[198, 9707, 11]` for both Qwen2.5 Q4_K_M models on `hello world`, and `[12095,13,1084]` / `[12095,13,576]` for Qwen2.5-0.5B / 1.5B on `The capital of France is` |
+| Real 0.5B-1.7B model output | Partially proven for two fixed 1.7B Llama-family prompts and two fixed Qwen2 prompts | `documentation/dev-notes/2026-06-27-tier1-smollm2-1-7b-reference-probe.md`; `documentation/dev-notes/2026-06-28-tier1-smollm2-second-prompt-reference.md`; `documentation/dev-notes/2026-06-27-tier1-qwen2-rope-layout.md`; `documentation/dev-notes/2026-06-27-tier1-qwen2-1-5b-reference-probe.md`; `documentation/dev-notes/2026-06-28-tier1-qwen2-second-prompt-reference.md`; Ferrite matched local `llama.cpp` token IDs `[18, 198, 3725, 198, 198, 788]` and `[7042,30,2]` for SmolLM2-1.7B-Instruct Q4_K_M, `[198, 9707, 11]` for both Qwen2.5 Q4_K_M models on `hello world`, and `[12095,13,1084]` / `[12095,13,576]` for Qwen2.5-0.5B / 1.5B on `The capital of France is` |
 | Qwen2 Tier 1 model coverage | Partially proven for Qwen2.5-0.5B and 1.5B Q4_K_M over two fixed prompts | `documentation/dev-notes/2026-06-27-tier1-qwen2-0-5b-probe.md`; `documentation/dev-notes/2026-06-27-tier1-qwen2-config-parser.md`; `documentation/dev-notes/2026-06-27-scalar-qkv-projection-bias.md`; `documentation/dev-notes/2026-06-27-tier1-qwen2-loader-dispatch.md`; `documentation/dev-notes/2026-06-27-tier1-qwen2-rope-layout.md`; `documentation/dev-notes/2026-06-27-tier1-qwen2-1-5b-reference-probe.md`; `documentation/dev-notes/2026-06-28-tier1-qwen2-second-prompt-reference.md`; Qwen2.5-0.5B-Instruct and Qwen2.5-1.5B-Instruct Q4_K_M both load, use split-half RoPE, and match three-token deterministic `llama.cpp` reference continuations for `hello world` and `The capital of France is` |
 | Tier 1 throughput target | Partially proven for local Qwen2.5-0.5B Q4_K_M only; not proven for the full tier | `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-scalar-probe.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-q4k-row-parallel.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-q6k-row-parallel.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-q4k-fused-neon.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-q6k-fused-neon.md`; `documentation/benchmarks/2026-06-27-tier1-smollm2-1-7b-token-id-benchmark.md`; `documentation/benchmarks/2026-06-27-tier1-qwen2-q4k-throughput.md`; `documentation/benchmarks/2026-06-27-tier1-qwen2-0-5b-q5-neon-block-dot.md`; `documentation/benchmarks/2026-06-27-tier1-qwen2-0-5b-q8-argmax.md`; `documentation/benchmarks/2026-06-28-tier1-qwen2-0-5b-q5-thresholded-row-parallel.md`; token-id benchmark path improved the SmolLM2-1.7B local default-pool run to about 5.51 tok/s and the 2-thread run to about 3.36 tok/s; Qwen2.5-0.5B improved to about 15.55 tok/s default-pool and 12.29 tok/s with `RAYON_NUM_THREADS=2` after thresholded Q5_0 row-parallel scheduling, but Qwen2.5-1.5B and broader Tier 1 throughput remain below or unproven |
 | Generated token path | Proven for one real 1.7B parity profile | `documentation/dev-notes/2026-06-27-token-id-generation-path.md`; generated-token loops use token-id-only repeated acceptance and still matched SmolLM2-1.7B token IDs `[18, 198, 3725, 198, 198, 788]` |
@@ -210,8 +209,8 @@ match=true
 
 - Run AVX2 runtime correctness checks on an x86_64 host behind ADR 0006's
   unsafe-boundary rules.
-- Expand Tier 1 model coverage beyond the single SmolLM2-1.7B-Instruct Q4_K_M
-  fixed local reference profile recorded so far.
+- Expand Tier 1 model coverage beyond the two fixed SmolLM2-1.7B-Instruct
+  Q4_K_M local reference profiles recorded so far.
 - Expand Qwen2 coverage beyond the two fixed Q4_K_M prompt profiles. The 0.5B
   and 1.5B models now have three-token deterministic reference proofs for
   `hello world` and `The capital of France is`, but broader prompt coverage,
