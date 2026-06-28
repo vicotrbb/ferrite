@@ -11,7 +11,7 @@ use super::InferenceError;
 
 #[cfg(test)]
 mod tests {
-    #[cfg(target_arch = "aarch64")]
+    #[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
     use super::super::q4_k::{q4_k_mul_vec_with_backend, Q4KMatVecBackend};
     #[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
     use super::super::q5_0::{q5_0_mul_vec_with_backend, Q5_0MatVecBackend};
@@ -66,6 +66,22 @@ mod tests {
         let output = q4_k_mul_vec_with_backend(&block, 1, 256, &[1.0; 256])?;
 
         assert_eq!(output.backend, Q4KMatVecBackend::Aarch64Neon);
+        assert_eq!(output.values, vec![256.0]);
+        Ok(())
+    }
+
+    #[test]
+    #[cfg(target_arch = "x86_64")]
+    fn q4_k_matvec_uses_avx2_backend_on_x86_64() -> Result<(), InferenceError> {
+        let mut block = Vec::new();
+        block.extend_from_slice(&0x3c00u16.to_le_bytes());
+        block.extend_from_slice(&0u16.to_le_bytes());
+        block.extend_from_slice(&[1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1]);
+        block.extend_from_slice(&[0x11; 128]);
+
+        let output = q4_k_mul_vec_with_backend(&block, 1, 256, &[1.0; 256])?;
+
+        assert_eq!(output.backend, Q4KMatVecBackend::X86_64Avx2);
         assert_eq!(output.values, vec![256.0]);
         Ok(())
     }
