@@ -65,6 +65,13 @@ impl OpenAiHttpError {
         }
     }
 
+    pub fn rate_limited(message: impl Into<String>) -> Self {
+        Self {
+            status: StatusCode::TOO_MANY_REQUESTS,
+            body: OpenAiErrorResponse::new(OpenAiErrorBody::new(message, "rate_limit_error")),
+        }
+    }
+
     pub fn internal(message: impl Into<String>) -> Self {
         Self {
             status: StatusCode::INTERNAL_SERVER_ERROR,

@@ -18,6 +18,7 @@ use axum::{
     Json, Router,
 };
 use std::sync::{Arc, Mutex};
+use tokio::sync::OwnedSemaphorePermit;
 
 const DEFAULT_MAX_TOKENS: usize = 16;
 const HARD_MAX_TOKENS: usize = 256;
@@ -48,15 +49,17 @@ async fn chat_completions(
     ensure_model(&state, request.model())?;
     let prompt = render_chat_prompt(request.messages())?;
     let max_tokens = normalized_max_tokens(request.max_tokens())?;
+    let permit = acquire_inference_permit(&state)?;
     if request.stream() {
         return Ok(chat_stream_response(
             required_engine(&state)?,
             state.model_id().to_owned(),
             prompt,
             max_tokens,
+            permit,
         ));
     }
-    let generated = generate_text(state.engine(), prompt, max_tokens).await?;
+    let generated = generate_text(state.engine(), prompt, max_tokens, permit).await?;
     Ok(Json(ChatCompletionResponse::from_generation(
         state.model_id().to_owned(),
         generated,
@@ -75,15 +78,23 @@ async fn completions(
         ));
     }
     let max_tokens = normalized_max_tokens(request.max_tokens())?;
+    let permit = acquire_inference_permit(&state)?;
     if request.stream() {
         return Ok(completion_stream_response(
             required_engine(&state)?,
             state.model_id().to_owned(),
             request.prompt().to_owned(),
             max_tokens,
+            permit,
         ));
     }
-    let generated = generate_text(state.engine(), request.prompt().to_owned(), max_tokens).await?;
+    let generated = generate_text(
+        state.engine(),
+        request.prompt().to_owned(),
+        max_tokens,
+        permit,
+    )
+    .await?;
     Ok(Json(CompletionResponse::from_generation(
         state.model_id().to_owned(),
         generated,
@@ -111,6 +122,12 @@ fn required_engine(
     })
 }
 
+fn acquire_inference_permit(state: &ServerState) -> Result<OwnedSemaphorePermit, OpenAiHttpError> {
+    state.try_acquire_inference_permit().ok_or_else(|| {
+        OpenAiHttpError::rate_limited("inference request queue is full; retry later")
+    })
+}
+
 fn normalized_max_tokens(value: Option<usize>) -> Result<usize, OpenAiHttpError> {
     let tokens = value.unwrap_or(DEFAULT_MAX_TOKENS);
     if tokens == 0 {
@@ -131,6 +148,7 @@ pub(super) fn completion_stream_response(
     model: String,
     prompt: String,
     max_tokens: usize,
+    permit: OwnedSemaphorePermit,
 ) -> Response {
     let context = CompletionStreamContext::new(model);
     let stop_chunk = context.stop();
@@ -140,6 +158,7 @@ pub(super) fn completion_stream_response(
         max_tokens,
         move |piece| context.token(piece.to_owned()),
         stop_chunk,
+        permit,
     )
 }
 
@@ -148,6 +167,7 @@ fn chat_stream_response(
     model: String,
     prompt: String,
     max_tokens: usize,
+    permit: OwnedSemaphorePermit,
 ) -> Response {
     let context = ChatCompletionStreamContext::new(model);
     let stop_chunk = context.stop();
@@ -157,6 +177,7 @@ fn chat_stream_response(
         max_tokens,
         move |piece| context.token(piece.to_owned()),
         stop_chunk,
+        permit,
     )
 }
 
@@ -166,12 +187,14 @@ fn stream_generated_text<T>(
     max_tokens: usize,
     mut token_chunk: impl FnMut(&str) -> T + Send + 'static,
     stop_chunk: T,
+    permit: OwnedSemaphorePermit,
 ) -> Response
 where
     T: serde::Serialize + Send + 'static,
 {
     let (sender, response) = streaming::channel_response();
     tokio::task::spawn_blocking(move || {
+        let _permit = permit;
         let result = (|| -> Result<(), OpenAiHttpError> {
             let engine = engine
                 .lock()
@@ -198,6 +221,7 @@ async fn generate_text(
     engine: Option<Arc<Mutex<crate::runtime::InferenceEngine>>>,
     prompt: String,
     max_tokens: usize,
+    permit: OwnedSemaphorePermit,
 ) -> Result<crate::runtime::GeneratedText, OpenAiHttpError> {
     let Some(engine) = engine else {
         return Err(OpenAiHttpError::service_unavailable(
@@ -206,6 +230,7 @@ async fn generate_text(
     };
 
     tokio::task::spawn_blocking(move || {
+        let _permit = permit;
         let engine = engine
             .lock()
             .map_err(|_| OpenAiHttpError::internal("inference engine lock is poisoned"))?;

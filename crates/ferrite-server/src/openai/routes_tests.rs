@@ -142,12 +142,17 @@ async fn completion_stream_helper_emits_tokens_from_generation_callback(
     let model_path = write_fixture_model()?;
     let engine = InferenceEngine::load(&model_path)?;
     remove_fixture_model(&model_path)?;
+    let state = ServerState::with_engine("fixture-model".to_owned(), engine);
+    let permit = state
+        .try_acquire_inference_permit()
+        .ok_or("expected inference permit")?;
 
     let response = super::routes::completion_stream_response(
-        std::sync::Arc::new(std::sync::Mutex::new(engine)),
+        state.engine().ok_or("expected inference engine")?,
         "fixture-model".to_owned(),
         "hello".to_owned(),
         1,
+        permit,
     );
     let body = to_text(response.into_body()).await?;
 
@@ -186,6 +191,32 @@ async fn completions_endpoint_returns_openai_error_for_missing_json_content_type
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     let body = to_json(response.into_body()).await?;
     assert_eq!(body["error"]["type"], "invalid_request_error");
+    Ok(())
+}
+
+#[tokio::test]
+async fn completions_endpoint_returns_429_when_inference_is_busy(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let model_path = write_fixture_model()?;
+    let engine = InferenceEngine::load(&model_path)?;
+    let state = ServerState::with_engine("fixture-model".to_owned(), engine);
+    let _held_permit = state
+        .try_acquire_inference_permit()
+        .ok_or("expected first inference permit")?;
+    let app = router(state);
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/completions")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            r#"{"model":"fixture-model","prompt":"hello","max_tokens":1}"#,
+        ))?;
+    let response = app.oneshot(request).await?;
+    remove_fixture_model(&model_path)?;
+
+    assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+    let body = to_json(response.into_body()).await?;
+    assert_eq!(body["error"]["type"], "rate_limit_error");
     Ok(())
 }
 
