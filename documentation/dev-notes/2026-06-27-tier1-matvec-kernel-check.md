@@ -17,6 +17,12 @@ This slice adds:
 The check returns the active matvec output after comparing it against the
 decoded scalar reference path.
 
+After the aarch64 NEON quantized-kernel slices, the harness was expanded to
+cover Q5_0, Q4_K, and Q6_K public `Matrix` paths as well. The Q4_K and Q6_K
+cases use one-row, whole-K-block fixtures so they exercise the same shape class
+as the current NEON dispatch gates while still comparing through the decoded
+scalar row reference.
+
 ## Validation
 
 Test-first failure before implementation:
@@ -33,14 +39,18 @@ Passing checks after implementation:
 ```text
 cargo test -p ferrite-inference --test matvec_kernel_check -- --nocapture
 cargo test -p ferrite-inference --test scalar_reference
+cargo fmt --all -- --check
+git diff --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
 ```
 
-The new matvec kernel-check target passed all 3 tests, and the scalar reference
-integration target passed all 16 tests.
+The expanded matvec kernel-check target passed all 6 tests, the scalar
+reference integration target passed all 16 tests, and the full workspace test
+suite passed.
 
 ## Remaining Work
 
-This is a correctness gate for future optimized kernels, not an AVX2 or
-throughput implementation. Durable SIMD work still needs an unsafe-boundary ADR
-or lint-policy change, then optimized kernels must be run through this
+This is a correctness gate for optimized kernels, not an AVX2 or throughput
+implementation. AVX2 kernels and real Tier 1 model runs still need to pass this
 comparison path before correctness or Tier 1 throughput claims are made.
