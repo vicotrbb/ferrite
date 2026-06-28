@@ -85,12 +85,16 @@ impl CompletionRequest {
             .with_extra_keys(&self.extra_fields)
             .into_vec();
         if let Some(stream_options) = &self.stream_options {
-            fields.extend(
-                stream_options
-                    .unsupported_fields()
-                    .into_iter()
-                    .map(|field| format!("stream_options.{field}")),
-            );
+            if !self.stream {
+                fields.push("stream_options".to_owned());
+            } else {
+                fields.extend(
+                    stream_options
+                        .unsupported_fields()
+                        .into_iter()
+                        .map(|field| format!("stream_options.{field}")),
+                );
+            }
         }
         fields
     }

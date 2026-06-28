@@ -107,6 +107,44 @@ async fn completion_stream_endpoint_rejects_enabled_obfuscation(
     Ok(())
 }
 
+#[tokio::test]
+async fn chat_endpoint_rejects_stream_options_without_streaming(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let app = router(ServerState::new("fixture-model".to_owned()));
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/chat/completions")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            r#"{"model":"fixture-model","messages":[{"role":"user","content":"hello"}],"stream_options":{"include_usage":true}}"#,
+        ))?;
+    let response = app.oneshot(request).await?;
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let body = to_text(response.into_body()).await?;
+    assert!(body.contains("stream_options"));
+    Ok(())
+}
+
+#[tokio::test]
+async fn completion_endpoint_rejects_stream_options_without_streaming(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let app = router(ServerState::new("fixture-model".to_owned()));
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/completions")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            r#"{"model":"fixture-model","prompt":"hello","stream_options":{"include_obfuscation":false}}"#,
+        ))?;
+    let response = app.oneshot(request).await?;
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let body = to_text(response.into_body()).await?;
+    assert!(body.contains("stream_options"));
+    Ok(())
+}
+
 async fn to_text(body: Body) -> Result<String, Box<dyn std::error::Error>> {
     let bytes = to_bytes(body, usize::MAX).await?;
     Ok(String::from_utf8(bytes.to_vec())?)
