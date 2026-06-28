@@ -19,11 +19,12 @@ axum = "0.7"
 ferrite-inference = { path = "../ferrite-inference" }
 ferrite-model = { path = "../ferrite-model" }
 serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 tokio = { version = "1", features = ["macros", "net", "rt-multi-thread"] }
+tokio-stream = "0.1"
 
 [dev-dependencies]
 ferrite-fixtures = { path = "../ferrite-fixtures" }
-serde_json = "1"
 tower = { version = "0.5", features = ["util"] }
 
 [lints]

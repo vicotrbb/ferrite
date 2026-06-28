@@ -2,12 +2,20 @@ use super::{
     error::OpenAiHttpError,
     prompt::render_chat_prompt,
     schema::{
-        ChatCompletionRequest, ChatCompletionResponse, CompletionRequest, CompletionResponse,
-        HealthResponse, ModelObject, ModelsResponse,
+        ChatCompletionRequest, ChatCompletionResponse, ChatCompletionStreamChunk,
+        CompletionRequest, CompletionResponse, CompletionStreamChunk, HealthResponse, ModelObject,
+        ModelsResponse,
     },
+    streaming,
 };
 use crate::state::ServerState;
-use axum::{extract::State, routing::get, routing::post, Json, Router};
+use axum::{
+    extract::State,
+    response::{IntoResponse, Response},
+    routing::get,
+    routing::post,
+    Json, Router,
+};
 use std::sync::{Arc, Mutex};
 
 const DEFAULT_MAX_TOKENS: usize = 16;
@@ -35,31 +43,28 @@ async fn models(State(state): State<ServerState>) -> Json<ModelsResponse> {
 async fn chat_completions(
     State(state): State<ServerState>,
     Json(request): Json<ChatCompletionRequest>,
-) -> Result<Json<ChatCompletionResponse>, OpenAiHttpError> {
-    if request.stream() {
-        return Err(OpenAiHttpError::not_implemented(
-            "chat completion streaming is not implemented yet",
-        ));
-    }
+) -> Result<Response, OpenAiHttpError> {
     ensure_model(&state, request.model())?;
     let prompt = render_chat_prompt(request.messages())?;
     let max_tokens = normalized_max_tokens(request.max_tokens())?;
     let generated = generate_text(state.engine(), prompt, max_tokens).await?;
+    if request.stream() {
+        return streaming::response(ChatCompletionStreamChunk::from_generation(
+            state.model_id().to_owned(),
+            &generated,
+        ));
+    }
     Ok(Json(ChatCompletionResponse::from_generation(
         state.model_id().to_owned(),
         generated,
-    )))
+    ))
+    .into_response())
 }
 
 async fn completions(
     State(state): State<ServerState>,
     Json(request): Json<CompletionRequest>,
-) -> Result<Json<CompletionResponse>, OpenAiHttpError> {
-    if request.stream() {
-        return Err(OpenAiHttpError::not_implemented(
-            "completion streaming is not implemented yet",
-        ));
-    }
+) -> Result<Response, OpenAiHttpError> {
     ensure_model(&state, request.model())?;
     if request.prompt().trim().is_empty() {
         return Err(OpenAiHttpError::invalid_request(
@@ -68,10 +73,17 @@ async fn completions(
     }
     let max_tokens = normalized_max_tokens(request.max_tokens())?;
     let generated = generate_text(state.engine(), request.prompt().to_owned(), max_tokens).await?;
+    if request.stream() {
+        return streaming::response(CompletionStreamChunk::from_generation(
+            state.model_id().to_owned(),
+            &generated,
+        ));
+    }
     Ok(Json(CompletionResponse::from_generation(
         state.model_id().to_owned(),
         generated,
-    )))
+    ))
+    .into_response())
 }
 
 fn ensure_model(state: &ServerState, requested_model: &str) -> Result<(), OpenAiHttpError> {

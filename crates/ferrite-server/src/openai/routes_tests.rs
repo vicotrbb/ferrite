@@ -86,19 +86,83 @@ async fn completions_endpoint_generates_with_loaded_fixture_model(
     Ok(())
 }
 
+#[tokio::test]
+async fn completions_endpoint_streams_openai_sse_chunks() -> Result<(), Box<dyn std::error::Error>>
+{
+    let model_path = write_fixture_model()?;
+    let engine = InferenceEngine::load(&model_path)?;
+    let app = router(ServerState::with_engine("fixture-model".to_owned(), engine));
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/completions")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            r#"{"model":"fixture-model","prompt":"hello","max_tokens":1,"stream":true}"#,
+        ))?;
+    let response = app.oneshot(request).await?;
+    remove_fixture_model(&model_path)?;
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_text(response.into_body()).await?;
+    assert!(body.contains("data: {\"id\":\"cmpl-ferrite-"));
+    assert!(body.contains("\"object\":\"text_completion\""));
+    assert!(body.contains("\"text\":\"winner\""));
+    assert!(body.contains("data: [DONE]"));
+    Ok(())
+}
+
+#[tokio::test]
+async fn chat_endpoint_streams_openai_sse_chunks() -> Result<(), Box<dyn std::error::Error>> {
+    let model_path = write_chat_fixture_model()?;
+    let engine = InferenceEngine::load(&model_path)?;
+    let app = router(ServerState::with_engine("fixture-model".to_owned(), engine));
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/chat/completions")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            r#"{"model":"fixture-model","messages":[{"role":"user","content":"hello"}],"max_tokens":1,"stream":true}"#,
+        ))?;
+    let response = app.oneshot(request).await?;
+    remove_fixture_model(&model_path)?;
+
+    let status = response.status();
+    let body = to_text(response.into_body()).await?;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert!(body.contains("data: {\"id\":\"chatcmpl-ferrite-"));
+    assert!(body.contains("\"object\":\"chat.completion.chunk\""));
+    assert!(body.contains("\"delta\":{\"content\":\"winner\"}"));
+    assert!(body.contains("data: [DONE]"));
+    Ok(())
+}
+
 async fn to_json(body: Body) -> Result<Value, Box<dyn std::error::Error>> {
+    Ok(serde_json::from_str(&to_text(body).await?)?)
+}
+
+async fn to_text(body: Body) -> Result<String, Box<dyn std::error::Error>> {
     let bytes = to_bytes(body, usize::MAX).await?;
-    Ok(serde_json::from_slice(&bytes)?)
+    Ok(String::from_utf8(bytes.to_vec())?)
 }
 
 fn write_fixture_model() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+    write_fixture_model_bytes(ferrite_fixtures::scalar_llama_f32_gguf_fixture())
+}
+
+fn write_chat_fixture_model() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+    write_fixture_model_bytes(ferrite_fixtures::scalar_llama_chat_f32_gguf_fixture())
+}
+
+fn write_fixture_model_bytes(
+    bytes: Vec<u8>,
+) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
     let mut path = std::env::temp_dir();
     path.push(format!(
         "ferrite-server-fixture-{}-{}.gguf",
         std::process::id(),
         FIXTURE_COUNTER.fetch_add(1, Ordering::Relaxed)
     ));
-    std::fs::write(&path, ferrite_fixtures::scalar_llama_f32_gguf_fixture())?;
+    std::fs::write(&path, bytes)?;
     Ok(path)
 }
 

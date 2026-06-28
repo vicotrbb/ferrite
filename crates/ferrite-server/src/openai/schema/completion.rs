@@ -40,6 +40,65 @@ pub struct CompletionResponse {
     usage: Usage,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct CompletionStreamChunk {
+    id: String,
+    object: &'static str,
+    created: u64,
+    model: String,
+    choices: Vec<CompletionStreamChoice>,
+}
+
+impl CompletionStreamChunk {
+    pub fn from_generation(model: String, generated: &GeneratedText) -> Vec<Self> {
+        let created = unix_timestamp();
+        let id = format!("cmpl-ferrite-{created}");
+        let mut chunks = Vec::new();
+        for text in generated.token_texts() {
+            chunks.push(Self {
+                id: id.clone(),
+                object: "text_completion",
+                created,
+                model: model.clone(),
+                choices: vec![CompletionStreamChoice::content(text.clone())],
+            });
+        }
+        chunks.push(Self {
+            id,
+            object: "text_completion",
+            created,
+            model,
+            choices: vec![CompletionStreamChoice::stop()],
+        });
+        chunks
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+struct CompletionStreamChoice {
+    text: String,
+    index: usize,
+    finish_reason: Option<&'static str>,
+}
+
+impl CompletionStreamChoice {
+    fn content(text: String) -> Self {
+        Self {
+            text,
+            index: 0,
+            finish_reason: None,
+        }
+    }
+
+    fn stop() -> Self {
+        Self {
+            text: String::new(),
+            index: 0,
+            finish_reason: Some("stop"),
+        }
+    }
+}
+
 impl CompletionResponse {
     pub fn from_generation(model: String, generated: GeneratedText) -> Self {
         let created = unix_timestamp();

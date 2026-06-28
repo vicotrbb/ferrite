@@ -36,9 +36,11 @@ impl InferenceEngine {
             .map_err(|error| RuntimeError::new(format!("failed to evaluate prompt: {error}")))?;
         let mut token_id = next.token_id;
         let mut generated_token_ids = Vec::with_capacity(max_tokens);
+        let mut token_texts = Vec::with_capacity(max_tokens);
 
         for _ in 0..max_tokens {
             generated_token_ids.push(token_id);
+            token_texts.push(self.decode_token(token_id)?);
             if Some(token_id) == self.tokenizer.eos_token_id() {
                 break;
             }
@@ -55,7 +57,14 @@ impl InferenceEngine {
             text,
             prompt_token_ids.len(),
             generated_token_ids.len(),
+            token_texts,
         ))
+    }
+
+    fn decode_token(&self, token_id: usize) -> Result<String, RuntimeError> {
+        self.tokenizer
+            .decode(&[token_id])
+            .map_err(|error| RuntimeError::new(format!("failed to decode token: {error}")))
     }
 }
 
@@ -64,14 +73,21 @@ pub struct GeneratedText {
     text: String,
     prompt_tokens: usize,
     completion_tokens: usize,
+    token_texts: Vec<String>,
 }
 
 impl GeneratedText {
-    pub fn new(text: String, prompt_tokens: usize, completion_tokens: usize) -> Self {
+    pub fn new(
+        text: String,
+        prompt_tokens: usize,
+        completion_tokens: usize,
+        token_texts: Vec<String>,
+    ) -> Self {
         Self {
             text,
             prompt_tokens,
             completion_tokens,
+            token_texts,
         }
     }
 
@@ -85,6 +101,10 @@ impl GeneratedText {
 
     pub fn completion_tokens(&self) -> usize {
         self.completion_tokens
+    }
+
+    pub fn token_texts(&self) -> &[String] {
+        &self.token_texts
     }
 }
 

@@ -74,6 +74,83 @@ pub struct ChatCompletionResponse {
     usage: Usage,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct ChatCompletionStreamChunk {
+    id: String,
+    object: &'static str,
+    created: u64,
+    model: String,
+    choices: Vec<ChatCompletionStreamChoice>,
+}
+
+impl ChatCompletionStreamChunk {
+    pub fn from_generation(model: String, generated: &GeneratedText) -> Vec<Self> {
+        let created = unix_timestamp();
+        let id = format!("chatcmpl-ferrite-{created}");
+        let mut chunks = Vec::new();
+        for text in generated.token_texts() {
+            chunks.push(Self {
+                id: id.clone(),
+                object: "chat.completion.chunk",
+                created,
+                model: model.clone(),
+                choices: vec![ChatCompletionStreamChoice::content(text.clone())],
+            });
+        }
+        chunks.push(Self {
+            id,
+            object: "chat.completion.chunk",
+            created,
+            model,
+            choices: vec![ChatCompletionStreamChoice::stop()],
+        });
+        chunks
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+struct ChatCompletionStreamChoice {
+    index: usize,
+    delta: ChatCompletionStreamDelta,
+    finish_reason: Option<&'static str>,
+}
+
+impl ChatCompletionStreamChoice {
+    fn content(content: String) -> Self {
+        Self {
+            index: 0,
+            delta: ChatCompletionStreamDelta::content(content),
+            finish_reason: None,
+        }
+    }
+
+    fn stop() -> Self {
+        Self {
+            index: 0,
+            delta: ChatCompletionStreamDelta::empty(),
+            finish_reason: Some("stop"),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+struct ChatCompletionStreamDelta {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    content: Option<String>,
+}
+
+impl ChatCompletionStreamDelta {
+    fn content(content: String) -> Self {
+        Self {
+            content: Some(content),
+        }
+    }
+
+    fn empty() -> Self {
+        Self { content: None }
+    }
+}
+
 impl ChatCompletionResponse {
     pub fn from_generation(model: String, generated: GeneratedText) -> Self {
         let created = unix_timestamp();
