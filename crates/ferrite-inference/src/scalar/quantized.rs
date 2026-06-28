@@ -177,6 +177,24 @@ mod tests {
     }
 
     #[test]
+    #[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
+    fn q6_k_simd_matvec_preserves_parallel_row_order() -> Result<(), InferenceError> {
+        let mut bytes = Vec::new();
+        bytes.extend(q6_k_block_with_first_group_pattern());
+        bytes.extend(q6_k_block_with_minus_32());
+        bytes.extend(q6_k_block_with_first_group_pattern());
+
+        let output = q6_k_mul_vec_with_backend(&bytes, 3, 256, &[1.0; 256])?;
+
+        #[cfg(target_arch = "aarch64")]
+        assert_eq!(output.backend, Q6KMatVecBackend::Aarch64Neon);
+        #[cfg(target_arch = "x86_64")]
+        assert_eq!(output.backend, Q6KMatVecBackend::X86_64Avx2);
+        assert_eq!(output.values, vec![-8066.0, -8192.0, -8066.0]);
+        Ok(())
+    }
+
+    #[test]
     fn q8_0_mul_vec_accumulates_rows_without_row_decodes() -> Result<(), InferenceError> {
         let mut bytes = Vec::new();
         bytes.extend_from_slice(&0x3c00u16.to_le_bytes());
@@ -282,6 +300,24 @@ mod tests {
         block.extend_from_slice(&0u16.to_le_bytes());
         block.extend_from_slice(&[1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1]);
         block.extend_from_slice(&[quantized | (quantized << 4); 128]);
+        block
+    }
+
+    #[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
+    fn q6_k_block_with_minus_32() -> Vec<u8> {
+        let mut block = vec![0u8; 128 + 64];
+        block.extend(vec![1u8; 16]);
+        block.extend_from_slice(&0x3c00u16.to_le_bytes());
+        block
+    }
+
+    #[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
+    fn q6_k_block_with_first_group_pattern() -> Vec<u8> {
+        let mut block = vec![0u8; 128 + 64];
+        block[32] = 0xff;
+        block[128] = 0xe4;
+        block.extend(vec![1u8; 16]);
+        block.extend_from_slice(&0x3c00u16.to_le_bytes());
         block
     }
 
