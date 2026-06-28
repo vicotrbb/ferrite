@@ -21,6 +21,34 @@ pub struct ChatCompletionRequest {
     parallel_tool_calls: Option<Value>,
     #[serde(default)]
     response_format: Option<Value>,
+    #[serde(default)]
+    temperature: Option<Value>,
+    #[serde(default)]
+    top_p: Option<Value>,
+    #[serde(default)]
+    n: Option<Value>,
+    #[serde(default)]
+    stop: Option<Value>,
+    #[serde(default)]
+    presence_penalty: Option<Value>,
+    #[serde(default)]
+    frequency_penalty: Option<Value>,
+    #[serde(default)]
+    logit_bias: Option<Value>,
+    #[serde(default)]
+    logprobs: Option<Value>,
+    #[serde(default)]
+    top_logprobs: Option<Value>,
+    #[serde(default)]
+    user: Option<Value>,
+    #[serde(default)]
+    seed: Option<Value>,
+    #[serde(default)]
+    stream_options: Option<Value>,
+    #[serde(default)]
+    store: Option<Value>,
+    #[serde(default)]
+    metadata: Option<Value>,
 }
 
 impl ChatCompletionRequest {
@@ -53,6 +81,48 @@ impl ChatCompletionRequest {
         }
         if self.response_format.is_some() {
             fields.push("response_format");
+        }
+        if self.temperature.is_some() {
+            fields.push("temperature");
+        }
+        if self.top_p.is_some() {
+            fields.push("top_p");
+        }
+        if self.n.is_some() {
+            fields.push("n");
+        }
+        if self.stop.is_some() {
+            fields.push("stop");
+        }
+        if self.presence_penalty.is_some() {
+            fields.push("presence_penalty");
+        }
+        if self.frequency_penalty.is_some() {
+            fields.push("frequency_penalty");
+        }
+        if self.logit_bias.is_some() {
+            fields.push("logit_bias");
+        }
+        if self.logprobs.is_some() {
+            fields.push("logprobs");
+        }
+        if self.top_logprobs.is_some() {
+            fields.push("top_logprobs");
+        }
+        if self.user.is_some() {
+            fields.push("user");
+        }
+        if self.seed.is_some() {
+            fields.push("seed");
+        }
+        if self.stream_options.is_some() {
+            fields.push("stream_options");
+        }
+        if self.store.is_some() {
+            fields.push("store");
+        }
+        if self.metadata.is_some() {
+            fields.push("metadata");
         }
         fields
     }

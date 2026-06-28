@@ -48,6 +48,46 @@ async fn chat_endpoint_rejects_response_format() -> Result<(), Box<dyn std::erro
 }
 
 #[tokio::test]
+async fn chat_endpoint_rejects_sampling_parameters() -> Result<(), Box<dyn std::error::Error>> {
+    let body = post_chat(
+        r#"{
+            "model":"fixture-model",
+            "messages":[{"role":"user","content":"hello"}],
+            "temperature":0.2
+        }"#,
+    )
+    .await?;
+
+    assert_eq!(body.status, StatusCode::BAD_REQUEST);
+    assert_eq!(body.json["error"]["type"], "invalid_request_error");
+    assert!(body.json["error"]["message"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("temperature"));
+    Ok(())
+}
+
+#[tokio::test]
+async fn chat_endpoint_rejects_multiple_choice_request() -> Result<(), Box<dyn std::error::Error>> {
+    let body = post_chat(
+        r#"{
+            "model":"fixture-model",
+            "messages":[{"role":"user","content":"hello"}],
+            "n":2
+        }"#,
+    )
+    .await?;
+
+    assert_eq!(body.status, StatusCode::BAD_REQUEST);
+    assert_eq!(body.json["error"]["type"], "invalid_request_error");
+    assert!(body.json["error"]["message"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("n"));
+    Ok(())
+}
+
+#[tokio::test]
 async fn completion_endpoint_rejects_multiple_choice_request(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let body = post_completion(
