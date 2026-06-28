@@ -76,7 +76,7 @@ pub(super) fn q6_k_mul_vec_with_backend(
             && cols.is_multiple_of(Q6_K_BLOCK_VALUES)
             && std::arch::is_x86_feature_detected!("avx2")
         {
-            return x86_64::avx2_q6_k_mul_vec(bytes, rows, cols, vector);
+            return super::q6_k_avx2::avx2_q6_k_mul_vec(bytes, rows, cols, vector);
         }
     }
 
@@ -216,7 +216,7 @@ pub(super) fn accumulate_q6_k_block(
     Ok(())
 }
 
-fn q6_k_block_values(block: &[u8]) -> Result<[f32; Q6_K_BLOCK_VALUES], InferenceError> {
+pub(super) fn q6_k_block_values(block: &[u8]) -> Result<[f32; Q6_K_BLOCK_VALUES], InferenceError> {
     if block.len() != Q6_K_BLOCK_BYTES {
         return Err(InferenceError::new(format!(
             "Q6_K block byte length {} does not match {Q6_K_BLOCK_BYTES}",
@@ -277,65 +277,4 @@ fn accumulate_matrix_value(
         .ok_or_else(|| InferenceError::new("quantized matrix column index out of bounds"))?;
     *target += value * vector_value;
     Ok(())
-}
-
-#[cfg(target_arch = "x86_64")]
-mod x86_64 {
-    use super::{
-        q6_k_block_values, Q6KMatVecBackend, Q6KMatVecOutput, Q6_K_BLOCK_BYTES, Q6_K_BLOCK_VALUES,
-    };
-    use crate::scalar::InferenceError;
-    use rayon::prelude::*;
-    use std::arch::x86_64::{
-        _mm256_add_ps, _mm256_loadu_ps, _mm256_mul_ps, _mm256_setzero_ps, _mm256_storeu_ps,
-    };
-
-    pub(super) fn avx2_q6_k_mul_vec(
-        bytes: &[u8],
-        rows: usize,
-        cols: usize,
-        vector: &[f32],
-    ) -> Result<Q6KMatVecOutput, InferenceError> {
-        let blocks_per_row = cols / Q6_K_BLOCK_VALUES;
-        let row_bytes = blocks_per_row * Q6_K_BLOCK_BYTES;
-        let values = bytes
-            .par_chunks_exact(row_bytes)
-            .map(|row_chunk| {
-                let mut sum = 0.0;
-                for (block_index, block) in row_chunk.chunks_exact(Q6_K_BLOCK_BYTES).enumerate() {
-                    let block_values = q6_k_block_values(block)?;
-                    let col_base = block_index * Q6_K_BLOCK_VALUES;
-                    // SAFETY: `block_values` contains exactly 256 contiguous
-                    // f32 values and `cols` is a multiple of 256, so every
-                    // 8-lane load from the block and vector slice is in bounds.
-                    sum += unsafe {
-                        avx2_f32_block_dot(block_values.as_ptr(), vector[col_base..].as_ptr())
-                    };
-                }
-                Ok(sum)
-            })
-            .collect::<Result<Vec<_>, InferenceError>>()?;
-        debug_assert_eq!(values.len(), rows);
-
-        Ok(Q6KMatVecOutput {
-            values,
-            backend: Q6KMatVecBackend::X86_64Avx2,
-        })
-    }
-
-    #[target_feature(enable = "avx2")]
-    unsafe fn avx2_f32_block_dot(left: *const f32, right: *const f32) -> f32 {
-        let mut lanes = _mm256_setzero_ps();
-        let mut offset = 0usize;
-        while offset < Q6_K_BLOCK_VALUES {
-            let left_lanes = _mm256_loadu_ps(left.add(offset));
-            let right_lanes = _mm256_loadu_ps(right.add(offset));
-            lanes = _mm256_add_ps(lanes, _mm256_mul_ps(left_lanes, right_lanes));
-            offset += 8;
-        }
-
-        let mut partial = [0.0f32; 8];
-        _mm256_storeu_ps(partial.as_mut_ptr(), lanes);
-        partial.iter().sum()
-    }
 }
