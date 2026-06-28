@@ -5,12 +5,13 @@ use super::{
     q4_k::q4_k_mul_vec,
     q6_k::q6_k_mul_vec,
     quantized::{
-        decode_q4_k_values, decode_q5_0_row, decode_q6_k_values, decode_q8_0_row,
         q4_k_storage_bytes, q5_0_mul_vec, q5_0_row_bytes, q6_k_storage_bytes, q8_0_argmax_mul_vec,
         q8_0_mul_vec, q8_0_row_bytes, Q5_0_BLOCK_VALUES, Q8_0_BLOCK_VALUES,
     },
     InferenceError,
 };
+
+mod rows;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Matrix {
@@ -215,64 +216,7 @@ impl Matrix {
     }
 
     pub fn row_values(&self, index: usize) -> Result<Vec<f32>, InferenceError> {
-        if index >= self.rows {
-            return Err(InferenceError::new(format!(
-                "matrix row {index} is out of bounds for {} rows",
-                self.rows
-            )));
-        }
-
-        match &self.data {
-            MatrixData::F32(_) => Ok(self.row(index)?.to_vec()),
-            MatrixData::Q4K(data) => {
-                let value_count = self
-                    .rows
-                    .checked_mul(self.cols)
-                    .ok_or_else(|| InferenceError::new("Q4_K matrix value count overflow"))?;
-                let values = decode_q4_k_values(data, value_count)?;
-                let start = index
-                    .checked_mul(self.cols)
-                    .ok_or_else(|| InferenceError::new("Q4_K row offset overflow"))?;
-                let end = start
-                    .checked_add(self.cols)
-                    .ok_or_else(|| InferenceError::new("Q4_K row end overflow"))?;
-                Ok(values[start..end].to_vec())
-            }
-            MatrixData::Q5_0(data) => {
-                let row_bytes = q5_0_row_bytes(self.cols)?;
-                let start = index
-                    .checked_mul(row_bytes)
-                    .ok_or_else(|| InferenceError::new("Q5_0 row offset overflow"))?;
-                let end = start
-                    .checked_add(row_bytes)
-                    .ok_or_else(|| InferenceError::new("Q5_0 row end overflow"))?;
-                decode_q5_0_row(&data[start..end], self.cols)
-            }
-            MatrixData::Q6K(data) => {
-                let value_count = self
-                    .rows
-                    .checked_mul(self.cols)
-                    .ok_or_else(|| InferenceError::new("Q6_K matrix value count overflow"))?;
-                let values = decode_q6_k_values(data, value_count)?;
-                let start = index
-                    .checked_mul(self.cols)
-                    .ok_or_else(|| InferenceError::new("Q6_K row offset overflow"))?;
-                let end = start
-                    .checked_add(self.cols)
-                    .ok_or_else(|| InferenceError::new("Q6_K row end overflow"))?;
-                Ok(values[start..end].to_vec())
-            }
-            MatrixData::Q8_0(data) => {
-                let row_bytes = q8_0_row_bytes(self.cols)?;
-                let start = index
-                    .checked_mul(row_bytes)
-                    .ok_or_else(|| InferenceError::new("Q8_0 row offset overflow"))?;
-                let end = start
-                    .checked_add(row_bytes)
-                    .ok_or_else(|| InferenceError::new("Q8_0 row end overflow"))?;
-                decode_q8_0_row(&data[start..end], self.cols)
-            }
-        }
+        rows::row_values(&self.data, self.rows, self.cols, index)
     }
 
     pub fn storage_bytes(&self) -> u128 {
