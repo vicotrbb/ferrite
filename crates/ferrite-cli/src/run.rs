@@ -1,5 +1,7 @@
 use crate::args::{self, PromptSource};
-use ferrite_inference::scalar::{NextToken, ScalarLlamaModel, ScalarLlamaSession};
+use ferrite_inference::scalar::{
+    NextToken, ProfiledNextToken, ScalarLlamaModel, ScalarLlamaSession,
+};
 use ferrite_model::gguf::parse_gguf;
 use ferrite_model::tokenizer::GgufTokenizer;
 use std::error::Error;
@@ -19,7 +21,7 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
 
     let prompt_token_ids = prompt_token_ids(&tokenizer, args.prompt)?;
     let mut session = model.start_session();
-    let next = session.accept_prompt(&prompt_token_ids)?;
+    let (next, profile) = accept_prompt(&mut session, &prompt_token_ids, args.profile_next_token)?;
     let token = tokenizer.token(next.token_id).ok_or_else(|| {
         io::Error::other(format!(
             "next token id {} is not present in tokenizer vocabulary",
@@ -30,6 +32,9 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
     println!("prompt_token_ids={}", join_token_ids(&prompt_token_ids));
     println!("next_token_id={}", next.token_id);
     println!("next_token={token}");
+    if let Some(profile) = &profile {
+        print_next_token_profile(profile);
+    }
     if let Some(count) = args.top_logits {
         println!("top_logits={}", format_top_logits(&next.logits, count));
     }
@@ -95,6 +100,39 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
         }
     }
     Ok(())
+}
+
+fn accept_prompt(
+    session: &mut ScalarLlamaSession<'_>,
+    tokens: &[usize],
+    profile_next_token: bool,
+) -> Result<(NextToken, Option<ProfiledNextToken>), Box<dyn Error>> {
+    if tokens.is_empty() {
+        return Err(io::Error::other("prompt must contain at least one token").into());
+    }
+    if !profile_next_token {
+        return Ok((session.accept_prompt(tokens)?, None));
+    }
+
+    for token_id in &tokens[..tokens.len() - 1] {
+        session.accept_token(*token_id)?;
+    }
+    let profiled = session.accept_token_profiled(tokens[tokens.len() - 1])?;
+    Ok((profiled.next_token.clone(), Some(profiled)))
+}
+
+fn print_next_token_profile(profile: &ProfiledNextToken) {
+    println!(
+        "profile_next_token_total_ns={}",
+        profile.total_elapsed().as_nanos()
+    );
+    for event in &profile.events {
+        println!(
+            "profile_next_token_op={}:{}",
+            event.label(),
+            event.elapsed().as_nanos()
+        );
+    }
 }
 
 fn generate_tokens(

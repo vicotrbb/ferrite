@@ -7,6 +7,7 @@ mod matrix;
 mod matvec;
 mod memory;
 mod output;
+mod profile;
 mod prompt;
 mod q4_k;
 mod q5_0;
@@ -20,6 +21,7 @@ mod tensor;
 pub use math::{argmax, rms_norm};
 pub use matrix::Matrix;
 pub use output::ScalarLlamaOutputWeights;
+pub use profile::{ProfiledNextToken, ScalarProfileEvent};
 pub use rope::apply_rope;
 pub use session::ScalarLlamaSession;
 

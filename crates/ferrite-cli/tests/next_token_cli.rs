@@ -153,6 +153,38 @@ fn cli_benchmarks_repeated_next_token_runs_after_loading_once() -> Result<(), Bo
 }
 
 #[test]
+fn cli_profiles_next_token_scalar_operations() -> Result<(), Box<dyn Error>> {
+    let model_path = write_fixture_model()?;
+    let binary = cli_binary()?;
+
+    let output = Command::new(binary)
+        .arg("--model")
+        .arg(&model_path)
+        .arg("--prompt")
+        .arg("hello")
+        .arg("--profile-next-token")
+        .output()?;
+
+    remove_fixture_model(&model_path)?;
+
+    assert!(
+        output.status.success(),
+        "cli failed with stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout)?;
+    let profile_total_ns = stdout
+        .lines()
+        .find_map(|line| line.strip_prefix("profile_next_token_total_ns="))
+        .ok_or("missing profile_next_token_total_ns")?;
+    assert!(profile_total_ns.parse::<u128>()? > 0);
+    assert!(stdout.contains("profile_next_token_op=layer.0.q_proj:"));
+    assert!(stdout.contains("profile_next_token_op=layer.0.ffn_down:"));
+    assert!(stdout.contains("profile_next_token_op=output:"));
+    Ok(())
+}
+
+#[test]
 fn cli_prints_top_next_token_logits() -> Result<(), Box<dyn Error>> {
     let model_path = write_fixture_model()?;
     let binary = cli_binary()?;

@@ -1,8 +1,10 @@
 use super::{
     attention::causal_attention,
     math::{add_assign, argmax, rms_norm, swiglu},
-    InferenceError, NextToken, ScalarLlamaModel,
+    profile::{ProfiledNextToken, ScalarProfileEvent},
+    InferenceError, Matrix, NextToken, ScalarLlamaModel,
 };
+use std::time::{Duration, Instant};
 
 #[derive(Debug)]
 pub struct ScalarLlamaSession<'a> {
@@ -64,6 +66,23 @@ impl<'a> ScalarLlamaSession<'a> {
     }
 
     pub fn accept_token(&mut self, token_id: usize) -> Result<NextToken, InferenceError> {
+        self.accept_token_inner(token_id, None)
+    }
+
+    pub fn accept_token_profiled(
+        &mut self,
+        token_id: usize,
+    ) -> Result<ProfiledNextToken, InferenceError> {
+        let mut events = Vec::new();
+        let next_token = self.accept_token_inner(token_id, Some(&mut events))?;
+        Ok(ProfiledNextToken { next_token, events })
+    }
+
+    fn accept_token_inner(
+        &mut self,
+        token_id: usize,
+        mut profile_events: Option<&mut Vec<ScalarProfileEvent>>,
+    ) -> Result<NextToken, InferenceError> {
         if token_id >= self.model.config.vocab_size {
             return Err(InferenceError::new(format!(
                 "token id {token_id} is out of bounds for vocab size {}",
@@ -80,9 +99,27 @@ impl<'a> ScalarLlamaSession<'a> {
                 &layer.attn_norm,
                 self.model.config.rms_norm_epsilon,
             )?;
-            let mut query = layer.q_proj.mul_vec(&normed)?;
-            let mut key = layer.k_proj.mul_vec(&normed)?;
-            let value = layer.v_proj.mul_vec(&normed)?;
+            let mut query = profiled_layer_mul_vec(
+                &layer.q_proj,
+                &normed,
+                layer_index,
+                "q_proj",
+                profile_events.as_deref_mut(),
+            )?;
+            let mut key = profiled_layer_mul_vec(
+                &layer.k_proj,
+                &normed,
+                layer_index,
+                "k_proj",
+                profile_events.as_deref_mut(),
+            )?;
+            let value = profiled_layer_mul_vec(
+                &layer.v_proj,
+                &normed,
+                layer_index,
+                "v_proj",
+                profile_events.as_deref_mut(),
+            )?;
 
             query = self.model.apply_rope_to_heads(
                 &query,
@@ -104,15 +141,39 @@ impl<'a> ScalarLlamaSession<'a> {
                 &self.layer_keys[layer_index],
                 &self.layer_values[layer_index],
             )?;
-            let attention_output = layer.o_proj.mul_vec(&attention)?;
+            let attention_output = profiled_layer_mul_vec(
+                &layer.o_proj,
+                &attention,
+                layer_index,
+                "o_proj",
+                profile_events.as_deref_mut(),
+            )?;
             add_assign(&mut hidden, &attention_output)?;
 
             let ffn_normed =
                 rms_norm(&hidden, &layer.ffn_norm, self.model.config.rms_norm_epsilon)?;
-            let gate = layer.ffn_gate.mul_vec(&ffn_normed)?;
-            let up = layer.ffn_up.mul_vec(&ffn_normed)?;
+            let gate = profiled_layer_mul_vec(
+                &layer.ffn_gate,
+                &ffn_normed,
+                layer_index,
+                "ffn_gate",
+                profile_events.as_deref_mut(),
+            )?;
+            let up = profiled_layer_mul_vec(
+                &layer.ffn_up,
+                &ffn_normed,
+                layer_index,
+                "ffn_up",
+                profile_events.as_deref_mut(),
+            )?;
             let activated = swiglu(&gate, &up)?;
-            let ffn_output = layer.ffn_down.mul_vec(&activated)?;
+            let ffn_output = profiled_layer_mul_vec(
+                &layer.ffn_down,
+                &activated,
+                layer_index,
+                "ffn_down",
+                profile_events.as_deref_mut(),
+            )?;
             add_assign(&mut hidden, &ffn_output)?;
         }
 
@@ -121,15 +182,60 @@ impl<'a> ScalarLlamaSession<'a> {
             &self.model.weights.output_norm,
             self.model.config.rms_norm_epsilon,
         )?;
-        let logits = self
-            .model
-            .weights
-            .output
-            .logits_matrix(&self.model.weights.token_embedding)
-            .mul_vec(&normed)?;
+        let logits = profiled_mul_vec(
+            self.model
+                .weights
+                .output
+                .logits_matrix(&self.model.weights.token_embedding),
+            &normed,
+            "output",
+            profile_events,
+        )?;
         let token_id = argmax(&logits)?;
         self.cached_token_count += 1;
 
         Ok(NextToken { token_id, logits })
+    }
+}
+
+fn profiled_layer_mul_vec(
+    matrix: &Matrix,
+    vector: &[f32],
+    layer_index: usize,
+    role: &str,
+    profile_events: Option<&mut Vec<ScalarProfileEvent>>,
+) -> Result<Vec<f32>, InferenceError> {
+    if profile_events.is_none() {
+        return matrix.mul_vec(vector);
+    }
+    profiled_mul_vec(
+        matrix,
+        vector,
+        &format!("layer.{layer_index}.{role}"),
+        profile_events,
+    )
+}
+
+fn profiled_mul_vec(
+    matrix: &Matrix,
+    vector: &[f32],
+    label: &str,
+    profile_events: Option<&mut Vec<ScalarProfileEvent>>,
+) -> Result<Vec<f32>, InferenceError> {
+    let Some(events) = profile_events else {
+        return matrix.mul_vec(vector);
+    };
+    let started = Instant::now();
+    let output = matrix.mul_vec(vector)?;
+    let elapsed = started.elapsed();
+    events.push(ScalarProfileEvent::new(label, nonzero_duration(elapsed)));
+    Ok(output)
+}
+
+fn nonzero_duration(elapsed: Duration) -> Duration {
+    if elapsed.is_zero() {
+        Duration::from_nanos(1)
+    } else {
+        elapsed
     }
 }
