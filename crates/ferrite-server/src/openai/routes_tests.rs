@@ -251,7 +251,7 @@ async fn completion_stream_helper_emits_tokens_from_generation_callback(
         .try_acquire_inference_permit()
         .ok_or("expected inference permit")?;
 
-    let response = super::routes::completion_stream_response(
+    let response = super::generation::completion_stream_response(
         state.engine().ok_or("expected inference engine")?,
         "fixture-model".to_owned(),
         "hello".to_owned(),
