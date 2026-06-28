@@ -29,6 +29,22 @@ async fn async_openai_client_lists_ferrite_model() -> Result<(), Box<dyn std::er
 }
 
 #[tokio::test]
+async fn async_openai_client_retrieves_ferrite_model() -> Result<(), Box<dyn std::error::Error>> {
+    let server = support::LiveServer::start().await?;
+    let config = OpenAIConfig::new()
+        .with_api_base(format!("http://{}/v1", server.addr()))
+        .with_api_key("local-test");
+    let client = Client::with_config(config);
+
+    let response = client.models().retrieve(support::MODEL_ID).await?;
+
+    assert_eq!(response.id, support::MODEL_ID);
+    assert_eq!(response.object, "model");
+    assert_eq!(response.owned_by, "ferrite");
+    Ok(())
+}
+
+#[tokio::test]
 async fn async_openai_client_uses_ferrite_base_url() -> Result<(), Box<dyn std::error::Error>> {
     let server = support::LiveServer::start().await?;
     let config = OpenAIConfig::new()
