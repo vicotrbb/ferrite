@@ -6,8 +6,9 @@ This benchmark records bounded local throughput for the Qwen2.5-1.5B Q8_0 and
 Q6_K artifacts after their local and x86_64 AVX2 six-prompt parity checks.
 
 This is benchmark evidence only. It does not prove the Tier 1 throughput gate:
-both quantizations remain below the 10 tok/s target on this local host, and
-x86_64 throughput for these two artifacts remains unmeasured.
+both quantizations remain below the 10 tok/s target on this local host. The
+follow-up x86_64 AVX2 pod run is recorded separately in
+`documentation/benchmarks/2026-06-28-tier1-avx2-qwen2-1-5b-q8-q6-throughput.md`.
 
 ## Tree State
 
