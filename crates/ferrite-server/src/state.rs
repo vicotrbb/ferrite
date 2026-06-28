@@ -1,3 +1,4 @@
+use crate::limits::TokenLimits;
 use crate::runtime::InferenceEngine;
 use std::sync::{Arc, Mutex};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
@@ -10,6 +11,7 @@ pub struct ServerState {
     engine: Option<Arc<Mutex<InferenceEngine>>>,
     inference_permits: Arc<Semaphore>,
     api_key: Option<Arc<str>>,
+    token_limits: TokenLimits,
 }
 
 impl ServerState {
@@ -19,6 +21,7 @@ impl ServerState {
             engine: None,
             inference_permits: Arc::new(Semaphore::new(INFERENCE_PERMITS)),
             api_key: None,
+            token_limits: TokenLimits::default(),
         }
     }
 
@@ -28,11 +31,17 @@ impl ServerState {
             engine: Some(Arc::new(Mutex::new(engine))),
             inference_permits: Arc::new(Semaphore::new(INFERENCE_PERMITS)),
             api_key: None,
+            token_limits: TokenLimits::default(),
         }
     }
 
     pub fn with_api_key(mut self, api_key: impl Into<String>) -> Self {
         self.api_key = Some(Arc::from(api_key.into()));
+        self
+    }
+
+    pub fn with_token_limits(mut self, token_limits: TokenLimits) -> Self {
+        self.token_limits = token_limits;
         self
     }
 
@@ -46,6 +55,10 @@ impl ServerState {
 
     pub fn api_key(&self) -> Option<&str> {
         self.api_key.as_deref()
+    }
+
+    pub fn token_limits(&self) -> TokenLimits {
+        self.token_limits
     }
 
     pub fn try_acquire_inference_permit(&self) -> Option<OwnedSemaphorePermit> {

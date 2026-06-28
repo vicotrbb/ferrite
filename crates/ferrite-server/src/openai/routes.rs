@@ -21,9 +21,6 @@ use axum::{
 use std::sync::{Arc, Mutex};
 use tokio::sync::OwnedSemaphorePermit;
 
-const DEFAULT_MAX_TOKENS: usize = 16;
-const HARD_MAX_TOKENS: usize = 256;
-
 pub fn router(state: ServerState) -> Router {
     Router::new()
         .route("/health", get(health))
@@ -69,7 +66,7 @@ async fn chat_completions(
     ensure_model(&state, request.model())?;
     ensure_supported_chat_request(&request)?;
     let prompt = render_chat_prompt(request.messages())?;
-    let max_tokens = normalized_max_tokens(request.max_tokens())?;
+    let max_tokens = normalized_max_tokens(&state, request.max_tokens())?;
     let permit = acquire_inference_permit(&state)?;
     if request.stream() {
         return Ok(chat_stream_response(
@@ -101,7 +98,7 @@ async fn completions(
             "prompt must contain non-whitespace text",
         ));
     }
-    let max_tokens = normalized_max_tokens(request.max_tokens())?;
+    let max_tokens = normalized_max_tokens(&state, request.max_tokens())?;
     let permit = acquire_inference_permit(&state)?;
     if request.stream() {
         return Ok(completion_stream_response(
@@ -199,19 +196,14 @@ fn acquire_inference_permit(state: &ServerState) -> Result<OwnedSemaphorePermit,
     })
 }
 
-fn normalized_max_tokens(value: Option<usize>) -> Result<usize, OpenAiHttpError> {
-    let tokens = value.unwrap_or(DEFAULT_MAX_TOKENS);
-    if tokens == 0 {
-        return Err(OpenAiHttpError::invalid_request(
-            "max_tokens must be greater than zero",
-        ));
-    }
-    if tokens > HARD_MAX_TOKENS {
-        return Err(OpenAiHttpError::invalid_request(format!(
-            "max_tokens must be less than or equal to {HARD_MAX_TOKENS}"
-        )));
-    }
-    Ok(tokens)
+fn normalized_max_tokens(
+    state: &ServerState,
+    value: Option<usize>,
+) -> Result<usize, OpenAiHttpError> {
+    state
+        .token_limits()
+        .normalize(value)
+        .map_err(|error| OpenAiHttpError::invalid_request(error.to_string()))
 }
 
 pub(super) fn completion_stream_response(

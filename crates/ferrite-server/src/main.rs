@@ -22,7 +22,8 @@ async fn run() -> Result<(), Box<dyn Error>> {
     let state = match config.api_key() {
         Some(api_key) => state.with_api_key(api_key),
         None => state,
-    };
+    }
+    .with_token_limits(config.token_limits());
     let app = ferrite_server::router(state);
     axum::serve(listener, app).await?;
     Ok(())
