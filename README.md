@@ -17,6 +17,7 @@ Initial endpoints:
 
 - `GET /health`
 - `GET /v1/models`
+- `GET /v1/models/{model}`
 - `POST /v1/completions`
 - `POST /v1/chat/completions`
 
