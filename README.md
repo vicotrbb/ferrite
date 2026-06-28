@@ -11,7 +11,9 @@ cargo run -p ferrite-server -- \
   --model target/models/model.gguf \
   --model-id ferrite-local \
   --bind 127.0.0.1:8080 \
-  --api-key local-secret
+  --api-key local-secret \
+  --default-max-tokens 16 \
+  --hard-max-tokens 256
 ```
 
 Initial endpoints:
@@ -38,6 +40,8 @@ with a Ferrite base URL.
 `--api-key` is optional; when set, `/v1/*` endpoints require
 `Authorization: Bearer <api-key>`, while `/health` remains open for local
 readiness checks.
+`--default-max-tokens` controls requests that omit `max_tokens` or
+`max_completion_tokens`; `--hard-max-tokens` caps every generation request.
 Streaming responses send token chunks as generation progresses:
 
 ```sh
