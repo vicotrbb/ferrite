@@ -1,4 +1,5 @@
 use crate::args::{self, PromptSource};
+use crate::profile::print_next_token_profile;
 use ferrite_inference::scalar::{
     NextToken, ProfiledNextToken, ScalarLlamaModel, ScalarLlamaSession,
 };
@@ -119,28 +120,6 @@ fn accept_prompt(
     }
     let profiled = session.accept_token_profiled(tokens[tokens.len() - 1])?;
     Ok((profiled.next_token.clone(), Some(profiled)))
-}
-
-fn print_next_token_profile(profile: &ProfiledNextToken) {
-    println!(
-        "profile_next_token_total_ns={}",
-        profile.total_elapsed().as_nanos()
-    );
-    for event in &profile.events {
-        println!(
-            "profile_next_token_op={}:{}",
-            event.label(),
-            event.elapsed().as_nanos()
-        );
-        println!(
-            "profile_next_token_matrix={}:{}:{}:{}:{}",
-            event.label(),
-            event.storage_kind().as_str(),
-            event.rows(),
-            event.cols(),
-            event.storage_bytes()
-        );
-    }
 }
 
 fn generate_tokens(

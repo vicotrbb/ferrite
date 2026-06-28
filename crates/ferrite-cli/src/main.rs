@@ -1,4 +1,5 @@
 mod args;
+mod profile;
 mod run;
 
 fn main() {

@@ -184,6 +184,9 @@ fn cli_profiles_next_token_scalar_operations() -> Result<(), Box<dyn Error>> {
     assert!(stdout.contains("profile_next_token_matrix=layer.0.q_proj:F32:2:2:16"));
     assert!(stdout.contains("profile_next_token_matrix=layer.0.ffn_down:F32:2:2:16"));
     assert!(stdout.contains("profile_next_token_matrix=output:F32:3:2:24"));
+    assert!(stdout.contains("profile_next_token_role=q_proj:F32:2:2:16:"));
+    assert!(stdout.contains("profile_next_token_role=ffn_down:F32:2:2:16:"));
+    assert!(stdout.contains("profile_next_token_role=output:F32:3:2:24:"));
     Ok(())
 }
 
