@@ -69,7 +69,7 @@ async fn chat_completions(
     ensure_supported_chat_request(&request)?;
     let prompt = render_chat_prompt(request.messages())?;
     let max_tokens = normalized_max_tokens(&state, request.max_tokens())?;
-    let permit = acquire_inference_permit(&state)?;
+    let permit = acquire_inference_permit(&state).await?;
     if request.stream() {
         return Ok(chat_stream_response(
             required_engine(&state)?,
@@ -102,7 +102,7 @@ async fn completions(
         ));
     }
     let max_tokens = normalized_max_tokens(&state, request.max_tokens())?;
-    let permit = acquire_inference_permit(&state)?;
+    let permit = acquire_inference_permit(&state).await?;
     if request.stream() {
         return Ok(completion_stream_response(
             required_engine(&state)?,
@@ -194,8 +194,10 @@ fn required_engine(
     })
 }
 
-fn acquire_inference_permit(state: &ServerState) -> Result<OwnedSemaphorePermit, OpenAiHttpError> {
-    state.try_acquire_inference_permit().ok_or_else(|| {
+async fn acquire_inference_permit(
+    state: &ServerState,
+) -> Result<OwnedSemaphorePermit, OpenAiHttpError> {
+    state.acquire_inference_permit().await.ok_or_else(|| {
         OpenAiHttpError::rate_limited("inference request queue is full; retry later")
     })
 }

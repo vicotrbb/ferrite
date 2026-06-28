@@ -1,6 +1,7 @@
 use crate::limits::TokenLimits;
 use crate::runtime::InferenceEngine;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
 const INFERENCE_PERMITS: usize = 1;
@@ -10,6 +11,7 @@ pub struct ServerState {
     model_id: String,
     engine: Option<Arc<Mutex<InferenceEngine>>>,
     inference_permits: Arc<Semaphore>,
+    inference_wait_timeout: Duration,
     api_key: Option<Arc<str>>,
     token_limits: TokenLimits,
 }
@@ -20,6 +22,7 @@ impl ServerState {
             model_id,
             engine: None,
             inference_permits: Arc::new(Semaphore::new(INFERENCE_PERMITS)),
+            inference_wait_timeout: Duration::ZERO,
             api_key: None,
             token_limits: TokenLimits::default(),
         }
@@ -30,6 +33,7 @@ impl ServerState {
             model_id,
             engine: Some(Arc::new(Mutex::new(engine))),
             inference_permits: Arc::new(Semaphore::new(INFERENCE_PERMITS)),
+            inference_wait_timeout: Duration::ZERO,
             api_key: None,
             token_limits: TokenLimits::default(),
         }
@@ -42,6 +46,11 @@ impl ServerState {
 
     pub fn with_token_limits(mut self, token_limits: TokenLimits) -> Self {
         self.token_limits = token_limits;
+        self
+    }
+
+    pub fn with_inference_wait_timeout(mut self, timeout: Duration) -> Self {
+        self.inference_wait_timeout = timeout;
         self
     }
 
@@ -67,6 +76,20 @@ impl ServerState {
 
     pub fn try_acquire_inference_permit(&self) -> Option<OwnedSemaphorePermit> {
         self.inference_permits.clone().try_acquire_owned().ok()
+    }
+
+    pub async fn acquire_inference_permit(&self) -> Option<OwnedSemaphorePermit> {
+        if self.inference_wait_timeout == Duration::ZERO {
+            return self.try_acquire_inference_permit();
+        }
+
+        tokio::time::timeout(
+            self.inference_wait_timeout,
+            self.inference_permits.clone().acquire_owned(),
+        )
+        .await
+        .ok()
+        .and_then(Result::ok)
     }
 }
 

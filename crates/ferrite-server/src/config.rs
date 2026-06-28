@@ -4,6 +4,7 @@ use std::ffi::OsString;
 use std::fmt;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ServerConfig {
@@ -12,6 +13,7 @@ pub struct ServerConfig {
     model_path: Option<PathBuf>,
     api_key: Option<String>,
     token_limits: TokenLimits,
+    inference_wait_timeout: Duration,
 }
 
 impl ServerConfig {
@@ -57,6 +59,11 @@ impl ServerConfig {
                     let value = next_value(&mut iter, "--hard-max-tokens")?;
                     hard_max_tokens = parse_token_limit(value, "--hard-max-tokens")?;
                 }
+                "--inference-wait-ms" => {
+                    let value = next_value(&mut iter, "--inference-wait-ms")?;
+                    config.inference_wait_timeout =
+                        Duration::from_millis(parse_millis(value, "--inference-wait-ms")?);
+                }
                 "--help" | "-h" => {
                     return Err(ConfigError::new(usage()));
                 }
@@ -93,6 +100,10 @@ impl ServerConfig {
     pub fn token_limits(&self) -> TokenLimits {
         self.token_limits
     }
+
+    pub fn inference_wait_timeout(&self) -> Duration {
+        self.inference_wait_timeout
+    }
 }
 
 impl Default for ServerConfig {
@@ -103,6 +114,7 @@ impl Default for ServerConfig {
             model_path: None,
             api_key: None,
             token_limits: TokenLimits::default(),
+            inference_wait_timeout: Duration::ZERO,
         }
     }
 }
@@ -148,8 +160,14 @@ fn parse_token_limit(value: OsString, flag: &str) -> Result<usize, ConfigError> 
         .map_err(|error| ConfigError::new(format!("invalid {flag}: {error}")))
 }
 
+fn parse_millis(value: OsString, flag: &str) -> Result<u64, ConfigError> {
+    os_string_to_string(value)?
+        .parse()
+        .map_err(|error| ConfigError::new(format!("invalid {flag}: {error}")))
+}
+
 fn usage() -> &'static str {
-    "usage: ferrite-server [--bind 127.0.0.1:8080] [--model-id ferrite-local] [--model path/to/model.gguf] [--api-key local-secret] [--default-max-tokens 16] [--hard-max-tokens 256]"
+    "usage: ferrite-server [--bind 127.0.0.1:8080] [--model-id ferrite-local] [--model path/to/model.gguf] [--api-key local-secret] [--default-max-tokens 16] [--hard-max-tokens 256] [--inference-wait-ms 0]"
 }
 
 #[cfg(test)]
@@ -214,6 +232,21 @@ mod tests {
 
         assert_eq!(config.token_limits().default_max_tokens(), 4);
         assert_eq!(config.token_limits().hard_max_tokens(), 8);
+        Ok(())
+    }
+
+    #[test]
+    fn parses_inference_wait_timeout() -> Result<(), Box<dyn Error>> {
+        let config = ServerConfig::parse([
+            OsString::from("ferrite-server"),
+            OsString::from("--inference-wait-ms"),
+            OsString::from("250"),
+        ])?;
+
+        assert_eq!(
+            config.inference_wait_timeout(),
+            std::time::Duration::from_millis(250)
+        );
         Ok(())
     }
 

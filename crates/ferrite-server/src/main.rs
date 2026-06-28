@@ -24,6 +24,7 @@ async fn run() -> Result<(), Box<dyn Error>> {
         None => state,
     }
     .with_token_limits(config.token_limits());
+    let state = state.with_inference_wait_timeout(config.inference_wait_timeout());
     let app = ferrite_server::router(state);
     axum::serve(listener, app).await?;
     Ok(())
