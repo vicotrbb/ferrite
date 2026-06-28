@@ -53,6 +53,10 @@ impl ServerState {
         self.engine.clone()
     }
 
+    pub fn has_loaded_model(&self) -> bool {
+        self.engine.is_some()
+    }
+
     pub fn api_key(&self) -> Option<&str> {
         self.api_key.as_deref()
     }

@@ -27,10 +27,13 @@ async fn health_endpoint_reports_ready_model() -> Result<(), Box<dyn std::error:
 
 #[tokio::test]
 async fn models_endpoint_returns_openai_list_shape() -> Result<(), Box<dyn std::error::Error>> {
-    let app = router(ServerState::new("test-model".to_owned()));
+    let model_path = write_fixture_model()?;
+    let engine = InferenceEngine::load(&model_path)?;
+    let app = router(ServerState::with_engine("test-model".to_owned(), engine));
     let response = app
         .oneshot(Request::builder().uri("/v1/models").body(Body::empty())?)
         .await?;
+    remove_fixture_model(&model_path)?;
 
     assert_eq!(response.status(), StatusCode::OK);
     let body = to_json(response.into_body()).await?;

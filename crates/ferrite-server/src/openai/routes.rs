@@ -40,9 +40,12 @@ async fn models(
     headers: HeaderMap,
 ) -> Result<Json<ModelsResponse>, OpenAiHttpError> {
     ensure_authorized(&state, &headers)?;
-    Ok(Json(ModelsResponse::new(vec![ModelObject::local(
-        state.model_id().to_owned(),
-    )])))
+    let models = if state.has_loaded_model() {
+        vec![ModelObject::local(state.model_id().to_owned())]
+    } else {
+        Vec::new()
+    };
+    Ok(Json(ModelsResponse::new(models)))
 }
 
 async fn model(
@@ -51,7 +54,7 @@ async fn model(
     Path(model): Path<String>,
 ) -> Result<Json<ModelObject>, OpenAiHttpError> {
     ensure_authorized(&state, &headers)?;
-    if model != state.model_id() {
+    if model != state.model_id() || !state.has_loaded_model() {
         return Err(OpenAiHttpError::model_not_found(model));
     }
     Ok(Json(ModelObject::local(state.model_id().to_owned())))
