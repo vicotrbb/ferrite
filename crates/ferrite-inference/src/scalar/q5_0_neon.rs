@@ -4,7 +4,11 @@ use super::{
     float::f16_bits_to_f32,
     q5_0::{Q5_0MatVecBackend, Q5_0MatVecOutput, Q5_0_BLOCK_BYTES, Q5_0_BLOCK_VALUES},
 };
+use rayon::prelude::*;
 use std::arch::aarch64::{vaddvq_f32, vdupq_n_f32, vfmaq_f32, vld1q_f32};
+
+const ROW_PARALLEL_MIN_ROWS: usize = 4096;
+const ROW_PARALLEL_MAX_COLS: usize = 1024;
 
 pub(super) fn neon_q5_0_mul_vec(
     bytes: &[u8],
@@ -13,25 +17,54 @@ pub(super) fn neon_q5_0_mul_vec(
     vector: &[f32],
 ) -> Q5_0MatVecOutput {
     let row_bytes = (cols / Q5_0_BLOCK_VALUES) * Q5_0_BLOCK_BYTES;
+    if uses_row_parallel(rows, cols) {
+        return neon_q5_0_mul_vec_row_parallel(bytes, rows, row_bytes, vector);
+    }
+
     let mut values = vec![0.0; rows];
-    for (row, row_bytes) in bytes.chunks_exact(row_bytes).enumerate() {
-        let mut sum = 0.0;
-        for (block_index, block) in row_bytes.chunks_exact(Q5_0_BLOCK_BYTES).enumerate() {
-            let col_base = block_index * Q5_0_BLOCK_VALUES;
-            // SAFETY: the dispatch path checks NEON support, `block` has
-            // exactly one Q5_0 block, and `cols` is a multiple of 32 so the
-            // per-block vector slice is in bounds.
-            sum += unsafe {
-                neon_q5_0_block_dot(block, &vector[col_base..col_base + Q5_0_BLOCK_VALUES])
-            };
-        }
-        values[row] = sum;
+    for (row, row_chunk) in bytes.chunks_exact(row_bytes).enumerate() {
+        values[row] = neon_q5_0_row_dot(row_chunk, vector);
     }
 
     Q5_0MatVecOutput {
         values,
         backend: Q5_0MatVecBackend::Aarch64Neon,
     }
+}
+
+fn neon_q5_0_mul_vec_row_parallel(
+    bytes: &[u8],
+    rows: usize,
+    row_bytes: usize,
+    vector: &[f32],
+) -> Q5_0MatVecOutput {
+    let values = bytes
+        .par_chunks_exact(row_bytes)
+        .map(|row_chunk| neon_q5_0_row_dot(row_chunk, vector))
+        .collect::<Vec<_>>();
+    debug_assert_eq!(values.len(), rows);
+
+    Q5_0MatVecOutput {
+        values,
+        backend: Q5_0MatVecBackend::Aarch64NeonRowParallel,
+    }
+}
+
+fn neon_q5_0_row_dot(row_chunk: &[u8], vector: &[f32]) -> f32 {
+    let mut sum = 0.0;
+    for (block_index, block) in row_chunk.chunks_exact(Q5_0_BLOCK_BYTES).enumerate() {
+        let col_base = block_index * Q5_0_BLOCK_VALUES;
+        // SAFETY: the dispatch path checks NEON support, `block` has exactly
+        // one Q5_0 block, and the matrix constructor validates that columns
+        // are a multiple of 32 so the per-block vector slice is in bounds.
+        sum +=
+            unsafe { neon_q5_0_block_dot(block, &vector[col_base..col_base + Q5_0_BLOCK_VALUES]) };
+    }
+    sum
+}
+
+fn uses_row_parallel(rows: usize, cols: usize) -> bool {
+    rows >= ROW_PARALLEL_MIN_ROWS && cols <= ROW_PARALLEL_MAX_COLS
 }
 
 #[target_feature(enable = "neon")]

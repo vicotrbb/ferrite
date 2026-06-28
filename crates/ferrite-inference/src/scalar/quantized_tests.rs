@@ -296,6 +296,25 @@ fn q5_0_matvec_uses_neon_backend_on_aarch64() -> Result<(), InferenceError> {
 }
 
 #[test]
+#[cfg(target_arch = "aarch64")]
+fn q5_0_large_moderate_width_matvec_uses_neon_row_parallel() -> Result<(), InferenceError> {
+    let rows = 4096;
+    let cols = 32;
+    let mut bytes = Vec::new();
+    for row in 0..rows {
+        bytes.extend(q5_0_block_with_value(if row % 2 == 0 { 1 } else { -2 }));
+    }
+
+    let output = q5_0_mul_vec_with_backend(&bytes, rows, cols, &[1.0; 32])?;
+
+    assert_eq!(output.backend, Q5_0MatVecBackend::Aarch64NeonRowParallel);
+    assert_eq!(output.values[0], 32.0);
+    assert_eq!(output.values[1], -64.0);
+    assert_eq!(output.values[rows - 1], -64.0);
+    Ok(())
+}
+
+#[test]
 #[cfg(target_arch = "x86_64")]
 fn q5_0_matvec_uses_avx2_backend_on_x86_64() -> Result<(), InferenceError> {
     let mut bytes = Vec::new();
