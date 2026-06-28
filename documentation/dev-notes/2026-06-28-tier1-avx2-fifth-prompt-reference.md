@@ -158,6 +158,7 @@ returned no output.
 
 The fifth fixed prompt now has x86_64 AVX2 model-output parity evidence for the
 current local Tier 1 model/quantization set. Qwen2.5-0.5B Q8_0 and Q6_K now
-have x86_64 AVX2 evidence for the first five fixed Qwen2 prompts. Q4_K_M
-artifacts now have x86_64 AVX2 evidence for the first three fixed prompts plus
-the fifth prompt; their fourth prompt remains unproven on x86_64 AVX2.
+have x86_64 AVX2 evidence for the first five fixed Qwen2 prompts. The follow-up
+`documentation/dev-notes/2026-06-28-tier1-avx2-prompt-closure.md` adds the
+remaining Q4_K_M fourth-prompt and current-artifact sixth-prompt x86_64 AVX2
+evidence.
