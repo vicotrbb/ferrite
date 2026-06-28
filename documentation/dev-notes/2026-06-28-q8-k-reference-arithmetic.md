@@ -26,6 +26,12 @@ Ferrite's `BlockQ8K` follows the same contract. Ferrite also clamps the lower
 bound to `-127`; with the reference scale selection, valid values are already in
 range, so the extra clamp is defensive rather than a semantic change.
 
+The follow-up guard `test: pin q8 k activation contract` pins this contract in
+`crates/ferrite-inference/src/scalar/q8_k.rs` for positive-dominant,
+negative-dominant, and all-zero activation blocks. These tests assert the sign
+of `d`, representative quantized lanes, and the 16-wide group sums used by the
+Q4_K/Q6_K x Q8_K dot identities below.
+
 The generic Q4_K x Q8_K reference computes:
 
 ```text
@@ -71,9 +77,10 @@ activation.d * super_scale * (weighted_sum - 32 * correction_sum)
 
 No reference-arithmetic hole was found in Ferrite's Path B design.
 
-The Q4_K and Q6_K formulas line up with llama.cpp's generic and ARM NEON
-contracts, and Ferrite's tests already compare target-specific Q8_K helpers
-against the scalar Q8_K adapters. The SmolLM2 failures documented in
+The Q8_K activation quantizer, Q4_K formula, and Q6_K formula line up with
+llama.cpp's generic and ARM NEON contracts. Ferrite's tests pin the quantizer
+contract and compare target-specific Q8_K helpers against the scalar Q8_K
+adapters. The SmolLM2 failures documented in
 `documentation/dev-notes/2026-06-28-q8-k-divergence-diagnostic.md` therefore
 remain best explained as activation-quantization drift crossing a narrow output
 margin, not as a proven Q4_K/Q6_K x Q8_K formula bug.
