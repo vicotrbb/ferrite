@@ -1,9 +1,11 @@
 #![allow(unsafe_code)]
 
 use super::{float::f16_bits_to_f32, InferenceError};
+use rayon::prelude::*;
 
 pub(super) const Q8_0_BLOCK_VALUES: usize = 32;
 pub(super) const Q8_0_BLOCK_BYTES: usize = 34;
+const PARALLEL_ARGMAX_MIN_ROWS: usize = 65_536;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Q8_0MatVecBackend {
@@ -54,6 +56,11 @@ pub(super) fn q8_0_argmax_mul_vec(
     #[cfg(target_arch = "aarch64")]
     {
         if std::arch::is_aarch64_feature_detected!("neon") {
+            if rows >= PARALLEL_ARGMAX_MIN_ROWS {
+                return Ok(super::q8_0_neon::neon_q8_0_parallel_argmax_mul_vec(
+                    bytes, cols, vector,
+                ));
+            }
             return Ok(super::q8_0_neon::neon_q8_0_argmax_mul_vec(
                 bytes, rows, cols, vector,
             ));
@@ -205,4 +212,50 @@ where
     }
 
     best_index
+}
+
+pub(super) fn parallel_argmax_q8_0_rows<F>(bytes: &[u8], row_bytes: usize, row_dot: F) -> usize
+where
+    F: Fn(&[u8]) -> f32 + Sync,
+{
+    bytes
+        .par_chunks_exact(row_bytes)
+        .enumerate()
+        .map(|(row_index, row_chunk)| (row_index, row_dot(row_chunk)))
+        .reduce(
+            || (0usize, f32::NEG_INFINITY),
+            |left, right| {
+                if right.1 > left.1 {
+                    right
+                } else {
+                    left
+                }
+            },
+        )
+        .0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{argmax_q8_0_rows, parallel_argmax_q8_0_rows};
+
+    #[test]
+    fn parallel_argmax_q8_0_rows_matches_sequential_argmax() {
+        let rows = [-2.0f32, 1.0, 0.0, 4.5, -3.0, 4.25, 3.0, -1.0, 2.0, 0.5];
+        let bytes = rows
+            .iter()
+            .flat_map(|value| value.to_le_bytes())
+            .collect::<Vec<_>>();
+        let row_bytes = std::mem::size_of::<f32>();
+        let row_dot = |row: &[u8]| {
+            let mut value = [0u8; 4];
+            value.copy_from_slice(row);
+            f32::from_le_bytes(value)
+        };
+
+        let expected = argmax_q8_0_rows(&bytes, row_bytes, row_dot);
+        let actual = parallel_argmax_q8_0_rows(&bytes, row_bytes, row_dot);
+
+        assert_eq!(actual, expected);
+    }
 }

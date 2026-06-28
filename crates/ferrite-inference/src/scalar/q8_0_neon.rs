@@ -3,7 +3,8 @@
 use super::{
     float::f16_bits_to_f32,
     q8_0::{
-        argmax_q8_0_rows, Q8_0MatVecBackend, Q8_0MatVecOutput, Q8_0_BLOCK_BYTES, Q8_0_BLOCK_VALUES,
+        argmax_q8_0_rows, parallel_argmax_q8_0_rows, Q8_0MatVecBackend, Q8_0MatVecOutput,
+        Q8_0_BLOCK_BYTES, Q8_0_BLOCK_VALUES,
     },
 };
 use std::arch::aarch64::{
@@ -51,6 +52,31 @@ pub(super) fn neon_q8_0_argmax_mul_vec(
 ) -> usize {
     let row_bytes = (cols / Q8_0_BLOCK_VALUES) * Q8_0_BLOCK_BYTES;
     argmax_q8_0_rows(bytes, row_bytes, |row_bytes| {
+        let mut sum = 0.0;
+        for (block_index, block) in row_bytes.chunks_exact(Q8_0_BLOCK_BYTES).enumerate() {
+            let scale = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
+            let col_base = block_index * Q8_0_BLOCK_VALUES;
+            // SAFETY: each Q8_0 block has exactly 32 quantized bytes and
+            // `cols` is validated as a multiple of 32, so every 8-byte
+            // quant load and matching 4-lane vector load is in bounds.
+            sum += unsafe {
+                neon_q8_0_block_dot(
+                    block[2..].as_ptr().cast::<i8>(),
+                    vector[col_base..].as_ptr(),
+                )
+            } * scale;
+        }
+        sum
+    })
+}
+
+pub(super) fn neon_q8_0_parallel_argmax_mul_vec(
+    bytes: &[u8],
+    cols: usize,
+    vector: &[f32],
+) -> usize {
+    let row_bytes = (cols / Q8_0_BLOCK_VALUES) * Q8_0_BLOCK_BYTES;
+    parallel_argmax_q8_0_rows(bytes, row_bytes, |row_bytes| {
         let mut sum = 0.0;
         for (block_index, block) in row_bytes.chunks_exact(Q8_0_BLOCK_BYTES).enumerate() {
             let scale = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
