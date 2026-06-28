@@ -13,6 +13,11 @@ pub(in crate::scalar) struct BlockQ8K {
 
 impl BlockQ8K {
     pub(in crate::scalar) fn quantize_blocks(values: &[f32]) -> Result<Vec<Self>, InferenceError> {
+        if values.is_empty() {
+            return Err(InferenceError::new(
+                "Q8_K activation length must not be zero",
+            ));
+        }
         if !values.len().is_multiple_of(Q8_K_BLOCK_VALUES) {
             return Err(InferenceError::new(format!(
                 "Q8_K activation length {} must be divisible by {Q8_K_BLOCK_VALUES}",
@@ -187,6 +192,17 @@ mod tests {
         assert_eq!(blocks.len(), 2);
         assert_eq!(blocks[0], BlockQ8K::quantize(&values[..Q8_K_BLOCK_VALUES])?);
         assert_eq!(blocks[1], BlockQ8K::quantize(&values[Q8_K_BLOCK_VALUES..])?);
+        Ok(())
+    }
+
+    #[test]
+    fn q8_k_rejects_empty_activation_block_collection() -> Result<(), InferenceError> {
+        let err = match BlockQ8K::quantize_blocks(&[]) {
+            Ok(_) => return Err(InferenceError::new("empty activation blocks must fail")),
+            Err(err) => err,
+        };
+
+        assert_eq!(err.to_string(), "Q8_K activation length must not be zero");
         Ok(())
     }
 

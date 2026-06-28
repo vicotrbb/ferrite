@@ -100,6 +100,9 @@ reference implementation and benchmarking baseline, not the Ferrite runtime.
 - `documentation/dev-notes/2026-06-28-q8-k-row-shape-guardrail.md` records the
   explicit whole-K-block row-shape invariant for scalar and aarch64 NEON Q8_K
   row adapters.
+- `documentation/dev-notes/2026-06-28-q8-k-empty-activation-guardrail.md`
+  records the non-empty activation block collection invariant for
+  `BlockQ8K::quantize_blocks`.
 - `documentation/benchmarks/2026-06-28-tier1-qwen2-1-5b-current-profile.md`
   records the current Qwen2.5-1.5B profile and hot aggregate roles.
 - `documentation/dev-notes/2026-06-28-tier1-q4-q6-thresholded-row-parallel-regression.md`
