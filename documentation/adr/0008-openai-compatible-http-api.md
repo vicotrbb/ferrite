@@ -142,3 +142,6 @@ Responses API are out of scope until explicit ADRs or plans add them.
   compatibility evidence for rejecting `tool_call_id` on non-tool messages.
 - `documentation/dev-notes/2026-06-29-openai-real-http-rerun.md` records a
   fresh explicit rerun of real Tier 0 and Tier 1 OpenAI-compatible HTTP tests.
+- `documentation/dev-notes/2026-06-29-openai-health-readiness.md` records
+  compatibility evidence for deriving `/health` readiness from actual loaded
+  model availability.

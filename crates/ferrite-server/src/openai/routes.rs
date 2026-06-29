@@ -31,7 +31,10 @@ pub fn router(state: ServerState) -> Router {
 }
 
 async fn health(State(state): State<ServerState>) -> Json<HealthResponse> {
-    Json(HealthResponse::ready(state.model_id().to_owned()))
+    Json(HealthResponse::new(
+        state.model_id().to_owned(),
+        state.has_loaded_model(),
+    ))
 }
 
 async fn models(

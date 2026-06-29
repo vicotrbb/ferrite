@@ -71,7 +71,7 @@ Ferrite has a live regression test using the `async-openai` client configured
 with a Ferrite base URL.
 `--api-key` is optional; when set, `/v1/*` endpoints require
 `Authorization: Bearer <api-key>`, while `/health` remains open for local
-readiness checks.
+readiness checks. `/health` returns `ready: false` until a model is loaded.
 `--default-max-tokens` controls requests that omit `max_tokens` or
 `max_completion_tokens`; `--hard-max-tokens` caps every generation request.
 `--inference-wait-ms` controls how long an overlapping generation request waits

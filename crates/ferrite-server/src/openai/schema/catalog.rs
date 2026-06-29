@@ -8,10 +8,10 @@ pub struct HealthResponse {
 }
 
 impl HealthResponse {
-    pub fn ready(model: String) -> Self {
+    pub fn new(model: String, ready: bool) -> Self {
         Self {
             status: "ok",
-            ready: true,
+            ready,
             model,
         }
     }
