@@ -67,7 +67,7 @@ for the generated token.
 
 ## Real Tier 1 HTTP Regression
 
-Follow-up command:
+Follow-up non-streaming command:
 
 ```sh
 cargo test -p ferrite-server --test openai_real_tier1_http live_http_server_applies_stop_sequences_with_real_tier1_model -- --ignored --nocapture
@@ -84,3 +84,20 @@ OpenAI-compatible HTTP server. It verified that `stop: "\n"` trims the known
 legacy completion token for `hello world` to empty visible text, and that
 `stop: "你"` trims the known chat completion token to empty visible content,
 while both responses still report one generated completion token.
+
+Follow-up streaming command:
+
+```sh
+cargo test -p ferrite-server --test openai_real_tier1_http live_http_server_streams_stop_sequences_with_real_tier1_model -- --ignored --nocapture
+```
+
+Observed result:
+
+- `live_http_server_streams_stop_sequences_with_real_tier1_model`: 1 passed;
+  0 failed; 7 filtered out; finished in 35.81s.
+
+This explicit opt-in run used the same local Qwen2.5-0.5B Q4_K_M artifact and
+verified the SSE paths. `stop: "\n"` suppresses the known legacy completion
+token from visible text chunks, and `stop: "你"` suppresses the known chat
+completion token from visible content chunks. Both streams still emit exactly
+one terminal `finish_reason: "stop"` event and `data: [DONE]`.
