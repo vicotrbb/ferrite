@@ -44,6 +44,7 @@ async fn chat_endpoint_returns_openai_message_shape() -> Result<(), Box<dyn std:
     assert_eq!(message["annotations"], serde_json::json!([]));
     assert_eq!(message["role"], "assistant");
     assert_eq!(message["content"], "winner");
+    assert_usage_has_detail_counters(&body["usage"])?;
     Ok(())
 }
 
@@ -114,6 +115,29 @@ fn assert_choice_has_null_logprobs(event: &Value) -> Result<(), Box<dyn std::err
         .ok_or("expected streamed choice object")?;
     assert!(choice.contains_key("logprobs"), "{event}");
     assert!(choice["logprobs"].is_null(), "{event}");
+    Ok(())
+}
+
+fn assert_usage_has_detail_counters(usage: &Value) -> Result<(), Box<dyn std::error::Error>> {
+    let prompt_details = usage["prompt_tokens_details"]
+        .as_object()
+        .ok_or("expected prompt token details")?;
+    assert_eq!(prompt_details["cached_tokens"], 0, "{usage}");
+    assert_eq!(prompt_details["audio_tokens"], 0, "{usage}");
+
+    let completion_details = usage["completion_tokens_details"]
+        .as_object()
+        .ok_or("expected completion token details")?;
+    assert_eq!(completion_details["reasoning_tokens"], 0, "{usage}");
+    assert_eq!(completion_details["audio_tokens"], 0, "{usage}");
+    assert_eq!(
+        completion_details["accepted_prediction_tokens"], 0,
+        "{usage}"
+    );
+    assert_eq!(
+        completion_details["rejected_prediction_tokens"], 0,
+        "{usage}"
+    );
     Ok(())
 }
 
