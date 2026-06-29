@@ -3,6 +3,7 @@ mod catalog;
 mod cors;
 pub mod error;
 mod generation;
+mod guards;
 mod json;
 pub mod prompt;
 pub mod routes;
