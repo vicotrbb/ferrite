@@ -27,6 +27,7 @@ pub fn router(state: ServerState) -> Router {
         .route("/v1/models/:model", get(model))
         .route("/v1/chat/completions", post(chat_completions))
         .route("/v1/completions", post(completions))
+        .method_not_allowed_fallback(method_not_allowed)
         .with_state(state)
 }
 
@@ -144,6 +145,10 @@ async fn completions(
         generated,
     ))
     .into_response())
+}
+
+async fn method_not_allowed() -> OpenAiHttpError {
+    OpenAiHttpError::method_not_allowed()
 }
 
 fn ensure_supported_completion_request(request: &CompletionRequest) -> Result<(), OpenAiHttpError> {

@@ -233,3 +233,6 @@ Responses API are out of scope until explicit ADRs or plans add them.
 - `documentation/dev-notes/2026-06-29-openai-single-field-error-param.md`
   records compatibility evidence for filling `error.param` when unsupported
   request validation rejects exactly one field.
+- `documentation/dev-notes/2026-06-29-openai-method-not-allowed.md` records
+  compatibility evidence for returning OpenAI-shaped JSON error bodies from
+  known OpenAI routes when clients use unsupported HTTP methods.

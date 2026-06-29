@@ -1005,6 +1005,27 @@ async fn completions_endpoint_returns_openai_error_for_missing_json_content_type
 }
 
 #[tokio::test]
+async fn completions_endpoint_returns_openai_error_for_wrong_method(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let app = router(ServerState::new("fixture-model".to_owned()));
+    let request = Request::builder()
+        .method("GET")
+        .uri("/v1/completions")
+        .body(Body::empty())?;
+    let response = app.oneshot(request).await?;
+
+    assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
+    let body = to_json(response.into_body()).await?;
+    assert_eq!(body["error"]["type"], "invalid_request_error");
+    assert_eq!(body["error"]["code"], "method_not_allowed");
+    assert!(body["error"]["message"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("method not allowed"));
+    Ok(())
+}
+
+#[tokio::test]
 async fn completions_endpoint_returns_429_when_inference_is_busy(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let model_path = write_fixture_model()?;

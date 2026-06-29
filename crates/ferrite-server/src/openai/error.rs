@@ -93,6 +93,17 @@ impl OpenAiHttpError {
         }
     }
 
+    pub fn method_not_allowed() -> Self {
+        Self {
+            status: StatusCode::METHOD_NOT_ALLOWED,
+            body: OpenAiErrorResponse::new(OpenAiErrorBody::with_code(
+                "method not allowed for this OpenAI-compatible endpoint",
+                "invalid_request_error",
+                "method_not_allowed",
+            )),
+        }
+    }
+
     pub fn authentication_required(message: impl Into<String>) -> Self {
         Self {
             status: StatusCode::UNAUTHORIZED,
