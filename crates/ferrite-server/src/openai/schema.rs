@@ -5,6 +5,7 @@ mod chat_stream;
 mod completion;
 mod completion_prompt;
 mod completion_stream;
+mod function_options;
 mod metadata;
 mod modalities;
 mod neutral_options;

@@ -1,5 +1,6 @@
 use super::{
     chat_content::ChatContent,
+    function_options::{is_empty_functions, is_no_function_call},
     metadata::is_valid_metadata,
     modalities::is_text_only_modalities,
     neutral_options::{is_neutral_bool, is_neutral_number},
@@ -35,6 +36,10 @@ pub struct ChatCompletionRequest {
     tool_choice: Option<Value>,
     #[serde(default)]
     parallel_tool_calls: Option<Value>,
+    #[serde(default)]
+    functions: Option<Value>,
+    #[serde(default)]
+    function_call: Option<Value>,
     #[serde(default)]
     response_format: Option<Value>,
     #[serde(default)]
@@ -106,6 +111,8 @@ impl ChatCompletionRequest {
                 "parallel_tool_calls",
                 !is_disabled_parallel_tool_calls(&self.parallel_tool_calls),
             )
+            .with_present("functions", !is_empty_functions(&self.functions))
+            .with_present("function_call", !is_no_function_call(&self.function_call))
             .with_present(
                 "response_format",
                 !is_neutral_response_format(&self.response_format),

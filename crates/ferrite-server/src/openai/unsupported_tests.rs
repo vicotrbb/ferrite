@@ -28,6 +28,26 @@ async fn chat_endpoint_rejects_tool_fields() -> Result<(), Box<dyn std::error::E
 }
 
 #[tokio::test]
+async fn chat_endpoint_rejects_function_fields() -> Result<(), Box<dyn std::error::Error>> {
+    let body = post_chat(
+        r#"{
+            "model":"fixture-model",
+            "messages":[{"role":"user","content":"hello"}],
+            "functions":[{"name":"lookup","parameters":{"type":"object"}}],
+            "function_call":"auto"
+        }"#,
+    )
+    .await?;
+
+    assert_eq!(body.status, StatusCode::BAD_REQUEST);
+    assert_eq!(body.json["error"]["type"], "invalid_request_error");
+    let message = body.json["error"]["message"].as_str().unwrap_or_default();
+    assert!(message.contains("functions"), "{message}");
+    assert!(message.contains("function_call"), "{message}");
+    Ok(())
+}
+
+#[tokio::test]
 async fn chat_endpoint_rejects_json_response_format() -> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat(
         r#"{
