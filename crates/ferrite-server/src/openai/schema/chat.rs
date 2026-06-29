@@ -1,5 +1,6 @@
 use super::{
     chat_content::ChatContent,
+    metadata::is_valid_metadata,
     modalities::is_text_only_modalities,
     neutral_options::{is_neutral_bool, is_neutral_number},
     response_format::is_neutral_response_format,
@@ -122,7 +123,7 @@ impl ChatCompletionRequest {
             .with_present("user", !is_user_identifier(&self.user))
             .with_present("seed", self.seed.is_some())
             .with_present("store", !is_neutral_bool(&self.store, false))
-            .with_present("metadata", self.metadata.is_some())
+            .with_present("metadata", !is_valid_metadata(&self.metadata))
             .with_extra_keys(&self.extra_fields)
             .into_vec();
         if let Some(stream_options) = &self.stream_options {
