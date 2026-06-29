@@ -17,6 +17,12 @@ async fn chat_endpoint_accepts_neutral_sampling_options() -> Result<(), Box<dyn 
 }
 
 #[tokio::test]
+async fn chat_endpoint_accepts_openai_default_temperature() -> Result<(), Box<dyn std::error::Error>>
+{
+    assert_chat_option_is_accepted(r#""temperature":1"#).await
+}
+
+#[tokio::test]
 async fn chat_endpoint_accepts_empty_stop_array() -> Result<(), Box<dyn std::error::Error>> {
     assert_chat_option_is_accepted(r#""stop":[]"#).await
 }

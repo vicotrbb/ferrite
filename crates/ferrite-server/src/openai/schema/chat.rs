@@ -8,7 +8,7 @@ use super::{
     metadata::is_valid_metadata,
     modalities::is_text_only_modalities,
     model_id::deserialize_model_id,
-    neutral_options::{is_neutral_bool, is_neutral_number},
+    neutral_options::{is_neutral_bool, is_neutral_number, is_neutral_number_in},
     prompt_cache_key::is_prompt_cache_key,
     reasoning_effort::is_no_reasoning_effort,
     response_format::is_neutral_response_format,
@@ -171,7 +171,10 @@ impl ChatCompletionRequest {
                 "max_completion_tokens",
                 self.max_completion_tokens.is_malformed(),
             )
-            .with_present("temperature", !is_neutral_number(&self.temperature, 0.0))
+            .with_present(
+                "temperature",
+                !is_neutral_number_in(&self.temperature, &[0.0, 1.0]),
+            )
             .with_present("top_p", !is_neutral_number(&self.top_p, 1.0))
             .with_present("n", !is_neutral_number(&self.n, 1.0))
             .with_present("stop", !is_neutral_stop_sequences(&self.stop))

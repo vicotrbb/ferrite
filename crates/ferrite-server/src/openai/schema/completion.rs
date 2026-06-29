@@ -3,7 +3,7 @@ use super::{
     id::response_id,
     logit_bias::is_neutral_logit_bias,
     model_id::deserialize_model_id,
-    neutral_options::{is_neutral_bool, is_neutral_number},
+    neutral_options::{is_neutral_bool, is_neutral_number, is_neutral_number_in},
     seed::is_seed,
     stop_sequences::is_neutral_stop_sequences,
     stream_flag::StreamFlag,
@@ -98,7 +98,10 @@ impl CompletionRequest {
             .with_present("stream", self.stream.is_malformed())
             .with_present("max_tokens", self.max_tokens.is_malformed())
             .with_present("suffix", self.suffix.is_some())
-            .with_present("temperature", !is_neutral_number(&self.temperature, 0.0))
+            .with_present(
+                "temperature",
+                !is_neutral_number_in(&self.temperature, &[0.0, 1.0]),
+            )
             .with_present("top_p", !is_neutral_number(&self.top_p, 1.0))
             .with_present("n", !is_neutral_number(&self.n, 1.0))
             .with_present("logprobs", self.logprobs.is_some())

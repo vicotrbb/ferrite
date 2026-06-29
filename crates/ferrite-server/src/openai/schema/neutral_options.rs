@@ -6,6 +6,14 @@ pub(super) fn is_neutral_number(value: &Option<Value>, expected: f64) -> bool {
         .is_none_or(|value| number_equals(value, expected))
 }
 
+pub(super) fn is_neutral_number_in(value: &Option<Value>, accepted: &[f64]) -> bool {
+    value.as_ref().is_none_or(|value| {
+        accepted
+            .iter()
+            .any(|expected| number_equals(value, *expected))
+    })
+}
+
 pub(super) fn is_neutral_bool(value: &Option<Value>, expected: bool) -> bool {
     value
         .as_ref()
@@ -33,9 +41,17 @@ mod tests {
     }
 
     #[test]
+    fn matching_number_in_accepted_set_is_neutral() {
+        assert!(is_neutral_number_in(&Some(json!(0)), &[0.0, 1.0]));
+        assert!(is_neutral_number_in(&Some(json!(1.0)), &[0.0, 1.0]));
+    }
+
+    #[test]
     fn non_matching_or_non_number_value_is_not_neutral() {
         assert!(!is_neutral_number(&Some(json!(0.2)), 0.0));
         assert!(!is_neutral_number(&Some(json!("0")), 0.0));
+        assert!(!is_neutral_number_in(&Some(json!(0.2)), &[0.0, 1.0]));
+        assert!(!is_neutral_number_in(&Some(json!("1")), &[0.0, 1.0]));
     }
 
     #[test]
