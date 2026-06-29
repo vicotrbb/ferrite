@@ -81,6 +81,12 @@ for one-token legacy completions: 10 sequential requests completed in 3,110 ms
 for about 3.22 req/s, and 9 queued requests at client concurrency 3 completed
 in 2,792 ms for about 3.22 req/s. This is still one-model, one-prompt,
 one-endpoint evidence rather than full Tier 1 HTTP throughput completion.
+The matching Q6_K path now has the same local release-build request-rate shape:
+10 sequential one-token legacy completion requests completed in 8,236 ms for
+about 1.21 req/s, and 9 queued requests at client concurrency 3 completed in
+7,401 ms for about 1.22 req/s. This expands local release HTTP throughput
+coverage across the two Qwen2.5-1.5B quantizations while keeping the full Tier
+1 HTTP throughput gate open.
 
 The OpenAI-compatible HTTP server now has opt-in real Tier 1 coverage for
 Qwen2.5-0.5B Q4_K_M through legacy completions, streaming legacy completions,
