@@ -11,6 +11,8 @@ mod auth_tests;
 #[cfg(test)]
 mod catalog_tests;
 #[cfg(test)]
+mod chat_message_tool_tests;
+#[cfg(test)]
 mod completion_unsupported_tests;
 #[cfg(test)]
 mod request_error_tests;
