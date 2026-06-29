@@ -25,7 +25,7 @@ use super::{
     usage::Usage,
     user_identifier::is_user_identifier,
 };
-use crate::runtime::GeneratedText;
+use crate::runtime::{GeneratedText, GenerationFinishReason};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -402,7 +402,7 @@ impl ChatCompletionResponse {
             created,
             model,
             system_fingerprint: None,
-            choices: vec![ChatCompletionChoice::new(generated.text().to_owned())],
+            choices: vec![ChatCompletionChoice::new(&generated)],
             usage: Usage::from_generation(&generated),
             service_tier,
         }
@@ -418,13 +418,20 @@ struct ChatCompletionChoice {
 }
 
 impl ChatCompletionChoice {
-    fn new(content: String) -> Self {
+    fn new(generated: &GeneratedText) -> Self {
         Self {
             index: 0,
-            message: ChatCompletionMessage::assistant(content),
+            message: ChatCompletionMessage::assistant(generated.text().to_owned()),
             logprobs: None,
-            finish_reason: "stop",
+            finish_reason: finish_reason(generated.finish_reason()),
         }
+    }
+}
+
+fn finish_reason(reason: GenerationFinishReason) -> &'static str {
+    match reason {
+        GenerationFinishReason::Stop => "stop",
+        GenerationFinishReason::Length => "length",
     }
 }
 

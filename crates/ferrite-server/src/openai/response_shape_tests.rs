@@ -36,6 +36,7 @@ async fn completions_endpoint_returns_openai_choice_shape() -> Result<(), Box<dy
         .ok_or("expected completion choice object")?;
     assert!(choice.contains_key("logprobs"), "{body}");
     assert!(choice["logprobs"].is_null(), "{body}");
+    assert_eq!(choice["finish_reason"], "length");
     assert_eq!(choice["text"], "winner");
     assert_usage_has_detail_counters(&body["usage"])?;
     Ok(())
@@ -69,12 +70,12 @@ async fn completions_stream_endpoint_returns_openai_choice_shape(
     assert_null_system_fingerprint(token_event)?;
     assert_choice_has_null_logprobs(token_event)?;
 
-    let stop_event = events
+    let length_event = events
         .iter()
-        .find(|event| event["choices"][0]["finish_reason"] == "stop")
-        .ok_or("expected stop event")?;
-    assert_null_system_fingerprint(stop_event)?;
-    assert_choice_has_null_logprobs(stop_event)?;
+        .find(|event| event["choices"][0]["finish_reason"] == "length")
+        .ok_or("expected length event")?;
+    assert_null_system_fingerprint(length_event)?;
+    assert_choice_has_null_logprobs(length_event)?;
     Ok(())
 }
 
@@ -103,6 +104,7 @@ async fn chat_endpoint_returns_openai_message_shape() -> Result<(), Box<dyn std:
         .ok_or("expected choice object")?;
     assert!(choice.contains_key("logprobs"), "{body}");
     assert!(choice["logprobs"].is_null(), "{body}");
+    assert_eq!(choice["finish_reason"], "length");
 
     let message = choice["message"]
         .as_object()
@@ -155,12 +157,12 @@ async fn chat_stream_endpoint_returns_openai_choice_shape() -> Result<(), Box<dy
     assert_null_system_fingerprint(token_event)?;
     assert_choice_has_null_logprobs(token_event)?;
 
-    let stop_event = events
+    let length_event = events
         .iter()
-        .find(|event| event["choices"][0]["finish_reason"] == "stop")
-        .ok_or("expected stop event")?;
-    assert_null_system_fingerprint(stop_event)?;
-    assert_choice_has_null_logprobs(stop_event)?;
+        .find(|event| event["choices"][0]["finish_reason"] == "length")
+        .ok_or("expected length event")?;
+    assert_null_system_fingerprint(length_event)?;
+    assert_choice_has_null_logprobs(length_event)?;
     Ok(())
 }
 

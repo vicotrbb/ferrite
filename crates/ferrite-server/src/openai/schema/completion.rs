@@ -14,7 +14,7 @@ use super::{
     usage::Usage,
     user_identifier::is_user_identifier,
 };
-use crate::runtime::GeneratedText;
+use crate::runtime::{GeneratedText, GenerationFinishReason};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -163,7 +163,7 @@ impl CompletionResponse {
             choices: generated
                 .iter()
                 .enumerate()
-                .map(|(index, generated)| CompletionChoice::new(index, generated.text().to_owned()))
+                .map(|(index, generated)| CompletionChoice::new(index, generated))
                 .collect(),
             usage: Usage::from_generations(&generated),
         }
@@ -179,13 +179,20 @@ struct CompletionChoice {
 }
 
 impl CompletionChoice {
-    fn new(index: usize, text: String) -> Self {
+    fn new(index: usize, generated: &GeneratedText) -> Self {
         Self {
-            text,
+            text: generated.text().to_owned(),
             index,
             logprobs: None,
-            finish_reason: "stop",
+            finish_reason: finish_reason(generated.finish_reason()),
         }
+    }
+}
+
+fn finish_reason(reason: GenerationFinishReason) -> &'static str {
+    match reason {
+        GenerationFinishReason::Stop => "stop",
+        GenerationFinishReason::Length => "length",
     }
 }
 

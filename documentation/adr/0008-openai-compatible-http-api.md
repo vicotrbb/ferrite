@@ -247,6 +247,10 @@ Responses API are out of scope until explicit ADRs or plans add them.
   records fixture evidence that supported stop sequences now terminate server
   generation instead of only trimming visible output after spending the full
   requested token budget.
+- `documentation/dev-notes/2026-06-29-openai-finish-reason-length.md` records
+  fixture evidence that ordinary token-budget exhaustion reports
+  `finish_reason: "length"` while stop-sequence paths continue to report
+  `finish_reason: "stop"`.
 - `documentation/dev-notes/2026-06-28-openai-real-tier1-qwen-1-5b-q8-http-proof.md`
   records matching larger-artifact Qwen2.5-1.5B Q8_0 stop-sequence evidence
   across non-streaming and streaming completion/chat HTTP paths.

@@ -1,5 +1,5 @@
 use super::{id::response_id, stream_usage::StreamUsage, unix_timestamp, usage::Usage};
-use crate::runtime::GeneratedText;
+use crate::runtime::{GeneratedText, GenerationFinishReason};
 use serde::Serialize;
 use serde_json::Value;
 
@@ -51,14 +51,14 @@ impl CompletionStreamContext {
         }
     }
 
-    pub fn stop(&self) -> CompletionStreamChunk {
+    pub fn finish(&self, reason: GenerationFinishReason) -> CompletionStreamChunk {
         CompletionStreamChunk {
             id: self.id.clone(),
             object: "text_completion",
             created: self.created,
             model: self.model.clone(),
             system_fingerprint: None,
-            choices: vec![CompletionStreamChoice::stop()],
+            choices: vec![CompletionStreamChoice::finish(reason)],
             usage: self.null_usage(),
         }
     }
@@ -87,7 +87,7 @@ impl CompletionStreamChunk {
         for text in generated.token_texts() {
             chunks.push(context.token(text.clone()));
         }
-        chunks.push(context.stop());
+        chunks.push(context.finish(generated.finish_reason()));
         chunks
     }
 }
@@ -110,13 +110,20 @@ impl CompletionStreamChoice {
         }
     }
 
-    fn stop() -> Self {
+    fn finish(reason: GenerationFinishReason) -> Self {
         Self {
             text: String::new(),
             index: 0,
             logprobs: None,
-            finish_reason: Some("stop"),
+            finish_reason: Some(finish_reason(reason)),
         }
+    }
+}
+
+fn finish_reason(reason: GenerationFinishReason) -> &'static str {
+    match reason {
+        GenerationFinishReason::Stop => "stop",
+        GenerationFinishReason::Length => "length",
     }
 }
 
@@ -144,6 +151,9 @@ mod tests {
     fn completion_stream_chunks_keep_one_id_within_a_stream() {
         let context = CompletionStreamContext::new("fixture-model".to_owned());
 
-        assert_eq!(context.token("hello".to_owned()).id, context.stop().id);
+        assert_eq!(
+            context.token("hello".to_owned()).id,
+            context.finish(GenerationFinishReason::Stop).id
+        );
     }
 }

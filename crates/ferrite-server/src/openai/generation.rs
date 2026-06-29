@@ -63,7 +63,7 @@ pub(super) fn completion_stream_response(
         ),
         move |piece| token_context.token(piece.to_owned()),
         move |generated| {
-            let mut chunks = vec![context.stop()];
+            let mut chunks = vec![context.finish(generated.finish_reason())];
             if include_usage {
                 chunks.push(context.usage(generated));
             }
@@ -96,7 +96,7 @@ pub(super) fn chat_stream_response(
         ),
         move |piece| token_context.token(piece.to_owned()),
         move |generated| {
-            let mut chunks = vec![context.stop()];
+            let mut chunks = vec![context.finish(generated.finish_reason())];
             if include_usage {
                 chunks.push(context.usage(generated));
             }
@@ -251,11 +251,12 @@ fn apply_stop_sequences(
     } else {
         vec![text.clone()]
     };
-    crate::runtime::GeneratedText::new(
+    crate::runtime::GeneratedText::with_finish_reason(
         text,
         generated.prompt_tokens(),
         generated.completion_tokens(),
         token_texts,
+        crate::runtime::GenerationFinishReason::Stop,
     )
 }
 

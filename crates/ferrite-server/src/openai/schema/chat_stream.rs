@@ -1,5 +1,5 @@
 use super::{id::response_id, stream_usage::StreamUsage, unix_timestamp, usage::Usage};
-use crate::runtime::GeneratedText;
+use crate::runtime::{GeneratedText, GenerationFinishReason};
 use serde::Serialize;
 use serde_json::Value;
 
@@ -74,7 +74,7 @@ impl ChatCompletionStreamContext {
         }
     }
 
-    pub fn stop(&self) -> ChatCompletionStreamChunk {
+    pub fn finish(&self, reason: GenerationFinishReason) -> ChatCompletionStreamChunk {
         ChatCompletionStreamChunk {
             id: self.id.clone(),
             object: "chat.completion.chunk",
@@ -82,7 +82,7 @@ impl ChatCompletionStreamContext {
             model: self.model.clone(),
             system_fingerprint: None,
             service_tier: self.service_tier,
-            choices: vec![ChatCompletionStreamChoice::stop()],
+            choices: vec![ChatCompletionStreamChoice::finish(reason)],
             usage: self.null_usage(),
         }
     }
@@ -112,7 +112,7 @@ impl ChatCompletionStreamChunk {
         for text in generated.token_texts() {
             chunks.push(context.token(text.clone()));
         }
-        chunks.push(context.stop());
+        chunks.push(context.finish(generated.finish_reason()));
         chunks
     }
 }
@@ -144,13 +144,20 @@ impl ChatCompletionStreamChoice {
         }
     }
 
-    fn stop() -> Self {
+    fn finish(reason: GenerationFinishReason) -> Self {
         Self {
             index: 0,
             delta: ChatCompletionStreamDelta::empty(),
             logprobs: None,
-            finish_reason: Some("stop"),
+            finish_reason: Some(finish_reason(reason)),
         }
+    }
+}
+
+fn finish_reason(reason: GenerationFinishReason) -> &'static str {
+    match reason {
+        GenerationFinishReason::Stop => "stop",
+        GenerationFinishReason::Length => "length",
     }
 }
 
@@ -211,6 +218,6 @@ mod tests {
         let id = context.role().id;
 
         assert_eq!(id, context.token("hello".to_owned()).id);
-        assert_eq!(id, context.stop().id);
+        assert_eq!(id, context.finish(GenerationFinishReason::Stop).id);
     }
 }

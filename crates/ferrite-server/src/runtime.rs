@@ -8,6 +8,12 @@ pub enum GenerationControl {
     Stop,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GenerationFinishReason {
+    Stop,
+    Length,
+}
+
 #[derive(Debug)]
 pub struct InferenceEngine {
     model: ScalarLlamaModel,
@@ -52,6 +58,7 @@ impl InferenceEngine {
         let mut token_id = next.token_id;
         let mut generated_token_ids = Vec::with_capacity(max_tokens);
         let mut token_texts = Vec::with_capacity(max_tokens);
+        let mut finish_reason = GenerationFinishReason::Length;
 
         for _ in 0..max_tokens {
             generated_token_ids.push(token_id);
@@ -59,9 +66,11 @@ impl InferenceEngine {
             let control = on_token(&token_text)?;
             token_texts.push(token_text);
             if control == GenerationControl::Stop {
+                finish_reason = GenerationFinishReason::Stop;
                 break;
             }
             if Some(token_id) == self.tokenizer.eos_token_id() {
+                finish_reason = GenerationFinishReason::Stop;
                 break;
             }
             token_id = session.accept_token_id(token_id).map_err(|error| {
@@ -73,11 +82,12 @@ impl InferenceEngine {
             .tokenizer
             .decode(&generated_token_ids)
             .map_err(|error| RuntimeError::new(format!("failed to decode completion: {error}")))?;
-        Ok(GeneratedText::new(
+        Ok(GeneratedText::with_finish_reason(
             text,
             prompt_token_ids.len(),
             generated_token_ids.len(),
             token_texts,
+            finish_reason,
         ))
     }
 
@@ -94,6 +104,7 @@ pub struct GeneratedText {
     prompt_tokens: usize,
     completion_tokens: usize,
     token_texts: Vec<String>,
+    finish_reason: GenerationFinishReason,
 }
 
 impl GeneratedText {
@@ -103,11 +114,28 @@ impl GeneratedText {
         completion_tokens: usize,
         token_texts: Vec<String>,
     ) -> Self {
+        Self::with_finish_reason(
+            text,
+            prompt_tokens,
+            completion_tokens,
+            token_texts,
+            GenerationFinishReason::Stop,
+        )
+    }
+
+    pub fn with_finish_reason(
+        text: String,
+        prompt_tokens: usize,
+        completion_tokens: usize,
+        token_texts: Vec<String>,
+        finish_reason: GenerationFinishReason,
+    ) -> Self {
         Self {
             text,
             prompt_tokens,
             completion_tokens,
             token_texts,
+            finish_reason,
         }
     }
 
@@ -125,6 +153,10 @@ impl GeneratedText {
 
     pub fn token_texts(&self) -> &[String] {
         &self.token_texts
+    }
+
+    pub fn finish_reason(&self) -> GenerationFinishReason {
+        self.finish_reason
     }
 }
 
