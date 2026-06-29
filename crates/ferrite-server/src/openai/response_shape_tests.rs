@@ -68,6 +68,15 @@ async fn chat_stream_endpoint_returns_openai_choice_shape() -> Result<(), Box<dy
     assert_eq!(status, StatusCode::OK, "{body}");
 
     let events = json_sse_events(&body)?;
+    let role_event = events.first().ok_or("expected role event")?;
+    let role_choice = role_event["choices"][0]
+        .as_object()
+        .ok_or("expected role choice object")?;
+    assert_eq!(role_choice["delta"]["role"], "assistant", "{role_event}");
+    assert_eq!(role_choice["delta"]["content"], "", "{role_event}");
+    assert!(role_choice["finish_reason"].is_null(), "{role_event}");
+    assert_choice_has_null_logprobs(role_event)?;
+
     let token_event = events
         .iter()
         .find(|event| event["choices"][0]["delta"]["content"] == "winner")

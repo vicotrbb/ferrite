@@ -49,6 +49,17 @@ impl ChatCompletionStreamContext {
         }
     }
 
+    pub fn role(&self) -> ChatCompletionStreamChunk {
+        ChatCompletionStreamChunk {
+            id: self.id.clone(),
+            object: "chat.completion.chunk",
+            created: self.created,
+            model: self.model.clone(),
+            choices: vec![ChatCompletionStreamChoice::role()],
+            usage: self.null_usage(),
+        }
+    }
+
     pub fn stop(&self) -> ChatCompletionStreamChunk {
         ChatCompletionStreamChunk {
             id: self.id.clone(),
@@ -79,7 +90,7 @@ impl ChatCompletionStreamContext {
 impl ChatCompletionStreamChunk {
     pub fn from_generation(model: String, generated: &GeneratedText) -> Vec<Self> {
         let context = ChatCompletionStreamContext::new(model);
-        let mut chunks = Vec::new();
+        let mut chunks = vec![context.role()];
         for text in generated.token_texts() {
             chunks.push(context.token(text.clone()));
         }
@@ -97,6 +108,15 @@ struct ChatCompletionStreamChoice {
 }
 
 impl ChatCompletionStreamChoice {
+    fn role() -> Self {
+        Self {
+            index: 0,
+            delta: ChatCompletionStreamDelta::role(),
+            logprobs: None,
+            finish_reason: None,
+        }
+    }
+
     fn content(content: String) -> Self {
         Self {
             index: 0,
@@ -119,17 +139,30 @@ impl ChatCompletionStreamChoice {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 struct ChatCompletionStreamDelta {
     #[serde(skip_serializing_if = "Option::is_none")]
+    role: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     content: Option<String>,
 }
 
 impl ChatCompletionStreamDelta {
+    fn role() -> Self {
+        Self {
+            role: Some("assistant"),
+            content: Some(String::new()),
+        }
+    }
+
     fn content(content: String) -> Self {
         Self {
+            role: None,
             content: Some(content),
         }
     }
 
     fn empty() -> Self {
-        Self { content: None }
+        Self {
+            role: None,
+            content: None,
+        }
     }
 }

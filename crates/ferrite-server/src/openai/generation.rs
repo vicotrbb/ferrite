@@ -21,6 +21,7 @@ pub(super) fn completion_stream_response(
         engine,
         prompt,
         max_tokens,
+        Vec::new(),
         move |piece| token_context.token(piece.to_owned()),
         move |generated| {
             let mut chunks = vec![context.stop()];
@@ -47,6 +48,7 @@ pub(super) fn chat_stream_response(
         engine,
         prompt,
         max_tokens,
+        vec![context.role()],
         move |piece| token_context.token(piece.to_owned()),
         move |generated| {
             let mut chunks = vec![context.stop()];
@@ -63,6 +65,7 @@ fn stream_generated_text<T>(
     engine: Arc<Mutex<crate::runtime::InferenceEngine>>,
     prompt: String,
     max_tokens: usize,
+    initial_chunks: Vec<T>,
     mut token_chunk: impl FnMut(&str) -> T + Send + 'static,
     final_chunks: impl FnOnce(&crate::runtime::GeneratedText) -> Vec<T> + Send + 'static,
     permit: OwnedSemaphorePermit,
@@ -74,6 +77,9 @@ where
     tokio::task::spawn_blocking(move || {
         let _permit = permit;
         let result = (|| -> Result<(), OpenAiHttpError> {
+            for chunk in initial_chunks {
+                sender.send_json_blocking(&chunk)?;
+            }
             let engine = engine
                 .lock()
                 .map_err(|_| OpenAiHttpError::internal("inference engine lock is poisoned"))?;
