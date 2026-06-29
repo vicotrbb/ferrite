@@ -25,9 +25,35 @@ async fn completions_endpoint_applies_string_stop_sequence(
 }
 
 #[tokio::test]
+async fn completions_endpoint_stops_generation_when_stop_sequence_matches(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let body = post_completion(
+        r#"{"model":"fixture-model","prompt":"hello","max_tokens":3,"stop":"ner"}"#,
+    )
+    .await?;
+
+    assert_eq!(body["choices"][0]["text"], "win");
+    assert_eq!(body["usage"]["completion_tokens"], 1);
+    Ok(())
+}
+
+#[tokio::test]
 async fn chat_endpoint_applies_string_stop_sequence() -> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat(
         r#"{"model":"fixture-model","messages":[{"role":"user","content":"hello"}],"max_completion_tokens":1,"stop":"ner"}"#,
+    )
+    .await?;
+
+    assert_eq!(body["choices"][0]["message"]["content"], "win");
+    assert_eq!(body["usage"]["completion_tokens"], 1);
+    Ok(())
+}
+
+#[tokio::test]
+async fn chat_endpoint_stops_generation_when_stop_sequence_matches(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let body = post_chat(
+        r#"{"model":"fixture-model","messages":[{"role":"user","content":"hello"}],"max_completion_tokens":3,"stop":"ner"}"#,
     )
     .await?;
 

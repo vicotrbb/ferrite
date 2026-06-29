@@ -2,6 +2,12 @@ use ferrite_inference::scalar::ScalarLlamaModel;
 use ferrite_model::{gguf::parse_gguf, tokenizer::GgufTokenizer};
 use std::{error::Error, fmt, fs, path::Path};
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GenerationControl {
+    Continue,
+    Stop,
+}
+
 #[derive(Debug)]
 pub struct InferenceEngine {
     model: ScalarLlamaModel,
@@ -22,14 +28,14 @@ impl InferenceEngine {
     }
 
     pub fn generate(&self, prompt: &str, max_tokens: usize) -> Result<GeneratedText, RuntimeError> {
-        self.generate_with_token_callback(prompt, max_tokens, |_| Ok(()))
+        self.generate_with_token_callback(prompt, max_tokens, |_| Ok(GenerationControl::Continue))
     }
 
     pub fn generate_with_token_callback(
         &self,
         prompt: &str,
         max_tokens: usize,
-        mut on_token: impl FnMut(&str) -> Result<(), RuntimeError>,
+        mut on_token: impl FnMut(&str) -> Result<GenerationControl, RuntimeError>,
     ) -> Result<GeneratedText, RuntimeError> {
         let prompt_token_ids = self
             .tokenizer
@@ -50,8 +56,11 @@ impl InferenceEngine {
         for _ in 0..max_tokens {
             generated_token_ids.push(token_id);
             let token_text = self.decode_token(token_id)?;
-            on_token(&token_text)?;
+            let control = on_token(&token_text)?;
             token_texts.push(token_text);
+            if control == GenerationControl::Stop {
+                break;
+            }
             if Some(token_id) == self.tokenizer.eos_token_id() {
                 break;
             }
@@ -157,7 +166,7 @@ mod tests {
         let mut pieces = Vec::new();
         let generated = engine.generate_with_token_callback("hello", 1, |piece| {
             pieces.push(piece.to_owned());
-            Ok(())
+            Ok(GenerationControl::Continue)
         })?;
 
         assert_eq!(pieces, ["winner"]);

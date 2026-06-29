@@ -3,6 +3,7 @@ use super::{
     schema::{ChatCompletionStreamContext, CompletionStreamContext},
     streaming,
 };
+use crate::runtime::GenerationControl;
 use axum::response::Response;
 use std::sync::{Arc, Mutex};
 use tokio::sync::OwnedSemaphorePermit;
@@ -161,7 +162,11 @@ where
                                 crate::runtime::RuntimeError::new(error.to_string())
                             })?;
                     }
-                    Ok(())
+                    if stop_filter.stopped() {
+                        Ok(GenerationControl::Stop)
+                    } else {
+                        Ok(GenerationControl::Continue)
+                    }
                 })
                 .map_err(|error| OpenAiHttpError::internal(error.to_string()))?;
             for visible_piece in stop_filter.finish() {
@@ -214,8 +219,16 @@ pub(super) async fn generate_texts(
         prompts
             .iter()
             .map(|prompt| {
+                let mut stop_filter = StopSequenceFilter::new(stop_sequences.clone());
                 engine
-                    .generate(prompt, max_tokens)
+                    .generate_with_token_callback(prompt, max_tokens, |piece| {
+                        let _ = stop_filter.push(piece);
+                        if stop_filter.stopped() {
+                            Ok(GenerationControl::Stop)
+                        } else {
+                            Ok(GenerationControl::Continue)
+                        }
+                    })
                     .map(|generated| apply_stop_sequences(generated, &stop_sequences))
                     .map_err(|error| OpenAiHttpError::internal(error.to_string()))
             })
@@ -290,6 +303,10 @@ impl StopSequenceFilter {
         } else {
             Vec::new()
         }
+    }
+
+    fn stopped(&self) -> bool {
+        self.stopped
     }
 
     fn finish(self) -> Vec<String> {
