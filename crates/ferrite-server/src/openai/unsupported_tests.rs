@@ -93,7 +93,7 @@ async fn chat_endpoint_rejects_unknown_fields() -> Result<(), Box<dyn std::error
         r#"{
             "model":"fixture-model",
             "messages":[{"role":"user","content":"hello"}],
-            "modalities":["text"]
+            "unsupported_option":true
         }"#,
     )
     .await?;
@@ -103,7 +103,7 @@ async fn chat_endpoint_rejects_unknown_fields() -> Result<(), Box<dyn std::error
     assert!(body.json["error"]["message"]
         .as_str()
         .unwrap_or_default()
-        .contains("modalities"));
+        .contains("unsupported_option"));
     Ok(())
 }
 

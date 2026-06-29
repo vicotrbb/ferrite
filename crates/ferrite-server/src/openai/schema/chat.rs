@@ -1,5 +1,6 @@
 use super::{
     chat_content::ChatContent,
+    modalities::is_text_only_modalities,
     neutral_options::{is_neutral_bool, is_neutral_number},
     response_format::is_neutral_response_format,
     stop_sequences::is_neutral_stop_sequences,
@@ -31,6 +32,8 @@ pub struct ChatCompletionRequest {
     parallel_tool_calls: Option<Value>,
     #[serde(default)]
     response_format: Option<Value>,
+    #[serde(default)]
+    modalities: Option<Value>,
     #[serde(default)]
     temperature: Option<Value>,
     #[serde(default)]
@@ -95,6 +98,7 @@ impl ChatCompletionRequest {
                 "response_format",
                 !is_neutral_response_format(&self.response_format),
             )
+            .with_present("modalities", !is_text_only_modalities(&self.modalities))
             .with_present("temperature", !is_neutral_number(&self.temperature, 0.0))
             .with_present("top_p", !is_neutral_number(&self.top_p, 1.0))
             .with_present("n", !is_neutral_number(&self.n, 1.0))
