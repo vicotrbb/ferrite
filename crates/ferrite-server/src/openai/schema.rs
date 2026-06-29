@@ -1,5 +1,6 @@
 mod catalog;
 mod chat;
+mod chat_content;
 mod chat_stream;
 mod completion;
 mod completion_stream;

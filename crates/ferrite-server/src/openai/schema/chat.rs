@@ -1,6 +1,6 @@
 use super::{
-    neutral_options::is_neutral_number, stream_options::StreamOptions, unix_timestamp,
-    unsupported::UnsupportedFields, usage::Usage,
+    chat_content::ChatContent, neutral_options::is_neutral_number, stream_options::StreamOptions,
+    unix_timestamp, unsupported::UnsupportedFields, usage::Usage,
 };
 use crate::runtime::GeneratedText;
 use serde::{Deserialize, Serialize};
@@ -126,7 +126,7 @@ impl ChatCompletionRequest {
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 pub struct ChatMessage {
     role: ChatRole,
-    content: String,
+    content: ChatContent,
 }
 
 impl ChatMessage {
@@ -134,7 +134,7 @@ impl ChatMessage {
     pub fn new(role: ChatRole, content: impl Into<String>) -> Self {
         Self {
             role,
-            content: content.into(),
+            content: ChatContent::from_text(content),
         }
     }
 
@@ -143,7 +143,7 @@ impl ChatMessage {
     }
 
     pub fn content(&self) -> &str {
-        &self.content
+        self.content.text()
     }
 }
 
