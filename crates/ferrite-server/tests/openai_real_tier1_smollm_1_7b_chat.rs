@@ -40,6 +40,58 @@ async fn live_http_server_chats_with_smollm_1_7b_q4_reference_prompt(
     Ok(())
 }
 
+#[tokio::test]
+#[ignore = "requires local SmolLM2-1.7B Q4_K_M GGUF model artifact"]
+async fn live_http_server_matches_smollm_1_7b_q4_chat_first_tokens_for_reference_prompts(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let model_path = smollm_1_7b_q4_model_path()?;
+    let server = support::LiveServer::start_with_existing_model(REAL_MODEL_ID, model_path).await?;
+    let cases = [
+        PromptCase {
+            prompt: "hello world",
+            prompt_tokens: 9,
+            content: "1",
+        },
+        PromptCase {
+            prompt: "The capital of France is",
+            prompt_tokens: 12,
+            content: "\n",
+        },
+        PromptCase {
+            prompt: "Once upon a time",
+            prompt_tokens: 11,
+            content: "\n",
+        },
+        PromptCase {
+            prompt: "Rust is a systems programming language",
+            prompt_tokens: 13,
+            content: "\n",
+        },
+        PromptCase {
+            prompt: "Machine learning models can",
+            prompt_tokens: 11,
+            content: "1",
+        },
+        PromptCase {
+            prompt: "The recipe calls for",
+            prompt_tokens: 11,
+            content: "1",
+        },
+    ];
+
+    for case in cases {
+        let response = send_http_request(
+            server.addr(),
+            "POST",
+            "/v1/chat/completions",
+            chat_body(case.prompt, false).as_bytes(),
+        )
+        .await?;
+        assert_smollm_chat_response(&response, case)?;
+    }
+    Ok(())
+}
+
 #[derive(Clone, Copy)]
 struct PromptCase {
     prompt: &'static str,
