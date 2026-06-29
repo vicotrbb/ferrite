@@ -2,8 +2,9 @@
 
 ## Scope
 
-This slice adds an ignored real-model HTTP regression for six fixed
-Qwen2.5-1.5B Q8_0 prompt profiles through `POST /v1/completions`.
+This slice adds ignored real-model HTTP regressions for six fixed
+Qwen2.5-1.5B Q8_0 prompt profiles through `POST /v1/completions` and
+`POST /v1/chat/completions`.
 
 The test is isolated in
 `crates/ferrite-server/tests/openai_real_tier1_qwen_1_5b_prompts.rs` so prompt
@@ -13,7 +14,9 @@ coverage stays separate from endpoint-shape and queue-order regressions.
 
 - Model: `target/models/qwen2.5-1.5b-instruct-q8_0.gguf`
 - Model id: `qwen2.5-1.5b-q8_0`
-- Endpoint: `POST /v1/completions`
+- Endpoints:
+  - `POST /v1/completions`
+  - `POST /v1/chat/completions`
 - Generation limit: 1 token per prompt
 - Prompts:
   - `hello world`
@@ -23,9 +26,19 @@ coverage stays separate from endpoint-shape and queue-order regressions.
   - `Machine learning models can`
   - `The recipe calls for`
 
-Each response asserts HTTP `200`, the OpenAI `text_completion` object shape,
-the configured model id, the decoded first-token text, and prompt/completion
-usage counts.
+Each response asserts HTTP `200`, the OpenAI object shape, the configured model
+id, the decoded first-token text/content, and prompt/completion usage counts.
+
+## Expected First Token
+
+| Prompt | Completion prompt tokens | Completion text | Chat prompt tokens | Chat content |
+| --- | ---: | --- | ---: | --- |
+| `hello world` | 2 | `\n` | 8 | `你好` |
+| `The capital of France is` | 5 | ` Paris` | 11 | ` Paris` |
+| `Once upon a time` | 4 | `,` | 10 | `1` |
+| `Rust is a systems programming language` | 7 | ` that` | 12 | `你说` |
+| `Machine learning models can` | 4 | ` be` | 10 | `1` |
+| `The recipe calls for` | 4 | ` ` | 10 | `2` |
 
 ## Debugging Note
 
@@ -45,23 +58,31 @@ generated token. The regression was corrected to assert one generated token.
 
 ```sh
 cargo fmt --check
+cargo test -p ferrite-server --test openai_real_tier1_qwen_1_5b_prompts
 cargo test -p ferrite-server --test openai_real_tier1_qwen_1_5b_prompts live_http_server_matches_qwen_1_5b_q8_first_tokens_for_reference_prompts -- --ignored --nocapture
+cargo test -p ferrite-server --test openai_real_tier1_qwen_1_5b_prompts live_http_server_matches_qwen_1_5b_q8_chat_first_tokens_for_reference_prompts -- --ignored --nocapture
 ```
 
 Result:
 
 ```text
-test live_http_server_matches_qwen_1_5b_q8_first_tokens_for_reference_prompts ... ok
+test live_http_server_matches_qwen_1_5b_q8_chat_first_tokens_for_reference_prompts ... ignored, requires local Qwen2.5-1.5B Q8_0 GGUF model artifact
+test live_http_server_matches_qwen_1_5b_q8_first_tokens_for_reference_prompts ... ignored, requires local Qwen2.5-1.5B Q8_0 GGUF model artifact
+test result: ok. 0 passed; 0 failed; 2 ignored
 
+test live_http_server_matches_qwen_1_5b_q8_first_tokens_for_reference_prompts ... ok
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 296.39s
+
+test live_http_server_matches_qwen_1_5b_q8_chat_first_tokens_for_reference_prompts ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 626.61s
 ```
 
 ## Interpretation
 
 This narrows the broader model/prompt behavior gap for Ferrite's
 OpenAI-compatible server by proving six deterministic Qwen2.5-1.5B Q8_0
-reference prompts through the HTTP legacy completion path.
+reference prompts through the HTTP legacy completion and chat completion paths.
 
-It does not prove broad prompt behavior, chat prompt parity for these six
-profiles, longer completions through HTTP, Q6_K prompt coverage, x86_64 HTTP
-behavior, or server throughput.
+It does not prove broad prompt behavior, streaming chat prompt parity for these
+six profiles, longer completions through HTTP, Q6_K chat prompt coverage,
+x86_64 HTTP behavior, or server throughput.
