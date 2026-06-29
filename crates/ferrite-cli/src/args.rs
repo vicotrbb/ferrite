@@ -115,7 +115,6 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
                     &mut iter,
                     "--experimental-q8-k-activation-roles",
                 )?)?);
-                experimental_q8_k_activation_matvec = true;
             }
             "--compare-q8-k-activation-matvec" => {
                 compare_q8_k_activation_matvec = true;

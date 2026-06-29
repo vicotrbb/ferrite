@@ -119,6 +119,9 @@ reference implementation and benchmarking baseline, not the Ferrite runtime.
 - `documentation/dev-notes/2026-06-28-q8-k-role-scoped-policy.md` records the
   role-scoped experimental policy used to isolate Q8_K drift without temporary
   source edits.
+- `documentation/dev-notes/2026-06-29-q8-k-role-scoped-comparison.md` records
+  the CLI guardrail that role scoping can filter comparison-only diagnostics
+  without implicitly enabling experimental execution.
 - `documentation/dev-notes/2026-06-28-q8-k-single-role-probes.md` records the
   first single-role SmolLM2 probes; only `ffn_up` matched both fixed prompts,
   and it still requires broader parity evidence.
