@@ -5,6 +5,7 @@ use super::{
     response_format::is_neutral_response_format,
     stop_sequences::is_neutral_stop_sequences,
     stream_options::StreamOptions,
+    tool_options::{is_disabled_parallel_tool_calls, is_empty_tools, is_no_tool_choice},
     unix_timestamp,
     unsupported::UnsupportedFields,
     usage::Usage,
@@ -91,9 +92,12 @@ impl ChatCompletionRequest {
 
     pub fn unsupported_fields(&self) -> Vec<String> {
         let mut fields = UnsupportedFields::new()
-            .with_present("tools", self.tools.is_some())
-            .with_present("tool_choice", self.tool_choice.is_some())
-            .with_present("parallel_tool_calls", self.parallel_tool_calls.is_some())
+            .with_present("tools", !is_empty_tools(&self.tools))
+            .with_present("tool_choice", !is_no_tool_choice(&self.tool_choice))
+            .with_present(
+                "parallel_tool_calls",
+                !is_disabled_parallel_tool_calls(&self.parallel_tool_calls),
+            )
             .with_present(
                 "response_format",
                 !is_neutral_response_format(&self.response_format),

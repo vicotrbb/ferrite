@@ -11,6 +11,7 @@ mod response_format;
 mod stop_sequences;
 mod stream_options;
 mod stream_usage;
+mod tool_options;
 mod unsupported;
 mod usage;
 
