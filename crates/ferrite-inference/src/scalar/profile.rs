@@ -21,6 +21,8 @@ pub struct ScalarMatVecComparison {
     storage_bytes: u128,
     max_abs_diff: f32,
     max_relative_diff: f32,
+    reference_argmax_index: usize,
+    candidate_argmax_index: usize,
 }
 
 impl ScalarMatVecComparison {
@@ -36,6 +38,11 @@ impl ScalarMatVecComparison {
                 reference.len(),
                 candidate.len()
             )));
+        }
+        if reference.is_empty() {
+            return Err(InferenceError::new(
+                "matvec comparison output must not be empty",
+            ));
         }
 
         let mut max_abs_diff = 0.0f32;
@@ -57,6 +64,10 @@ impl ScalarMatVecComparison {
             let denominator = reference.abs().max(1.0e-6);
             max_relative_diff = max_relative_diff.max(abs_diff / denominator);
         }
+        let reference_argmax_index = argmax_index(reference)
+            .ok_or_else(|| InferenceError::new("matvec comparison output must not be empty"))?;
+        let candidate_argmax_index = argmax_index(candidate)
+            .ok_or_else(|| InferenceError::new("matvec comparison output must not be empty"))?;
 
         Ok(Self {
             label,
@@ -66,6 +77,8 @@ impl ScalarMatVecComparison {
             storage_bytes: matrix.storage_bytes(),
             max_abs_diff,
             max_relative_diff,
+            reference_argmax_index,
+            candidate_argmax_index,
         })
     }
 
@@ -96,6 +109,25 @@ impl ScalarMatVecComparison {
     pub fn max_relative_diff(&self) -> f32 {
         self.max_relative_diff
     }
+
+    pub fn reference_argmax_index(&self) -> usize {
+        self.reference_argmax_index
+    }
+
+    pub fn candidate_argmax_index(&self) -> usize {
+        self.candidate_argmax_index
+    }
+}
+
+fn argmax_index(values: &[f32]) -> Option<usize> {
+    values
+        .iter()
+        .enumerate()
+        .max_by(|(left_index, left), (right_index, right)| {
+            left.total_cmp(right)
+                .then_with(|| right_index.cmp(left_index))
+        })
+        .map(|(index, _)| index)
 }
 
 impl ScalarProfileEvent {
@@ -209,6 +241,21 @@ mod tests {
             err.to_string(),
             "matvec comparison q8_k_probe candidate value 1 is not finite"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn matvec_comparison_records_argmax_indexes() -> Result<(), InferenceError> {
+        let matrix = Matrix::from_row_major(3, 2, vec![1.0, 0.0, 0.0, 1.0, 1.0, 1.0])?;
+        let comparison = ScalarMatVecComparison::new(
+            "q8_k_probe",
+            &matrix,
+            &[0.25, 2.0, 1.5],
+            &[0.25, 1.0, 3.0],
+        )?;
+
+        assert_eq!(comparison.reference_argmax_index(), 1);
+        assert_eq!(comparison.candidate_argmax_index(), 2);
         Ok(())
     }
 }

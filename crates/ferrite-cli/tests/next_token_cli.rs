@@ -124,6 +124,10 @@ fn cli_compares_q8_k_activation_matvec_without_changing_execution_policy(
     assert!(stdout.contains("compare_q8_k_activation_matvec=true"));
     assert!(stdout.contains("q8_k_activation_matvec_policy=default_only"));
     assert!(stdout.contains("profile_next_token_q8_k_compare=layer.0.q_proj:"));
+    assert!(q8_k_compare_line_has_argmax_indexes(
+        &stdout,
+        "profile_next_token_q8_k_compare=layer.0.q_proj:"
+    ));
     Ok(())
 }
 
@@ -742,6 +746,18 @@ fn remove_fixture_model(path: &PathBuf) -> Result<(), Box<dyn Error>> {
         Err(error) if error.kind() == ErrorKind::NotFound => Ok(()),
         Err(error) => Err(error.into()),
     }
+}
+
+fn q8_k_compare_line_has_argmax_indexes(stdout: &str, prefix: &str) -> bool {
+    stdout
+        .lines()
+        .filter(|line| line.starts_with(prefix))
+        .any(|line| {
+            let parts = line.split(':').collect::<Vec<_>>();
+            parts.len() == 9
+                && parts[7].parse::<usize>().is_ok()
+                && parts[8].parse::<usize>().is_ok()
+        })
 }
 
 fn unique_suffix() -> u128 {
