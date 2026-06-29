@@ -6,6 +6,12 @@ pub(super) fn is_neutral_number(value: &Option<Value>, expected: f64) -> bool {
         .is_none_or(|value| number_equals(value, expected))
 }
 
+pub(super) fn is_neutral_bool(value: &Option<Value>, expected: bool) -> bool {
+    value
+        .as_ref()
+        .is_none_or(|value| value.as_bool() == Some(expected))
+}
+
 fn number_equals(value: &Value, expected: f64) -> bool {
     value.as_f64().is_some_and(|actual| actual == expected)
 }
@@ -30,5 +36,21 @@ mod tests {
     fn non_matching_or_non_number_value_is_not_neutral() {
         assert!(!is_neutral_number(&Some(json!(0.2)), 0.0));
         assert!(!is_neutral_number(&Some(json!("0")), 0.0));
+    }
+
+    #[test]
+    fn missing_bool_is_neutral() {
+        assert!(is_neutral_bool(&None, false));
+    }
+
+    #[test]
+    fn matching_bool_is_neutral() {
+        assert!(is_neutral_bool(&Some(json!(false)), false));
+    }
+
+    #[test]
+    fn non_matching_or_non_bool_value_is_not_neutral() {
+        assert!(!is_neutral_bool(&Some(json!(true)), false));
+        assert!(!is_neutral_bool(&Some(json!("false")), false));
     }
 }

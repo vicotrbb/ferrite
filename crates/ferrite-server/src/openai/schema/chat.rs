@@ -1,7 +1,11 @@
 use super::{
-    chat_content::ChatContent, neutral_options::is_neutral_number,
-    stop_sequences::is_neutral_stop_sequences, stream_options::StreamOptions, unix_timestamp,
-    unsupported::UnsupportedFields, usage::Usage,
+    chat_content::ChatContent,
+    neutral_options::{is_neutral_bool, is_neutral_number},
+    stop_sequences::is_neutral_stop_sequences,
+    stream_options::StreamOptions,
+    unix_timestamp,
+    unsupported::UnsupportedFields,
+    usage::Usage,
 };
 use crate::runtime::GeneratedText;
 use serde::{Deserialize, Serialize};
@@ -100,11 +104,11 @@ impl ChatCompletionRequest {
                 !is_neutral_number(&self.frequency_penalty, 0.0),
             )
             .with_present("logit_bias", self.logit_bias.is_some())
-            .with_present("logprobs", self.logprobs.is_some())
+            .with_present("logprobs", !is_neutral_bool(&self.logprobs, false))
             .with_present("top_logprobs", self.top_logprobs.is_some())
             .with_present("user", self.user.is_some())
             .with_present("seed", self.seed.is_some())
-            .with_present("store", self.store.is_some())
+            .with_present("store", !is_neutral_bool(&self.store, false))
             .with_present("metadata", self.metadata.is_some())
             .with_extra_keys(&self.extra_fields)
             .into_vec();
