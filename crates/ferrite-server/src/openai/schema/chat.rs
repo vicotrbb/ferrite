@@ -226,6 +226,7 @@ pub enum ChatRole {
     User,
     Assistant,
     Tool,
+    Function,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]

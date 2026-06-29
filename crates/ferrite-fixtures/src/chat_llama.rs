@@ -5,7 +5,15 @@ use crate::gguf_writer::{
 
 pub fn scalar_llama_chat_f32_gguf_fixture() -> Vec<u8> {
     let alignment = 64u64;
-    let tokens = ["<unk>", "hello", "winner", "user: ", "\n", "assistant: "];
+    let tokens = [
+        "<unk>",
+        "hello",
+        "winner",
+        "user: ",
+        "\n",
+        "assistant: ",
+        "function: ",
+    ];
     let mut tensors = tensors();
 
     let mut offset = 0u64;
@@ -56,13 +64,29 @@ fn tensors() -> Vec<F32TensorFixture> {
     vec![
         tensor(
             "token_embd.weight",
-            matrix_dims(6, 2),
-            vec![1.0, 1.0, 0.0, 1.0, 2.0, -1.0, 1.0, 0.0, 1.0, 0.0, 0.0, 1.0],
+            matrix_dims(7, 2),
+            vec![
+                1.0, 1.0, // <unk>
+                0.0, 1.0, // hello
+                2.0, -1.0, // winner
+                1.0, 0.0, // user:
+                1.0, 0.0, // newline
+                0.0, 1.0, // assistant:
+                1.0, 0.0, // function:
+            ],
         ),
         tensor(
             "output.weight",
-            matrix_dims(6, 2),
-            vec![0.1, 0.1, 0.2, 0.0, 1.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+            matrix_dims(7, 2),
+            vec![
+                0.1, 0.1, // <unk>
+                0.2, 0.0, // hello
+                1.0, 0.5, // winner
+                0.0, 0.0, // user:
+                0.0, 0.0, // newline
+                0.0, 0.0, // assistant:
+                0.0, 0.0, // function:
+            ],
         ),
         tensor("output_norm.weight", vec![2], vec![1.0, 1.0]),
         tensor("blk.0.attn_norm.weight", vec![2], vec![1.0, 1.0]),
