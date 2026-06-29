@@ -116,6 +116,30 @@ async fn chat_endpoint_rejects_non_array_messages() -> Result<(), Box<dyn std::e
 }
 
 #[tokio::test]
+async fn chat_endpoint_rejects_non_object_message_items() -> Result<(), Box<dyn std::error::Error>>
+{
+    let body = post_chat(
+        r#"{
+            "model":"fixture-model",
+            "messages":[42]
+        }"#,
+    )
+    .await?;
+
+    assert_eq!(body.status, StatusCode::BAD_REQUEST);
+    assert_eq!(body.json["error"]["type"], "invalid_request_error");
+    let message = body.json["error"]["message"].as_str().unwrap_or_default();
+    assert!(message.contains("messages.role"), "{message}");
+    assert!(message.contains("messages.content"), "{message}");
+    assert!(
+        !message.contains("messages must contain at least one item"),
+        "{message}"
+    );
+    assert!(!message.contains("malformed JSON"), "{message}");
+    Ok(())
+}
+
+#[tokio::test]
 async fn chat_endpoint_rejects_function_fields() -> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat(
         r#"{

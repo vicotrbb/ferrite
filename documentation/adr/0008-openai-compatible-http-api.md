@@ -222,3 +222,7 @@ Responses API are out of scope until explicit ADRs or plans add them.
   records compatibility evidence for returning explicit `messages.content`
   errors when chat messages provide malformed scalar content values instead of
   collapsing the message array or returning generic body errors.
+- `documentation/dev-notes/2026-06-29-openai-non-object-message-items.md`
+  records compatibility evidence for returning explicit message-field errors
+  when chat message arrays contain non-object items instead of collapsing the
+  array into a misleading empty-message error.

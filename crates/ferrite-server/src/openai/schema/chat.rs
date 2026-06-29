@@ -233,6 +233,27 @@ pub struct ChatMessage {
 }
 
 impl ChatMessage {
+    pub(super) fn from_request_value(value: Value) -> Self {
+        match value {
+            Value::Object(_) => serde_json::from_value(value).unwrap_or_else(|_| Self::malformed()),
+            _ => Self::malformed(),
+        }
+    }
+
+    fn malformed() -> Self {
+        Self {
+            role: ChatRole::Unknown,
+            content: None,
+            name: None,
+            tool_call_id: None,
+            tool_calls: None,
+            function_call: None,
+            audio: None,
+            refusal: None,
+            extra_fields: BTreeMap::new(),
+        }
+    }
+
     #[cfg(test)]
     pub fn new(role: ChatRole, content: impl Into<String>) -> Self {
         Self {
@@ -428,5 +449,15 @@ mod tests {
 
         assert_eq!(message.unsupported_fields(), ["messages.role"]);
         Ok(())
+    }
+
+    #[test]
+    fn records_malformed_message_item_for_request_validation() {
+        let message = ChatMessage::from_request_value(Value::Number(42.into()));
+
+        assert_eq!(
+            message.unsupported_fields(),
+            ["messages.role", "messages.content"]
+        );
     }
 }
