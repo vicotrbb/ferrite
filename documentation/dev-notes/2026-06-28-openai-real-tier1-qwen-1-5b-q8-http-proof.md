@@ -4,11 +4,12 @@
 
 This note records explicit ignored integration tests for serving
 Qwen2.5-1.5B-Instruct Q8_0 through the OpenAI-compatible legacy completions
-endpoint, both non-streaming and SSE streaming.
+endpoint, both non-streaming and SSE streaming, and through the chat
+completions endpoint.
 
 This proves deterministic real Tier 1 Q8_0 completion requests through the HTTP
-server. It does not prove chat, concurrent serving, queue fairness, or HTTP
-throughput for the 1.5B Q8_0 model.
+server. It does not prove streaming chat, concurrent serving, queue fairness,
+or HTTP throughput for the 1.5B Q8_0 model.
 
 ## Test Added
 
@@ -16,10 +17,12 @@ throughput for the 1.5B Q8_0 model.
 - Tests:
   - `live_http_server_generates_with_qwen_1_5b_q8_model`
   - `live_http_server_streams_with_qwen_1_5b_q8_model`
+  - `live_http_server_chats_with_qwen_1_5b_q8_model`
 - Default model path:
   `target/models/qwen2.5-1.5b-instruct-q8_0.gguf`
 - Override env var: `FERRITE_QWEN_1_5B_Q8_MODEL`
 - HTTP endpoint: `POST /v1/completions`
+- Chat endpoint: `POST /v1/chat/completions`
 - Model id: `qwen2.5-1.5b-q8_0`
 - Prompt: `hello world`
 - Max tokens: 1
@@ -86,6 +89,37 @@ The streaming response assertions verify:
 - streamed token text `\n`; and
 - terminal `data: [DONE]`.
 
+The chat proof was added with a third red/green check. Red command:
+
+```sh
+cargo test -p ferrite-server --test openai_real_tier1_qwen_1_5b_http live_http_server_chats_with_qwen_1_5b_q8_model -- --ignored --nocapture
+```
+
+Expected red failure:
+
+```text
+error[E0425]: cannot find function `assert_qwen_1_5b_q8_chat_response` in this scope
+```
+
+After adding the local chat response assertion helper, the focused chat test
+passed:
+
+```text
+test live_http_server_chats_with_qwen_1_5b_q8_model ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 81.08s
+```
+
+The chat response assertions verify:
+
+- HTTP `200 OK`;
+- OpenAI `chat.completion` object shape;
+- response model id `qwen2.5-1.5b-q8_0`;
+- assistant message content `你好`;
+- prompt token count 8;
+- completion token count 1; and
+- total token count 9.
+
 ## Verification
 
 The explicit ignored real-model test file passed again:
@@ -97,8 +131,9 @@ cargo test -p ferrite-server --test openai_real_tier1_qwen_1_5b_http -- --ignore
 ```text
 test live_http_server_streams_with_qwen_1_5b_q8_model ... ok
 test live_http_server_generates_with_qwen_1_5b_q8_model ... ok
+test live_http_server_chats_with_qwen_1_5b_q8_model ... ok
 
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 36.17s
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 98.50s
 ```
 
 Normal server verification also passed:
@@ -118,5 +153,6 @@ unless explicitly selected.
 
 Ferrite now has explicit OpenAI-compatible HTTP proofs for local
 Qwen2.5-1.5B Q8_0 legacy completion serving, both non-streaming and SSE
-streaming. This follows the CLI throughput slice that measured the same model
-above 10 tok/s locally, but HTTP throughput for this model remains unmeasured.
+streaming, plus non-streaming chat completion serving. This follows the CLI
+throughput slice that measured the same model above 10 tok/s locally, but HTTP
+throughput for this model remains unmeasured.
