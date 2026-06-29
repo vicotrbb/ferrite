@@ -12,6 +12,44 @@ struct ProfileRoleKey {
     storage_bytes: u128,
 }
 
+#[derive(Clone, Debug)]
+struct Q8KComparisonRoleSummary {
+    comparisons: usize,
+    argmax_mismatches: usize,
+    max_abs_diff: f32,
+    max_relative_diff: f32,
+    min_reference_argmax_margin: f32,
+    min_candidate_argmax_margin: f32,
+}
+
+impl Q8KComparisonRoleSummary {
+    fn new() -> Self {
+        Self {
+            comparisons: 0,
+            argmax_mismatches: 0,
+            max_abs_diff: 0.0,
+            max_relative_diff: 0.0,
+            min_reference_argmax_margin: f32::INFINITY,
+            min_candidate_argmax_margin: f32::INFINITY,
+        }
+    }
+
+    fn observe(&mut self, comparison: &ScalarMatVecComparison) {
+        self.comparisons += 1;
+        if comparison.reference_argmax_index() != comparison.candidate_argmax_index() {
+            self.argmax_mismatches += 1;
+        }
+        self.max_abs_diff = self.max_abs_diff.max(comparison.max_abs_diff());
+        self.max_relative_diff = self.max_relative_diff.max(comparison.max_relative_diff());
+        self.min_reference_argmax_margin = self
+            .min_reference_argmax_margin
+            .min(comparison.reference_argmax_margin());
+        self.min_candidate_argmax_margin = self
+            .min_candidate_argmax_margin
+            .min(comparison.candidate_argmax_margin());
+    }
+}
+
 pub(crate) fn print_next_token_profile(profile: &ProfiledNextToken) {
     print_profile(
         "profile_next_token",
@@ -72,6 +110,7 @@ fn print_profile(prefix: &str, total_elapsed: Duration, events: &[ScalarProfileE
 }
 
 fn print_q8_k_comparisons(prefix: &str, comparisons: &[ScalarMatVecComparison]) {
+    let mut role_summaries = BTreeMap::<ProfileRoleKey, Q8KComparisonRoleSummary>::new();
     for comparison in comparisons {
         println!(
             "{prefix}_q8_k_compare={}:{}:{}:{}:{}:{:.6}:{:.6}:{}:{}:{:.6}:{:.6}",
@@ -86,6 +125,35 @@ fn print_q8_k_comparisons(prefix: &str, comparisons: &[ScalarMatVecComparison]) 
             comparison.candidate_argmax_index(),
             comparison.reference_argmax_margin(),
             comparison.candidate_argmax_margin()
+        );
+
+        let key = ProfileRoleKey {
+            role: profile_role(comparison.label()).to_owned(),
+            storage_kind: comparison.storage_kind().as_str(),
+            rows: comparison.rows(),
+            cols: comparison.cols(),
+            storage_bytes: comparison.storage_bytes(),
+        };
+        role_summaries
+            .entry(key)
+            .or_insert_with(Q8KComparisonRoleSummary::new)
+            .observe(comparison);
+    }
+
+    for (key, summary) in role_summaries {
+        println!(
+            "{prefix}_q8_k_compare_role={}:{}:{}:{}:{}:{}:{}:{:.6}:{:.6}:{:.6}:{:.6}",
+            key.role,
+            key.storage_kind,
+            key.rows,
+            key.cols,
+            key.storage_bytes,
+            summary.comparisons,
+            summary.argmax_mismatches,
+            summary.max_abs_diff,
+            summary.max_relative_diff,
+            summary.min_reference_argmax_margin,
+            summary.min_candidate_argmax_margin
         );
     }
 }

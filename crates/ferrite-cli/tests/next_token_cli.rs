@@ -128,6 +128,10 @@ fn cli_compares_q8_k_activation_matvec_without_changing_execution_policy(
         &stdout,
         "profile_next_token_q8_k_compare=layer.0.q_proj:"
     ));
+    assert!(q8_k_compare_role_summary_has_drift_fields(
+        &stdout,
+        "profile_next_token_q8_k_compare_role=q_proj:"
+    ));
     Ok(())
 }
 
@@ -401,6 +405,10 @@ fn cli_compares_q8_k_activation_matvec_for_benchmark_token_profile() -> Result<(
     let stdout = String::from_utf8(output.stdout)?;
     assert!(stdout.contains("compare_q8_k_activation_matvec=true"));
     assert!(stdout.contains("profile_benchmark_token_q8_k_compare=layer.0.q_proj:"));
+    assert!(q8_k_compare_role_summary_has_drift_fields(
+        &stdout,
+        "profile_benchmark_token_q8_k_compare_role=q_proj:"
+    ));
     Ok(())
 }
 
@@ -759,6 +767,33 @@ fn q8_k_compare_line_has_argmax_indexes_and_margins(stdout: &str, prefix: &str) 
                 && parts[8].parse::<usize>().is_ok()
                 && parts[9].parse::<f32>().is_ok()
                 && parts[10].parse::<f32>().is_ok()
+        })
+}
+
+fn q8_k_compare_role_summary_has_drift_fields(stdout: &str, prefix: &str) -> bool {
+    stdout
+        .lines()
+        .filter_map(|line| line.strip_prefix(prefix))
+        .any(|line| {
+            let parts = line.split(':').collect::<Vec<_>>();
+            if parts.len() != 10 {
+                return false;
+            }
+            let Ok(comparisons) = parts[4].parse::<usize>() else {
+                return false;
+            };
+            let Ok(argmax_mismatches) = parts[5].parse::<usize>() else {
+                return false;
+            };
+            comparisons > 0
+                && argmax_mismatches <= comparisons
+                && parts[1].parse::<usize>().is_ok()
+                && parts[2].parse::<usize>().is_ok()
+                && parts[3].parse::<u128>().is_ok()
+                && parts[6].parse::<f32>().is_ok()
+                && parts[7].parse::<f32>().is_ok()
+                && parts[8].parse::<f32>().is_ok()
+                && parts[9].parse::<f32>().is_ok()
         })
 }
 
