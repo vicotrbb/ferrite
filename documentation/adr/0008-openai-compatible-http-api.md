@@ -205,3 +205,8 @@ Responses API are out of scope until explicit ADRs or plans add them.
   compatibility evidence for returning explicit `prompt` errors when legacy
   completion requests provide malformed prompt values instead of JSON body
   deserialization errors.
+- `documentation/dev-notes/2026-06-29-openai-malformed-stream-options.md`
+  records compatibility evidence for returning explicit
+  `stream_options.include_usage` errors when streaming requests provide
+  malformed nested stream option values instead of JSON body deserialization
+  errors.

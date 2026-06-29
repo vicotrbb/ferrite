@@ -113,12 +113,7 @@ impl CompletionRequest {
             if !self.stream {
                 fields.push("stream_options".to_owned());
             } else {
-                fields.extend(
-                    stream_options
-                        .unsupported_fields()
-                        .into_iter()
-                        .map(|field| format!("stream_options.{field}")),
-                );
+                fields.extend(stream_options.unsupported_request_fields());
             }
         }
         fields

@@ -145,6 +145,48 @@ async fn completion_endpoint_rejects_stream_options_without_streaming(
     Ok(())
 }
 
+#[tokio::test]
+async fn chat_stream_endpoint_rejects_malformed_include_usage(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let app = router(ServerState::new("fixture-model".to_owned()));
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/chat/completions")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            r#"{"model":"fixture-model","messages":[{"role":"user","content":"hello"}],"stream":true,"stream_options":{"include_usage":"yes"}}"#,
+        ))?;
+    let response = app.oneshot(request).await?;
+    let status = response.status();
+    let body = to_text(response.into_body()).await?;
+
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert!(body.contains("stream_options.include_usage"), "{body}");
+    assert!(!body.contains("malformed JSON"), "{body}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn completions_stream_endpoint_rejects_malformed_include_usage(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let app = router(ServerState::new("fixture-model".to_owned()));
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/completions")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            r#"{"model":"fixture-model","prompt":"hello","stream":true,"stream_options":{"include_usage":"yes"}}"#,
+        ))?;
+    let response = app.oneshot(request).await?;
+    let status = response.status();
+    let body = to_text(response.into_body()).await?;
+
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert!(body.contains("stream_options.include_usage"), "{body}");
+    assert!(!body.contains("malformed JSON"), "{body}");
+    Ok(())
+}
+
 async fn to_text(body: Body) -> Result<String, Box<dyn std::error::Error>> {
     let bytes = to_bytes(body, usize::MAX).await?;
     Ok(String::from_utf8(bytes.to_vec())?)
