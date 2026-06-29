@@ -1,4 +1,4 @@
-use super::chat::ChatMessage;
+use super::chat_message::ChatMessage;
 use serde::{Deserialize, Deserializer};
 use serde_json::Value;
 
