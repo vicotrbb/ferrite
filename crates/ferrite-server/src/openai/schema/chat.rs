@@ -264,7 +264,10 @@ impl ChatMessage {
 
     fn content_matches_role(&self) -> bool {
         match &self.content {
-            Some(content) => self.role == ChatRole::Assistant || !content.has_refusal_part(),
+            Some(content) => {
+                !content.has_unsupported_part()
+                    && (self.role == ChatRole::Assistant || !content.has_refusal_part())
+            }
             None => {
                 self.role == ChatRole::Assistant
                     && (self.tool_calls.is_some() || self.function_call.is_some())

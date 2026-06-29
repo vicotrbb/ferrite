@@ -260,6 +260,54 @@ async fn chat_endpoint_rejects_user_refusal_content_parts() -> Result<(), Box<dy
 }
 
 #[tokio::test]
+async fn chat_endpoint_rejects_image_content_parts() -> Result<(), Box<dyn std::error::Error>> {
+    let body = post_chat(
+        r#"{
+            "model":"fixture-model",
+            "messages":[{
+                "role":"user",
+                "content":[{
+                    "type":"image_url",
+                    "image_url":{"url":"https://example.test/image.png"}
+                }]
+            }]
+        }"#,
+    )
+    .await?;
+
+    assert_eq!(body.status, StatusCode::BAD_REQUEST);
+    assert_eq!(body.json["error"]["type"], "invalid_request_error");
+    let message = body.json["error"]["message"].as_str().unwrap_or_default();
+    assert!(message.contains("messages.content"), "{message}");
+    assert!(!message.contains("malformed JSON"), "{message}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn chat_endpoint_rejects_audio_content_parts() -> Result<(), Box<dyn std::error::Error>> {
+    let body = post_chat(
+        r#"{
+            "model":"fixture-model",
+            "messages":[{
+                "role":"user",
+                "content":[{
+                    "type":"input_audio",
+                    "input_audio":{"data":"ZmVycml0ZQ==","format":"wav"}
+                }]
+            }]
+        }"#,
+    )
+    .await?;
+
+    assert_eq!(body.status, StatusCode::BAD_REQUEST);
+    assert_eq!(body.json["error"]["type"], "invalid_request_error");
+    let message = body.json["error"]["message"].as_str().unwrap_or_default();
+    assert!(message.contains("messages.content"), "{message}");
+    assert!(!message.contains("malformed JSON"), "{message}");
+    Ok(())
+}
+
+#[tokio::test]
 async fn chat_endpoint_rejects_malformed_message_name() -> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat(
         r#"{

@@ -4,6 +4,7 @@ use serde::{Deserialize, Deserializer};
 pub struct ChatContent {
     text: String,
     has_refusal_part: bool,
+    has_unsupported_part: bool,
 }
 
 impl ChatContent {
@@ -12,6 +13,7 @@ impl ChatContent {
         Self {
             text: text.into(),
             has_refusal_part: false,
+            has_unsupported_part: false,
         }
     }
 
@@ -21,6 +23,10 @@ impl ChatContent {
 
     pub fn has_refusal_part(&self) -> bool {
         self.has_refusal_part
+    }
+
+    pub fn has_unsupported_part(&self) -> bool {
+        self.has_unsupported_part
     }
 }
 
@@ -47,12 +53,15 @@ impl ChatContentWire {
             Self::Text(text) => ChatContent {
                 text,
                 has_refusal_part: false,
+                has_unsupported_part: false,
             },
             Self::Parts(parts) => {
                 let has_refusal_part = parts.iter().any(ContentPart::is_refusal);
+                let has_unsupported_part = parts.iter().any(ContentPart::is_unsupported);
                 ChatContent {
                     text: parts.into_iter().map(ContentPart::into_text).collect(),
                     has_refusal_part,
+                    has_unsupported_part,
                 }
             }
         }
@@ -63,8 +72,14 @@ impl ChatContentWire {
 #[serde(rename_all = "snake_case")]
 #[serde(tag = "type")]
 enum ContentPart {
-    Text { text: String },
-    Refusal { refusal: String },
+    Text {
+        text: String,
+    },
+    Refusal {
+        refusal: String,
+    },
+    #[serde(other)]
+    Unsupported,
 }
 
 impl ContentPart {
@@ -72,10 +87,15 @@ impl ContentPart {
         matches!(self, Self::Refusal { .. })
     }
 
+    fn is_unsupported(&self) -> bool {
+        matches!(self, Self::Unsupported)
+    }
+
     fn into_text(self) -> String {
         match self {
             Self::Text { text } => text,
             Self::Refusal { refusal } => refusal,
+            Self::Unsupported => String::new(),
         }
     }
 }
@@ -90,6 +110,7 @@ mod tests {
 
         assert_eq!(content.text(), "hello");
         assert!(!content.has_refusal_part());
+        assert!(!content.has_unsupported_part());
         Ok(())
     }
 
@@ -100,6 +121,7 @@ mod tests {
 
         assert_eq!(content.text(), "hello");
         assert!(!content.has_refusal_part());
+        assert!(!content.has_unsupported_part());
         Ok(())
     }
 
@@ -110,18 +132,20 @@ mod tests {
 
         assert_eq!(content.text(), "hello");
         assert!(content.has_refusal_part());
+        assert!(!content.has_unsupported_part());
         Ok(())
     }
 
     #[test]
-    fn rejects_non_text_content_parts() {
-        let result = serde_json::from_str::<ChatContent>(
+    fn records_non_text_content_parts_for_request_validation(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let content: ChatContent = serde_json::from_str(
             r#"[{"type":"image_url","image_url":{"url":"https://example.test/image.png"}}]"#,
-        );
+        )?;
 
-        assert!(result.is_err(), "image content parts are not supported");
-        if let Err(error) = result {
-            assert!(error.is_data() || error.is_syntax());
-        }
+        assert_eq!(content.text(), "");
+        assert!(!content.has_refusal_part());
+        assert!(content.has_unsupported_part());
+        Ok(())
     }
 }

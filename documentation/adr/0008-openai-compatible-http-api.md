@@ -165,3 +165,7 @@ Responses API are out of scope until explicit ADRs or plans add them.
 - `documentation/dev-notes/2026-06-29-openai-refusal-content-role-boundary.md`
   records compatibility evidence for accepting refusal content parts only on
   assistant messages and rejecting them on user messages.
+- `documentation/dev-notes/2026-06-29-openai-unsupported-content-parts.md`
+  records compatibility evidence for returning explicit `messages.content`
+  errors for unsupported multimodal content parts instead of JSON body
+  deserialization errors.
