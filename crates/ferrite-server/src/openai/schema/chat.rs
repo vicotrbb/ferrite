@@ -247,6 +247,7 @@ impl ChatCompletionResponse {
 struct ChatCompletionChoice {
     index: usize,
     message: ChatCompletionMessage,
+    logprobs: Option<Value>,
     finish_reason: &'static str,
 }
 
@@ -255,6 +256,7 @@ impl ChatCompletionChoice {
         Self {
             index: 0,
             message: ChatCompletionMessage::assistant(content),
+            logprobs: None,
             finish_reason: "stop",
         }
     }
@@ -264,6 +266,8 @@ impl ChatCompletionChoice {
 struct ChatCompletionMessage {
     role: &'static str,
     content: String,
+    refusal: Option<String>,
+    annotations: Vec<Value>,
 }
 
 impl ChatCompletionMessage {
@@ -271,6 +275,8 @@ impl ChatCompletionMessage {
         Self {
             role: "assistant",
             content,
+            refusal: None,
+            annotations: Vec::new(),
         }
     }
 }

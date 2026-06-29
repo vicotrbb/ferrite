@@ -11,6 +11,8 @@ mod auth_tests;
 #[cfg(test)]
 mod catalog_tests;
 #[cfg(test)]
+mod response_shape_tests;
+#[cfg(test)]
 mod routes_tests;
 #[cfg(test)]
 mod service_tier_tests;
