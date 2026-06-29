@@ -9,6 +9,8 @@ pub mod streaming;
 #[cfg(test)]
 mod auth_tests;
 #[cfg(test)]
+mod availability_tests;
+#[cfg(test)]
 mod catalog_tests;
 #[cfg(test)]
 mod chat_message_tool_tests;

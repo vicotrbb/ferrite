@@ -83,10 +83,11 @@ async fn chat_completions(
     let prompt = render_chat_prompt(request.messages())?;
     let max_tokens =
         normalized_max_tokens(&state, request.max_tokens(), request.max_tokens_param())?;
+    let engine = required_engine(&state)?;
     let permit = acquire_inference_permit(&state).await?;
     if request.stream() {
         return Ok(chat_stream_response(
-            required_engine(&state)?,
+            engine,
             state.model_id().to_owned(),
             prompt,
             max_tokens,
@@ -95,7 +96,7 @@ async fn chat_completions(
             permit,
         ));
     }
-    let generated = generate_text(state.engine(), prompt, max_tokens, permit).await?;
+    let generated = generate_text(Some(engine), prompt, max_tokens, permit).await?;
     Ok(Json(ChatCompletionResponse::from_generation(
         state.model_id().to_owned(),
         generated,
@@ -128,6 +129,7 @@ async fn completions(
     }
     let max_tokens =
         normalized_max_tokens(&state, request.max_tokens(), request.max_tokens_param())?;
+    let engine = required_engine(&state)?;
     let permit = acquire_inference_permit(&state).await?;
     if request.stream() {
         let Some(prompt) = request.single_prompt() else {
@@ -136,7 +138,7 @@ async fn completions(
             ));
         };
         return Ok(completion_stream_response(
-            required_engine(&state)?,
+            engine,
             state.model_id().to_owned(),
             prompt.to_owned(),
             max_tokens,
@@ -144,13 +146,8 @@ async fn completions(
             permit,
         ));
     }
-    let generated = generate_texts(
-        state.engine(),
-        request.prompts().to_vec(),
-        max_tokens,
-        permit,
-    )
-    .await?;
+    let generated =
+        generate_texts(Some(engine), request.prompts().to_vec(), max_tokens, permit).await?;
     Ok(Json(CompletionResponse::from_generations(
         state.model_id().to_owned(),
         generated,
