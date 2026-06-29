@@ -10,6 +10,7 @@ mod metadata;
 mod modalities;
 mod neutral_options;
 mod prompt_cache_key;
+mod reasoning_effort;
 mod response_format;
 mod safety_identifier;
 mod stop_sequences;

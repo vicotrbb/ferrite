@@ -5,6 +5,7 @@ use super::{
     modalities::is_text_only_modalities,
     neutral_options::{is_neutral_bool, is_neutral_number},
     prompt_cache_key::is_prompt_cache_key,
+    reasoning_effort::is_no_reasoning_effort,
     response_format::is_neutral_response_format,
     safety_identifier::is_safety_identifier,
     stop_sequences::is_neutral_stop_sequences,
@@ -76,6 +77,8 @@ pub struct ChatCompletionRequest {
     prompt_cache_key: Option<Value>,
     #[serde(default)]
     safety_identifier: Option<Value>,
+    #[serde(default)]
+    reasoning_effort: Option<Value>,
     #[serde(default, flatten)]
     extra_fields: BTreeMap<String, Value>,
 }
@@ -144,6 +147,10 @@ impl ChatCompletionRequest {
             .with_present(
                 "safety_identifier",
                 !is_safety_identifier(&self.safety_identifier),
+            )
+            .with_present(
+                "reasoning_effort",
+                !is_no_reasoning_effort(&self.reasoning_effort),
             )
             .with_extra_keys(&self.extra_fields)
             .into_vec();

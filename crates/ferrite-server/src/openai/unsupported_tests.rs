@@ -88,6 +88,27 @@ async fn chat_endpoint_rejects_sampling_parameters() -> Result<(), Box<dyn std::
 }
 
 #[tokio::test]
+async fn chat_endpoint_rejects_enabled_reasoning_effort() -> Result<(), Box<dyn std::error::Error>>
+{
+    let body = post_chat(
+        r#"{
+            "model":"fixture-model",
+            "messages":[{"role":"user","content":"hello"}],
+            "reasoning_effort":"low"
+        }"#,
+    )
+    .await?;
+
+    assert_eq!(body.status, StatusCode::BAD_REQUEST);
+    assert_eq!(body.json["error"]["type"], "invalid_request_error");
+    assert!(body.json["error"]["message"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("reasoning_effort"));
+    Ok(())
+}
+
+#[tokio::test]
 async fn chat_endpoint_rejects_multiple_choice_request() -> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat(
         r#"{
