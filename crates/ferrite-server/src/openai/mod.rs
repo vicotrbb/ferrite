@@ -22,6 +22,8 @@ mod chat_message_tool_tests;
 #[cfg(test)]
 mod chat_message_validation_tests;
 #[cfg(test)]
+mod chat_metadata_validation_tests;
+#[cfg(test)]
 mod chat_option_tests;
 #[cfg(test)]
 mod chat_request_validation_tests;
