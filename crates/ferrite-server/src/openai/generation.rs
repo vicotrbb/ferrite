@@ -40,9 +40,12 @@ pub(super) fn chat_stream_response(
     prompt: String,
     max_tokens: usize,
     include_usage: bool,
+    service_tier: Option<&'static str>,
     permit: OwnedSemaphorePermit,
 ) -> Response {
-    let context = ChatCompletionStreamContext::new(model).with_usage_field(include_usage);
+    let context = ChatCompletionStreamContext::new(model)
+        .with_usage_field(include_usage)
+        .with_service_tier(service_tier);
     let token_context = context.clone();
     stream_generated_text(
         engine,

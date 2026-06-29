@@ -10,6 +10,8 @@ pub struct ChatCompletionStreamChunk {
     created: u64,
     model: String,
     system_fingerprint: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    service_tier: Option<&'static str>,
     choices: Vec<ChatCompletionStreamChoice>,
     #[serde(skip_serializing_if = "Option::is_none")]
     usage: Option<StreamUsage>,
@@ -21,6 +23,7 @@ pub struct ChatCompletionStreamContext {
     created: u64,
     model: String,
     include_usage: bool,
+    service_tier: Option<&'static str>,
 }
 
 impl ChatCompletionStreamContext {
@@ -31,11 +34,17 @@ impl ChatCompletionStreamContext {
             created,
             model,
             include_usage: false,
+            service_tier: None,
         }
     }
 
     pub fn with_usage_field(mut self, include_usage: bool) -> Self {
         self.include_usage = include_usage;
+        self
+    }
+
+    pub fn with_service_tier(mut self, service_tier: Option<&'static str>) -> Self {
+        self.service_tier = service_tier;
         self
     }
 
@@ -46,6 +55,7 @@ impl ChatCompletionStreamContext {
             created: self.created,
             model: self.model.clone(),
             system_fingerprint: None,
+            service_tier: self.service_tier,
             choices: vec![ChatCompletionStreamChoice::content(content)],
             usage: self.null_usage(),
         }
@@ -58,6 +68,7 @@ impl ChatCompletionStreamContext {
             created: self.created,
             model: self.model.clone(),
             system_fingerprint: None,
+            service_tier: self.service_tier,
             choices: vec![ChatCompletionStreamChoice::role()],
             usage: self.null_usage(),
         }
@@ -70,6 +81,7 @@ impl ChatCompletionStreamContext {
             created: self.created,
             model: self.model.clone(),
             system_fingerprint: None,
+            service_tier: self.service_tier,
             choices: vec![ChatCompletionStreamChoice::stop()],
             usage: self.null_usage(),
         }
@@ -82,6 +94,7 @@ impl ChatCompletionStreamContext {
             created: self.created,
             model: self.model.clone(),
             system_fingerprint: None,
+            service_tier: self.service_tier,
             choices: Vec::new(),
             usage: Some(StreamUsage::value(Usage::from_generation(generated))),
         }

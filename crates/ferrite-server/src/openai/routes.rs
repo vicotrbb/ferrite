@@ -80,6 +80,7 @@ async fn chat_completions(
             prompt,
             max_tokens,
             request.stream_include_usage(),
+            request.response_service_tier(),
             permit,
         ));
     }

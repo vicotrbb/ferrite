@@ -34,6 +34,28 @@ async fn chat_endpoint_accepts_auto_service_tier() -> Result<(), Box<dyn std::er
 }
 
 #[tokio::test]
+async fn chat_stream_endpoint_includes_service_tier() -> Result<(), Box<dyn std::error::Error>> {
+    let model_path = write_chat_fixture_model()?;
+    let engine = InferenceEngine::load(&model_path)?;
+    let app = router(ServerState::with_engine("fixture-model".to_owned(), engine));
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/chat/completions")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            r#"{"model":"fixture-model","messages":[{"role":"user","content":"hello"}],"max_completion_tokens":1,"stream":true,"service_tier":"auto"}"#,
+        ))?;
+    let response = app.oneshot(request).await?;
+    remove_fixture_model(&model_path)?;
+
+    let status = response.status();
+    let body = to_text(response.into_body()).await?;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert!(body.contains(r#""service_tier":"default""#), "{body}");
+    Ok(())
+}
+
+#[tokio::test]
 async fn chat_endpoint_rejects_alternative_service_tier() -> Result<(), Box<dyn std::error::Error>>
 {
     let app = router(ServerState::new("fixture-model".to_owned()));
@@ -60,6 +82,11 @@ async fn chat_endpoint_rejects_alternative_service_tier() -> Result<(), Box<dyn 
 async fn to_json(body: Body) -> Result<Value, Box<dyn std::error::Error>> {
     let bytes = to_bytes(body, usize::MAX).await?;
     Ok(serde_json::from_slice(&bytes)?)
+}
+
+async fn to_text(body: Body) -> Result<String, Box<dyn std::error::Error>> {
+    let bytes = to_bytes(body, usize::MAX).await?;
+    Ok(String::from_utf8(bytes.to_vec())?)
 }
 
 fn write_chat_fixture_model() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {

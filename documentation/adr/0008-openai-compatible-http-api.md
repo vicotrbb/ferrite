@@ -226,3 +226,7 @@ Responses API are out of scope until explicit ADRs or plans add them.
   records compatibility evidence for returning explicit message-field errors
   when chat message arrays contain non-object items instead of collapsing the
   array into a misleading empty-message error.
+- `documentation/dev-notes/2026-06-29-openai-stream-service-tier.md` records
+  compatibility evidence for including the normalized local `service_tier`
+  value on streamed chat completion chunks when the request sets a supported
+  service tier.
