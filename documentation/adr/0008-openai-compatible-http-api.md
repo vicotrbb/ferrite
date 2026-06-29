@@ -109,3 +109,6 @@ Responses API are out of scope until explicit ADRs or plans add them.
 - `documentation/dev-notes/2026-06-29-openai-completion-seed.md` records
   focused compatibility evidence for accepting integer `seed` on legacy
   completions while preserving malformed-seed rejection.
+- `documentation/dev-notes/2026-06-29-openai-chat-seed.md` records matching
+  compatibility evidence for accepting integer `seed` on chat completions
+  while preserving malformed-seed rejection.

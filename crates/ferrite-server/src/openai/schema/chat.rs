@@ -8,6 +8,7 @@ use super::{
     reasoning_effort::is_no_reasoning_effort,
     response_format::is_neutral_response_format,
     safety_identifier::is_safety_identifier,
+    seed::is_seed,
     service_tier::{is_local_service_tier, response_service_tier},
     stop_sequences::is_neutral_stop_sequences,
     stream_options::StreamOptions,
@@ -159,7 +160,7 @@ impl ChatCompletionRequest {
             .with_present("logprobs", !is_neutral_bool(&self.logprobs, false))
             .with_present("top_logprobs", self.top_logprobs.is_some())
             .with_present("user", !is_user_identifier(&self.user))
-            .with_present("seed", self.seed.is_some())
+            .with_present("seed", !is_seed(&self.seed))
             .with_present("store", !is_neutral_bool(&self.store, false))
             .with_present("metadata", !is_valid_metadata(&self.metadata))
             .with_present(

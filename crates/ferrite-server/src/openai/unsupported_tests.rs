@@ -213,6 +213,26 @@ async fn chat_endpoint_rejects_overlong_safety_identifier() -> Result<(), Box<dy
 }
 
 #[tokio::test]
+async fn chat_endpoint_rejects_malformed_seed() -> Result<(), Box<dyn std::error::Error>> {
+    let body = post_chat(
+        r#"{
+            "model":"fixture-model",
+            "messages":[{"role":"user","content":"hello"}],
+            "seed":"42"
+        }"#,
+    )
+    .await?;
+
+    assert_eq!(body.status, StatusCode::BAD_REQUEST);
+    assert_eq!(body.json["error"]["type"], "invalid_request_error");
+    assert!(body.json["error"]["message"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("seed"));
+    Ok(())
+}
+
+#[tokio::test]
 async fn chat_endpoint_rejects_unknown_fields() -> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat(
         r#"{
