@@ -132,5 +132,8 @@ Responses API are out of scope until explicit ADRs or plans add them.
 - `documentation/dev-notes/2026-06-29-openai-message-metadata-types.md`
   records compatibility evidence for validating documented message metadata
   field types before treating them as local no-ops.
+- `documentation/dev-notes/2026-06-29-openai-tool-message-id.md` records
+  compatibility evidence for requiring `tool_call_id` on tool-role messages
+  before treating them as local transcript text.
 - `documentation/dev-notes/2026-06-29-openai-real-http-rerun.md` records a
   fresh explicit rerun of real Tier 0 and Tier 1 OpenAI-compatible HTTP tests.

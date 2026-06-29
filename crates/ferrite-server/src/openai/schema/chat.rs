@@ -243,7 +243,7 @@ impl ChatMessage {
             .with_present("messages.name", !is_optional_string(&self.name))
             .with_present(
                 "messages.tool_call_id",
-                !is_optional_string(&self.tool_call_id),
+                !is_optional_string(&self.tool_call_id) || self.tool_message_missing_tool_call_id(),
             )
             .with_present("messages.tool_calls", !is_empty_tools(&self.tool_calls))
             .with_present(
@@ -252,6 +252,10 @@ impl ChatMessage {
             )
             .with_extra_keys_with_prefix("messages.", &self.extra_fields)
             .into_vec()
+    }
+
+    fn tool_message_missing_tool_call_id(&self) -> bool {
+        self.role == ChatRole::Tool && self.tool_call_id.is_none()
     }
 }
 
