@@ -129,7 +129,7 @@ request cases above and then sampled the direct server process RSS.
 
 The local Qwen2.5-1.5B Q8_0 server path loads at about 1.88 GiB current RSS and
 stays below 1.92 GiB current RSS across this bounded one-token sequential HTTP
-probe. The repeated pass increased by about 30.8 MiB from post-load to the
+probe. The repeated pass increased by about 29.4 MiB from post-load to the
 post-idle sample after three full endpoint cycles.
 
 This narrows the Tier 1 server-memory gap for the local Qwen2.5-1.5B Q8_0
