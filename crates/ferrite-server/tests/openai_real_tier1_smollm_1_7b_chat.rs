@@ -2,8 +2,7 @@ mod support;
 
 use std::path::PathBuf;
 
-use serde_json::Value;
-use support::http::{response_json, send_http_request};
+use support::http::{response_json, send_http_request, sse_json_events};
 
 const DEFAULT_MODEL_PATH: &str = "target/models/SmolLM2-1.7B-Instruct-Q4_K_M.gguf";
 const REAL_MODEL_ID: &str = "smollm2-1.7b-q4_k_m";
@@ -214,18 +213,6 @@ fn assert_smollm_chat_stream_response(
         "terminal chat stream chunk should not include content"
     );
     Ok(())
-}
-
-fn sse_json_events(response: &str) -> Result<Vec<Value>, Box<dyn std::error::Error>> {
-    let (_, body) = response
-        .split_once("\r\n\r\n")
-        .ok_or("expected HTTP response body")?;
-    body.lines()
-        .filter_map(|line| line.strip_prefix("data: "))
-        .filter(|data| *data != "[DONE]")
-        .map(serde_json::from_str)
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(Into::into)
 }
 
 fn smollm_1_7b_q4_model_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
