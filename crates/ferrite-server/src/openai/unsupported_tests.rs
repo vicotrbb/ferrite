@@ -100,6 +100,29 @@ async fn chat_endpoint_rejects_message_function_call_fields(
 }
 
 #[tokio::test]
+async fn chat_endpoint_rejects_unknown_message_fields() -> Result<(), Box<dyn std::error::Error>> {
+    let body = post_chat(
+        r#"{
+            "model":"fixture-model",
+            "messages":[{
+                "role":"user",
+                "content":"hello",
+                "vendor_context":{"trace":"local"}
+            }]
+        }"#,
+    )
+    .await?;
+
+    assert_eq!(body.status, StatusCode::BAD_REQUEST);
+    assert_eq!(body.json["error"]["type"], "invalid_request_error");
+    assert!(body.json["error"]["message"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("messages.vendor_context"));
+    Ok(())
+}
+
+#[tokio::test]
 async fn chat_endpoint_rejects_json_response_format() -> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat(
         r#"{

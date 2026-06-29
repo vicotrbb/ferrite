@@ -203,10 +203,16 @@ impl ChatCompletionRequest {
 pub struct ChatMessage {
     role: ChatRole,
     content: ChatContent,
+    #[serde(default, rename = "name")]
+    _name: Option<Value>,
+    #[serde(default, rename = "tool_call_id")]
+    _tool_call_id: Option<Value>,
     #[serde(default)]
     tool_calls: Option<Value>,
     #[serde(default)]
     function_call: Option<Value>,
+    #[serde(default, flatten)]
+    extra_fields: BTreeMap<String, Value>,
 }
 
 impl ChatMessage {
@@ -215,8 +221,11 @@ impl ChatMessage {
         Self {
             role,
             content: ChatContent::from_text(content),
+            _name: None,
+            _tool_call_id: None,
             tool_calls: None,
             function_call: None,
+            extra_fields: BTreeMap::new(),
         }
     }
 
@@ -235,6 +244,7 @@ impl ChatMessage {
                 "messages.function_call",
                 !is_no_function_call(&self.function_call),
             )
+            .with_extra_keys_with_prefix("messages.", &self.extra_fields)
             .into_vec()
     }
 }

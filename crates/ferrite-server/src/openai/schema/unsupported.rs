@@ -23,6 +23,16 @@ impl UnsupportedFields {
         self
     }
 
+    pub fn with_extra_keys_with_prefix(
+        mut self,
+        prefix: &'static str,
+        extra_fields: &BTreeMap<String, Value>,
+    ) -> Self {
+        self.fields
+            .extend(extra_fields.keys().map(|field| format!("{prefix}{field}")));
+        self
+    }
+
     pub fn into_vec(self) -> Vec<String> {
         self.fields
     }
@@ -54,5 +64,17 @@ mod tests {
                 "vendor_option".to_owned()
             ]
         );
+    }
+
+    #[test]
+    fn collects_prefixed_extra_unsupported_fields() {
+        let mut extra = BTreeMap::new();
+        extra.insert("vendor_context".to_owned(), json!({"trace": "local"}));
+
+        let fields = UnsupportedFields::new()
+            .with_extra_keys_with_prefix("messages.", &extra)
+            .into_vec();
+
+        assert_eq!(fields, vec!["messages.vendor_context".to_owned()]);
     }
 }
