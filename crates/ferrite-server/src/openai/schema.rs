@@ -8,6 +8,7 @@ mod completion_stream;
 mod metadata;
 mod modalities;
 mod neutral_options;
+mod prompt_cache_key;
 mod response_format;
 mod stop_sequences;
 mod stream_options;

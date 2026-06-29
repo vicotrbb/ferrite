@@ -3,6 +3,7 @@ use super::{
     metadata::is_valid_metadata,
     modalities::is_text_only_modalities,
     neutral_options::{is_neutral_bool, is_neutral_number},
+    prompt_cache_key::is_prompt_cache_key,
     response_format::is_neutral_response_format,
     stop_sequences::is_neutral_stop_sequences,
     stream_options::StreamOptions,
@@ -65,6 +66,8 @@ pub struct ChatCompletionRequest {
     store: Option<Value>,
     #[serde(default)]
     metadata: Option<Value>,
+    #[serde(default)]
+    prompt_cache_key: Option<Value>,
     #[serde(default, flatten)]
     extra_fields: BTreeMap<String, Value>,
 }
@@ -124,6 +127,10 @@ impl ChatCompletionRequest {
             .with_present("seed", self.seed.is_some())
             .with_present("store", !is_neutral_bool(&self.store, false))
             .with_present("metadata", !is_valid_metadata(&self.metadata))
+            .with_present(
+                "prompt_cache_key",
+                !is_prompt_cache_key(&self.prompt_cache_key),
+            )
             .with_extra_keys(&self.extra_fields)
             .into_vec();
         if let Some(stream_options) = &self.stream_options {

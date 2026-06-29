@@ -108,6 +108,27 @@ async fn chat_endpoint_rejects_malformed_metadata() -> Result<(), Box<dyn std::e
 }
 
 #[tokio::test]
+async fn chat_endpoint_rejects_malformed_prompt_cache_key() -> Result<(), Box<dyn std::error::Error>>
+{
+    let body = post_chat(
+        r#"{
+            "model":"fixture-model",
+            "messages":[{"role":"user","content":"hello"}],
+            "prompt_cache_key":123
+        }"#,
+    )
+    .await?;
+
+    assert_eq!(body.status, StatusCode::BAD_REQUEST);
+    assert_eq!(body.json["error"]["type"], "invalid_request_error");
+    assert!(body.json["error"]["message"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("prompt_cache_key"));
+    Ok(())
+}
+
+#[tokio::test]
 async fn chat_endpoint_rejects_unknown_fields() -> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat(
         r#"{
