@@ -204,7 +204,8 @@ impl ChatCompletionRequest {
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 pub struct ChatMessage {
     role: ChatRole,
-    content: ChatContent,
+    #[serde(default)]
+    content: Option<ChatContent>,
     #[serde(default)]
     name: Option<Value>,
     #[serde(default)]
@@ -226,7 +227,7 @@ impl ChatMessage {
     pub fn new(role: ChatRole, content: impl Into<String>) -> Self {
         Self {
             role,
-            content: ChatContent::from_text(content),
+            content: Some(ChatContent::from_text(content)),
             name: None,
             tool_call_id: None,
             tool_calls: None,
@@ -242,11 +243,12 @@ impl ChatMessage {
     }
 
     pub fn content(&self) -> &str {
-        self.content.text()
+        self.content.as_ref().map_or("", ChatContent::text)
     }
 
     fn unsupported_fields(&self) -> Vec<String> {
         UnsupportedFields::new()
+            .with_present("messages.content", !self.content_matches_role())
             .with_present("messages.name", !self.name_matches_role())
             .with_present("messages.tool_call_id", !self.tool_call_id_matches_role())
             .with_present("messages.tool_calls", !is_empty_tools(&self.tool_calls))
@@ -258,6 +260,12 @@ impl ChatMessage {
             .with_present("messages.refusal", self.refusal.is_some())
             .with_extra_keys_with_prefix("messages.", &self.extra_fields)
             .into_vec()
+    }
+
+    fn content_matches_role(&self) -> bool {
+        self.content.is_some()
+            || (self.role == ChatRole::Assistant
+                && (self.tool_calls.is_some() || self.function_call.is_some()))
     }
 
     fn name_matches_role(&self) -> bool {

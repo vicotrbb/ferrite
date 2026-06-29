@@ -76,6 +76,32 @@ async fn chat_endpoint_rejects_message_tool_call_fields() -> Result<(), Box<dyn 
 }
 
 #[tokio::test]
+async fn chat_endpoint_rejects_message_tool_call_fields_without_content(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let body = post_chat(
+        r#"{
+            "model":"fixture-model",
+            "messages":[{
+                "role":"assistant",
+                "tool_calls":[{
+                    "id":"call_1",
+                    "type":"function",
+                    "function":{"name":"lookup","arguments":"{}"}
+                }]
+            }]
+        }"#,
+    )
+    .await?;
+
+    assert_eq!(body.status, StatusCode::BAD_REQUEST);
+    assert_eq!(body.json["error"]["type"], "invalid_request_error");
+    let message = body.json["error"]["message"].as_str().unwrap_or_default();
+    assert!(message.contains("messages.tool_calls"), "{message}");
+    assert!(!message.contains("malformed JSON"), "{message}");
+    Ok(())
+}
+
+#[tokio::test]
 async fn chat_endpoint_rejects_message_function_call_fields(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat(
@@ -96,6 +122,28 @@ async fn chat_endpoint_rejects_message_function_call_fields(
         .as_str()
         .unwrap_or_default()
         .contains("messages.function_call"));
+    Ok(())
+}
+
+#[tokio::test]
+async fn chat_endpoint_rejects_message_function_call_fields_without_content(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let body = post_chat(
+        r#"{
+            "model":"fixture-model",
+            "messages":[{
+                "role":"assistant",
+                "function_call":{"name":"lookup","arguments":"{}"}
+            }]
+        }"#,
+    )
+    .await?;
+
+    assert_eq!(body.status, StatusCode::BAD_REQUEST);
+    assert_eq!(body.json["error"]["type"], "invalid_request_error");
+    let message = body.json["error"]["message"].as_str().unwrap_or_default();
+    assert!(message.contains("messages.function_call"), "{message}");
+    assert!(!message.contains("malformed JSON"), "{message}");
     Ok(())
 }
 
@@ -166,6 +214,26 @@ async fn chat_endpoint_rejects_unknown_message_fields() -> Result<(), Box<dyn st
         .as_str()
         .unwrap_or_default()
         .contains("messages.vendor_context"));
+    Ok(())
+}
+
+#[tokio::test]
+async fn chat_endpoint_rejects_message_without_content() -> Result<(), Box<dyn std::error::Error>> {
+    let body = post_chat(
+        r#"{
+            "model":"fixture-model",
+            "messages":[{
+                "role":"user"
+            }]
+        }"#,
+    )
+    .await?;
+
+    assert_eq!(body.status, StatusCode::BAD_REQUEST);
+    assert_eq!(body.json["error"]["type"], "invalid_request_error");
+    let message = body.json["error"]["message"].as_str().unwrap_or_default();
+    assert!(message.contains("messages.content"), "{message}");
+    assert!(!message.contains("malformed JSON"), "{message}");
     Ok(())
 }
 

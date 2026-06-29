@@ -158,3 +158,7 @@ Responses API are out of scope until explicit ADRs or plans add them.
 - `documentation/dev-notes/2026-06-29-openai-parallel-tool-calls-without-tools.md`
   records compatibility evidence for accepting boolean `parallel_tool_calls`
   when no tools are configured while keeping active tool calling unsupported.
+- `documentation/dev-notes/2026-06-29-openai-assistant-tool-call-content-optional.md`
+  records compatibility evidence for parsing assistant tool-call transcript
+  messages without `content` and rejecting the unsupported tool metadata
+  explicitly.
