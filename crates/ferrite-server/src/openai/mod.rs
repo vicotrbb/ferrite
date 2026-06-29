@@ -40,7 +40,11 @@ mod health_tests;
 #[cfg(test)]
 mod request_error_tests;
 #[cfg(test)]
+mod response_shape_assertions;
+#[cfg(test)]
 mod response_shape_tests;
+#[cfg(test)]
+mod response_stream_shape_tests;
 #[cfg(test)]
 mod route_streaming_tests;
 #[cfg(test)]
