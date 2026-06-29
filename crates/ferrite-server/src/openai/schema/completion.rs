@@ -1,6 +1,7 @@
 use super::{
     completion_prompt::CompletionPrompt,
     neutral_options::{is_neutral_bool, is_neutral_number},
+    seed::is_seed,
     stop_sequences::is_neutral_stop_sequences,
     stream_options::StreamOptions,
     unix_timestamp,
@@ -47,6 +48,8 @@ pub struct CompletionRequest {
     logit_bias: Option<Value>,
     #[serde(default)]
     user: Option<Value>,
+    #[serde(default)]
+    seed: Option<Value>,
     #[serde(default, flatten)]
     extra_fields: BTreeMap<String, Value>,
 }
@@ -98,6 +101,7 @@ impl CompletionRequest {
             .with_present("best_of", self.best_of.is_some())
             .with_present("logit_bias", self.logit_bias.is_some())
             .with_present("user", !is_user_identifier(&self.user))
+            .with_present("seed", !is_seed(&self.seed))
             .with_extra_keys(&self.extra_fields)
             .into_vec();
         if let Some(stream_options) = &self.stream_options {

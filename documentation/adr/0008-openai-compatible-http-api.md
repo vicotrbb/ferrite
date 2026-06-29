@@ -106,3 +106,6 @@ Responses API are out of scope until explicit ADRs or plans add them.
     <https://platform.openai.com/docs/api-reference/completions/create>
   - Models list endpoint:
     <https://platform.openai.com/docs/api-reference/models/list>
+- `documentation/dev-notes/2026-06-29-openai-completion-seed.md` records
+  focused compatibility evidence for accepting integer `seed` on legacy
+  completions while preserving malformed-seed rejection.
