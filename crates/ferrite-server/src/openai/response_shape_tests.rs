@@ -28,6 +28,7 @@ async fn chat_endpoint_returns_openai_message_shape() -> Result<(), Box<dyn std:
     let status = response.status();
     let body = to_json(response.into_body()).await?;
     assert_eq!(status, StatusCode::OK, "{body}");
+    assert_null_system_fingerprint(&body)?;
 
     let choice = body["choices"][0]
         .as_object()
@@ -70,6 +71,7 @@ async fn chat_stream_endpoint_returns_openai_choice_shape() -> Result<(), Box<dy
 
     let events = json_sse_events(&body)?;
     let role_event = events.first().ok_or("expected role event")?;
+    assert_null_system_fingerprint(role_event)?;
     let role_choice = role_event["choices"][0]
         .as_object()
         .ok_or("expected role choice object")?;
@@ -82,12 +84,14 @@ async fn chat_stream_endpoint_returns_openai_choice_shape() -> Result<(), Box<dy
         .iter()
         .find(|event| event["choices"][0]["delta"]["content"] == "winner")
         .ok_or("expected token event")?;
+    assert_null_system_fingerprint(token_event)?;
     assert_choice_has_null_logprobs(token_event)?;
 
     let stop_event = events
         .iter()
         .find(|event| event["choices"][0]["finish_reason"] == "stop")
         .ok_or("expected stop event")?;
+    assert_null_system_fingerprint(stop_event)?;
     assert_choice_has_null_logprobs(stop_event)?;
     Ok(())
 }
@@ -115,6 +119,13 @@ fn assert_choice_has_null_logprobs(event: &Value) -> Result<(), Box<dyn std::err
         .ok_or("expected streamed choice object")?;
     assert!(choice.contains_key("logprobs"), "{event}");
     assert!(choice["logprobs"].is_null(), "{event}");
+    Ok(())
+}
+
+fn assert_null_system_fingerprint(body: &Value) -> Result<(), Box<dyn std::error::Error>> {
+    let object = body.as_object().ok_or("expected response object")?;
+    assert!(object.contains_key("system_fingerprint"), "{body}");
+    assert!(body["system_fingerprint"].is_null(), "{body}");
     Ok(())
 }
 

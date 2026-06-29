@@ -9,6 +9,7 @@ pub struct ChatCompletionStreamChunk {
     object: &'static str,
     created: u64,
     model: String,
+    system_fingerprint: Option<String>,
     choices: Vec<ChatCompletionStreamChoice>,
     #[serde(skip_serializing_if = "Option::is_none")]
     usage: Option<StreamUsage>,
@@ -44,6 +45,7 @@ impl ChatCompletionStreamContext {
             object: "chat.completion.chunk",
             created: self.created,
             model: self.model.clone(),
+            system_fingerprint: None,
             choices: vec![ChatCompletionStreamChoice::content(content)],
             usage: self.null_usage(),
         }
@@ -55,6 +57,7 @@ impl ChatCompletionStreamContext {
             object: "chat.completion.chunk",
             created: self.created,
             model: self.model.clone(),
+            system_fingerprint: None,
             choices: vec![ChatCompletionStreamChoice::role()],
             usage: self.null_usage(),
         }
@@ -66,6 +69,7 @@ impl ChatCompletionStreamContext {
             object: "chat.completion.chunk",
             created: self.created,
             model: self.model.clone(),
+            system_fingerprint: None,
             choices: vec![ChatCompletionStreamChoice::stop()],
             usage: self.null_usage(),
         }
@@ -77,6 +81,7 @@ impl ChatCompletionStreamContext {
             object: "chat.completion.chunk",
             created: self.created,
             model: self.model.clone(),
+            system_fingerprint: None,
             choices: Vec::new(),
             usage: Some(StreamUsage::value(Usage::from_generation(generated))),
         }

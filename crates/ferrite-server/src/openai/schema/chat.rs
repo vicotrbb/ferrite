@@ -218,6 +218,7 @@ pub struct ChatCompletionResponse {
     object: &'static str,
     created: u64,
     model: String,
+    system_fingerprint: Option<String>,
     choices: Vec<ChatCompletionChoice>,
     usage: Usage,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -236,6 +237,7 @@ impl ChatCompletionResponse {
             object: "chat.completion",
             created,
             model,
+            system_fingerprint: None,
             choices: vec![ChatCompletionChoice::new(generated.text().to_owned())],
             usage: Usage::from_generation(&generated),
             service_tier,
