@@ -251,4 +251,5 @@ Responses API are out of scope until explicit ADRs or plans add them.
   integration-test support extracted for real-model stop assertions.
 - `documentation/dev-notes/2026-06-29-openai-real-tier1-smollm-1-7b-stop-proof.md`
   records matching SmolLM2-1.7B Q4_K_M stop-sequence evidence across
-  non-streaming and streaming completion/chat HTTP paths.
+  non-streaming and streaming completion/chat HTTP paths, plus six-prompt
+  legacy completion stop coverage.

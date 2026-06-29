@@ -8,8 +8,8 @@ to SmolLM2-1.7B-Instruct Q4_K_M. It uses the existing known one-token
 trims the visible generated token.
 
 This is compatibility evidence for the HTTP server boundary. It does not claim
-broader prompt coverage, longer generations, x86_64 stop behavior, or full
-Tier 1 HTTP completion.
+longer generations, x86_64 stop behavior, broad chat stop prompt coverage, or
+full Tier 1 HTTP completion.
 
 ## Code Organization
 
@@ -56,4 +56,37 @@ across these four one-token HTTP shapes:
 The non-streaming responses preserve generated-token usage accounting while
 returning empty visible text/content. The streaming responses suppress visible
 text/content chunks and still emit a terminal `finish_reason: "stop"` event and
+`data: [DONE]`.
+
+## Six-Prompt Legacy Completion Stop Regression
+
+Command:
+
+```sh
+cargo test -p ferrite-server --test openai_real_tier1_smollm_1_7b_stop live_http_server_applies_completion_stop_sequences_to_smollm_1_7b_q4_reference_prompts -- --ignored --nocapture
+```
+
+Observed result:
+
+```text
+test live_http_server_applies_completion_stop_sequences_to_smollm_1_7b_q4_reference_prompts ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 506.87s
+```
+
+This expands SmolLM2-1.7B Q4_K_M real-model `stop` coverage across the six
+established legacy completion reference prompts, in both non-streaming and
+streaming completion mode:
+
+- `hello world`;
+- `The capital of France is`;
+- `Once upon a time`;
+- `Rust is a systems programming language`;
+- `Machine learning models can`; and
+- `The recipe calls for`.
+
+Each request uses the already documented one-token completion text as the
+requested stop sequence. Non-streaming responses preserve generated-token usage
+accounting and return empty visible text. Streaming responses suppress visible
+text chunks and still emit a terminal `finish_reason: "stop"` event and
 `data: [DONE]`.

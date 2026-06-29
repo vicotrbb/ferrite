@@ -115,7 +115,10 @@ real-model stop assertion support. Broader real-model `stop` coverage across
 prompts remains open.
 SmolLM2-1.7B Q4_K_M now also has one-prompt, four-endpoint stop-sequence
 coverage for the known `hello world` completion and chat paths, using the same
-shared real-model stop assertion support.
+shared real-model stop assertion support. Its legacy completion path also has
+six-prompt stop-sequence coverage in non-streaming and streaming modes. Broader
+real-model `stop` coverage for chat prompts, Qwen2.5 prompts, x86_64, and
+longer generations remains open.
 
 The OpenAI-compatible HTTP server now has opt-in real Tier 1 coverage for
 Qwen2.5-0.5B Q4_K_M through legacy completions, streaming legacy completions,
