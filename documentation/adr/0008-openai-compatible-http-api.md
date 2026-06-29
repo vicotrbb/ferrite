@@ -197,3 +197,7 @@ Responses API are out of scope until explicit ADRs or plans add them.
   compatibility evidence for returning explicit `model` errors when generation
   requests provide malformed model ids instead of JSON body deserialization
   errors.
+- `documentation/dev-notes/2026-06-29-openai-malformed-messages.md` records
+  compatibility evidence for returning explicit `messages` errors when chat
+  requests provide malformed message arrays instead of JSON body
+  deserialization errors.

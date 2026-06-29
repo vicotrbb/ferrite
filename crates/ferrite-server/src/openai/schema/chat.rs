@@ -1,5 +1,6 @@
 use super::{
     chat_content::ChatContent,
+    chat_messages::deserialize_chat_messages,
     function_options::{is_empty_functions, is_no_function_call},
     logit_bias::is_neutral_logit_bias,
     message_metadata::is_optional_string,
@@ -30,7 +31,7 @@ use std::collections::BTreeMap;
 pub struct ChatCompletionRequest {
     #[serde(default, deserialize_with = "deserialize_model_id")]
     model: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_chat_messages")]
     messages: Vec<ChatMessage>,
     #[serde(default)]
     stream: bool,
