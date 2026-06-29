@@ -218,3 +218,39 @@ test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 This rerun confirms the larger Tier 1 Qwen2.5-1.5B Q8_0 OpenAI HTTP path still
 works after the later compatibility slices, including unique response IDs,
 stream role chunks, and current wait-queue behavior.
+
+## Stop Sequence Regression
+
+Tree state:
+
+- Commit: `08b86a9`
+- Model artifact: `target/models/qwen2.5-1.5b-instruct-q8_0.gguf`
+- File size: 1.8 GB
+
+Command:
+
+```sh
+cargo test -p ferrite-server --test openai_real_tier1_qwen_1_5b_http live_http_server_applies_stop_sequences_with_qwen_1_5b_q8_model -- --ignored --nocapture
+```
+
+Observed result:
+
+```text
+test live_http_server_applies_stop_sequences_with_qwen_1_5b_q8_model ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 229.11s
+```
+
+This opt-in regression proves supported OpenAI `stop` sequence trimming for the
+larger local Tier 1 Qwen2.5-1.5B Q8_0 artifact across all four single-token HTTP
+shapes:
+
+- legacy completion with `stop: "\n"`;
+- streaming legacy completion with `stop: "\n"`;
+- chat completion with `stop: "你"`; and
+- streaming chat completion with `stop: "你"`.
+
+The non-streaming responses preserve generated-token usage accounting while
+returning empty visible text/content. The streaming responses suppress visible
+text/content chunks and still emit a terminal `finish_reason: "stop"` event and
+`data: [DONE]`.

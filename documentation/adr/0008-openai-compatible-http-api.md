@@ -243,3 +243,6 @@ Responses API are out of scope until explicit ADRs or plans add them.
   compatibility evidence for applying supported `stop` sequences at the server
   generation boundary for chat and legacy completions, both non-streaming and
   streaming, plus explicit opt-in real Tier 1 Qwen2.5-0.5B HTTP regressions.
+- `documentation/dev-notes/2026-06-28-openai-real-tier1-qwen-1-5b-q8-http-proof.md`
+  records matching larger-artifact Qwen2.5-1.5B Q8_0 stop-sequence evidence
+  across non-streaming and streaming completion/chat HTTP paths.
