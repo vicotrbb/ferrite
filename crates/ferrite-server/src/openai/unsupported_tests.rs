@@ -28,7 +28,7 @@ async fn chat_endpoint_rejects_tool_fields() -> Result<(), Box<dyn std::error::E
 }
 
 #[tokio::test]
-async fn chat_endpoint_rejects_response_format() -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_endpoint_rejects_json_response_format() -> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat(
         r#"{
             "model":"fixture-model",

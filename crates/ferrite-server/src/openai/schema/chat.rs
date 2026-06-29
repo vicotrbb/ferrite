@@ -1,6 +1,7 @@
 use super::{
     chat_content::ChatContent,
     neutral_options::{is_neutral_bool, is_neutral_number},
+    response_format::is_neutral_response_format,
     stop_sequences::is_neutral_stop_sequences,
     stream_options::StreamOptions,
     unix_timestamp,
@@ -90,7 +91,10 @@ impl ChatCompletionRequest {
             .with_present("tools", self.tools.is_some())
             .with_present("tool_choice", self.tool_choice.is_some())
             .with_present("parallel_tool_calls", self.parallel_tool_calls.is_some())
-            .with_present("response_format", self.response_format.is_some())
+            .with_present(
+                "response_format",
+                !is_neutral_response_format(&self.response_format),
+            )
             .with_present("temperature", !is_neutral_number(&self.temperature, 0.0))
             .with_present("top_p", !is_neutral_number(&self.top_p, 1.0))
             .with_present("n", !is_neutral_number(&self.n, 1.0))

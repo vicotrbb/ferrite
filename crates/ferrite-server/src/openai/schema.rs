@@ -6,6 +6,7 @@ mod completion;
 mod completion_prompt;
 mod completion_stream;
 mod neutral_options;
+mod response_format;
 mod stop_sequences;
 mod stream_options;
 mod stream_usage;
