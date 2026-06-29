@@ -60,3 +60,26 @@ async fn completion_endpoint_reports_unloaded_model_before_busy_queue(
         .contains("no model is loaded"));
     Ok(())
 }
+
+#[tokio::test]
+async fn streaming_completion_prompt_validation_runs_before_engine_availability(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let app = router(ServerState::new("fixture-model".to_owned()));
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/completions")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            r#"{"model":"fixture-model","prompt":["hello","again"],"stream":true,"max_tokens":1}"#,
+        ))?;
+    let response = app.oneshot(request).await?;
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let body = to_json(response.into_body()).await?;
+    assert_eq!(body["error"]["type"], "invalid_request_error");
+    assert!(body["error"]["message"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("exactly one text prompt"));
+    Ok(())
+}

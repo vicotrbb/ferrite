@@ -129,18 +129,27 @@ async fn completions(
     }
     let max_tokens =
         normalized_max_tokens(&state, request.max_tokens(), request.max_tokens_param())?;
+    let stream_prompt = if request.stream() {
+        Some(
+            request
+                .single_prompt()
+                .ok_or_else(|| {
+                    OpenAiHttpError::invalid_request(
+                        "streaming completions require exactly one text prompt",
+                    )
+                })?
+                .to_owned(),
+        )
+    } else {
+        None
+    };
     let engine = required_engine(&state)?;
     let permit = acquire_inference_permit(&state).await?;
-    if request.stream() {
-        let Some(prompt) = request.single_prompt() else {
-            return Err(OpenAiHttpError::invalid_request(
-                "streaming completions require exactly one text prompt",
-            ));
-        };
+    if let Some(prompt) = stream_prompt {
         return Ok(completion_stream_response(
             engine,
             state.model_id().to_owned(),
-            prompt.to_owned(),
+            prompt,
             max_tokens,
             request.stream_include_usage(),
             permit,
