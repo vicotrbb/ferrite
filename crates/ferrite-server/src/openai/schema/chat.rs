@@ -14,7 +14,7 @@ use super::{
     service_tier::{is_local_service_tier, response_service_tier},
     stop_sequences::is_neutral_stop_sequences,
     stream_options::StreamOptions,
-    tool_options::{is_disabled_parallel_tool_calls, is_empty_tools, is_no_tool_choice},
+    tool_options::{is_empty_tools, is_neutral_parallel_tool_calls, is_no_tool_choice},
     unix_timestamp,
     unsupported::UnsupportedFields,
     usage::Usage,
@@ -132,7 +132,7 @@ impl ChatCompletionRequest {
             .with_present("tool_choice", !is_no_tool_choice(&self.tool_choice))
             .with_present(
                 "parallel_tool_calls",
-                !is_disabled_parallel_tool_calls(&self.parallel_tool_calls),
+                !is_neutral_parallel_tool_calls(&self.parallel_tool_calls, &self.tools),
             )
             .with_present("functions", !is_empty_functions(&self.functions))
             .with_present("function_call", !is_no_function_call(&self.function_call))

@@ -155,3 +155,6 @@ Responses API are out of scope until explicit ADRs or plans add them.
   records compatibility evidence for accepting `refusal: null` on assistant
   transcript messages while keeping non-null top-level refusal metadata
   unsupported.
+- `documentation/dev-notes/2026-06-29-openai-parallel-tool-calls-without-tools.md`
+  records compatibility evidence for accepting boolean `parallel_tool_calls`
+  when no tools are configured while keeping active tool calling unsupported.
