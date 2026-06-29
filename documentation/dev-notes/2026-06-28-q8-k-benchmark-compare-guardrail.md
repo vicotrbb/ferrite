@@ -37,7 +37,7 @@ Focused verification:
 
 ```sh
 cargo test -p ferrite-cli cli_compares_q8_k_activation_matvec_for_benchmark_token_profile -- --nocapture
-cargo test -p ferrite-cli cli_compares_experimental_q8_k_activation_matvec -- --nocapture
+cargo test -p ferrite-cli cli_compares_q8_k_activation_matvec_without_changing_execution_policy -- --nocapture
 cargo test -p ferrite-cli cli_enables_experimental_q8_k_activation_matvec -- --nocapture
 ```
 
@@ -45,7 +45,7 @@ Results:
 
 ```text
 cli_compares_q8_k_activation_matvec_for_benchmark_token_profile ... ok
-cli_compares_experimental_q8_k_activation_matvec ... ok
+cli_compares_q8_k_activation_matvec_without_changing_execution_policy ... ok
 cli_enables_experimental_q8_k_activation_matvec ... ok
 ```
 

@@ -13,10 +13,15 @@ The diagnostic flag is:
 --compare-q8-k-activation-matvec
 ```
 
-It implies `--experimental-q8-k-activation-matvec` and requires a profiling mode.
-For each Q4_K/Q6_K profiled matvec, it compares the default matvec output and
-the Q8_K activation output using the same input vector, then prints max absolute
-and relative deltas.
+It requires a profiling mode. For each Q4_K/Q6_K profiled matvec, it compares
+the default matvec output and the Q8_K activation output using the same input
+vector, then prints max absolute and relative deltas.
+
+Note: the original implementation implied
+`--experimental-q8-k-activation-matvec`. The later
+`documentation/dev-notes/2026-06-29-q8-k-noninvasive-comparison.md` guardrail
+decoupled comparison from execution, so comparison-only runs now keep the main
+execution policy on `default_only` and compute the Q8_K candidate separately.
 
 ## Red-Green Evidence
 
@@ -165,7 +170,7 @@ Focused checks passed for the diagnostic implementation:
 ```sh
 cargo fmt --all -- --check
 git diff --check
-cargo test -p ferrite-cli cli_compares_experimental_q8_k_activation_matvec -- --nocapture
+cargo test -p ferrite-cli cli_compares_q8_k_activation_matvec_without_changing_execution_policy -- --nocapture
 cargo test -p ferrite-cli
 cargo test -p ferrite-inference
 cargo clippy --workspace --all-targets -- -D warnings

@@ -180,6 +180,7 @@ impl ScalarExecutionOptions {
         )
     }
 
+    #[cfg(test)]
     pub(in crate::scalar) fn q8_k_activation_matvec_for_role(
         self,
         role: Q8KActivationMatvecRole,
@@ -191,10 +192,16 @@ impl ScalarExecutionOptions {
         mut self,
         role: Q8KActivationMatvecRole,
     ) -> Self {
-        if !self.q8_k_activation_matvec_for_role(role) {
+        if !self.q8_k_activation_matvec_roles.contains(role) {
             self.q8_k_activation_matvec_policy = Q8KActivationMatvecPolicy::DefaultOnly;
             self.compare_q8_k_activation_matvec = false;
         }
+        self
+    }
+
+    pub(in crate::scalar) fn q8_k_activation_matvec_candidate(mut self) -> Self {
+        self.q8_k_activation_matvec_policy = Q8KActivationMatvecPolicy::ExperimentalParityScoped;
+        self.compare_q8_k_activation_matvec = false;
         self
     }
 

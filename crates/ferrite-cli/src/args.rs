@@ -119,7 +119,6 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
             }
             "--compare-q8-k-activation-matvec" => {
                 compare_q8_k_activation_matvec = true;
-                experimental_q8_k_activation_matvec = true;
             }
             "--help" | "-h" => {
                 return Err(io::Error::other(usage()).into());

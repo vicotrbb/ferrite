@@ -113,6 +113,9 @@ reference implementation and benchmarking baseline, not the Ferrite runtime.
   records CLI coverage for benchmark-token Q8_K comparison output.
 - `documentation/dev-notes/2026-06-28-q8-k-comparison-finite-guardrail.md`
   records fail-closed finite-value checks for Q8_K comparison metrics.
+- `documentation/dev-notes/2026-06-29-q8-k-noninvasive-comparison.md` records
+  the non-invasive comparison guardrail: comparison-only profiling keeps default
+  execution and computes the Q8_K candidate separately.
 - `documentation/dev-notes/2026-06-28-q8-k-role-scoped-policy.md` records the
   role-scoped experimental policy used to isolate Q8_K drift without temporary
   source edits.

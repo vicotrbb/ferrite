@@ -45,7 +45,7 @@ pub(super) fn profiled_mul_vec(
         nonzero_duration(elapsed),
         matrix,
     ));
-    compare_q8_k_activation_matvec(matrix, vector, label, &output, comparison_events, options)?;
+    compare_q8_k_activation_matvec(matrix, vector, label, comparison_events, options)?;
     Ok(output)
 }
 
@@ -71,7 +71,8 @@ pub(super) fn profiled_argmax_mul_vec(
     if let Some(events) = comparison_events {
         if options.compare_q8_k_activation_matvec() && is_q8_k_comparable(matrix.storage_kind()) {
             let reference = matrix.mul_vec(vector)?;
-            let candidate = matrix.mul_vec_with_options(vector, options)?;
+            let candidate =
+                matrix.mul_vec_with_options(vector, options.q8_k_activation_matvec_candidate())?;
             events.push(ScalarMatVecComparison::new(
                 label, matrix, &reference, &candidate,
             )?);
@@ -84,7 +85,6 @@ fn compare_q8_k_activation_matvec(
     matrix: &Matrix,
     vector: &[f32],
     label: &str,
-    candidate: &[f32],
     comparison_events: Option<&mut Vec<ScalarMatVecComparison>>,
     options: ScalarExecutionOptions,
 ) -> Result<(), InferenceError> {
@@ -96,8 +96,10 @@ fn compare_q8_k_activation_matvec(
     }
 
     let reference = matrix.mul_vec(vector)?;
+    let candidate =
+        matrix.mul_vec_with_options(vector, options.q8_k_activation_matvec_candidate())?;
     events.push(ScalarMatVecComparison::new(
-        label, matrix, &reference, candidate,
+        label, matrix, &reference, &candidate,
     )?);
     Ok(())
 }

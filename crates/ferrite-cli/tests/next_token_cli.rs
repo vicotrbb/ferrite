@@ -98,7 +98,8 @@ fn cli_enables_experimental_q8_k_activation_matvec() -> Result<(), Box<dyn Error
 }
 
 #[test]
-fn cli_compares_experimental_q8_k_activation_matvec() -> Result<(), Box<dyn Error>> {
+fn cli_compares_q8_k_activation_matvec_without_changing_execution_policy(
+) -> Result<(), Box<dyn Error>> {
     let model_path = write_q4_k_fixture_model()?;
     let binary = cli_binary()?;
 
@@ -119,7 +120,9 @@ fn cli_compares_experimental_q8_k_activation_matvec() -> Result<(), Box<dyn Erro
         String::from_utf8_lossy(&output.stderr)
     );
     let stdout = String::from_utf8(output.stdout)?;
+    assert!(stdout.contains("experimental_q8_k_activation_matvec=false"));
     assert!(stdout.contains("compare_q8_k_activation_matvec=true"));
+    assert!(stdout.contains("q8_k_activation_matvec_policy=default_only"));
     assert!(stdout.contains("profile_next_token_q8_k_compare=layer.0.q_proj:"));
     Ok(())
 }
