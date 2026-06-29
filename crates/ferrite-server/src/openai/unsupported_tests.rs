@@ -824,6 +824,25 @@ async fn chat_endpoint_rejects_malformed_max_completion_tokens(
 }
 
 #[tokio::test]
+async fn chat_endpoint_rejects_malformed_stream_flag() -> Result<(), Box<dyn std::error::Error>> {
+    let body = post_chat(
+        r#"{
+            "model":"fixture-model",
+            "messages":[{"role":"user","content":"hello"}],
+            "stream":"yes"
+        }"#,
+    )
+    .await?;
+
+    assert_eq!(body.status, StatusCode::BAD_REQUEST);
+    assert_eq!(body.json["error"]["type"], "invalid_request_error");
+    let message = body.json["error"]["message"].as_str().unwrap_or_default();
+    assert!(message.contains("stream"), "{message}");
+    assert!(!message.contains("malformed JSON"), "{message}");
+    Ok(())
+}
+
+#[tokio::test]
 async fn chat_endpoint_rejects_unknown_fields() -> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat(
         r#"{
@@ -1008,6 +1027,26 @@ async fn completion_endpoint_rejects_malformed_max_tokens() -> Result<(), Box<dy
     assert_eq!(body.json["error"]["type"], "invalid_request_error");
     let message = body.json["error"]["message"].as_str().unwrap_or_default();
     assert!(message.contains("max_tokens"), "{message}");
+    assert!(!message.contains("malformed JSON"), "{message}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn completion_endpoint_rejects_malformed_stream_flag(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let body = post_completion(
+        r#"{
+            "model":"fixture-model",
+            "prompt":"hello",
+            "stream":"yes"
+        }"#,
+    )
+    .await?;
+
+    assert_eq!(body.status, StatusCode::BAD_REQUEST);
+    assert_eq!(body.json["error"]["type"], "invalid_request_error");
+    let message = body.json["error"]["message"].as_str().unwrap_or_default();
+    assert!(message.contains("stream"), "{message}");
     assert!(!message.contains("malformed JSON"), "{message}");
     Ok(())
 }

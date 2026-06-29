@@ -15,6 +15,7 @@ use super::{
     seed::is_seed,
     service_tier::{is_local_service_tier, response_service_tier},
     stop_sequences::is_neutral_stop_sequences,
+    stream_flag::StreamFlag,
     stream_options::StreamOptions,
     token_limit::RequestTokenLimit,
     tool_options::{is_empty_tools, is_neutral_parallel_tool_calls, is_no_tool_choice},
@@ -35,7 +36,7 @@ pub struct ChatCompletionRequest {
     #[serde(default, deserialize_with = "deserialize_chat_messages")]
     messages: Vec<ChatMessage>,
     #[serde(default)]
-    stream: bool,
+    stream: StreamFlag,
     #[serde(default)]
     max_tokens: RequestTokenLimit,
     #[serde(default)]
@@ -114,7 +115,7 @@ impl ChatCompletionRequest {
     }
 
     pub fn stream(&self) -> bool {
-        self.stream
+        self.stream.value()
     }
 
     pub fn max_tokens(&self) -> Option<usize> {
@@ -153,6 +154,7 @@ impl ChatCompletionRequest {
             .with_present("prediction", self.prediction.is_some())
             .with_present("verbosity", self.verbosity.is_some())
             .with_present("web_search_options", self.web_search_options.is_some())
+            .with_present("stream", self.stream.is_malformed())
             .with_present("max_tokens", self.max_tokens.is_malformed())
             .with_present(
                 "max_completion_tokens",
@@ -193,7 +195,7 @@ impl ChatCompletionRequest {
             .with_extra_keys(&self.extra_fields)
             .into_vec();
         if let Some(stream_options) = &self.stream_options {
-            if !self.stream {
+            if !self.stream() {
                 fields.push("stream_options".to_owned());
             } else {
                 fields.extend(stream_options.unsupported_request_fields());

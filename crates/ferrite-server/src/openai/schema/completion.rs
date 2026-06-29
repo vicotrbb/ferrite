@@ -5,6 +5,7 @@ use super::{
     neutral_options::{is_neutral_bool, is_neutral_number},
     seed::is_seed,
     stop_sequences::is_neutral_stop_sequences,
+    stream_flag::StreamFlag,
     stream_options::StreamOptions,
     token_limit::RequestTokenLimit,
     unix_timestamp,
@@ -24,7 +25,7 @@ pub struct CompletionRequest {
     #[serde(default)]
     prompt: CompletionPrompt,
     #[serde(default)]
-    stream: bool,
+    stream: StreamFlag,
     #[serde(default)]
     max_tokens: RequestTokenLimit,
     #[serde(default)]
@@ -73,7 +74,7 @@ impl CompletionRequest {
     }
 
     pub fn stream(&self) -> bool {
-        self.stream
+        self.stream.value()
     }
 
     pub fn max_tokens(&self) -> Option<usize> {
@@ -89,6 +90,7 @@ impl CompletionRequest {
     pub fn unsupported_fields(&self) -> Vec<String> {
         let mut fields = UnsupportedFields::new()
             .with_present("prompt", self.prompt.has_unsupported_form())
+            .with_present("stream", self.stream.is_malformed())
             .with_present("max_tokens", self.max_tokens.is_malformed())
             .with_present("suffix", self.suffix.is_some())
             .with_present("temperature", !is_neutral_number(&self.temperature, 0.0))
@@ -112,7 +114,7 @@ impl CompletionRequest {
             .with_extra_keys(&self.extra_fields)
             .into_vec();
         if let Some(stream_options) = &self.stream_options {
-            if !self.stream {
+            if !self.stream() {
                 fields.push("stream_options".to_owned());
             } else {
                 fields.extend(stream_options.unsupported_request_fields());
