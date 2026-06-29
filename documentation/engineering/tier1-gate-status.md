@@ -72,6 +72,10 @@ same OpenAI-compatible server paths now also have local three-request
 queue-probe RSS samples for Q8_0 and Q6_K. The full Tier 1 throughput gate
 remains open because broader models, quantizations, prompts, x86_64 throughput,
 full-tier memory posture, and HTTP throughput are not yet proven.
+The Qwen2.5-1.5B Q8_0 OpenAI-compatible HTTP path now also has a debug
+test-profile throughput harness check for three sequential one-token legacy
+completion requests and three queued one-token legacy completion requests. This
+is harness evidence, not a release throughput pass.
 
 The OpenAI-compatible HTTP server now has opt-in real Tier 1 coverage for
 Qwen2.5-0.5B Q4_K_M through legacy completions, streaming legacy completions,
