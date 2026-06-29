@@ -84,6 +84,7 @@ async fn chat_completions(
     Ok(Json(ChatCompletionResponse::from_generation(
         state.model_id().to_owned(),
         generated,
+        request.response_service_tier(),
     ))
     .into_response())
 }

@@ -13,6 +13,7 @@ mod prompt_cache_key;
 mod reasoning_effort;
 mod response_format;
 mod safety_identifier;
+mod service_tier;
 mod stop_sequences;
 mod stream_options;
 mod stream_usage;

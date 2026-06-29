@@ -8,6 +8,7 @@ use super::{
     reasoning_effort::is_no_reasoning_effort,
     response_format::is_neutral_response_format,
     safety_identifier::is_safety_identifier,
+    service_tier::{is_local_service_tier, response_service_tier},
     stop_sequences::is_neutral_stop_sequences,
     stream_options::StreamOptions,
     tool_options::{is_disabled_parallel_tool_calls, is_empty_tools, is_no_tool_choice},
@@ -79,6 +80,8 @@ pub struct ChatCompletionRequest {
     safety_identifier: Option<Value>,
     #[serde(default)]
     reasoning_effort: Option<Value>,
+    #[serde(default)]
+    service_tier: Option<Value>,
     #[serde(default, flatten)]
     extra_fields: BTreeMap<String, Value>,
 }
@@ -104,6 +107,10 @@ impl ChatCompletionRequest {
         self.stream_options
             .as_ref()
             .is_some_and(StreamOptions::include_usage)
+    }
+
+    pub fn response_service_tier(&self) -> Option<&'static str> {
+        response_service_tier(&self.service_tier)
     }
 
     pub fn unsupported_fields(&self) -> Vec<String> {
@@ -152,6 +159,7 @@ impl ChatCompletionRequest {
                 "reasoning_effort",
                 !is_no_reasoning_effort(&self.reasoning_effort),
             )
+            .with_present("service_tier", !is_local_service_tier(&self.service_tier))
             .with_extra_keys(&self.extra_fields)
             .into_vec();
         if let Some(stream_options) = &self.stream_options {
@@ -212,10 +220,16 @@ pub struct ChatCompletionResponse {
     model: String,
     choices: Vec<ChatCompletionChoice>,
     usage: Usage,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    service_tier: Option<&'static str>,
 }
 
 impl ChatCompletionResponse {
-    pub fn from_generation(model: String, generated: GeneratedText) -> Self {
+    pub fn from_generation(
+        model: String,
+        generated: GeneratedText,
+        service_tier: Option<&'static str>,
+    ) -> Self {
         let created = unix_timestamp();
         Self {
             id: format!("chatcmpl-ferrite-{created}"),
@@ -224,6 +238,7 @@ impl ChatCompletionResponse {
             model,
             choices: vec![ChatCompletionChoice::new(generated.text().to_owned())],
             usage: Usage::from_generation(&generated),
+            service_tier,
         }
     }
 }
