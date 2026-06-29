@@ -1,6 +1,12 @@
-use axum::body::{to_bytes, Body};
+use super::routes::router;
+use crate::state::ServerState;
+use axum::{
+    body::{to_bytes, Body},
+    http::{Request, StatusCode},
+};
 use serde_json::Value;
 use std::sync::atomic::{AtomicU64, Ordering};
+use tower::ServiceExt;
 
 static FIXTURE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -11,6 +17,27 @@ pub(super) async fn to_json(body: Body) -> Result<Value, Box<dyn std::error::Err
 pub(super) async fn to_text(body: Body) -> Result<String, Box<dyn std::error::Error>> {
     let bytes = to_bytes(body, usize::MAX).await?;
     Ok(String::from_utf8(bytes.to_vec())?)
+}
+
+pub(super) struct JsonResponse {
+    pub status: StatusCode,
+    pub json: Value,
+}
+
+pub(super) async fn post_chat_json(
+    payload: &str,
+) -> Result<JsonResponse, Box<dyn std::error::Error>> {
+    let app = router(ServerState::new("fixture-model".to_owned()));
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/chat/completions")
+        .header("content-type", "application/json")
+        .body(Body::from(payload.to_owned()))?;
+    let response = app.oneshot(request).await?;
+    let status = response.status();
+    let json = to_json(response.into_body()).await?;
+
+    Ok(JsonResponse { status, json })
 }
 
 pub(super) fn write_fixture_model() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
