@@ -19,6 +19,8 @@ mod chat_message_validation_tests;
 #[cfg(test)]
 mod chat_option_tests;
 #[cfg(test)]
+mod completion_option_tests;
+#[cfg(test)]
 mod completion_unsupported_tests;
 #[cfg(test)]
 mod health_tests;
