@@ -5,7 +5,7 @@ use super::{
     model_id::deserialize_model_id,
     neutral_options::{is_neutral_bool, is_neutral_number, is_neutral_number_in},
     seed::is_seed,
-    stop_sequences::is_neutral_stop_sequences,
+    stop_sequences::{is_supported_stop_sequences, stop_sequences},
     stream_flag::StreamFlag,
     stream_options::StreamOptions,
     token_limit::RequestTokenLimit,
@@ -92,6 +92,10 @@ impl CompletionRequest {
             .is_some_and(StreamOptions::include_usage)
     }
 
+    pub fn stop_sequences(&self) -> Vec<String> {
+        stop_sequences(&self.stop)
+    }
+
     pub fn unsupported_fields(&self) -> Vec<String> {
         let mut fields = UnsupportedFields::new()
             .with_present("prompt", self.prompt.has_unsupported_form())
@@ -106,7 +110,7 @@ impl CompletionRequest {
             .with_present("n", !is_neutral_number(&self.n, 1.0))
             .with_present("logprobs", self.logprobs.is_some())
             .with_present("echo", !is_neutral_bool(&self.echo, false))
-            .with_present("stop", !is_neutral_stop_sequences(&self.stop))
+            .with_present("stop", !is_supported_stop_sequences(&self.stop))
             .with_present(
                 "presence_penalty",
                 !is_neutral_number(&self.presence_penalty, 0.0),

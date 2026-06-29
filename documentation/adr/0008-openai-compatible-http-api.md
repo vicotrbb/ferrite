@@ -239,3 +239,7 @@ Responses API are out of scope until explicit ADRs or plans add them.
 - `documentation/dev-notes/2026-06-29-openai-route-not-found.md` records
   compatibility evidence for returning OpenAI-shaped JSON error bodies when
   clients probe unsupported OpenAI route paths.
+- `documentation/dev-notes/2026-06-29-openai-stop-sequences.md` records
+  compatibility evidence for applying supported `stop` sequences at the server
+  generation boundary for chat and legacy completions, both non-streaming and
+  streaming.

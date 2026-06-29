@@ -15,7 +15,7 @@ use super::{
     safety_identifier::is_safety_identifier,
     seed::is_seed,
     service_tier::{is_local_service_tier, response_service_tier},
-    stop_sequences::is_neutral_stop_sequences,
+    stop_sequences::{is_supported_stop_sequences, stop_sequences},
     stream_flag::StreamFlag,
     stream_options::StreamOptions,
     token_limit::RequestTokenLimit,
@@ -145,6 +145,10 @@ impl ChatCompletionRequest {
         response_service_tier(&self.service_tier)
     }
 
+    pub fn stop_sequences(&self) -> Vec<String> {
+        stop_sequences(&self.stop)
+    }
+
     pub fn unsupported_fields(&self) -> Vec<String> {
         let mut fields = UnsupportedFields::new()
             .with_present("tools", !is_empty_tools(&self.tools))
@@ -177,7 +181,7 @@ impl ChatCompletionRequest {
             )
             .with_present("top_p", !is_neutral_number(&self.top_p, 1.0))
             .with_present("n", !is_neutral_number(&self.n, 1.0))
-            .with_present("stop", !is_neutral_stop_sequences(&self.stop))
+            .with_present("stop", !is_supported_stop_sequences(&self.stop))
             .with_present(
                 "presence_penalty",
                 !is_neutral_number(&self.presence_penalty, 0.0),

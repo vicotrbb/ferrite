@@ -1,6 +1,9 @@
 use super::{
     error::OpenAiHttpError,
-    generation::{chat_stream_response, completion_stream_response, generate_text, generate_texts},
+    generation::{
+        chat_stream_response, completion_stream_response, generate_text, generate_texts,
+        ChatStreamOptions, CompletionStreamOptions,
+    },
     json::OpenAiJson,
     prompt::render_chat_prompt,
     schema::{
@@ -91,12 +94,22 @@ async fn chat_completions(
             state.model_id().to_owned(),
             prompt,
             max_tokens,
-            request.stream_include_usage(),
-            request.response_service_tier(),
+            ChatStreamOptions::new(
+                request.stop_sequences(),
+                request.stream_include_usage(),
+                request.response_service_tier(),
+            ),
             permit,
         ));
     }
-    let generated = generate_text(Some(engine), prompt, max_tokens, permit).await?;
+    let generated = generate_text(
+        Some(engine),
+        prompt,
+        max_tokens,
+        request.stop_sequences(),
+        permit,
+    )
+    .await?;
     Ok(Json(ChatCompletionResponse::from_generation(
         state.model_id().to_owned(),
         generated,
@@ -151,12 +164,18 @@ async fn completions(
             state.model_id().to_owned(),
             prompt,
             max_tokens,
-            request.stream_include_usage(),
+            CompletionStreamOptions::new(request.stop_sequences(), request.stream_include_usage()),
             permit,
         ));
     }
-    let generated =
-        generate_texts(Some(engine), request.prompts().to_vec(), max_tokens, permit).await?;
+    let generated = generate_texts(
+        Some(engine),
+        request.prompts().to_vec(),
+        max_tokens,
+        request.stop_sequences(),
+        permit,
+    )
+    .await?;
     Ok(Json(CompletionResponse::from_generations(
         state.model_id().to_owned(),
         generated,

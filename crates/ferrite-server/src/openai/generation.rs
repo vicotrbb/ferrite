@@ -7,21 +7,59 @@ use axum::response::Response;
 use std::sync::{Arc, Mutex};
 use tokio::sync::OwnedSemaphorePermit;
 
+pub(super) struct CompletionStreamOptions {
+    stop_sequences: Vec<String>,
+    include_usage: bool,
+}
+
+impl CompletionStreamOptions {
+    pub(super) fn new(stop_sequences: Vec<String>, include_usage: bool) -> Self {
+        Self {
+            stop_sequences,
+            include_usage,
+        }
+    }
+}
+
+pub(super) struct ChatStreamOptions {
+    stop_sequences: Vec<String>,
+    include_usage: bool,
+    service_tier: Option<&'static str>,
+}
+
+impl ChatStreamOptions {
+    pub(super) fn new(
+        stop_sequences: Vec<String>,
+        include_usage: bool,
+        service_tier: Option<&'static str>,
+    ) -> Self {
+        Self {
+            stop_sequences,
+            include_usage,
+            service_tier,
+        }
+    }
+}
+
 pub(super) fn completion_stream_response(
     engine: Arc<Mutex<crate::runtime::InferenceEngine>>,
     model: String,
     prompt: String,
     max_tokens: usize,
-    include_usage: bool,
+    options: CompletionStreamOptions,
     permit: OwnedSemaphorePermit,
 ) -> Response {
+    let include_usage = options.include_usage;
     let context = CompletionStreamContext::new(model).with_usage_field(include_usage);
     let token_context = context.clone();
     stream_generated_text(
-        engine,
-        prompt,
-        max_tokens,
-        Vec::new(),
+        StreamGenerationInput::new(
+            engine,
+            prompt,
+            max_tokens,
+            options.stop_sequences,
+            Vec::new(),
+        ),
         move |piece| token_context.token(piece.to_owned()),
         move |generated| {
             let mut chunks = vec![context.stop()];
@@ -39,19 +77,22 @@ pub(super) fn chat_stream_response(
     model: String,
     prompt: String,
     max_tokens: usize,
-    include_usage: bool,
-    service_tier: Option<&'static str>,
+    options: ChatStreamOptions,
     permit: OwnedSemaphorePermit,
 ) -> Response {
+    let include_usage = options.include_usage;
     let context = ChatCompletionStreamContext::new(model)
         .with_usage_field(include_usage)
-        .with_service_tier(service_tier);
+        .with_service_tier(options.service_tier);
     let token_context = context.clone();
     stream_generated_text(
-        engine,
-        prompt,
-        max_tokens,
-        vec![context.role()],
+        StreamGenerationInput::new(
+            engine,
+            prompt,
+            max_tokens,
+            options.stop_sequences,
+            vec![context.role()],
+        ),
         move |piece| token_context.token(piece.to_owned()),
         move |generated| {
             let mut chunks = vec![context.stop()];
@@ -64,11 +105,34 @@ pub(super) fn chat_stream_response(
     )
 }
 
-fn stream_generated_text<T>(
+struct StreamGenerationInput<T> {
     engine: Arc<Mutex<crate::runtime::InferenceEngine>>,
     prompt: String,
     max_tokens: usize,
+    stop_sequences: Vec<String>,
     initial_chunks: Vec<T>,
+}
+
+impl<T> StreamGenerationInput<T> {
+    fn new(
+        engine: Arc<Mutex<crate::runtime::InferenceEngine>>,
+        prompt: String,
+        max_tokens: usize,
+        stop_sequences: Vec<String>,
+        initial_chunks: Vec<T>,
+    ) -> Self {
+        Self {
+            engine,
+            prompt,
+            max_tokens,
+            stop_sequences,
+            initial_chunks,
+        }
+    }
+}
+
+fn stream_generated_text<T>(
+    input: StreamGenerationInput<T>,
     mut token_chunk: impl FnMut(&str) -> T + Send + 'static,
     final_chunks: impl FnOnce(&crate::runtime::GeneratedText) -> Vec<T> + Send + 'static,
     permit: OwnedSemaphorePermit,
@@ -80,20 +144,29 @@ where
     tokio::task::spawn_blocking(move || {
         let _permit = permit;
         let result = (|| -> Result<(), OpenAiHttpError> {
-            for chunk in initial_chunks {
+            for chunk in input.initial_chunks {
                 sender.send_json_blocking(&chunk)?;
             }
-            let engine = engine
+            let mut stop_filter = StopSequenceFilter::new(input.stop_sequences);
+            let engine = input
+                .engine
                 .lock()
                 .map_err(|_| OpenAiHttpError::internal("inference engine lock is poisoned"))?;
             let generated = engine
-                .generate_with_token_callback(&prompt, max_tokens, |piece| {
-                    sender
-                        .send_json_blocking(&token_chunk(piece))
-                        .map_err(|error| crate::runtime::RuntimeError::new(error.to_string()))?;
+                .generate_with_token_callback(&input.prompt, input.max_tokens, |piece| {
+                    for visible_piece in stop_filter.push(piece) {
+                        sender
+                            .send_json_blocking(&token_chunk(&visible_piece))
+                            .map_err(|error| {
+                                crate::runtime::RuntimeError::new(error.to_string())
+                            })?;
+                    }
                     Ok(())
                 })
                 .map_err(|error| OpenAiHttpError::internal(error.to_string()))?;
+            for visible_piece in stop_filter.finish() {
+                sender.send_json_blocking(&token_chunk(&visible_piece))?;
+            }
             for chunk in final_chunks(&generated) {
                 sender.send_json_blocking(&chunk)?;
             }
@@ -110,9 +183,11 @@ pub(super) async fn generate_text(
     engine: Option<Arc<Mutex<crate::runtime::InferenceEngine>>>,
     prompt: String,
     max_tokens: usize,
+    stop_sequences: Vec<String>,
     permit: OwnedSemaphorePermit,
 ) -> Result<crate::runtime::GeneratedText, OpenAiHttpError> {
-    let mut generated = generate_texts(engine, vec![prompt], max_tokens, permit).await?;
+    let mut generated =
+        generate_texts(engine, vec![prompt], max_tokens, stop_sequences, permit).await?;
     generated
         .pop()
         .ok_or_else(|| OpenAiHttpError::internal("inference did not return a completion"))
@@ -122,6 +197,7 @@ pub(super) async fn generate_texts(
     engine: Option<Arc<Mutex<crate::runtime::InferenceEngine>>>,
     prompts: Vec<String>,
     max_tokens: usize,
+    stop_sequences: Vec<String>,
     permit: OwnedSemaphorePermit,
 ) -> Result<Vec<crate::runtime::GeneratedText>, OpenAiHttpError> {
     let Some(engine) = engine else {
@@ -140,10 +216,87 @@ pub(super) async fn generate_texts(
             .map(|prompt| {
                 engine
                     .generate(prompt, max_tokens)
+                    .map(|generated| apply_stop_sequences(generated, &stop_sequences))
                     .map_err(|error| OpenAiHttpError::internal(error.to_string()))
             })
             .collect()
     })
     .await
     .map_err(|error| OpenAiHttpError::internal(format!("inference task failed: {error}")))?
+}
+
+fn apply_stop_sequences(
+    generated: crate::runtime::GeneratedText,
+    stop_sequences: &[String],
+) -> crate::runtime::GeneratedText {
+    let Some(stop_index) = first_stop_index(generated.text(), stop_sequences) else {
+        return generated;
+    };
+    let text = generated.text()[..stop_index].to_owned();
+    let token_texts = if text.is_empty() {
+        Vec::new()
+    } else {
+        vec![text.clone()]
+    };
+    crate::runtime::GeneratedText::new(
+        text,
+        generated.prompt_tokens(),
+        generated.completion_tokens(),
+        token_texts,
+    )
+}
+
+fn first_stop_index(text: &str, stop_sequences: &[String]) -> Option<usize> {
+    stop_sequences
+        .iter()
+        .filter(|stop| !stop.is_empty())
+        .filter_map(|stop| text.find(stop))
+        .min()
+}
+
+struct StopSequenceFilter {
+    stop_sequences: Vec<String>,
+    pending: String,
+    stopped: bool,
+}
+
+impl StopSequenceFilter {
+    fn new(stop_sequences: Vec<String>) -> Self {
+        Self {
+            stop_sequences,
+            pending: String::new(),
+            stopped: false,
+        }
+    }
+
+    fn push(&mut self, piece: &str) -> Vec<String> {
+        if self.stopped {
+            return Vec::new();
+        }
+        if self.stop_sequences.is_empty() {
+            return vec![piece.to_owned()];
+        }
+
+        self.pending.push_str(piece);
+        if let Some(stop_index) = first_stop_index(&self.pending, &self.stop_sequences) {
+            let visible = self.pending[..stop_index].to_owned();
+            self.pending.clear();
+            self.stopped = true;
+            if visible.is_empty() {
+                Vec::new()
+            } else {
+                vec![visible]
+            }
+        } else {
+            Vec::new()
+        }
+    }
+
+    fn finish(self) -> Vec<String> {
+        if self.stopped || self.pending.is_empty() {
+            Vec::new()
+        } else {
+            vec![self.pending]
+        }
+    }
 }

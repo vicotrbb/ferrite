@@ -29,6 +29,8 @@ mod routes_tests;
 #[cfg(test)]
 mod service_tier_tests;
 #[cfg(test)]
+mod stop_sequences_tests;
+#[cfg(test)]
 mod stream_options_tests;
 #[cfg(test)]
 mod test_support;
