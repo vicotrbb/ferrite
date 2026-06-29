@@ -697,6 +697,7 @@ async fn chat_endpoint_rejects_sampling_parameters() -> Result<(), Box<dyn std::
 
     assert_eq!(body.status, StatusCode::BAD_REQUEST);
     assert_eq!(body.json["error"]["type"], "invalid_request_error");
+    assert_eq!(body.json["error"]["param"], "temperature");
     assert!(body.json["error"]["message"]
         .as_str()
         .unwrap_or_default()
@@ -942,6 +943,7 @@ async fn completion_endpoint_rejects_logprobs_request() -> Result<(), Box<dyn st
 
     assert_eq!(body.status, StatusCode::BAD_REQUEST);
     assert_eq!(body.json["error"]["type"], "invalid_request_error");
+    assert_eq!(body.json["error"]["param"], "logprobs");
     assert!(body.json["error"]["message"]
         .as_str()
         .unwrap_or_default()

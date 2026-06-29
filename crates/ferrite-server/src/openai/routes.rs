@@ -152,10 +152,10 @@ fn ensure_supported_completion_request(request: &CompletionRequest) -> Result<()
         return Ok(());
     }
 
-    Err(OpenAiHttpError::invalid_request(format!(
-        "unsupported completion field(s): {}",
-        unsupported.join(", ")
-    )))
+    Err(unsupported_field_error(
+        "unsupported completion field(s)",
+        &unsupported,
+    ))
 }
 
 fn ensure_authorized(state: &ServerState, headers: &HeaderMap) -> Result<(), OpenAiHttpError> {
@@ -187,10 +187,18 @@ fn ensure_supported_chat_request(request: &ChatCompletionRequest) -> Result<(), 
         return Ok(());
     }
 
-    Err(OpenAiHttpError::invalid_request(format!(
-        "unsupported chat completion field(s): {}",
-        unsupported.join(", ")
-    )))
+    Err(unsupported_field_error(
+        "unsupported chat completion field(s)",
+        &unsupported,
+    ))
+}
+
+fn unsupported_field_error(label: &str, unsupported: &[String]) -> OpenAiHttpError {
+    let message = format!("{label}: {}", unsupported.join(", "));
+    match unsupported {
+        [field] => OpenAiHttpError::invalid_request_with_param(message, field),
+        _ => OpenAiHttpError::invalid_request(message),
+    }
 }
 
 fn ensure_model(state: &ServerState, requested_model: &str) -> Result<(), OpenAiHttpError> {

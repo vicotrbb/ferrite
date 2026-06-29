@@ -37,6 +37,11 @@ impl OpenAiErrorBody {
             code: Some(code.into()),
         }
     }
+
+    pub fn with_param(mut self, param: impl Into<String>) -> Self {
+        self.param = Some(param.into());
+        self
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -61,6 +66,18 @@ impl OpenAiHttpError {
         Self {
             status: StatusCode::BAD_REQUEST,
             body: OpenAiErrorResponse::new(OpenAiErrorBody::new(message, "invalid_request_error")),
+        }
+    }
+
+    pub fn invalid_request_with_param(
+        message: impl Into<String>,
+        param: impl Into<String>,
+    ) -> Self {
+        Self {
+            status: StatusCode::BAD_REQUEST,
+            body: OpenAiErrorResponse::new(
+                OpenAiErrorBody::new(message, "invalid_request_error").with_param(param),
+            ),
         }
     }
 

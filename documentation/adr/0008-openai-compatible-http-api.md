@@ -230,3 +230,6 @@ Responses API are out of scope until explicit ADRs or plans add them.
   compatibility evidence for including the normalized local `service_tier`
   value on streamed chat completion chunks when the request sets a supported
   service tier.
+- `documentation/dev-notes/2026-06-29-openai-single-field-error-param.md`
+  records compatibility evidence for filling `error.param` when unsupported
+  request validation rejects exactly one field.
