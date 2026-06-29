@@ -11,6 +11,74 @@ use tower::ServiceExt;
 static FIXTURE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[tokio::test]
+async fn completions_endpoint_returns_openai_choice_shape() -> Result<(), Box<dyn std::error::Error>>
+{
+    let model_path = write_completion_fixture_model()?;
+    let engine = InferenceEngine::load(&model_path)?;
+    let app = router(ServerState::with_engine("fixture-model".to_owned(), engine));
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/completions")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            r#"{"model":"fixture-model","prompt":"hello","max_tokens":1}"#,
+        ))?;
+    let response = app.oneshot(request).await?;
+    remove_fixture_model(&model_path)?;
+
+    let status = response.status();
+    let body = to_json(response.into_body()).await?;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_null_system_fingerprint(&body)?;
+
+    let choice = body["choices"][0]
+        .as_object()
+        .ok_or("expected completion choice object")?;
+    assert!(choice.contains_key("logprobs"), "{body}");
+    assert!(choice["logprobs"].is_null(), "{body}");
+    assert_eq!(choice["text"], "winner");
+    assert_usage_has_detail_counters(&body["usage"])?;
+    Ok(())
+}
+
+#[tokio::test]
+async fn completions_stream_endpoint_returns_openai_choice_shape(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let model_path = write_completion_fixture_model()?;
+    let engine = InferenceEngine::load(&model_path)?;
+    let app = router(ServerState::with_engine("fixture-model".to_owned(), engine));
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/completions")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            r#"{"model":"fixture-model","prompt":"hello","max_tokens":1,"stream":true}"#,
+        ))?;
+    let response = app.oneshot(request).await?;
+    remove_fixture_model(&model_path)?;
+
+    let status = response.status();
+    let body = to_text(response.into_body()).await?;
+    assert_eq!(status, StatusCode::OK, "{body}");
+
+    let events = json_sse_events(&body)?;
+    let token_event = events
+        .iter()
+        .find(|event| event["choices"][0]["text"] == "winner")
+        .ok_or("expected token event")?;
+    assert_null_system_fingerprint(token_event)?;
+    assert_choice_has_null_logprobs(token_event)?;
+
+    let stop_event = events
+        .iter()
+        .find(|event| event["choices"][0]["finish_reason"] == "stop")
+        .ok_or("expected stop event")?;
+    assert_null_system_fingerprint(stop_event)?;
+    assert_choice_has_null_logprobs(stop_event)?;
+    Ok(())
+}
+
+#[tokio::test]
 async fn chat_endpoint_returns_openai_message_shape() -> Result<(), Box<dyn std::error::Error>> {
     let model_path = write_chat_fixture_model()?;
     let engine = InferenceEngine::load(&model_path)?;
@@ -152,17 +220,24 @@ fn assert_usage_has_detail_counters(usage: &Value) -> Result<(), Box<dyn std::er
     Ok(())
 }
 
+fn write_completion_fixture_model() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+    write_fixture_model_bytes(ferrite_fixtures::scalar_llama_f32_gguf_fixture())
+}
+
 fn write_chat_fixture_model() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+    write_fixture_model_bytes(ferrite_fixtures::scalar_llama_chat_f32_gguf_fixture())
+}
+
+fn write_fixture_model_bytes(
+    bytes: Vec<u8>,
+) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
     let mut path = std::env::temp_dir();
     path.push(format!(
         "ferrite-server-response-shape-fixture-{}-{}.gguf",
         std::process::id(),
         FIXTURE_COUNTER.fetch_add(1, Ordering::Relaxed)
     ));
-    std::fs::write(
-        &path,
-        ferrite_fixtures::scalar_llama_chat_f32_gguf_fixture(),
-    )?;
+    std::fs::write(&path, bytes)?;
     Ok(path)
 }
 

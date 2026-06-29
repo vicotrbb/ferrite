@@ -122,6 +122,7 @@ pub struct CompletionResponse {
     object: &'static str,
     created: u64,
     model: String,
+    system_fingerprint: Option<String>,
     choices: Vec<CompletionChoice>,
     usage: Usage,
 }
@@ -138,6 +139,7 @@ impl CompletionResponse {
             object: "text_completion",
             created,
             model,
+            system_fingerprint: None,
             choices: generated
                 .iter()
                 .enumerate()
@@ -152,6 +154,7 @@ impl CompletionResponse {
 struct CompletionChoice {
     text: String,
     index: usize,
+    logprobs: Option<Value>,
     finish_reason: &'static str,
 }
 
@@ -160,6 +163,7 @@ impl CompletionChoice {
         Self {
             text,
             index,
+            logprobs: None,
             finish_reason: "stop",
         }
     }

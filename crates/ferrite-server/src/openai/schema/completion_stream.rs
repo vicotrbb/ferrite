@@ -1,6 +1,7 @@
 use super::{stream_usage::StreamUsage, unix_timestamp, usage::Usage};
 use crate::runtime::GeneratedText;
 use serde::Serialize;
+use serde_json::Value;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct CompletionStreamChunk {
@@ -8,6 +9,7 @@ pub struct CompletionStreamChunk {
     object: &'static str,
     created: u64,
     model: String,
+    system_fingerprint: Option<String>,
     choices: Vec<CompletionStreamChoice>,
     #[serde(skip_serializing_if = "Option::is_none")]
     usage: Option<StreamUsage>,
@@ -43,6 +45,7 @@ impl CompletionStreamContext {
             object: "text_completion",
             created: self.created,
             model: self.model.clone(),
+            system_fingerprint: None,
             choices: vec![CompletionStreamChoice::content(text)],
             usage: self.null_usage(),
         }
@@ -54,6 +57,7 @@ impl CompletionStreamContext {
             object: "text_completion",
             created: self.created,
             model: self.model.clone(),
+            system_fingerprint: None,
             choices: vec![CompletionStreamChoice::stop()],
             usage: self.null_usage(),
         }
@@ -65,6 +69,7 @@ impl CompletionStreamContext {
             object: "text_completion",
             created: self.created,
             model: self.model.clone(),
+            system_fingerprint: None,
             choices: Vec::new(),
             usage: Some(StreamUsage::value(Usage::from_generation(generated))),
         }
@@ -91,6 +96,7 @@ impl CompletionStreamChunk {
 struct CompletionStreamChoice {
     text: String,
     index: usize,
+    logprobs: Option<Value>,
     finish_reason: Option<&'static str>,
 }
 
@@ -99,6 +105,7 @@ impl CompletionStreamChoice {
         Self {
             text,
             index: 0,
+            logprobs: None,
             finish_reason: None,
         }
     }
@@ -107,6 +114,7 @@ impl CompletionStreamChoice {
         Self {
             text: String::new(),
             index: 0,
+            logprobs: None,
             finish_reason: Some("stop"),
         }
     }
