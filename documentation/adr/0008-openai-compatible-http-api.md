@@ -119,5 +119,9 @@ Responses API are out of scope until explicit ADRs or plans add them.
   records compatibility evidence for accepting deprecated
   `role: "function"` chat transcript messages as local text context while
   keeping function calling unsupported.
+- `documentation/dev-notes/2026-06-29-openai-assistant-refusal-content.md`
+  records compatibility evidence for accepting assistant `refusal` content
+  parts as local transcript text while keeping hosted refusal semantics out of
+  scope.
 - `documentation/dev-notes/2026-06-29-openai-real-http-rerun.md` records a
   fresh explicit rerun of real Tier 0 and Tier 1 OpenAI-compatible HTTP tests.

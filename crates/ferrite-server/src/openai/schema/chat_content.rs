@@ -32,29 +32,33 @@ impl<'de> Deserialize<'de> for ChatContent {
 #[serde(untagged)]
 enum ChatContentWire {
     Text(String),
-    Parts(Vec<TextContentPart>),
+    Parts(Vec<ContentPart>),
 }
 
 impl ChatContentWire {
     fn into_text(self) -> String {
         match self {
             Self::Text(text) => text,
-            Self::Parts(parts) => parts.into_iter().map(|part| part.text).collect(),
+            Self::Parts(parts) => parts.into_iter().map(ContentPart::into_text).collect(),
         }
     }
 }
 
 #[derive(Deserialize)]
-struct TextContentPart {
-    #[serde(rename = "type")]
-    _part_type: TextPartType,
-    text: String,
+#[serde(rename_all = "snake_case")]
+#[serde(tag = "type")]
+enum ContentPart {
+    Text { text: String },
+    Refusal { refusal: String },
 }
 
-#[derive(Deserialize)]
-#[serde(rename_all = "snake_case")]
-enum TextPartType {
-    Text,
+impl ContentPart {
+    fn into_text(self) -> String {
+        match self {
+            Self::Text { text } => text,
+            Self::Refusal { refusal } => refusal,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -73,6 +77,15 @@ mod tests {
     fn deserializes_text_content_parts() -> Result<(), Box<dyn std::error::Error>> {
         let content: ChatContent =
             serde_json::from_str(r#"[{"type":"text","text":"he"},{"type":"text","text":"llo"}]"#)?;
+
+        assert_eq!(content.text(), "hello");
+        Ok(())
+    }
+
+    #[test]
+    fn deserializes_refusal_content_parts() -> Result<(), Box<dyn std::error::Error>> {
+        let content: ChatContent =
+            serde_json::from_str(r#"[{"type":"refusal","refusal":"hello"}]"#)?;
 
         assert_eq!(content.text(), "hello");
         Ok(())
