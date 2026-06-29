@@ -104,6 +104,18 @@ impl OpenAiHttpError {
         }
     }
 
+    pub fn route_not_found(path: impl AsRef<str>) -> Self {
+        let path = path.as_ref();
+        Self {
+            status: StatusCode::NOT_FOUND,
+            body: OpenAiErrorResponse::new(OpenAiErrorBody::with_code(
+                format!("OpenAI-compatible route not found: {path}"),
+                "invalid_request_error",
+                "not_found",
+            )),
+        }
+    }
+
     pub fn authentication_required(message: impl Into<String>) -> Self {
         Self {
             status: StatusCode::UNAUTHORIZED,

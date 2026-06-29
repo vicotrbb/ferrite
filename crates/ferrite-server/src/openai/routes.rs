@@ -10,7 +10,7 @@ use super::{
 };
 use crate::state::ServerState;
 use axum::{
-    extract::{Path, State},
+    extract::{OriginalUri, Path, State},
     http::HeaderMap,
     response::{IntoResponse, Response},
     routing::get,
@@ -28,6 +28,7 @@ pub fn router(state: ServerState) -> Router {
         .route("/v1/chat/completions", post(chat_completions))
         .route("/v1/completions", post(completions))
         .method_not_allowed_fallback(method_not_allowed)
+        .fallback(not_found)
         .with_state(state)
 }
 
@@ -149,6 +150,10 @@ async fn completions(
 
 async fn method_not_allowed() -> OpenAiHttpError {
     OpenAiHttpError::method_not_allowed()
+}
+
+async fn not_found(OriginalUri(uri): OriginalUri) -> OpenAiHttpError {
+    OpenAiHttpError::route_not_found(uri.path())
 }
 
 fn ensure_supported_completion_request(request: &CompletionRequest) -> Result<(), OpenAiHttpError> {
