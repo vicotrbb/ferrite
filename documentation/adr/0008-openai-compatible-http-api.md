@@ -162,3 +162,6 @@ Responses API are out of scope until explicit ADRs or plans add them.
   records compatibility evidence for parsing assistant tool-call transcript
   messages without `content` and rejecting the unsupported tool metadata
   explicitly.
+- `documentation/dev-notes/2026-06-29-openai-refusal-content-role-boundary.md`
+  records compatibility evidence for accepting refusal content parts only on
+  assistant messages and rejecting them on user messages.

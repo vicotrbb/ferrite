@@ -3,16 +3,24 @@ use serde::{Deserialize, Deserializer};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ChatContent {
     text: String,
+    has_refusal_part: bool,
 }
 
 impl ChatContent {
     #[cfg(test)]
     pub fn from_text(text: impl Into<String>) -> Self {
-        Self { text: text.into() }
+        Self {
+            text: text.into(),
+            has_refusal_part: false,
+        }
     }
 
     pub fn text(&self) -> &str {
         &self.text
+    }
+
+    pub fn has_refusal_part(&self) -> bool {
+        self.has_refusal_part
     }
 }
 
@@ -22,9 +30,7 @@ impl<'de> Deserialize<'de> for ChatContent {
         D: Deserializer<'de>,
     {
         let wire = ChatContentWire::deserialize(deserializer)?;
-        Ok(Self {
-            text: wire.into_text(),
-        })
+        Ok(wire.into_content())
     }
 }
 
@@ -36,10 +42,19 @@ enum ChatContentWire {
 }
 
 impl ChatContentWire {
-    fn into_text(self) -> String {
+    fn into_content(self) -> ChatContent {
         match self {
-            Self::Text(text) => text,
-            Self::Parts(parts) => parts.into_iter().map(ContentPart::into_text).collect(),
+            Self::Text(text) => ChatContent {
+                text,
+                has_refusal_part: false,
+            },
+            Self::Parts(parts) => {
+                let has_refusal_part = parts.iter().any(ContentPart::is_refusal);
+                ChatContent {
+                    text: parts.into_iter().map(ContentPart::into_text).collect(),
+                    has_refusal_part,
+                }
+            }
         }
     }
 }
@@ -53,6 +68,10 @@ enum ContentPart {
 }
 
 impl ContentPart {
+    fn is_refusal(&self) -> bool {
+        matches!(self, Self::Refusal { .. })
+    }
+
     fn into_text(self) -> String {
         match self {
             Self::Text { text } => text,
@@ -70,6 +89,7 @@ mod tests {
         let content: ChatContent = serde_json::from_str(r#""hello""#)?;
 
         assert_eq!(content.text(), "hello");
+        assert!(!content.has_refusal_part());
         Ok(())
     }
 
@@ -79,6 +99,7 @@ mod tests {
             serde_json::from_str(r#"[{"type":"text","text":"he"},{"type":"text","text":"llo"}]"#)?;
 
         assert_eq!(content.text(), "hello");
+        assert!(!content.has_refusal_part());
         Ok(())
     }
 
@@ -88,6 +109,7 @@ mod tests {
             serde_json::from_str(r#"[{"type":"refusal","refusal":"hello"}]"#)?;
 
         assert_eq!(content.text(), "hello");
+        assert!(content.has_refusal_part());
         Ok(())
     }
 

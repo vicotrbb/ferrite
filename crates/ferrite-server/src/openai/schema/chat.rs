@@ -263,9 +263,13 @@ impl ChatMessage {
     }
 
     fn content_matches_role(&self) -> bool {
-        self.content.is_some()
-            || (self.role == ChatRole::Assistant
-                && (self.tool_calls.is_some() || self.function_call.is_some()))
+        match &self.content {
+            Some(content) => self.role == ChatRole::Assistant || !content.has_refusal_part(),
+            None => {
+                self.role == ChatRole::Assistant
+                    && (self.tool_calls.is_some() || self.function_call.is_some())
+            }
+        }
     }
 
     fn name_matches_role(&self) -> bool {
