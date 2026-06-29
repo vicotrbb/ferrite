@@ -91,3 +91,21 @@ curl -N http://127.0.0.1:8080/v1/chat/completions \
 
 When `stream_options.include_usage` is true, Ferrite emits a final usage chunk
 before `data: [DONE]`.
+
+## CLI Memory Sampling
+
+For memory probes, the `ferrite` CLI can pause after loading the model and
+dropping the raw GGUF byte buffer:
+
+```sh
+target/release/ferrite \
+  --model target/models/model.gguf \
+  --prompt 'hello world' \
+  --sleep-after-load-ms 5000 \
+  --generate-tokens 1
+```
+
+The CLI prints `sleep_after_load_ms=<ms>` and flushes stdout before sleeping,
+so an external sampler can collect current RSS with `ps -o rss= -p "$pid"`.
+Use `/usr/bin/time -l` separately for peak RSS; wrapping the command with
+`time` changes which process `$!` points at in shell scripts.
