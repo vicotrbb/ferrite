@@ -8,6 +8,7 @@ mod json;
 pub mod prompt;
 pub mod routes;
 pub mod schema;
+mod stream_generation;
 pub mod streaming;
 
 #[cfg(test)]

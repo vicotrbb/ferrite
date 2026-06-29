@@ -70,12 +70,12 @@ async fn completion_stream_helper_emits_tokens_from_generation_callback(
         .try_acquire_inference_permit()
         .ok_or("expected inference permit")?;
 
-    let response = super::generation::completion_stream_response(
+    let response = super::stream_generation::completion_stream_response(
         state.engine().ok_or("expected inference engine")?,
         "fixture-model".to_owned(),
         "hello".to_owned(),
         1,
-        super::generation::CompletionStreamOptions::new(Vec::new(), false),
+        super::stream_generation::CompletionStreamOptions::new(Vec::new(), false),
         permit,
     );
     let body = to_text(response.into_body()).await?;

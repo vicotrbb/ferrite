@@ -1,10 +1,7 @@
 use super::{
     auth::ensure_authorized,
     error::OpenAiHttpError,
-    generation::{
-        chat_stream_response, completion_stream_response, generate_text, generate_texts,
-        ChatStreamOptions, CompletionStreamOptions,
-    },
+    generation::{generate_text, generate_texts},
     guards::{
         acquire_inference_permit, ensure_model, ensure_supported_chat_request,
         ensure_supported_completion_request, normalized_max_tokens, required_engine,
@@ -13,6 +10,10 @@ use super::{
     prompt::render_chat_prompt,
     schema::{
         ChatCompletionRequest, ChatCompletionResponse, CompletionRequest, CompletionResponse,
+    },
+    stream_generation::{
+        chat_stream_response, completion_stream_response, ChatStreamOptions,
+        CompletionStreamOptions,
     },
 };
 use crate::state::ServerState;
