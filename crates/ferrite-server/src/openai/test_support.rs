@@ -40,6 +40,22 @@ pub(super) async fn post_chat_json(
     Ok(JsonResponse { status, json })
 }
 
+pub(super) async fn post_completion_json(
+    payload: &str,
+) -> Result<JsonResponse, Box<dyn std::error::Error>> {
+    let app = router(ServerState::new("fixture-model".to_owned()));
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/completions")
+        .header("content-type", "application/json")
+        .body(Body::from(payload.to_owned()))?;
+    let response = app.oneshot(request).await?;
+    let status = response.status();
+    let json = to_json(response.into_body()).await?;
+
+    Ok(JsonResponse { status, json })
+}
+
 pub(super) fn write_fixture_model() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
     write_fixture_model_bytes(ferrite_fixtures::scalar_llama_f32_gguf_fixture())
 }

@@ -32,6 +32,8 @@ mod completion_concurrency_tests;
 #[cfg(test)]
 mod completion_option_tests;
 #[cfg(test)]
+mod completion_prompt_validation_tests;
+#[cfg(test)]
 mod completion_unsupported_tests;
 #[cfg(test)]
 mod health_tests;
