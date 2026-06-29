@@ -76,6 +76,11 @@ The Qwen2.5-1.5B Q8_0 OpenAI-compatible HTTP path now also has a debug
 test-profile throughput harness check for three sequential one-token legacy
 completion requests and three queued one-token legacy completion requests. This
 is harness evidence, not a release throughput pass.
+The same Q8_0 path now has a bounded local release-build HTTP throughput sample
+for one-token legacy completions: 10 sequential requests completed in 3,110 ms
+for about 3.22 req/s, and 9 queued requests at client concurrency 3 completed
+in 2,792 ms for about 3.22 req/s. This is still one-model, one-prompt,
+one-endpoint evidence rather than full Tier 1 HTTP throughput completion.
 
 The OpenAI-compatible HTTP server now has opt-in real Tier 1 coverage for
 Qwen2.5-0.5B Q4_K_M through legacy completions, streaming legacy completions,
