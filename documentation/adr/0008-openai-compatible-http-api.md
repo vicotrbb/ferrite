@@ -249,3 +249,6 @@ Responses API are out of scope until explicit ADRs or plans add them.
 - `documentation/dev-notes/2026-06-29-openai-real-tier1-qwen-1-5b-q6-stop-proof.md`
   records matching Qwen2.5-1.5B Q6_K stop-sequence evidence and the shared
   integration-test support extracted for real-model stop assertions.
+- `documentation/dev-notes/2026-06-29-openai-real-tier1-smollm-1-7b-stop-proof.md`
+  records matching SmolLM2-1.7B Q4_K_M stop-sequence evidence across
+  non-streaming and streaming completion/chat HTTP paths.
