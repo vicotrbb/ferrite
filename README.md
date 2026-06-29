@@ -92,6 +92,36 @@ curl -N http://127.0.0.1:8080/v1/chat/completions \
 When `stream_options.include_usage` is true, Ferrite emits a final usage chunk
 before `data: [DONE]`.
 
+Release-oriented HTTP throughput checks should run the server and benchmark
+client as separate release binaries:
+
+```sh
+cargo build --release -p ferrite-server
+
+target/release/ferrite-server \
+  --model target/models/qwen2.5-1.5b-instruct-q8_0.gguf \
+  --model-id qwen2.5-1.5b-q8_0 \
+  --bind 127.0.0.1:8080 \
+  --api-key local-secret \
+  --default-max-tokens 1 \
+  --hard-max-tokens 16 \
+  --inference-wait-ms 30000
+
+target/release/ferrite-openai-throughput \
+  --addr 127.0.0.1:8080 \
+  --model qwen2.5-1.5b-q8_0 \
+  --prompt 'hello world' \
+  --requests 3 \
+  --concurrency 1 \
+  --max-tokens 1 \
+  --api-key local-secret
+```
+
+The client prints `openai_http_completion_requests`, `elapsed_ms`, and
+`requests_per_second`. Record throughput claims under `documentation/benchmarks/`
+with the exact server/client commands, model, host, build mode, request count,
+concurrency, prompt, and generated-token count.
+
 ## CLI Memory Sampling
 
 For memory probes, the `ferrite` CLI can pause after loading the model and

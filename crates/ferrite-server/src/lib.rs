@@ -3,6 +3,7 @@ pub mod limits;
 pub mod openai;
 pub mod runtime;
 pub mod state;
+pub mod throughput_client;
 
 use axum::Router;
 
