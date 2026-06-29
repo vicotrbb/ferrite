@@ -1,4 +1,4 @@
-use super::{stream_usage::StreamUsage, unix_timestamp, usage::Usage};
+use super::{id::response_id, stream_usage::StreamUsage, unix_timestamp, usage::Usage};
 use crate::runtime::GeneratedText;
 use serde::Serialize;
 use serde_json::Value;
@@ -30,7 +30,7 @@ impl ChatCompletionStreamContext {
     pub fn new(model: String) -> Self {
         let created = unix_timestamp();
         Self {
-            id: format!("chatcmpl-ferrite-{created}"),
+            id: response_id("chatcmpl", created),
             created,
             model,
             include_usage: false,
@@ -182,5 +182,35 @@ impl ChatCompletionStreamDelta {
             role: None,
             content: None,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn chat_stream_context_ids_are_unique_between_streams_in_the_same_second(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        for _ in 0..1_000 {
+            let first = ChatCompletionStreamContext::new("fixture-model".to_owned());
+            let second = ChatCompletionStreamContext::new("fixture-model".to_owned());
+
+            if first.created == second.created {
+                assert_ne!(first.id, second.id);
+                return Ok(());
+            }
+        }
+
+        Err("expected to create two chat stream contexts in the same second".into())
+    }
+
+    #[test]
+    fn chat_stream_chunks_keep_one_id_within_a_stream() {
+        let context = ChatCompletionStreamContext::new("fixture-model".to_owned());
+        let id = context.role().id;
+
+        assert_eq!(id, context.token("hello".to_owned()).id);
+        assert_eq!(id, context.stop().id);
     }
 }

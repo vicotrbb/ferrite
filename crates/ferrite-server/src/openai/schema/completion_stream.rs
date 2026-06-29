@@ -1,4 +1,4 @@
-use super::{stream_usage::StreamUsage, unix_timestamp, usage::Usage};
+use super::{id::response_id, stream_usage::StreamUsage, unix_timestamp, usage::Usage};
 use crate::runtime::GeneratedText;
 use serde::Serialize;
 use serde_json::Value;
@@ -27,7 +27,7 @@ impl CompletionStreamContext {
     pub fn new(model: String) -> Self {
         let created = unix_timestamp();
         Self {
-            id: format!("cmpl-ferrite-{created}"),
+            id: response_id("cmpl", created),
             created,
             model,
             include_usage: false,
@@ -117,5 +117,33 @@ impl CompletionStreamChoice {
             logprobs: None,
             finish_reason: Some("stop"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn completion_stream_context_ids_are_unique_between_streams_in_the_same_second(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        for _ in 0..1_000 {
+            let first = CompletionStreamContext::new("fixture-model".to_owned());
+            let second = CompletionStreamContext::new("fixture-model".to_owned());
+
+            if first.created == second.created {
+                assert_ne!(first.id, second.id);
+                return Ok(());
+            }
+        }
+
+        Err("expected to create two completion stream contexts in the same second".into())
+    }
+
+    #[test]
+    fn completion_stream_chunks_keep_one_id_within_a_stream() {
+        let context = CompletionStreamContext::new("fixture-model".to_owned());
+
+        assert_eq!(context.token("hello".to_owned()).id, context.stop().id);
     }
 }

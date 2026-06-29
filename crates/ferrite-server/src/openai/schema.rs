@@ -7,6 +7,7 @@ mod completion;
 mod completion_prompt;
 mod completion_stream;
 mod function_options;
+mod id;
 mod logit_bias;
 mod message_metadata;
 mod metadata;

@@ -1,5 +1,6 @@
 use super::{
     completion_prompt::CompletionPrompt,
+    id::response_id,
     logit_bias::is_neutral_logit_bias,
     model_id::deserialize_model_id,
     neutral_options::{is_neutral_bool, is_neutral_number},
@@ -147,7 +148,7 @@ impl CompletionResponse {
     pub fn from_generations(model: String, generated: Vec<GeneratedText>) -> Self {
         let created = unix_timestamp();
         Self {
-            id: format!("cmpl-ferrite-{created}"),
+            id: response_id("cmpl", created),
             object: "text_completion",
             created,
             model,
@@ -178,5 +179,32 @@ impl CompletionChoice {
             logprobs: None,
             finish_reason: "stop",
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn completion_response_ids_are_unique_within_the_same_second(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        for _ in 0..1_000 {
+            let first =
+                CompletionResponse::from_generation("fixture-model".to_owned(), generated());
+            let second =
+                CompletionResponse::from_generation("fixture-model".to_owned(), generated());
+
+            if first.created == second.created {
+                assert_ne!(first.id, second.id);
+                return Ok(());
+            }
+        }
+
+        Err("expected to create two completion responses in the same second".into())
+    }
+
+    fn generated() -> GeneratedText {
+        GeneratedText::new("winner".to_owned(), 1, 1, vec!["winner".to_owned()])
     }
 }

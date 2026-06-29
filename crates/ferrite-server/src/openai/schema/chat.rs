@@ -2,6 +2,7 @@ use super::{
     chat_content::ChatContent,
     chat_messages::deserialize_chat_messages,
     function_options::{is_empty_functions, is_no_function_call},
+    id::response_id,
     logit_bias::is_neutral_logit_bias,
     message_metadata::is_optional_string,
     metadata::is_valid_metadata,
@@ -389,7 +390,7 @@ impl ChatCompletionResponse {
     ) -> Self {
         let created = unix_timestamp();
         Self {
-            id: format!("chatcmpl-ferrite-{created}"),
+            id: response_id("chatcmpl", created),
             object: "chat.completion",
             created,
             model,
@@ -444,6 +445,30 @@ mod tests {
     use super::*;
 
     #[test]
+    fn chat_completion_response_ids_are_unique_within_the_same_second(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        for _ in 0..1_000 {
+            let first = ChatCompletionResponse::from_generation(
+                "fixture-model".to_owned(),
+                generated(),
+                None,
+            );
+            let second = ChatCompletionResponse::from_generation(
+                "fixture-model".to_owned(),
+                generated(),
+                None,
+            );
+
+            if first.created == second.created {
+                assert_ne!(first.id, second.id);
+                return Ok(());
+            }
+        }
+
+        Err("expected to create two chat completion responses in the same second".into())
+    }
+
+    #[test]
     fn records_unknown_message_role_for_request_validation(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let message: ChatMessage = serde_json::from_str(r#"{"role":"critic","content":"hello"}"#)?;
@@ -469,5 +494,9 @@ mod tests {
             message.unsupported_fields(),
             ["messages.role", "messages.content"]
         );
+    }
+
+    fn generated() -> GeneratedText {
+        GeneratedText::new("winner".to_owned(), 1, 1, vec!["winner".to_owned()])
     }
 }
