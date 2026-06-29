@@ -46,7 +46,49 @@ async fn live_http_server_matches_smollm_1_7b_q4_chat_first_tokens_for_reference
 ) -> Result<(), Box<dyn std::error::Error>> {
     let model_path = smollm_1_7b_q4_model_path()?;
     let server = support::LiveServer::start_with_existing_model(REAL_MODEL_ID, model_path).await?;
-    let cases = [
+
+    for case in prompt_cases() {
+        let response = send_http_request(
+            server.addr(),
+            "POST",
+            "/v1/chat/completions",
+            chat_body(case.prompt, false).as_bytes(),
+        )
+        .await?;
+        assert_smollm_chat_response(&response, case)?;
+    }
+    Ok(())
+}
+
+#[tokio::test]
+#[ignore = "requires local SmolLM2-1.7B Q4_K_M GGUF model artifact"]
+async fn live_http_server_streams_smollm_1_7b_q4_chat_first_tokens_for_reference_prompts(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let model_path = smollm_1_7b_q4_model_path()?;
+    let server = support::LiveServer::start_with_existing_model(REAL_MODEL_ID, model_path).await?;
+
+    for case in prompt_cases() {
+        let response = send_http_request(
+            server.addr(),
+            "POST",
+            "/v1/chat/completions",
+            chat_body(case.prompt, true).as_bytes(),
+        )
+        .await?;
+        assert_smollm_chat_stream_response(&response, case)?;
+    }
+    Ok(())
+}
+
+#[derive(Clone, Copy)]
+struct PromptCase {
+    prompt: &'static str,
+    prompt_tokens: u64,
+    content: &'static str,
+}
+
+fn prompt_cases() -> [PromptCase; 6] {
+    [
         PromptCase {
             prompt: "hello world",
             prompt_tokens: 9,
@@ -77,26 +119,7 @@ async fn live_http_server_matches_smollm_1_7b_q4_chat_first_tokens_for_reference
             prompt_tokens: 11,
             content: "1",
         },
-    ];
-
-    for case in cases {
-        let response = send_http_request(
-            server.addr(),
-            "POST",
-            "/v1/chat/completions",
-            chat_body(case.prompt, false).as_bytes(),
-        )
-        .await?;
-        assert_smollm_chat_response(&response, case)?;
-    }
-    Ok(())
-}
-
-#[derive(Clone, Copy)]
-struct PromptCase {
-    prompt: &'static str,
-    prompt_tokens: u64,
-    content: &'static str,
+    ]
 }
 
 fn chat_body(prompt: &str, stream: bool) -> String {

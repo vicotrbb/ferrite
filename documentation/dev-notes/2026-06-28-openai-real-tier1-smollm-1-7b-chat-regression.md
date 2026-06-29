@@ -7,8 +7,8 @@ SmolLM2-1.7B-Instruct Q4_K_M.
 
 The existing SmolLM2 HTTP regressions covered six-prompt legacy completions and
 streaming legacy completions. This test file proves the same real model can
-also serve chat completions over the six-prompt reference set, plus streaming
-chat completions for the canonical `hello world` prompt:
+also serve chat completions and streaming chat completions over the six-prompt
+reference set:
 
 - `POST /v1/chat/completions`
 - `POST /v1/chat/completions` with `stream: true`
@@ -24,7 +24,7 @@ The test:
 - starts Ferrite's OpenAI-compatible server with
   `target/models/SmolLM2-1.7B-Instruct-Q4_K_M.gguf`;
 - sends six non-streaming chat completion requests;
-- sends one streaming chat completion request;
+- sends six streaming chat completion requests;
 - verifies HTTP `200` and OpenAI-shaped chat response objects;
 - verifies prompt and completion usage for the non-streaming response;
 - parses SSE `data:` JSON events for the streaming response;
@@ -63,7 +63,8 @@ Result:
 ```text
 test live_http_server_chats_with_smollm_1_7b_q4_reference_prompt ... ignored, requires local SmolLM2-1.7B Q4_K_M GGUF model artifact
 test live_http_server_matches_smollm_1_7b_q4_chat_first_tokens_for_reference_prompts ... ignored, requires local SmolLM2-1.7B Q4_K_M GGUF model artifact
-test result: ok. 0 passed; 0 failed; 2 ignored
+test live_http_server_streams_smollm_1_7b_q4_chat_first_tokens_for_reference_prompts ... ignored, requires local SmolLM2-1.7B Q4_K_M GGUF model artifact
+test result: ok. 0 passed; 0 failed; 3 ignored
 ```
 
 Real local model run for the chat plus streaming chat smoke proof:
@@ -92,10 +93,22 @@ test live_http_server_matches_smollm_1_7b_q4_chat_first_tokens_for_reference_pro
 test result: ok. 1 passed; 0 failed; 0 ignored; 1 filtered out; finished in 477.08s
 ```
 
+Real local model run for the six-prompt streaming chat proof:
+
+```sh
+cargo test -p ferrite-server --test openai_real_tier1_smollm_1_7b_chat live_http_server_streams_smollm_1_7b_q4_chat_first_tokens_for_reference_prompts -- --ignored --nocapture
+```
+
+Result:
+
+```text
+test live_http_server_streams_smollm_1_7b_q4_chat_first_tokens_for_reference_prompts ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 2 filtered out; finished in 476.54s
+```
+
 ## Boundary
 
-This proves the local OpenAI-compatible chat path can drive the real
-SmolLM2-1.7B Q4_K_M model for six deterministic one-token prompt cases. It
-also proves the streaming chat path for one deterministic one-token prompt
-case. It does not prove six-prompt SmolLM2 streaming chat behavior, SmolLM2
-chat throughput, broad concurrent serving, or full Tier 1 completion.
+This proves the local OpenAI-compatible chat and streaming chat paths can drive
+the real SmolLM2-1.7B Q4_K_M model for six deterministic one-token prompt
+cases. It does not prove SmolLM2 chat throughput, broad concurrent serving, or
+full Tier 1 completion.
