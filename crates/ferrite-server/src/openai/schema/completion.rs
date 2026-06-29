@@ -6,6 +6,7 @@ use super::{
     unix_timestamp,
     unsupported::UnsupportedFields,
     usage::Usage,
+    user_identifier::is_user_identifier,
 };
 use crate::runtime::GeneratedText;
 use serde::{Deserialize, Serialize};
@@ -96,7 +97,7 @@ impl CompletionRequest {
             )
             .with_present("best_of", self.best_of.is_some())
             .with_present("logit_bias", self.logit_bias.is_some())
-            .with_present("user", self.user.is_some())
+            .with_present("user", !is_user_identifier(&self.user))
             .with_extra_keys(&self.extra_fields)
             .into_vec();
         if let Some(stream_options) = &self.stream_options {

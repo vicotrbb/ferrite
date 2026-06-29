@@ -14,6 +14,7 @@ mod stream_usage;
 mod tool_options;
 mod unsupported;
 mod usage;
+mod user_identifier;
 
 pub use catalog::{HealthResponse, ModelObject, ModelsResponse};
 pub use chat::{ChatCompletionRequest, ChatCompletionResponse, ChatMessage, ChatRole};

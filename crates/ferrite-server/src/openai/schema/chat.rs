@@ -9,6 +9,7 @@ use super::{
     unix_timestamp,
     unsupported::UnsupportedFields,
     usage::Usage,
+    user_identifier::is_user_identifier,
 };
 use crate::runtime::GeneratedText;
 use serde::{Deserialize, Serialize};
@@ -118,7 +119,7 @@ impl ChatCompletionRequest {
             .with_present("logit_bias", self.logit_bias.is_some())
             .with_present("logprobs", !is_neutral_bool(&self.logprobs, false))
             .with_present("top_logprobs", self.top_logprobs.is_some())
-            .with_present("user", self.user.is_some())
+            .with_present("user", !is_user_identifier(&self.user))
             .with_present("seed", self.seed.is_some())
             .with_present("store", !is_neutral_bool(&self.store, false))
             .with_present("metadata", self.metadata.is_some())
