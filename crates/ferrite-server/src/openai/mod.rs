@@ -16,6 +16,8 @@ mod availability_tests;
 #[cfg(test)]
 mod catalog_tests;
 #[cfg(test)]
+mod chat_content_part_validation_tests;
+#[cfg(test)]
 mod chat_message_tool_tests;
 #[cfg(test)]
 mod chat_message_validation_tests;
