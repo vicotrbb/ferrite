@@ -194,6 +194,31 @@ fn cli_scopes_q8_k_comparison_roles_without_changing_execution_policy() -> Resul
 }
 
 #[test]
+fn cli_rejects_q8_k_role_scope_without_comparison_or_experimental_dispatch(
+) -> Result<(), Box<dyn Error>> {
+    let model_path = write_q4_k_fixture_model()?;
+    let binary = cli_binary()?;
+
+    let output = Command::new(binary)
+        .arg("--model")
+        .arg(&model_path)
+        .arg("--prompt-token-ids")
+        .arg("0")
+        .arg("--experimental-q8-k-activation-roles")
+        .arg("ffn_down")
+        .output()?;
+
+    remove_fixture_model(&model_path)?;
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8(output.stderr)?;
+    assert!(stderr.contains(
+        "use --experimental-q8-k-activation-roles with --experimental-q8-k-activation-matvec or --compare-q8-k-activation-matvec"
+    ));
+    Ok(())
+}
+
+#[test]
 fn cli_rejects_mixed_text_and_token_id_prompts() -> Result<(), Box<dyn Error>> {
     let model_path = write_fixture_model()?;
     let binary = cli_binary()?;

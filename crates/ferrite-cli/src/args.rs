@@ -130,15 +130,19 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
         }
     }
 
-    validate_modes(
+    validate_modes(ModeValidation {
         generate_tokens,
         benchmark_runs,
         profile_next_token,
         profile_benchmark_token,
-        compare_q8_k_activation_matvec,
+        q8_k_activation: Q8KActivationModeValidation {
+            experimental_matvec: experimental_q8_k_activation_matvec,
+            has_role_scope: experimental_q8_k_activation_roles.is_some(),
+            compare_matvec: compare_q8_k_activation_matvec,
+        },
         stream,
-        expected_generated_token_ids.as_deref(),
-    )?;
+        expected_generated_token_ids: expected_generated_token_ids.as_deref(),
+    })?;
 
     Ok(CliArgs {
         model_path: model_path.ok_or_else(|| io::Error::other("missing --model argument"))?,
@@ -158,34 +162,54 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
     })
 }
 
-fn validate_modes(
+struct ModeValidation<'a> {
     generate_tokens: Option<usize>,
     benchmark_runs: Option<usize>,
     profile_next_token: bool,
     profile_benchmark_token: bool,
-    compare_q8_k_activation_matvec: bool,
+    q8_k_activation: Q8KActivationModeValidation,
     stream: bool,
-    expected_generated_token_ids: Option<&[usize]>,
-) -> Result<(), Box<dyn Error>> {
-    if generate_tokens.is_some() && benchmark_runs.is_some() {
+    expected_generated_token_ids: Option<&'a [usize]>,
+}
+
+struct Q8KActivationModeValidation {
+    experimental_matvec: bool,
+    has_role_scope: bool,
+    compare_matvec: bool,
+}
+
+fn validate_modes(validation: ModeValidation<'_>) -> Result<(), Box<dyn Error>> {
+    if validation.generate_tokens.is_some() && validation.benchmark_runs.is_some() {
         return Err(
             io::Error::other("use either --generate-tokens or --benchmark-runs, not both").into(),
         );
     }
-    if stream && generate_tokens.is_none() {
+    if validation.stream && validation.generate_tokens.is_none() {
         return Err(io::Error::other("use --stream with --generate-tokens").into());
     }
-    if expected_generated_token_ids.is_some() && generate_tokens.is_none() {
+    if validation.expected_generated_token_ids.is_some() && validation.generate_tokens.is_none() {
         return Err(
             io::Error::other("use --expect-generated-token-ids with --generate-tokens").into(),
         );
     }
-    if profile_benchmark_token && benchmark_runs.is_none() {
+    if validation.profile_benchmark_token && validation.benchmark_runs.is_none() {
         return Err(io::Error::other("use --profile-benchmark-token with --benchmark-runs").into());
     }
-    if compare_q8_k_activation_matvec && !profile_next_token && !profile_benchmark_token {
+    if validation.q8_k_activation.compare_matvec
+        && !validation.profile_next_token
+        && !validation.profile_benchmark_token
+    {
         return Err(io::Error::other(
             "use --compare-q8-k-activation-matvec with --profile-next-token or --profile-benchmark-token",
+        )
+        .into());
+    }
+    if validation.q8_k_activation.has_role_scope
+        && !validation.q8_k_activation.experimental_matvec
+        && !validation.q8_k_activation.compare_matvec
+    {
+        return Err(io::Error::other(
+            "use --experimental-q8-k-activation-roles with --experimental-q8-k-activation-matvec or --compare-q8-k-activation-matvec",
         )
         .into());
     }

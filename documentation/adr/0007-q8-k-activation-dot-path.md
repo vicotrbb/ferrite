@@ -122,6 +122,9 @@ reference implementation and benchmarking baseline, not the Ferrite runtime.
 - `documentation/dev-notes/2026-06-29-q8-k-role-scoped-comparison.md` records
   the CLI guardrail that role scoping can filter comparison-only diagnostics
   without implicitly enabling experimental execution.
+- `documentation/dev-notes/2026-06-29-q8-k-role-scope-noop-guardrail.md`
+  records the CLI guardrail that a role scope must pair with either
+  experimental execution or comparison diagnostics.
 - `documentation/dev-notes/2026-06-28-q8-k-single-role-probes.md` records the
   first single-role SmolLM2 probes; only `ffn_up` matched both fixed prompts,
   and it still requires broader parity evidence.
