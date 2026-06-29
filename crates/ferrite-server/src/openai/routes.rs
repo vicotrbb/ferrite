@@ -193,9 +193,7 @@ fn ensure_model(state: &ServerState, requested_model: &str) -> Result<(), OpenAi
     if requested_model == state.model_id() {
         Ok(())
     } else {
-        Err(OpenAiHttpError::invalid_request(format!(
-            "model {requested_model} is not loaded"
-        )))
+        Err(OpenAiHttpError::model_not_found(requested_model))
     }
 }
 

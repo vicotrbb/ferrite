@@ -64,6 +64,54 @@ async fn chat_endpoint_returns_openai_error_when_model_is_not_loaded(
 }
 
 #[tokio::test]
+async fn completions_endpoint_returns_model_not_found_for_unknown_model(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let app = router(ServerState::new("fixture-model".to_owned()));
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/completions")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            r#"{"model":"other-model","prompt":"hello","max_tokens":1}"#,
+        ))?;
+    let response = app.oneshot(request).await?;
+
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    let body = to_json(response.into_body()).await?;
+    assert_eq!(body["error"]["type"], "invalid_request_error");
+    assert_eq!(body["error"]["code"], "model_not_found");
+    assert!(body["error"]["message"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("other-model"));
+    Ok(())
+}
+
+#[tokio::test]
+async fn chat_endpoint_returns_model_not_found_for_unknown_model(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let app = router(ServerState::new("fixture-model".to_owned()));
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/chat/completions")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            r#"{"model":"other-model","messages":[{"role":"user","content":"hello"}],"max_tokens":1}"#,
+        ))?;
+    let response = app.oneshot(request).await?;
+
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+    let body = to_json(response.into_body()).await?;
+    assert_eq!(body["error"]["type"], "invalid_request_error");
+    assert_eq!(body["error"]["code"], "model_not_found");
+    assert!(body["error"]["message"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("other-model"));
+    Ok(())
+}
+
+#[tokio::test]
 async fn completions_endpoint_generates_with_loaded_fixture_model(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let model_path = write_fixture_model()?;

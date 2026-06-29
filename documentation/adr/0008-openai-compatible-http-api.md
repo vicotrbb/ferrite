@@ -112,3 +112,6 @@ Responses API are out of scope until explicit ADRs or plans add them.
 - `documentation/dev-notes/2026-06-29-openai-chat-seed.md` records matching
   compatibility evidence for accepting integer `seed` on chat completions
   while preserving malformed-seed rejection.
+- `documentation/dev-notes/2026-06-29-openai-generation-model-not-found.md`
+  records compatibility evidence for returning `model_not_found` from
+  generation endpoints when the requested model id is not loaded.
