@@ -1,6 +1,4 @@
-use serde_json::Value;
-
-use crate::support::http::response_json;
+use crate::support::http::{response_json, sse_json_events};
 
 #[derive(Clone, Copy)]
 pub struct StopSequenceExpectation {
@@ -119,13 +117,4 @@ fn assert_stop_stream_headers(response: &str) {
         response.contains("data: [DONE]"),
         "missing stream terminator: {response}"
     );
-}
-
-fn sse_json_events(response: &str) -> Result<Vec<Value>, Box<dyn std::error::Error>> {
-    response
-        .lines()
-        .filter_map(|line| line.strip_prefix("data: "))
-        .filter(|payload| *payload != "[DONE]")
-        .map(|payload| Ok(serde_json::from_str(payload)?))
-        .collect()
 }
