@@ -115,3 +115,5 @@ Responses API are out of scope until explicit ADRs or plans add them.
 - `documentation/dev-notes/2026-06-29-openai-generation-model-not-found.md`
   records compatibility evidence for returning `model_not_found` from
   generation endpoints when the requested model id is not loaded.
+- `documentation/dev-notes/2026-06-29-openai-real-http-rerun.md` records a
+  fresh explicit rerun of real Tier 0 and Tier 1 OpenAI-compatible HTTP tests.
