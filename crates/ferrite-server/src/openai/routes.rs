@@ -184,13 +184,20 @@ fn ensure_authorized(state: &ServerState, headers: &HeaderMap) -> Result<(), Ope
             "invalid Authorization bearer token",
         ));
     };
-    if header == format!("Bearer {api_key}") {
+    if bearer_token_matches(header, api_key) {
         Ok(())
     } else {
         Err(OpenAiHttpError::authentication_required(
             "invalid Authorization bearer token",
         ))
     }
+}
+
+fn bearer_token_matches(header: &str, api_key: &str) -> bool {
+    let Some((scheme, token)) = header.split_once(' ') else {
+        return false;
+    };
+    scheme.eq_ignore_ascii_case("Bearer") && token == api_key
 }
 
 fn ensure_supported_chat_request(request: &ChatCompletionRequest) -> Result<(), OpenAiHttpError> {
