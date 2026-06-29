@@ -215,3 +215,56 @@ Covered behavior:
 This confirms that the OpenAI-compatible HTTP server still drives real Tier 0
 and default Tier 1 GGUF models through Ferrite-owned loading, tokenization,
 generation, and SSE streaming after the response-ID compatibility change.
+
+## Post-Stream-Stop-Filter Rerun
+
+Tree state:
+
+- Commit: `4382a3b`
+- Local artifact paths present:
+  - `target/models/SmolLM2-135M-Instruct-Q4_K_M.gguf`
+  - `target/models/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf`
+
+This rerun followed the OpenAI compatibility commit that changed the streaming
+stop-sequence filter to flush visible token chunks when configured stop
+sequences do not match generated output.
+
+Tier 0 command:
+
+```sh
+cargo test -p ferrite-server --test openai_real_model_http -- --ignored --nocapture
+```
+
+Observed result:
+
+- 4 ignored tests were explicitly enabled.
+- 4 passed, 0 failed, 0 ignored.
+- Rust test harness duration: 23.08s.
+
+Tier 1 command:
+
+```sh
+cargo test -p ferrite-server --test openai_real_tier1_http -- --ignored --nocapture
+```
+
+Observed result:
+
+- 8 ignored tests were explicitly enabled.
+- 8 passed, 0 failed, 0 ignored.
+- Rust test harness duration: 180.48s.
+
+Covered behavior:
+
+- real Tier 0 SmolLM2-135M Q4_K_M legacy completion, streaming legacy
+  completion, chat completion, and streaming chat completion;
+- real Tier 1 Qwen2.5-0.5B Q4_K_M legacy completion, streaming legacy
+  completion, chat completion, streaming chat completion, non-streaming stop
+  sequences, streaming stop sequences, default backpressure, and configured
+  wait-queue completion.
+
+This confirms that the OpenAI-compatible HTTP server still drives the default
+real Tier 0 and Tier 1 GGUF models through Ferrite-owned loading,
+tokenization, generation, stop handling, concurrency control, and SSE streaming
+after the streaming stop-filter flush fix. It still does not prove Tier 2+
+models, larger Tier 1 prompt-regression suites, long-context behavior, or broad
+conversation quality.
