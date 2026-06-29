@@ -67,6 +67,30 @@ async fn model_retrieve_endpoint_returns_loaded_model() -> Result<(), Box<dyn st
 }
 
 #[tokio::test]
+async fn model_retrieve_endpoint_supports_encoded_slashes() -> Result<(), Box<dyn std::error::Error>>
+{
+    let model_id = "HuggingFaceTB/SmolLM2-135M-Instruct";
+    let model_path = write_fixture_model()?;
+    let engine = InferenceEngine::load(&model_path)?;
+    let app = router(ServerState::with_engine(model_id.to_owned(), engine));
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/v1/models/HuggingFaceTB%2FSmolLM2-135M-Instruct")
+                .body(Body::empty())?,
+        )
+        .await?;
+    remove_fixture_model(&model_path)?;
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_json(response.into_body()).await?;
+    assert_eq!(body["id"], model_id);
+    assert_eq!(body["object"], "model");
+    assert_eq!(body["owned_by"], "ferrite");
+    Ok(())
+}
+
+#[tokio::test]
 async fn model_retrieve_endpoint_rejects_unknown_model() -> Result<(), Box<dyn std::error::Error>> {
     let model_path = write_fixture_model()?;
     let engine = InferenceEngine::load(&model_path)?;
