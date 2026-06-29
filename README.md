@@ -69,6 +69,9 @@ Point OpenAI-compatible clients at `http://127.0.0.1:8080/v1` as the base URL.
 The server supports non-streaming text generation and OpenAI-style SSE streams.
 Ferrite has a live regression test using the `async-openai` client configured
 with a Ferrite base URL.
+Ferrite returns CORS headers for `/v1/*` responses and unauthenticated CORS
+preflight responses for supported OpenAI-compatible endpoints so local browser
+clients can call the API.
 `--api-key` is optional; when set, `/v1/*` endpoints require
 `Authorization: Bearer <api-key>`, while `/health` remains open for local
 readiness checks. `/health` returns `ready: false` until a model is loaded.

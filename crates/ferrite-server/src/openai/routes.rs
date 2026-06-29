@@ -10,8 +10,9 @@ use super::{
 };
 use crate::{limits::TokenLimitError, state::ServerState};
 use axum::{
-    extract::{OriginalUri, Path, State},
-    http::HeaderMap,
+    extract::{OriginalUri, Path, Request, State},
+    http::{header, HeaderMap, HeaderValue, StatusCode},
+    middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::get,
     routing::post,
@@ -23,12 +24,19 @@ use tokio::sync::OwnedSemaphorePermit;
 pub fn router(state: ServerState) -> Router {
     Router::new()
         .route("/health", get(health))
-        .route("/v1/models", get(models))
-        .route("/v1/models/:model", get(model))
-        .route("/v1/chat/completions", post(chat_completions))
-        .route("/v1/completions", post(completions))
+        .route("/v1/models", get(models).options(openai_preflight))
+        .route("/v1/models/:model", get(model).options(openai_preflight))
+        .route(
+            "/v1/chat/completions",
+            post(chat_completions).options(openai_preflight),
+        )
+        .route(
+            "/v1/completions",
+            post(completions).options(openai_preflight),
+        )
         .method_not_allowed_fallback(method_not_allowed)
         .fallback(not_found)
+        .layer(middleware::from_fn(add_openai_cors_headers))
         .with_state(state)
 }
 
@@ -158,6 +166,36 @@ async fn method_not_allowed(
         return error;
     }
     OpenAiHttpError::method_not_allowed()
+}
+
+async fn openai_preflight() -> Response {
+    let mut response = StatusCode::NO_CONTENT.into_response();
+    insert_openai_cors_headers(response.headers_mut());
+    response
+}
+
+async fn add_openai_cors_headers(request: Request, next: Next) -> Response {
+    let is_openai_route = request.uri().path().starts_with("/v1/");
+    let mut response = next.run(request).await;
+    if is_openai_route {
+        insert_openai_cors_headers(response.headers_mut());
+    }
+    response
+}
+
+fn insert_openai_cors_headers(headers: &mut HeaderMap) {
+    headers.insert(
+        header::ACCESS_CONTROL_ALLOW_ORIGIN,
+        HeaderValue::from_static("*"),
+    );
+    headers.insert(
+        header::ACCESS_CONTROL_ALLOW_METHODS,
+        HeaderValue::from_static("GET, POST, OPTIONS"),
+    );
+    headers.insert(
+        header::ACCESS_CONTROL_ALLOW_HEADERS,
+        HeaderValue::from_static("authorization, content-type"),
+    );
 }
 
 async fn not_found(
