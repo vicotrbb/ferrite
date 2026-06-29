@@ -47,6 +47,16 @@ pub struct ChatCompletionRequest {
     #[serde(default)]
     modalities: Option<Value>,
     #[serde(default)]
+    audio: Option<Value>,
+    #[serde(default)]
+    moderation: Option<Value>,
+    #[serde(default)]
+    prediction: Option<Value>,
+    #[serde(default)]
+    verbosity: Option<Value>,
+    #[serde(default)]
+    web_search_options: Option<Value>,
+    #[serde(default)]
     temperature: Option<Value>,
     #[serde(default)]
     top_p: Option<Value>,
@@ -128,6 +138,11 @@ impl ChatCompletionRequest {
                 !is_neutral_response_format(&self.response_format),
             )
             .with_present("modalities", !is_text_only_modalities(&self.modalities))
+            .with_present("audio", self.audio.is_some())
+            .with_present("moderation", self.moderation.is_some())
+            .with_present("prediction", self.prediction.is_some())
+            .with_present("verbosity", self.verbosity.is_some())
+            .with_present("web_search_options", self.web_search_options.is_some())
             .with_present("temperature", !is_neutral_number(&self.temperature, 0.0))
             .with_present("top_p", !is_neutral_number(&self.top_p, 1.0))
             .with_present("n", !is_neutral_number(&self.n, 1.0))
