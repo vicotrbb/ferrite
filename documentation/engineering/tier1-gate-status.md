@@ -87,6 +87,12 @@ about 1.21 req/s, and 9 queued requests at client concurrency 3 completed in
 7,401 ms for about 1.22 req/s. This expands local release HTTP throughput
 coverage across the two Qwen2.5-1.5B quantizations while keeping the full Tier
 1 HTTP throughput gate open.
+SmolLM2-1.7B Q4_K_M now has the same local release-build one-token legacy
+completion request-rate shape: 10 sequential requests completed in 5,095 ms for
+about 1.96 req/s, and 9 queued requests at client concurrency 3 completed in
+4,518 ms for about 1.99 req/s. This adds a second Tier 1 model family to the
+release HTTP throughput evidence, while chat, streaming, longer generations,
+more prompts, x86_64, and steady-state behavior remain open.
 
 The OpenAI-compatible HTTP server now has opt-in real Tier 1 coverage for
 Qwen2.5-0.5B Q4_K_M through legacy completions, streaming legacy completions,
