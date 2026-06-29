@@ -1,6 +1,7 @@
 use super::{
     chat_content::ChatContent,
     function_options::{is_empty_functions, is_no_function_call},
+    logit_bias::is_neutral_logit_bias,
     message_metadata::is_optional_string,
     metadata::is_valid_metadata,
     modalities::is_text_only_modalities,
@@ -157,7 +158,7 @@ impl ChatCompletionRequest {
                 "frequency_penalty",
                 !is_neutral_number(&self.frequency_penalty, 0.0),
             )
-            .with_present("logit_bias", self.logit_bias.is_some())
+            .with_present("logit_bias", !is_neutral_logit_bias(&self.logit_bias))
             .with_present("logprobs", !is_neutral_bool(&self.logprobs, false))
             .with_present("top_logprobs", self.top_logprobs.is_some())
             .with_present("user", !is_user_identifier(&self.user))

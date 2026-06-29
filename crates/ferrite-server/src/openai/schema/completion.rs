@@ -1,5 +1,6 @@
 use super::{
     completion_prompt::CompletionPrompt,
+    logit_bias::is_neutral_logit_bias,
     neutral_options::{is_neutral_bool, is_neutral_number},
     seed::is_seed,
     stop_sequences::is_neutral_stop_sequences,
@@ -99,7 +100,7 @@ impl CompletionRequest {
                 !is_neutral_number(&self.frequency_penalty, 0.0),
             )
             .with_present("best_of", self.best_of.is_some())
-            .with_present("logit_bias", self.logit_bias.is_some())
+            .with_present("logit_bias", !is_neutral_logit_bias(&self.logit_bias))
             .with_present("user", !is_user_identifier(&self.user))
             .with_present("seed", !is_seed(&self.seed))
             .with_extra_keys(&self.extra_fields)

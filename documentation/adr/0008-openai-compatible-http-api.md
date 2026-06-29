@@ -145,3 +145,6 @@ Responses API are out of scope until explicit ADRs or plans add them.
 - `documentation/dev-notes/2026-06-29-openai-health-readiness.md` records
   compatibility evidence for deriving `/health` readiness from actual loaded
   model availability.
+- `documentation/dev-notes/2026-06-29-openai-empty-logit-bias.md` records
+  compatibility evidence for accepting empty `logit_bias` maps as local no-ops
+  while keeping non-empty biasing unsupported.
