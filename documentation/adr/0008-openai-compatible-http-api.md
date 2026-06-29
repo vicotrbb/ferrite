@@ -210,3 +210,7 @@ Responses API are out of scope until explicit ADRs or plans add them.
   `stream_options.include_usage` errors when streaming requests provide
   malformed nested stream option values instead of JSON body deserialization
   errors.
+- `documentation/dev-notes/2026-06-29-openai-malformed-token-limits.md`
+  records compatibility evidence for returning explicit `max_tokens` and
+  `max_completion_tokens` errors when generation requests provide malformed
+  token-limit values instead of JSON body deserialization errors.

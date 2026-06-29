@@ -6,6 +6,7 @@ use super::{
     seed::is_seed,
     stop_sequences::is_neutral_stop_sequences,
     stream_options::StreamOptions,
+    token_limit::RequestTokenLimit,
     unix_timestamp,
     unsupported::UnsupportedFields,
     usage::Usage,
@@ -25,7 +26,7 @@ pub struct CompletionRequest {
     #[serde(default)]
     stream: bool,
     #[serde(default)]
-    max_tokens: Option<usize>,
+    max_tokens: RequestTokenLimit,
     #[serde(default)]
     stream_options: Option<StreamOptions>,
     #[serde(default)]
@@ -76,7 +77,7 @@ impl CompletionRequest {
     }
 
     pub fn max_tokens(&self) -> Option<usize> {
-        self.max_tokens
+        self.max_tokens.value()
     }
 
     pub fn stream_include_usage(&self) -> bool {
@@ -88,6 +89,7 @@ impl CompletionRequest {
     pub fn unsupported_fields(&self) -> Vec<String> {
         let mut fields = UnsupportedFields::new()
             .with_present("prompt", self.prompt.has_unsupported_form())
+            .with_present("max_tokens", self.max_tokens.is_malformed())
             .with_present("suffix", self.suffix.is_some())
             .with_present("temperature", !is_neutral_number(&self.temperature, 0.0))
             .with_present("top_p", !is_neutral_number(&self.top_p, 1.0))

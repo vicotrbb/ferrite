@@ -22,6 +22,7 @@ mod service_tier;
 mod stop_sequences;
 mod stream_options;
 mod stream_usage;
+mod token_limit;
 mod tool_options;
 mod unsupported;
 mod usage;

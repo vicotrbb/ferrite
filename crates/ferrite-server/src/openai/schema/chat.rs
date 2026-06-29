@@ -16,6 +16,7 @@ use super::{
     service_tier::{is_local_service_tier, response_service_tier},
     stop_sequences::is_neutral_stop_sequences,
     stream_options::StreamOptions,
+    token_limit::RequestTokenLimit,
     tool_options::{is_empty_tools, is_neutral_parallel_tool_calls, is_no_tool_choice},
     unix_timestamp,
     unsupported::UnsupportedFields,
@@ -36,9 +37,9 @@ pub struct ChatCompletionRequest {
     #[serde(default)]
     stream: bool,
     #[serde(default)]
-    max_tokens: Option<usize>,
+    max_tokens: RequestTokenLimit,
     #[serde(default)]
-    max_completion_tokens: Option<usize>,
+    max_completion_tokens: RequestTokenLimit,
     #[serde(default)]
     tools: Option<Value>,
     #[serde(default)]
@@ -117,7 +118,9 @@ impl ChatCompletionRequest {
     }
 
     pub fn max_tokens(&self) -> Option<usize> {
-        self.max_tokens.or(self.max_completion_tokens)
+        self.max_tokens
+            .value()
+            .or_else(|| self.max_completion_tokens.value())
     }
 
     pub fn stream_include_usage(&self) -> bool {
@@ -150,6 +153,11 @@ impl ChatCompletionRequest {
             .with_present("prediction", self.prediction.is_some())
             .with_present("verbosity", self.verbosity.is_some())
             .with_present("web_search_options", self.web_search_options.is_some())
+            .with_present("max_tokens", self.max_tokens.is_malformed())
+            .with_present(
+                "max_completion_tokens",
+                self.max_completion_tokens.is_malformed(),
+            )
             .with_present("temperature", !is_neutral_number(&self.temperature, 0.0))
             .with_present("top_p", !is_neutral_number(&self.top_p, 1.0))
             .with_present("n", !is_neutral_number(&self.n, 1.0))
