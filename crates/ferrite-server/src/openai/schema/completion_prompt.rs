@@ -1,6 +1,6 @@
 use serde::{Deserialize, Deserializer};
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct CompletionPrompt {
     prompts: Vec<String>,
     has_unsupported_form: bool,

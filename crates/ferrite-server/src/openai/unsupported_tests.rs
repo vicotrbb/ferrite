@@ -45,6 +45,23 @@ async fn chat_endpoint_rejects_missing_model() -> Result<(), Box<dyn std::error:
 }
 
 #[tokio::test]
+async fn chat_endpoint_rejects_missing_messages() -> Result<(), Box<dyn std::error::Error>> {
+    let body = post_chat(
+        r#"{
+            "model":"fixture-model"
+        }"#,
+    )
+    .await?;
+
+    assert_eq!(body.status, StatusCode::BAD_REQUEST);
+    assert_eq!(body.json["error"]["type"], "invalid_request_error");
+    let message = body.json["error"]["message"].as_str().unwrap_or_default();
+    assert!(message.contains("messages"), "{message}");
+    assert!(!message.contains("malformed JSON"), "{message}");
+    Ok(())
+}
+
+#[tokio::test]
 async fn chat_endpoint_rejects_function_fields() -> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat(
         r#"{
@@ -806,6 +823,23 @@ async fn completion_endpoint_rejects_missing_model() -> Result<(), Box<dyn std::
     assert_eq!(body.json["error"]["type"], "invalid_request_error");
     let message = body.json["error"]["message"].as_str().unwrap_or_default();
     assert!(message.contains("model"), "{message}");
+    assert!(!message.contains("malformed JSON"), "{message}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn completion_endpoint_rejects_missing_prompt() -> Result<(), Box<dyn std::error::Error>> {
+    let body = post_completion(
+        r#"{
+            "model":"fixture-model"
+        }"#,
+    )
+    .await?;
+
+    assert_eq!(body.status, StatusCode::BAD_REQUEST);
+    assert_eq!(body.json["error"]["type"], "invalid_request_error");
+    let message = body.json["error"]["message"].as_str().unwrap_or_default();
+    assert!(message.contains("prompt"), "{message}");
     assert!(!message.contains("malformed JSON"), "{message}");
     Ok(())
 }

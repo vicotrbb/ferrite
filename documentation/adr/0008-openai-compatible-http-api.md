@@ -189,3 +189,7 @@ Responses API are out of scope until explicit ADRs or plans add them.
   compatibility evidence for returning explicit `model` errors when generation
   requests omit the required model field instead of JSON body deserialization
   errors.
+- `documentation/dev-notes/2026-06-29-openai-missing-generation-inputs.md`
+  records compatibility evidence for returning explicit `messages` and
+  `prompt` errors when generation requests omit their required input fields
+  instead of JSON body deserialization errors.

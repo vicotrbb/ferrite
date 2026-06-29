@@ -19,6 +19,7 @@ use std::collections::BTreeMap;
 pub struct CompletionRequest {
     #[serde(default)]
     model: String,
+    #[serde(default)]
     prompt: CompletionPrompt,
     #[serde(default)]
     stream: bool,

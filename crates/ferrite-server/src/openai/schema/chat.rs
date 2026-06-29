@@ -29,6 +29,7 @@ use std::collections::BTreeMap;
 pub struct ChatCompletionRequest {
     #[serde(default)]
     model: String,
+    #[serde(default)]
     messages: Vec<ChatMessage>,
     #[serde(default)]
     stream: bool,
