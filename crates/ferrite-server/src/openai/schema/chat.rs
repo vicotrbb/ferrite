@@ -190,6 +190,11 @@ impl ChatCompletionRequest {
                 );
             }
         }
+        fields.extend(
+            self.messages
+                .iter()
+                .flat_map(ChatMessage::unsupported_fields),
+        );
         fields
     }
 }
@@ -198,6 +203,10 @@ impl ChatCompletionRequest {
 pub struct ChatMessage {
     role: ChatRole,
     content: ChatContent,
+    #[serde(default)]
+    tool_calls: Option<Value>,
+    #[serde(default)]
+    function_call: Option<Value>,
 }
 
 impl ChatMessage {
@@ -206,6 +215,8 @@ impl ChatMessage {
         Self {
             role,
             content: ChatContent::from_text(content),
+            tool_calls: None,
+            function_call: None,
         }
     }
 
@@ -215,6 +226,16 @@ impl ChatMessage {
 
     pub fn content(&self) -> &str {
         self.content.text()
+    }
+
+    fn unsupported_fields(&self) -> Vec<String> {
+        UnsupportedFields::new()
+            .with_present("messages.tool_calls", !is_empty_tools(&self.tool_calls))
+            .with_present(
+                "messages.function_call",
+                !is_no_function_call(&self.function_call),
+            )
+            .into_vec()
     }
 }
 

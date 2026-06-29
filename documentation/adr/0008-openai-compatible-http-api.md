@@ -123,5 +123,8 @@ Responses API are out of scope until explicit ADRs or plans add them.
   records compatibility evidence for accepting assistant `refusal` content
   parts as local transcript text while keeping hosted refusal semantics out of
   scope.
+- `documentation/dev-notes/2026-06-29-openai-message-tool-call-fields.md`
+  records compatibility evidence for rejecting active message-level
+  tool/function call metadata instead of silently dropping it.
 - `documentation/dev-notes/2026-06-29-openai-real-http-rerun.md` records a
   fresh explicit rerun of real Tier 0 and Tier 1 OpenAI-compatible HTTP tests.
