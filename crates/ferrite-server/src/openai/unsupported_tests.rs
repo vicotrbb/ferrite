@@ -388,6 +388,28 @@ async fn chat_endpoint_rejects_message_without_content() -> Result<(), Box<dyn s
 }
 
 #[tokio::test]
+async fn chat_endpoint_rejects_malformed_message_content() -> Result<(), Box<dyn std::error::Error>>
+{
+    let body = post_chat(
+        r#"{
+            "model":"fixture-model",
+            "messages":[{
+                "role":"user",
+                "content":42
+            }]
+        }"#,
+    )
+    .await?;
+
+    assert_eq!(body.status, StatusCode::BAD_REQUEST);
+    assert_eq!(body.json["error"]["type"], "invalid_request_error");
+    let message = body.json["error"]["message"].as_str().unwrap_or_default();
+    assert!(message.contains("messages.content"), "{message}");
+    assert!(!message.contains("malformed JSON"), "{message}");
+    Ok(())
+}
+
+#[tokio::test]
 async fn chat_endpoint_rejects_user_refusal_content_parts() -> Result<(), Box<dyn std::error::Error>>
 {
     let body = post_chat(

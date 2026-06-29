@@ -218,3 +218,7 @@ Responses API are out of scope until explicit ADRs or plans add them.
   records compatibility evidence for returning explicit `stream` errors when
   generation requests provide malformed streaming flags instead of JSON body
   deserialization errors.
+- `documentation/dev-notes/2026-06-29-openai-malformed-message-content.md`
+  records compatibility evidence for returning explicit `messages.content`
+  errors when chat messages provide malformed scalar content values instead of
+  collapsing the message array or returning generic body errors.

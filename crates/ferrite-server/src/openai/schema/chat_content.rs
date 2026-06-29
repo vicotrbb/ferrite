@@ -36,16 +36,29 @@ impl<'de> Deserialize<'de> for ChatContent {
     where
         D: Deserializer<'de>,
     {
-        let wire = ChatContentWire::deserialize(deserializer)?;
-        Ok(wire.into_content())
+        Ok(ChatContentWire::from_value(Value::deserialize(deserializer)?).into_content())
     }
 }
 
-#[derive(Deserialize)]
-#[serde(untagged)]
 enum ChatContentWire {
     Text(String),
     Parts(Vec<ContentPart>),
+    Unsupported,
+}
+
+impl ChatContentWire {
+    fn from_value(value: Value) -> Self {
+        match value {
+            Value::String(text) => Self::Text(text),
+            Value::Array(parts) => Self::Parts(
+                parts
+                    .into_iter()
+                    .map(ContentPart::from_value)
+                    .collect::<Vec<_>>(),
+            ),
+            _ => Self::Unsupported,
+        }
+    }
 }
 
 impl ChatContentWire {
@@ -65,6 +78,11 @@ impl ChatContentWire {
                     has_unsupported_part,
                 }
             }
+            Self::Unsupported => ChatContent {
+                text: String::new(),
+                has_refusal_part: false,
+                has_unsupported_part: true,
+            },
         }
     }
 }
@@ -75,13 +93,9 @@ enum ContentPart {
     Unsupported,
 }
 
-impl<'de> Deserialize<'de> for ContentPart {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let value = Value::deserialize(deserializer)?;
-        Ok(match value.get("type").and_then(Value::as_str) {
+impl ContentPart {
+    fn from_value(value: Value) -> Self {
+        match value.get("type").and_then(Value::as_str) {
             Some("text") => value
                 .get("text")
                 .and_then(Value::as_str)
@@ -97,11 +111,9 @@ impl<'de> Deserialize<'de> for ContentPart {
                 })
                 .unwrap_or(Self::Unsupported),
             _ => Self::Unsupported,
-        })
+        }
     }
-}
 
-impl ContentPart {
     fn is_refusal(&self) -> bool {
         matches!(self, Self::Refusal { .. })
     }
@@ -172,6 +184,16 @@ mod tests {
     fn records_malformed_text_content_parts_for_request_validation(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let content: ChatContent = serde_json::from_str(r#"[{"type":"text"}]"#)?;
+
+        assert_eq!(content.text(), "");
+        assert!(!content.has_refusal_part());
+        assert!(content.has_unsupported_part());
+        Ok(())
+    }
+
+    #[test]
+    fn records_scalar_content_for_request_validation() -> Result<(), Box<dyn std::error::Error>> {
+        let content: ChatContent = serde_json::from_str("42")?;
 
         assert_eq!(content.text(), "");
         assert!(!content.has_refusal_part());
