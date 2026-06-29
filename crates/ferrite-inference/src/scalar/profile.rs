@@ -23,6 +23,8 @@ pub struct ScalarMatVecComparison {
     max_relative_diff: f32,
     reference_argmax_index: usize,
     candidate_argmax_index: usize,
+    reference_argmax_margin: f32,
+    candidate_argmax_margin: f32,
 }
 
 impl ScalarMatVecComparison {
@@ -68,6 +70,8 @@ impl ScalarMatVecComparison {
             .ok_or_else(|| InferenceError::new("matvec comparison output must not be empty"))?;
         let candidate_argmax_index = argmax_index(candidate)
             .ok_or_else(|| InferenceError::new("matvec comparison output must not be empty"))?;
+        let reference_argmax_margin = argmax_margin(reference);
+        let candidate_argmax_margin = argmax_margin(candidate);
 
         Ok(Self {
             label,
@@ -79,6 +83,8 @@ impl ScalarMatVecComparison {
             max_relative_diff,
             reference_argmax_index,
             candidate_argmax_index,
+            reference_argmax_margin,
+            candidate_argmax_margin,
         })
     }
 
@@ -117,6 +123,14 @@ impl ScalarMatVecComparison {
     pub fn candidate_argmax_index(&self) -> usize {
         self.candidate_argmax_index
     }
+
+    pub fn reference_argmax_margin(&self) -> f32 {
+        self.reference_argmax_margin
+    }
+
+    pub fn candidate_argmax_margin(&self) -> f32 {
+        self.candidate_argmax_margin
+    }
 }
 
 fn argmax_index(values: &[f32]) -> Option<usize> {
@@ -128,6 +142,24 @@ fn argmax_index(values: &[f32]) -> Option<usize> {
                 .then_with(|| right_index.cmp(left_index))
         })
         .map(|(index, _)| index)
+}
+
+fn argmax_margin(values: &[f32]) -> f32 {
+    let mut best = f32::NEG_INFINITY;
+    let mut second = f32::NEG_INFINITY;
+    for value in values {
+        if *value > best {
+            second = best;
+            best = *value;
+        } else if *value > second {
+            second = *value;
+        }
+    }
+    if second.is_finite() {
+        best - second
+    } else {
+        0.0
+    }
 }
 
 impl ScalarProfileEvent {
@@ -245,7 +277,7 @@ mod tests {
     }
 
     #[test]
-    fn matvec_comparison_records_argmax_indexes() -> Result<(), InferenceError> {
+    fn matvec_comparison_records_argmax_indexes_and_margins() -> Result<(), InferenceError> {
         let matrix = Matrix::from_row_major(3, 2, vec![1.0, 0.0, 0.0, 1.0, 1.0, 1.0])?;
         let comparison = ScalarMatVecComparison::new(
             "q8_k_probe",
@@ -256,6 +288,8 @@ mod tests {
 
         assert_eq!(comparison.reference_argmax_index(), 1);
         assert_eq!(comparison.candidate_argmax_index(), 2);
+        assert_eq!(comparison.reference_argmax_margin(), 0.5);
+        assert_eq!(comparison.candidate_argmax_margin(), 2.0);
         Ok(())
     }
 }

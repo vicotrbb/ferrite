@@ -74,7 +74,7 @@ fn print_profile(prefix: &str, total_elapsed: Duration, events: &[ScalarProfileE
 fn print_q8_k_comparisons(prefix: &str, comparisons: &[ScalarMatVecComparison]) {
     for comparison in comparisons {
         println!(
-            "{prefix}_q8_k_compare={}:{}:{}:{}:{}:{:.6}:{:.6}:{}:{}",
+            "{prefix}_q8_k_compare={}:{}:{}:{}:{}:{:.6}:{:.6}:{}:{}:{:.6}:{:.6}",
             comparison.label(),
             comparison.storage_kind().as_str(),
             comparison.rows(),
@@ -83,7 +83,9 @@ fn print_q8_k_comparisons(prefix: &str, comparisons: &[ScalarMatVecComparison]) 
             comparison.max_abs_diff(),
             comparison.max_relative_diff(),
             comparison.reference_argmax_index(),
-            comparison.candidate_argmax_index()
+            comparison.candidate_argmax_index(),
+            comparison.reference_argmax_margin(),
+            comparison.candidate_argmax_margin()
         );
     }
 }

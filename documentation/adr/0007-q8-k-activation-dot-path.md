@@ -131,6 +131,9 @@ reference implementation and benchmarking baseline, not the Ferrite runtime.
 - `documentation/dev-notes/2026-06-29-q8-k-qwen-argmax-rerun.md` applies the
   argmax diagnostic to the Qwen2.5-1.5B divergence point and shows the final
   output decision flip under experimental all-role Q8_K execution.
+- `documentation/dev-notes/2026-06-29-q8-k-comparison-margin.md` records the
+  comparison diagnostic that reports reference and Q8_K candidate argmax
+  margins alongside argmax indexes.
 - `documentation/dev-notes/2026-06-28-q8-k-single-role-probes.md` records the
   first single-role SmolLM2 probes; only `ffn_up` matched both fixed prompts,
   and it still requires broader parity evidence.
