@@ -1,6 +1,7 @@
 use super::{
     chat_content::ChatContent,
     function_options::{is_empty_functions, is_no_function_call},
+    message_metadata::is_optional_string,
     metadata::is_valid_metadata,
     modalities::is_text_only_modalities,
     neutral_options::{is_neutral_bool, is_neutral_number},
@@ -203,10 +204,10 @@ impl ChatCompletionRequest {
 pub struct ChatMessage {
     role: ChatRole,
     content: ChatContent,
-    #[serde(default, rename = "name")]
-    _name: Option<Value>,
-    #[serde(default, rename = "tool_call_id")]
-    _tool_call_id: Option<Value>,
+    #[serde(default)]
+    name: Option<Value>,
+    #[serde(default)]
+    tool_call_id: Option<Value>,
     #[serde(default)]
     tool_calls: Option<Value>,
     #[serde(default)]
@@ -221,8 +222,8 @@ impl ChatMessage {
         Self {
             role,
             content: ChatContent::from_text(content),
-            _name: None,
-            _tool_call_id: None,
+            name: None,
+            tool_call_id: None,
             tool_calls: None,
             function_call: None,
             extra_fields: BTreeMap::new(),
@@ -239,6 +240,11 @@ impl ChatMessage {
 
     fn unsupported_fields(&self) -> Vec<String> {
         UnsupportedFields::new()
+            .with_present("messages.name", !is_optional_string(&self.name))
+            .with_present(
+                "messages.tool_call_id",
+                !is_optional_string(&self.tool_call_id),
+            )
             .with_present("messages.tool_calls", !is_empty_tools(&self.tool_calls))
             .with_present(
                 "messages.function_call",

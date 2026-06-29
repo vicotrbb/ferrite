@@ -123,6 +123,53 @@ async fn chat_endpoint_rejects_unknown_message_fields() -> Result<(), Box<dyn st
 }
 
 #[tokio::test]
+async fn chat_endpoint_rejects_malformed_message_name() -> Result<(), Box<dyn std::error::Error>> {
+    let body = post_chat(
+        r#"{
+            "model":"fixture-model",
+            "messages":[{
+                "role":"user",
+                "content":"hello",
+                "name":{"id":"local-user"}
+            }]
+        }"#,
+    )
+    .await?;
+
+    assert_eq!(body.status, StatusCode::BAD_REQUEST);
+    assert_eq!(body.json["error"]["type"], "invalid_request_error");
+    assert!(body.json["error"]["message"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("messages.name"));
+    Ok(())
+}
+
+#[tokio::test]
+async fn chat_endpoint_rejects_malformed_message_tool_call_id(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let body = post_chat(
+        r#"{
+            "model":"fixture-model",
+            "messages":[{
+                "role":"tool",
+                "content":"hello",
+                "tool_call_id":123
+            }]
+        }"#,
+    )
+    .await?;
+
+    assert_eq!(body.status, StatusCode::BAD_REQUEST);
+    assert_eq!(body.json["error"]["type"], "invalid_request_error");
+    assert!(body.json["error"]["message"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("messages.tool_call_id"));
+    Ok(())
+}
+
+#[tokio::test]
 async fn chat_endpoint_rejects_json_response_format() -> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat(
         r#"{
