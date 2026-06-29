@@ -3,11 +3,16 @@ use serde::{Deserialize, Deserializer};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CompletionPrompt {
     prompts: Vec<String>,
+    has_unsupported_form: bool,
 }
 
 impl CompletionPrompt {
     pub fn prompts(&self) -> &[String] {
         &self.prompts
+    }
+
+    pub fn has_unsupported_form(&self) -> bool {
+        self.has_unsupported_form
     }
 
     pub fn single_prompt(&self) -> Option<&str> {
@@ -21,9 +26,7 @@ impl<'de> Deserialize<'de> for CompletionPrompt {
         D: Deserializer<'de>,
     {
         let wire = CompletionPromptWire::deserialize(deserializer)?;
-        Ok(Self {
-            prompts: wire.into_prompts(),
-        })
+        Ok(wire.into_prompt())
     }
 }
 
@@ -32,13 +35,35 @@ impl<'de> Deserialize<'de> for CompletionPrompt {
 enum CompletionPromptWire {
     Text(String),
     TextArray(Vec<String>),
+    TokenArray(Vec<i64>),
+    TokenArrayBatch(Vec<Vec<i64>>),
 }
 
 impl CompletionPromptWire {
-    fn into_prompts(self) -> Vec<String> {
+    fn into_prompt(self) -> CompletionPrompt {
         match self {
-            Self::Text(prompt) => vec![prompt],
-            Self::TextArray(prompts) => prompts,
+            Self::Text(prompt) => CompletionPrompt {
+                prompts: vec![prompt],
+                has_unsupported_form: false,
+            },
+            Self::TextArray(prompts) => CompletionPrompt {
+                prompts,
+                has_unsupported_form: false,
+            },
+            Self::TokenArray(tokens) => {
+                drop(tokens);
+                CompletionPrompt {
+                    prompts: Vec::new(),
+                    has_unsupported_form: true,
+                }
+            }
+            Self::TokenArrayBatch(token_batches) => {
+                drop(token_batches);
+                CompletionPrompt {
+                    prompts: Vec::new(),
+                    has_unsupported_form: true,
+                }
+            }
         }
     }
 }
@@ -52,6 +77,7 @@ mod tests {
         let prompt: CompletionPrompt = serde_json::from_str(r#""hello""#)?;
 
         assert_eq!(prompt.prompts(), ["hello"]);
+        assert!(!prompt.has_unsupported_form());
         Ok(())
     }
 
@@ -60,12 +86,27 @@ mod tests {
         let prompt: CompletionPrompt = serde_json::from_str(r#"["hello","world"]"#)?;
 
         assert_eq!(prompt.prompts(), ["hello", "world"]);
+        assert!(!prompt.has_unsupported_form());
         Ok(())
     }
 
     #[test]
-    fn rejects_token_prompt_forms() {
-        assert!(serde_json::from_str::<CompletionPrompt>(r#"[1,2,3]"#).is_err());
-        assert!(serde_json::from_str::<CompletionPrompt>(r#"[[1,2,3]]"#).is_err());
+    fn records_token_prompt_forms_for_request_validation() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let prompt: CompletionPrompt = serde_json::from_str(r#"[1,2,3]"#)?;
+
+        assert!(prompt.prompts().is_empty());
+        assert!(prompt.has_unsupported_form());
+        Ok(())
+    }
+
+    #[test]
+    fn records_token_prompt_batches_for_request_validation(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let prompt: CompletionPrompt = serde_json::from_str(r#"[[1,2,3]]"#)?;
+
+        assert!(prompt.prompts().is_empty());
+        assert!(prompt.has_unsupported_form());
+        Ok(())
     }
 }

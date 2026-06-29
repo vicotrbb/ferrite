@@ -173,3 +173,7 @@ Responses API are out of scope until explicit ADRs or plans add them.
   records compatibility evidence for returning explicit `messages.content`
   errors for malformed text content parts instead of JSON body deserialization
   errors.
+- `documentation/dev-notes/2026-06-29-openai-token-prompts.md` records
+  compatibility evidence for returning explicit `prompt` errors for documented
+  legacy completion token prompt forms instead of JSON body deserialization
+  errors.

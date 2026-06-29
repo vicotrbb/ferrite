@@ -84,6 +84,7 @@ impl CompletionRequest {
 
     pub fn unsupported_fields(&self) -> Vec<String> {
         let mut fields = UnsupportedFields::new()
+            .with_present("prompt", self.prompt.has_unsupported_form())
             .with_present("suffix", self.suffix.is_some())
             .with_present("temperature", !is_neutral_number(&self.temperature, 0.0))
             .with_present("top_p", !is_neutral_number(&self.top_p, 1.0))
