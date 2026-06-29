@@ -23,4 +23,6 @@ mod service_tier_tests;
 #[cfg(test)]
 mod stream_options_tests;
 #[cfg(test)]
+mod token_limit_tests;
+#[cfg(test)]
 mod unsupported_tests;

@@ -81,6 +81,10 @@ impl CompletionRequest {
         self.max_tokens.value()
     }
 
+    pub fn max_tokens_param(&self) -> Option<&'static str> {
+        self.max_tokens.value().map(|_| "max_tokens")
+    }
+
     pub fn stream_include_usage(&self) -> bool {
         self.stream_options
             .as_ref()

@@ -73,7 +73,8 @@ async fn chat_completions(
     ensure_model(&state, request.model())?;
     ensure_supported_chat_request(&request)?;
     let prompt = render_chat_prompt(request.messages())?;
-    let max_tokens = normalized_max_tokens(&state, request.max_tokens())?;
+    let max_tokens =
+        normalized_max_tokens(&state, request.max_tokens(), request.max_tokens_param())?;
     let permit = acquire_inference_permit(&state).await?;
     if request.stream() {
         return Ok(chat_stream_response(
@@ -117,7 +118,8 @@ async fn completions(
             "prompt must contain non-whitespace text",
         ));
     }
-    let max_tokens = normalized_max_tokens(&state, request.max_tokens())?;
+    let max_tokens =
+        normalized_max_tokens(&state, request.max_tokens(), request.max_tokens_param())?;
     let permit = acquire_inference_permit(&state).await?;
     if request.stream() {
         let Some(prompt) = request.single_prompt() else {
@@ -243,9 +245,13 @@ async fn acquire_inference_permit(
 fn normalized_max_tokens(
     state: &ServerState,
     value: Option<usize>,
+    param: Option<&'static str>,
 ) -> Result<usize, OpenAiHttpError> {
     state
         .token_limits()
         .normalize(value)
-        .map_err(|error| OpenAiHttpError::invalid_request(error.to_string()))
+        .map_err(|error| match param {
+            Some(param) => OpenAiHttpError::invalid_request_with_param(error.to_string(), param),
+            None => OpenAiHttpError::invalid_request(error.to_string()),
+        })
 }

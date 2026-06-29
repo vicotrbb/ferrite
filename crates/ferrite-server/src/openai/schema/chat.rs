@@ -124,6 +124,16 @@ impl ChatCompletionRequest {
             .or_else(|| self.max_completion_tokens.value())
     }
 
+    pub fn max_tokens_param(&self) -> Option<&'static str> {
+        if self.max_tokens.value().is_some() {
+            Some("max_tokens")
+        } else if self.max_completion_tokens.value().is_some() {
+            Some("max_completion_tokens")
+        } else {
+            None
+        }
+    }
+
     pub fn stream_include_usage(&self) -> bool {
         self.stream_options
             .as_ref()
