@@ -10,8 +10,9 @@ use ferrite_model::tokenizer::GgufTokenizer;
 use std::error::Error;
 use std::ffi::OsString;
 use std::fs;
-use std::io;
-use std::time::Instant;
+use std::io::{self, Write};
+use std::thread;
+use std::time::{Duration, Instant};
 
 pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error>> {
     let args = args::parse(args)?;
@@ -21,6 +22,11 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
     let tokenizer = GgufTokenizer::from_gguf(&gguf)?;
     let model = ScalarLlamaModel::from_gguf_scalar(&gguf, &bytes)?;
     drop(bytes);
+    if let Some(sleep_ms) = args.sleep_after_load_ms {
+        println!("sleep_after_load_ms={sleep_ms}");
+        io::stdout().flush()?;
+        thread::sleep(Duration::from_millis(sleep_ms));
+    }
 
     let prompt_token_ids = prompt_token_ids(&tokenizer, args.prompt)?;
     let q8_k_activation_matvec_policy = if args.experimental_q8_k_activation_matvec {

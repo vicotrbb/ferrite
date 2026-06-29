@@ -244,6 +244,33 @@ fn cli_benchmarks_repeated_next_token_runs_after_loading_once() -> Result<(), Bo
 }
 
 #[test]
+fn cli_can_pause_after_model_load_for_memory_sampling() -> Result<(), Box<dyn Error>> {
+    let model_path = write_fixture_model()?;
+    let binary = cli_binary()?;
+
+    let output = Command::new(binary)
+        .arg("--model")
+        .arg(&model_path)
+        .arg("--prompt")
+        .arg("hello")
+        .arg("--sleep-after-load-ms")
+        .arg("1")
+        .output()?;
+
+    remove_fixture_model(&model_path)?;
+
+    assert!(
+        output.status.success(),
+        "cli failed with stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout)?;
+    assert!(stdout.contains("sleep_after_load_ms=1"));
+    assert!(stdout.contains("next_token_id=2"));
+    Ok(())
+}
+
+#[test]
 fn cli_profiles_benchmark_token_id_decode() -> Result<(), Box<dyn Error>> {
     let model_path = write_fixture_model()?;
     let binary = cli_binary()?;

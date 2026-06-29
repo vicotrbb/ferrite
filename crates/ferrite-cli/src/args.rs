@@ -17,6 +17,7 @@ pub struct CliArgs {
     pub experimental_q8_k_activation_roles: Option<String>,
     pub compare_q8_k_activation_matvec: bool,
     pub stream: bool,
+    pub sleep_after_load_ms: Option<u64>,
 }
 
 pub enum PromptSource {
@@ -39,6 +40,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
     let mut experimental_q8_k_activation_roles = None;
     let mut compare_q8_k_activation_matvec = false;
     let mut stream = false;
+    let mut sleep_after_load_ms = None;
     let mut iter = args.into_iter();
     let _program = iter.next();
 
@@ -92,6 +94,12 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
             }
             "--stream" => {
                 stream = true;
+            }
+            "--sleep-after-load-ms" => {
+                sleep_after_load_ms = Some(parse_nonzero_u64(
+                    next_value(&mut iter, "--sleep-after-load-ms")?,
+                    "--sleep-after-load-ms",
+                )?);
             }
             "--profile-next-token" => {
                 profile_next_token = true;
@@ -148,6 +156,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
         experimental_q8_k_activation_roles,
         compare_q8_k_activation_matvec,
         stream,
+        sleep_after_load_ms,
     })
 }
 
@@ -230,6 +239,17 @@ fn parse_nonzero_usize(value: OsString, flag: &str) -> Result<usize, Box<dyn Err
     Ok(value)
 }
 
+fn parse_nonzero_u64(value: OsString, flag: &str) -> Result<u64, Box<dyn Error>> {
+    let value = os_string_to_string(value)?;
+    let value = value
+        .parse::<u64>()
+        .map_err(|error| io::Error::other(format!("{flag} must be a u64: {error}")))?;
+    if value == 0 {
+        return Err(io::Error::other(format!("{flag} must be greater than zero")).into());
+    }
+    Ok(value)
+}
+
 fn parse_token_ids(value: OsString) -> Result<Vec<usize>, Box<dyn Error>> {
     let value = os_string_to_string(value)?;
     let mut token_ids = Vec::new();
@@ -248,5 +268,5 @@ fn parse_token_ids(value: OsString) -> Result<Vec<usize>, Box<dyn Error>> {
 }
 
 fn usage() -> &'static str {
-    "usage: ferrite --model <path.gguf> (--prompt <text> | --prompt-token-ids <id[,id...]>) [--expect-token-id <id>] [--top-logits <count>] [--profile-next-token] [--generate-tokens <count>] [--expect-generated-token-ids <id[,id...]>] [--stream] [--benchmark-runs <count>] [--profile-benchmark-token] [--experimental-q8-k-activation-matvec] [--experimental-q8-k-activation-roles <role[,role...]>] [--compare-q8-k-activation-matvec]"
+    "usage: ferrite --model <path.gguf> (--prompt <text> | --prompt-token-ids <id[,id...]>) [--expect-token-id <id>] [--top-logits <count>] [--profile-next-token] [--generate-tokens <count>] [--expect-generated-token-ids <id[,id...]>] [--stream] [--benchmark-runs <count>] [--profile-benchmark-token] [--sleep-after-load-ms <ms>] [--experimental-q8-k-activation-matvec] [--experimental-q8-k-activation-roles <role[,role...]>] [--compare-q8-k-activation-matvec]"
 }
