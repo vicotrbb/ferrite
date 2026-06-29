@@ -154,7 +154,16 @@ async fn method_not_allowed() -> OpenAiHttpError {
     OpenAiHttpError::method_not_allowed()
 }
 
-async fn not_found(OriginalUri(uri): OriginalUri) -> OpenAiHttpError {
+async fn not_found(
+    State(state): State<ServerState>,
+    headers: HeaderMap,
+    OriginalUri(uri): OriginalUri,
+) -> OpenAiHttpError {
+    if uri.path().starts_with("/v1/") {
+        if let Err(error) = ensure_authorized(&state, &headers) {
+            return error;
+        }
+    }
     OpenAiHttpError::route_not_found(uri.path())
 }
 
