@@ -148,3 +148,6 @@ Responses API are out of scope until explicit ADRs or plans add them.
 - `documentation/dev-notes/2026-06-29-openai-empty-logit-bias.md` records
   compatibility evidence for accepting empty `logit_bias` maps as local no-ops
   while keeping non-empty biasing unsupported.
+- `documentation/dev-notes/2026-06-29-openai-assistant-audio-null.md` records
+  compatibility evidence for accepting `audio: null` on assistant transcript
+  messages while keeping non-null audio metadata unsupported.
