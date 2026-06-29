@@ -2,6 +2,7 @@ mod support;
 
 use std::path::PathBuf;
 
+use serde_json::Value;
 use support::http::{response_json, send_http_request};
 
 const DEFAULT_MODEL_PATH: &str = "target/models/qwen2.5-1.5b-instruct-q8_0.gguf";
@@ -39,10 +40,30 @@ async fn live_http_server_matches_qwen_1_5b_q8_chat_first_tokens_for_reference_p
             server.addr(),
             "POST",
             "/v1/chat/completions",
-            chat_body(case.prompt).as_bytes(),
+            chat_body(case.prompt, false).as_bytes(),
         )
         .await?;
         assert_qwen_chat_response(&response, case)?;
+    }
+    Ok(())
+}
+
+#[tokio::test]
+#[ignore = "requires local Qwen2.5-1.5B Q8_0 GGUF model artifact"]
+async fn live_http_server_streams_qwen_1_5b_q8_chat_first_tokens_for_reference_prompts(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let model_path = qwen_1_5b_q8_model_path()?;
+    let server = support::LiveServer::start_with_existing_model(REAL_MODEL_ID, model_path).await?;
+
+    for case in prompt_cases() {
+        let response = send_http_request(
+            server.addr(),
+            "POST",
+            "/v1/chat/completions",
+            chat_body(case.prompt, true).as_bytes(),
+        )
+        .await?;
+        assert_qwen_chat_stream_response(&response, case)?;
     }
     Ok(())
 }
@@ -54,6 +75,7 @@ struct PromptCase {
     completion_text: &'static str,
     chat_prompt_tokens: u64,
     chat_content: &'static str,
+    chat_stream_content: &'static str,
 }
 
 fn prompt_cases() -> [PromptCase; 6] {
@@ -64,6 +86,7 @@ fn prompt_cases() -> [PromptCase; 6] {
             completion_text: "\n",
             chat_prompt_tokens: 8,
             chat_content: "你好",
+            chat_stream_content: "你好",
         },
         PromptCase {
             prompt: "The capital of France is",
@@ -71,6 +94,7 @@ fn prompt_cases() -> [PromptCase; 6] {
             completion_text: " Paris",
             chat_prompt_tokens: 11,
             chat_content: " Paris",
+            chat_stream_content: " Paris",
         },
         PromptCase {
             prompt: "Once upon a time",
@@ -78,6 +102,7 @@ fn prompt_cases() -> [PromptCase; 6] {
             completion_text: ",",
             chat_prompt_tokens: 10,
             chat_content: "1",
+            chat_stream_content: "1",
         },
         PromptCase {
             prompt: "Rust is a systems programming language",
@@ -85,6 +110,7 @@ fn prompt_cases() -> [PromptCase; 6] {
             completion_text: " that",
             chat_prompt_tokens: 12,
             chat_content: "你说",
+            chat_stream_content: "你说",
         },
         PromptCase {
             prompt: "Machine learning models can",
@@ -92,6 +118,7 @@ fn prompt_cases() -> [PromptCase; 6] {
             completion_text: " be",
             chat_prompt_tokens: 10,
             chat_content: "1",
+            chat_stream_content: "1",
         },
         PromptCase {
             prompt: "The recipe calls for",
@@ -99,6 +126,7 @@ fn prompt_cases() -> [PromptCase; 6] {
             completion_text: " ",
             chat_prompt_tokens: 10,
             chat_content: "2",
+            chat_stream_content: "2",
         },
     ]
 }
@@ -112,7 +140,7 @@ fn completion_body(prompt: &str) -> String {
     .to_string()
 }
 
-fn chat_body(prompt: &str) -> String {
+fn chat_body(prompt: &str, stream: bool) -> String {
     serde_json::json!({
         "model": REAL_MODEL_ID,
         "messages": [
@@ -122,6 +150,7 @@ fn chat_body(prompt: &str) -> String {
             },
         ],
         "max_completion_tokens": 1,
+        "stream": stream,
     })
     .to_string()
 }
@@ -168,6 +197,78 @@ fn assert_qwen_chat_response(
     assert_eq!(body["usage"]["completion_tokens"], 1);
     assert_eq!(body["usage"]["total_tokens"], case.chat_prompt_tokens + 1);
     Ok(())
+}
+
+fn assert_qwen_chat_stream_response(
+    response: &str,
+    case: PromptCase,
+) -> Result<(), Box<dyn std::error::Error>> {
+    assert!(
+        response.starts_with("HTTP/1.1 200 OK"),
+        "unexpected response for prompt {:?}: {response}",
+        case.prompt
+    );
+    assert!(
+        response
+            .to_ascii_lowercase()
+            .contains("content-type: text/event-stream"),
+        "unexpected response headers for prompt {:?}: {response}",
+        case.prompt
+    );
+    assert!(
+        response.contains("data: [DONE]"),
+        "missing stream terminator for prompt {:?}: {response}",
+        case.prompt
+    );
+
+    let events = sse_json_events(response)?;
+    assert!(
+        !events.is_empty(),
+        "missing JSON SSE events for prompt {:?}: {response}",
+        case.prompt
+    );
+    for event in &events {
+        assert_eq!(event["object"], "chat.completion.chunk");
+        assert_eq!(event["model"], REAL_MODEL_ID);
+    }
+    let generated_content = events
+        .iter()
+        .filter_map(|event| {
+            let choice = &event["choices"][0];
+            (choice["finish_reason"].is_null()).then(|| choice["delta"]["content"].as_str())?
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        generated_content,
+        vec![case.chat_stream_content],
+        "unexpected generated chat stream chunks"
+    );
+    let stop_events = events
+        .iter()
+        .filter(|event| event["choices"][0]["finish_reason"] == "stop")
+        .collect::<Vec<_>>();
+    assert_eq!(
+        stop_events.len(),
+        1,
+        "expected exactly one terminal stream chunk"
+    );
+    assert!(
+        stop_events[0]["choices"][0]["delta"]["content"].is_null(),
+        "terminal chat stream chunk should not include content"
+    );
+    Ok(())
+}
+
+fn sse_json_events(response: &str) -> Result<Vec<Value>, Box<dyn std::error::Error>> {
+    let (_, body) = response
+        .split_once("\r\n\r\n")
+        .ok_or("expected HTTP response body")?;
+    body.lines()
+        .filter_map(|line| line.strip_prefix("data: "))
+        .filter(|data| *data != "[DONE]")
+        .map(serde_json::from_str)
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(Into::into)
 }
 
 fn qwen_1_5b_q8_model_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
