@@ -34,6 +34,7 @@ mod response_shape_tests;
 mod routes_tests;
 #[cfg(test)]
 mod service_tier_tests;
+mod stop_filter;
 #[cfg(test)]
 mod stop_sequences_tests;
 #[cfg(test)]
