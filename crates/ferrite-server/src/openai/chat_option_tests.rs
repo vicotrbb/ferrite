@@ -65,6 +65,12 @@ async fn chat_endpoint_accepts_explicit_no_tool_options() -> Result<(), Box<dyn 
 }
 
 #[tokio::test]
+async fn chat_endpoint_accepts_auto_tool_choice_without_tools(
+) -> Result<(), Box<dyn std::error::Error>> {
+    assert_chat_option_is_accepted(r#""tool_choice":"auto""#).await
+}
+
+#[tokio::test]
 async fn chat_endpoint_accepts_parallel_tool_calls_without_tools(
 ) -> Result<(), Box<dyn std::error::Error>> {
     assert_chat_option_is_accepted(r#""tools":[],"parallel_tool_calls":true"#).await
@@ -74,6 +80,12 @@ async fn chat_endpoint_accepts_parallel_tool_calls_without_tools(
 async fn chat_endpoint_accepts_explicit_no_function_options(
 ) -> Result<(), Box<dyn std::error::Error>> {
     assert_chat_option_is_accepted(r#""functions":[],"function_call":"none""#).await
+}
+
+#[tokio::test]
+async fn chat_endpoint_accepts_auto_function_call_without_functions(
+) -> Result<(), Box<dyn std::error::Error>> {
+    assert_chat_option_is_accepted(r#""function_call":"auto""#).await
 }
 
 #[tokio::test]

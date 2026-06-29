@@ -1,7 +1,7 @@
 use super::{
     chat_message::ChatMessage,
     chat_messages::deserialize_chat_messages,
-    function_options::{is_empty_functions, is_no_function_call},
+    function_options::{is_empty_functions, is_neutral_function_call},
     logit_bias::is_neutral_logit_bias,
     metadata::is_valid_metadata,
     modalities::is_text_only_modalities,
@@ -147,13 +147,19 @@ impl ChatCompletionRequest {
     pub fn unsupported_fields(&self) -> Vec<String> {
         let mut fields = UnsupportedFields::new()
             .with_present("tools", !is_empty_tools(&self.tools))
-            .with_present("tool_choice", !is_no_tool_choice(&self.tool_choice))
+            .with_present(
+                "tool_choice",
+                !is_no_tool_choice(&self.tool_choice, &self.tools),
+            )
             .with_present(
                 "parallel_tool_calls",
                 !is_neutral_parallel_tool_calls(&self.parallel_tool_calls, &self.tools),
             )
             .with_present("functions", !is_empty_functions(&self.functions))
-            .with_present("function_call", !is_no_function_call(&self.function_call))
+            .with_present(
+                "function_call",
+                !is_neutral_function_call(&self.function_call, &self.functions),
+            )
             .with_present(
                 "response_format",
                 !is_neutral_response_format(&self.response_format),
