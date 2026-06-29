@@ -4,8 +4,9 @@
 
 This slice extends real Tier 1 OpenAI-compatible HTTP `stop` sequence evidence
 to SmolLM2-1.7B-Instruct Q4_K_M. It uses the existing known one-token
-`hello world` completion and chat shapes so the requested stop sequence fully
-trims the visible generated token.
+`hello world` completion and chat shapes plus the six established legacy
+completion reference prompts so the requested stop sequence fully trims the
+visible generated token.
 
 This is compatibility evidence for the HTTP server boundary. It does not claim
 longer generations, x86_64 stop behavior, broad chat stop prompt coverage, or
@@ -13,9 +14,12 @@ full Tier 1 HTTP completion.
 
 ## Code Organization
 
-The new proof is isolated in
-`crates/ferrite-server/tests/openai_real_tier1_smollm_1_7b_stop.rs` and reuses
-the shared stop-response assertions from
+The one-prompt four-endpoint proof is isolated in
+`crates/ferrite-server/tests/openai_real_tier1_smollm_1_7b_stop.rs`. The
+six-prompt legacy completion proof lives separately in
+`crates/ferrite-server/tests/openai_real_tier1_smollm_1_7b_stop_prompts.rs` so
+the real-model prompt matrix does not turn into a large mixed-purpose test
+file. Both tests reuse the shared stop-response assertions from
 `crates/ferrite-server/tests/support/stop_sequences.rs`.
 
 ## Local Artifact
@@ -63,7 +67,7 @@ text/content chunks and still emit a terminal `finish_reason: "stop"` event and
 Command:
 
 ```sh
-cargo test -p ferrite-server --test openai_real_tier1_smollm_1_7b_stop live_http_server_applies_completion_stop_sequences_to_smollm_1_7b_q4_reference_prompts -- --ignored --nocapture
+cargo test -p ferrite-server --test openai_real_tier1_smollm_1_7b_stop_prompts live_http_server_applies_completion_stop_sequences_to_smollm_1_7b_q4_reference_prompts -- --ignored --nocapture
 ```
 
 Observed result:
@@ -90,3 +94,15 @@ requested stop sequence. Non-streaming responses preserve generated-token usage
 accounting and return empty visible text. Streaming responses suppress visible
 text chunks and still emit a terminal `finish_reason: "stop"` event and
 `data: [DONE]`.
+
+The observed pass was captured before the test was split into the focused
+`openai_real_tier1_smollm_1_7b_stop_prompts` target; the test body was moved
+unchanged so the current rerunnable command above points at the organized file.
+
+## Broad Chat Stop Gap
+
+Broad six-prompt SmolLM2-1.7B chat stop-sequence coverage is still not claimed
+by this note. A diagnostic attempt against the first `hello world`
+non-streaming chat stop request was interrupted after it remained in the first
+request for several minutes on the local scalar path. The existing one-prompt
+four-endpoint proof above remains the current SmolLM2 chat stop evidence.
