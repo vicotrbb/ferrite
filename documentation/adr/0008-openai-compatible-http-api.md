@@ -201,3 +201,7 @@ Responses API are out of scope until explicit ADRs or plans add them.
   compatibility evidence for returning explicit `messages` errors when chat
   requests provide malformed message arrays instead of JSON body
   deserialization errors.
+- `documentation/dev-notes/2026-06-29-openai-malformed-prompt.md` records
+  compatibility evidence for returning explicit `prompt` errors when legacy
+  completion requests provide malformed prompt values instead of JSON body
+  deserialization errors.

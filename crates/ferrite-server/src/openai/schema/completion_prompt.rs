@@ -1,4 +1,5 @@
 use serde::{Deserialize, Deserializer};
+use serde_json::Value;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct CompletionPrompt {
@@ -25,21 +26,63 @@ impl<'de> Deserialize<'de> for CompletionPrompt {
     where
         D: Deserializer<'de>,
     {
-        let wire = CompletionPromptWire::deserialize(deserializer)?;
-        Ok(wire.into_prompt())
+        Ok(CompletionPromptWire::from_value(Value::deserialize(deserializer)?).into_prompt())
     }
 }
 
-#[derive(Deserialize)]
-#[serde(untagged)]
 enum CompletionPromptWire {
     Text(String),
     TextArray(Vec<String>),
     TokenArray(Vec<i64>),
     TokenArrayBatch(Vec<Vec<i64>>),
+    Unsupported,
 }
 
 impl CompletionPromptWire {
+    fn from_value(value: Value) -> Self {
+        match value {
+            Value::String(prompt) => Self::Text(prompt),
+            Value::Array(values) => Self::from_array(values),
+            _ => Self::Unsupported,
+        }
+    }
+
+    fn from_array(values: Vec<Value>) -> Self {
+        if values.iter().all(Value::is_string) {
+            return Self::TextArray(
+                values
+                    .into_iter()
+                    .filter_map(|value| value.as_str().map(ToOwned::to_owned))
+                    .collect(),
+            );
+        }
+        if values.iter().all(Value::is_i64) {
+            return Self::TokenArray(
+                values
+                    .into_iter()
+                    .filter_map(|value| value.as_i64())
+                    .collect(),
+            );
+        }
+        if values.iter().all(is_token_array) {
+            return Self::TokenArrayBatch(
+                values
+                    .into_iter()
+                    .filter_map(|value| match value {
+                        Value::Array(tokens) => Some(
+                            tokens
+                                .into_iter()
+                                .filter_map(|token| token.as_i64())
+                                .collect(),
+                        ),
+                        _ => None,
+                    })
+                    .collect(),
+            );
+        }
+        Self::Unsupported
+    }
+
     fn into_prompt(self) -> CompletionPrompt {
         match self {
             Self::Text(prompt) => CompletionPrompt {
@@ -64,7 +107,18 @@ impl CompletionPromptWire {
                     has_unsupported_form: true,
                 }
             }
+            Self::Unsupported => CompletionPrompt {
+                prompts: Vec::new(),
+                has_unsupported_form: true,
+            },
         }
+    }
+}
+
+fn is_token_array(value: &Value) -> bool {
+    match value {
+        Value::Array(tokens) => tokens.iter().all(Value::is_i64),
+        _ => false,
     }
 }
 
@@ -104,6 +158,24 @@ mod tests {
     fn records_token_prompt_batches_for_request_validation(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let prompt: CompletionPrompt = serde_json::from_str(r#"[[1,2,3]]"#)?;
+
+        assert!(prompt.prompts().is_empty());
+        assert!(prompt.has_unsupported_form());
+        Ok(())
+    }
+
+    #[test]
+    fn records_null_prompt_for_request_validation() -> Result<(), Box<dyn std::error::Error>> {
+        let prompt: CompletionPrompt = serde_json::from_str("null")?;
+
+        assert!(prompt.prompts().is_empty());
+        assert!(prompt.has_unsupported_form());
+        Ok(())
+    }
+
+    #[test]
+    fn records_object_prompt_for_request_validation() -> Result<(), Box<dyn std::error::Error>> {
+        let prompt: CompletionPrompt = serde_json::from_str(r#"{"text":"hello"}"#)?;
 
         assert!(prompt.prompts().is_empty());
         assert!(prompt.has_unsupported_form());
