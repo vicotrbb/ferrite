@@ -66,6 +66,9 @@ impl Q8KActivationMatvecRole {
     }
 
     pub fn parse_list(value: &str) -> Result<Vec<Self>, String> {
+        if value == "all" {
+            return Ok(Self::ALL.to_vec());
+        }
         if value.is_empty() {
             return Err("Q8_K activation matvec role list must not be empty".to_owned());
         }

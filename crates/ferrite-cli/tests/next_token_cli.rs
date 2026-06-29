@@ -202,6 +202,36 @@ fn cli_scopes_q8_k_comparison_roles_without_changing_execution_policy() -> Resul
 }
 
 #[test]
+fn cli_accepts_all_q8_k_activation_role_scope() -> Result<(), Box<dyn Error>> {
+    let model_path = write_q4_k_fixture_model()?;
+    let binary = cli_binary()?;
+
+    let output = Command::new(binary)
+        .arg("--model")
+        .arg(&model_path)
+        .arg("--prompt-token-ids")
+        .arg("0")
+        .arg("--profile-next-token")
+        .arg("--compare-q8-k-activation-matvec")
+        .arg("--experimental-q8-k-activation-roles")
+        .arg("all")
+        .output()?;
+
+    remove_fixture_model(&model_path)?;
+
+    assert!(
+        output.status.success(),
+        "cli failed with stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout)?;
+    assert!(stdout.contains("q8_k_activation_matvec_roles=all"));
+    assert!(stdout.contains("profile_next_token_q8_k_compare=layer.0.q_proj:"));
+    assert!(stdout.contains("profile_next_token_q8_k_compare=layer.0.ffn_down:"));
+    Ok(())
+}
+
+#[test]
 fn cli_rejects_q8_k_role_scope_without_comparison_or_experimental_dispatch(
 ) -> Result<(), Box<dyn Error>> {
     let model_path = write_q4_k_fixture_model()?;
