@@ -114,6 +114,35 @@ async fn completions_endpoint_accepts_neutral_sampling_options(
 }
 
 #[tokio::test]
+async fn completions_endpoint_accepts_array_of_string_prompts(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let model_path = write_fixture_model()?;
+    let engine = InferenceEngine::load(&model_path)?;
+    let app = router(ServerState::with_engine("fixture-model".to_owned(), engine));
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/completions")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            r#"{"model":"fixture-model","prompt":["hello","hello"],"max_tokens":1}"#,
+        ))?;
+    let response = app.oneshot(request).await?;
+    remove_fixture_model(&model_path)?;
+
+    let status = response.status();
+    let body = to_json(response.into_body()).await?;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["choices"][0]["index"], 0);
+    assert_eq!(body["choices"][0]["text"], "winner");
+    assert_eq!(body["choices"][1]["index"], 1);
+    assert_eq!(body["choices"][1]["text"], "winner");
+    assert_eq!(body["usage"]["prompt_tokens"], 2);
+    assert_eq!(body["usage"]["completion_tokens"], 2);
+    assert_eq!(body["usage"]["total_tokens"], 4);
+    Ok(())
+}
+
+#[tokio::test]
 async fn completions_endpoint_streams_openai_sse_chunks() -> Result<(), Box<dyn std::error::Error>>
 {
     let model_path = write_fixture_model()?;

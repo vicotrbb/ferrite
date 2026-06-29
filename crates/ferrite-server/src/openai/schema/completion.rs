@@ -1,6 +1,6 @@
 use super::{
-    neutral_options::is_neutral_number, stream_options::StreamOptions, unix_timestamp,
-    unsupported::UnsupportedFields, usage::Usage,
+    completion_prompt::CompletionPrompt, neutral_options::is_neutral_number,
+    stream_options::StreamOptions, unix_timestamp, unsupported::UnsupportedFields, usage::Usage,
 };
 use crate::runtime::GeneratedText;
 use serde::{Deserialize, Serialize};
@@ -10,7 +10,7 @@ use std::collections::BTreeMap;
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 pub struct CompletionRequest {
     model: String,
-    prompt: String,
+    prompt: CompletionPrompt,
     #[serde(default)]
     stream: bool,
     #[serde(default)]
@@ -50,8 +50,12 @@ impl CompletionRequest {
         &self.model
     }
 
-    pub fn prompt(&self) -> &str {
-        &self.prompt
+    pub fn prompts(&self) -> &[String] {
+        self.prompt.prompts()
+    }
+
+    pub fn single_prompt(&self) -> Option<&str> {
+        self.prompt.single_prompt()
     }
 
     pub fn stream(&self) -> bool {
@@ -118,14 +122,22 @@ pub struct CompletionResponse {
 
 impl CompletionResponse {
     pub fn from_generation(model: String, generated: GeneratedText) -> Self {
+        Self::from_generations(model, vec![generated])
+    }
+
+    pub fn from_generations(model: String, generated: Vec<GeneratedText>) -> Self {
         let created = unix_timestamp();
         Self {
             id: format!("cmpl-ferrite-{created}"),
             object: "text_completion",
             created,
             model,
-            choices: vec![CompletionChoice::new(generated.text().to_owned())],
-            usage: Usage::from_generation(&generated),
+            choices: generated
+                .iter()
+                .enumerate()
+                .map(|(index, generated)| CompletionChoice::new(index, generated.text().to_owned()))
+                .collect(),
+            usage: Usage::from_generations(&generated),
         }
     }
 }
@@ -138,10 +150,10 @@ struct CompletionChoice {
 }
 
 impl CompletionChoice {
-    fn new(text: String) -> Self {
+    fn new(index: usize, text: String) -> Self {
         Self {
             text,
-            index: 0,
+            index,
             finish_reason: "stop",
         }
     }

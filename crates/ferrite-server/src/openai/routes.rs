@@ -1,6 +1,6 @@
 use super::{
     error::OpenAiHttpError,
-    generation::{chat_stream_response, completion_stream_response, generate_text},
+    generation::{chat_stream_response, completion_stream_response, generate_text, generate_texts},
     json::OpenAiJson,
     prompt::render_chat_prompt,
     schema::{
@@ -96,7 +96,16 @@ async fn completions(
     ensure_authorized(&state, &headers)?;
     ensure_model(&state, request.model())?;
     ensure_supported_completion_request(&request)?;
-    if request.prompt().trim().is_empty() {
+    if request.prompts().is_empty() {
+        return Err(OpenAiHttpError::invalid_request(
+            "prompt must contain at least one item",
+        ));
+    }
+    if request
+        .prompts()
+        .iter()
+        .any(|prompt| prompt.trim().is_empty())
+    {
         return Err(OpenAiHttpError::invalid_request(
             "prompt must contain non-whitespace text",
         ));
@@ -104,23 +113,28 @@ async fn completions(
     let max_tokens = normalized_max_tokens(&state, request.max_tokens())?;
     let permit = acquire_inference_permit(&state).await?;
     if request.stream() {
+        let Some(prompt) = request.single_prompt() else {
+            return Err(OpenAiHttpError::invalid_request(
+                "streaming completions require exactly one text prompt",
+            ));
+        };
         return Ok(completion_stream_response(
             required_engine(&state)?,
             state.model_id().to_owned(),
-            request.prompt().to_owned(),
+            prompt.to_owned(),
             max_tokens,
             request.stream_include_usage(),
             permit,
         ));
     }
-    let generated = generate_text(
+    let generated = generate_texts(
         state.engine(),
-        request.prompt().to_owned(),
+        request.prompts().to_vec(),
         max_tokens,
         permit,
     )
     .await?;
-    Ok(Json(CompletionResponse::from_generation(
+    Ok(Json(CompletionResponse::from_generations(
         state.model_id().to_owned(),
         generated,
     ))

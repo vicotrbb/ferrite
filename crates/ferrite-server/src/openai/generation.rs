@@ -103,6 +103,18 @@ pub(super) async fn generate_text(
     max_tokens: usize,
     permit: OwnedSemaphorePermit,
 ) -> Result<crate::runtime::GeneratedText, OpenAiHttpError> {
+    let mut generated = generate_texts(engine, vec![prompt], max_tokens, permit).await?;
+    generated
+        .pop()
+        .ok_or_else(|| OpenAiHttpError::internal("inference did not return a completion"))
+}
+
+pub(super) async fn generate_texts(
+    engine: Option<Arc<Mutex<crate::runtime::InferenceEngine>>>,
+    prompts: Vec<String>,
+    max_tokens: usize,
+    permit: OwnedSemaphorePermit,
+) -> Result<Vec<crate::runtime::GeneratedText>, OpenAiHttpError> {
     let Some(engine) = engine else {
         return Err(OpenAiHttpError::service_unavailable(
             "no model is loaded; start ferrite-server with --model",
@@ -114,9 +126,14 @@ pub(super) async fn generate_text(
         let engine = engine
             .lock()
             .map_err(|_| OpenAiHttpError::internal("inference engine lock is poisoned"))?;
-        engine
-            .generate(&prompt, max_tokens)
-            .map_err(|error| OpenAiHttpError::internal(error.to_string()))
+        prompts
+            .iter()
+            .map(|prompt| {
+                engine
+                    .generate(prompt, max_tokens)
+                    .map_err(|error| OpenAiHttpError::internal(error.to_string()))
+            })
+            .collect()
     })
     .await
     .map_err(|error| OpenAiHttpError::internal(format!("inference task failed: {error}")))?

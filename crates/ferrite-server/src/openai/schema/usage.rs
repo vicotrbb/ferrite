@@ -16,4 +16,14 @@ impl Usage {
             total_tokens: generated.prompt_tokens() + generated.completion_tokens(),
         }
     }
+
+    pub(super) fn from_generations(generated: &[GeneratedText]) -> Self {
+        let prompt_tokens = generated.iter().map(GeneratedText::prompt_tokens).sum();
+        let completion_tokens = generated.iter().map(GeneratedText::completion_tokens).sum();
+        Self {
+            prompt_tokens,
+            completion_tokens,
+            total_tokens: prompt_tokens + completion_tokens,
+        }
+    }
 }
