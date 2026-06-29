@@ -1,6 +1,7 @@
 use super::{
     completion_prompt::CompletionPrompt, neutral_options::is_neutral_number,
-    stream_options::StreamOptions, unix_timestamp, unsupported::UnsupportedFields, usage::Usage,
+    stop_sequences::is_neutral_stop_sequences, stream_options::StreamOptions, unix_timestamp,
+    unsupported::UnsupportedFields, usage::Usage,
 };
 use crate::runtime::GeneratedText;
 use serde::{Deserialize, Serialize};
@@ -80,7 +81,7 @@ impl CompletionRequest {
             .with_present("n", !is_neutral_number(&self.n, 1.0))
             .with_present("logprobs", self.logprobs.is_some())
             .with_present("echo", self.echo.is_some())
-            .with_present("stop", self.stop.is_some())
+            .with_present("stop", !is_neutral_stop_sequences(&self.stop))
             .with_present(
                 "presence_penalty",
                 !is_neutral_number(&self.presence_penalty, 0.0),
