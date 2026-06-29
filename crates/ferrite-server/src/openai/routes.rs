@@ -194,10 +194,14 @@ fn ensure_authorized(state: &ServerState, headers: &HeaderMap) -> Result<(), Ope
 }
 
 fn bearer_token_matches(header: &str, api_key: &str) -> bool {
-    let Some((scheme, token)) = header.split_once(' ') else {
+    let mut parts = header.split_whitespace();
+    let Some(scheme) = parts.next() else {
         return false;
     };
-    scheme.eq_ignore_ascii_case("Bearer") && token == api_key
+    let Some(token) = parts.next() else {
+        return false;
+    };
+    parts.next().is_none() && scheme.eq_ignore_ascii_case("Bearer") && token == api_key
 }
 
 fn ensure_supported_chat_request(request: &ChatCompletionRequest) -> Result<(), OpenAiHttpError> {

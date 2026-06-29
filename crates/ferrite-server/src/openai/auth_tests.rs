@@ -38,6 +38,16 @@ async fn protected_openai_routes_accept_case_insensitive_bearer_scheme(
 }
 
 #[tokio::test]
+async fn protected_openai_routes_accept_repeated_bearer_separator_spaces(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let response = get_models(Some("Bearer   local-secret")).await?;
+
+    assert_eq!(response.status, StatusCode::OK);
+    assert_eq!(response.json["object"], "list");
+    Ok(())
+}
+
+#[tokio::test]
 async fn health_route_does_not_require_bearer_token() -> Result<(), Box<dyn std::error::Error>> {
     let app = router(ServerState::new("fixture-model".to_owned()).with_api_key("local-secret"));
     let response = app
