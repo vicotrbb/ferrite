@@ -260,6 +260,26 @@ async fn chat_endpoint_rejects_non_string_message_role() -> Result<(), Box<dyn s
 }
 
 #[tokio::test]
+async fn chat_endpoint_rejects_message_without_role() -> Result<(), Box<dyn std::error::Error>> {
+    let body = post_chat(
+        r#"{
+            "model":"fixture-model",
+            "messages":[{
+                "content":"hello"
+            }]
+        }"#,
+    )
+    .await?;
+
+    assert_eq!(body.status, StatusCode::BAD_REQUEST);
+    assert_eq!(body.json["error"]["type"], "invalid_request_error");
+    let message = body.json["error"]["message"].as_str().unwrap_or_default();
+    assert!(message.contains("messages.role"), "{message}");
+    assert!(!message.contains("malformed JSON"), "{message}");
+    Ok(())
+}
+
+#[tokio::test]
 async fn chat_endpoint_rejects_message_without_content() -> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat(
         r#"{

@@ -181,3 +181,7 @@ Responses API are out of scope until explicit ADRs or plans add them.
   records compatibility evidence for returning explicit `messages.role` errors
   for unknown or malformed chat message roles instead of JSON body
   deserialization errors.
+- `documentation/dev-notes/2026-06-29-openai-missing-message-role.md`
+  records compatibility evidence for returning explicit `messages.role` errors
+  when chat messages omit the required role field instead of JSON body
+  deserialization errors.

@@ -203,6 +203,7 @@ impl ChatCompletionRequest {
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 pub struct ChatMessage {
+    #[serde(default)]
     role: ChatRole,
     #[serde(default)]
     content: Option<ChatContent>,
@@ -297,7 +298,7 @@ impl ChatMessage {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum ChatRole {
     Developer,
     System,
@@ -305,6 +306,7 @@ pub enum ChatRole {
     Assistant,
     Tool,
     Function,
+    #[default]
     Unknown,
 }
 
@@ -405,6 +407,15 @@ mod tests {
     fn records_unknown_message_role_for_request_validation(
     ) -> Result<(), Box<dyn std::error::Error>> {
         let message: ChatMessage = serde_json::from_str(r#"{"role":"critic","content":"hello"}"#)?;
+
+        assert_eq!(message.unsupported_fields(), ["messages.role"]);
+        Ok(())
+    }
+
+    #[test]
+    fn records_missing_message_role_for_request_validation(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let message: ChatMessage = serde_json::from_str(r#"{"content":"hello"}"#)?;
 
         assert_eq!(message.unsupported_fields(), ["messages.role"]);
         Ok(())
