@@ -439,6 +439,29 @@ async fn chat_endpoint_accepts_assistant_refusal_content_parts(
 }
 
 #[tokio::test]
+async fn chat_endpoint_accepts_null_assistant_refusal_message_metadata(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let model_path = write_chat_fixture_model()?;
+    let engine = InferenceEngine::load(&model_path)?;
+    let app = router(ServerState::with_engine("fixture-model".to_owned(), engine));
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/chat/completions")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            r#"{"model":"fixture-model","messages":[{"role":"assistant","content":"hello","refusal":null}],"max_completion_tokens":1}"#,
+        ))?;
+    let response = app.oneshot(request).await?;
+    remove_fixture_model(&model_path)?;
+
+    let status = response.status();
+    let body = to_json(response.into_body()).await?;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body["choices"][0]["message"]["content"], "winner");
+    Ok(())
+}
+
+#[tokio::test]
 async fn chat_endpoint_accepts_null_assistant_audio_message_metadata(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let model_path = write_chat_fixture_model()?;

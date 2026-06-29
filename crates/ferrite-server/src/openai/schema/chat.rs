@@ -215,6 +215,8 @@ pub struct ChatMessage {
     function_call: Option<Value>,
     #[serde(default)]
     audio: Option<Value>,
+    #[serde(default)]
+    refusal: Option<Value>,
     #[serde(default, flatten)]
     extra_fields: BTreeMap<String, Value>,
 }
@@ -230,6 +232,7 @@ impl ChatMessage {
             tool_calls: None,
             function_call: None,
             audio: None,
+            refusal: None,
             extra_fields: BTreeMap::new(),
         }
     }
@@ -252,6 +255,7 @@ impl ChatMessage {
                 !is_no_function_call(&self.function_call),
             )
             .with_present("messages.audio", self.audio.is_some())
+            .with_present("messages.refusal", self.refusal.is_some())
             .with_extra_keys_with_prefix("messages.", &self.extra_fields)
             .into_vec()
     }

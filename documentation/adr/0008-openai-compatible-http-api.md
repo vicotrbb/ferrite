@@ -151,3 +151,7 @@ Responses API are out of scope until explicit ADRs or plans add them.
 - `documentation/dev-notes/2026-06-29-openai-assistant-audio-null.md` records
   compatibility evidence for accepting `audio: null` on assistant transcript
   messages while keeping non-null audio metadata unsupported.
+- `documentation/dev-notes/2026-06-29-openai-assistant-refusal-null.md`
+  records compatibility evidence for accepting `refusal: null` on assistant
+  transcript messages while keeping non-null top-level refusal metadata
+  unsupported.
