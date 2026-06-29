@@ -1,10 +1,12 @@
 #![allow(unsafe_code)]
 
 use super::{float::f16_bits_to_f32, InferenceError};
+#[cfg(any(target_arch = "aarch64", test))]
 use rayon::prelude::*;
 
 pub(super) const Q8_0_BLOCK_VALUES: usize = 32;
 pub(super) const Q8_0_BLOCK_BYTES: usize = 34;
+#[cfg(target_arch = "aarch64")]
 const PARALLEL_ARGMAX_MIN_ROWS: usize = 65_536;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -216,6 +218,7 @@ where
     best_index
 }
 
+#[cfg(any(target_arch = "aarch64", test))]
 pub(super) fn parallel_argmax_q8_0_rows<F>(bytes: &[u8], row_bytes: usize, row_dot: F) -> usize
 where
     F: Fn(&[u8]) -> f32 + Sync,
