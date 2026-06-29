@@ -46,6 +46,18 @@ pub fn response_json(response: &str) -> Result<Value, Box<dyn std::error::Error>
     Ok(serde_json::from_str(body)?)
 }
 
+pub fn sse_json_events(response: &str) -> Result<Vec<Value>, Box<dyn std::error::Error>> {
+    let (_, body) = response
+        .split_once("\r\n\r\n")
+        .ok_or("expected HTTP response body")?;
+    body.lines()
+        .filter_map(|line| line.strip_prefix("data: "))
+        .filter(|data| *data != "[DONE]")
+        .map(serde_json::from_str)
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(Into::into)
+}
+
 async fn read_http_response(stream: &mut TcpStream) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let mut response = Vec::new();
     let mut content_length = None;

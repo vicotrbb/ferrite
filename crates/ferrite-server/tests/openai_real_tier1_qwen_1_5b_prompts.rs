@@ -2,8 +2,7 @@ mod support;
 
 use std::path::PathBuf;
 
-use serde_json::Value;
-use support::http::{response_json, send_http_request};
+use support::http::{response_json, send_http_request, sse_json_events};
 
 const DEFAULT_MODEL_PATH: &str = "target/models/qwen2.5-1.5b-instruct-q8_0.gguf";
 const REAL_MODEL_ID: &str = "qwen2.5-1.5b-q8_0";
@@ -258,18 +257,6 @@ fn assert_qwen_chat_stream_response(
         "terminal chat stream chunk should not include content"
     );
     Ok(())
-}
-
-fn sse_json_events(response: &str) -> Result<Vec<Value>, Box<dyn std::error::Error>> {
-    let (_, body) = response
-        .split_once("\r\n\r\n")
-        .ok_or("expected HTTP response body")?;
-    body.lines()
-        .filter_map(|line| line.strip_prefix("data: "))
-        .filter(|data| *data != "[DONE]")
-        .map(serde_json::from_str)
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(Into::into)
 }
 
 fn qwen_1_5b_q8_model_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
