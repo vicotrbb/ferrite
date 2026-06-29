@@ -166,3 +166,52 @@ Tier 0 and Tier 1 GGUF models through Ferrite-owned loading, tokenization,
 generation, and streaming paths after the latest local-serving compatibility
 work. It still does not prove Tier 2+ models, larger Tier 1 prompt-regression
 suites, long-context behavior, or broad conversation quality.
+
+## Post-Unique-ID Rerun
+
+Tree state:
+
+- Commit: `d0741d9`
+- Local artifact paths present:
+  - `target/models/SmolLM2-135M-Instruct-Q4_K_M.gguf`
+  - `target/models/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf`
+
+This rerun followed the OpenAI compatibility commit that changed chat,
+completion, and stream response IDs from timestamp-only values to unique
+process-local IDs.
+
+Tier 0 command:
+
+```sh
+cargo test -p ferrite-server --test openai_real_model_http -- --ignored --nocapture
+```
+
+Observed result:
+
+- 4 ignored tests were explicitly enabled.
+- 4 passed, 0 failed, 0 ignored.
+- Rust test harness duration: 19.76s.
+
+Tier 1 command:
+
+```sh
+cargo test -p ferrite-server --test openai_real_tier1_http -- --ignored --nocapture
+```
+
+Observed result:
+
+- 6 ignored tests were explicitly enabled.
+- 6 passed, 0 failed, 0 ignored.
+- Rust test harness duration: 124.48s.
+
+Covered behavior:
+
+- real Tier 0 SmolLM2-135M Q4_K_M legacy completion, streaming legacy
+  completion, chat completion, and streaming chat completion;
+- real Tier 1 Qwen2.5-0.5B Q4_K_M legacy completion, streaming legacy
+  completion, chat completion, streaming chat completion, default
+  backpressure, and configured wait-queue completion.
+
+This confirms that the OpenAI-compatible HTTP server still drives real Tier 0
+and default Tier 1 GGUF models through Ferrite-owned loading, tokenization,
+generation, and SSE streaming after the response-ID compatibility change.
