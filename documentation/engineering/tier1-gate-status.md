@@ -99,6 +99,11 @@ for about 5.74 req/s, and 9 queued requests at client concurrency 3 completed
 in 1,593 ms for about 5.65 req/s. This covers the smallest current Tier 1
 Qwen2 HTTP path, while broader endpoint shapes, quantizations, prompts,
 x86_64, and steady-state behavior remain open.
+The same Qwen2.5-0.5B Q4_K_M real HTTP harness now also proves supported
+OpenAI `stop` sequence trimming for one legacy completion path and one chat
+completion path while preserving generated-token usage accounting. Broader
+real-model `stop` coverage across streaming, prompts, and the larger Tier 1
+artifacts remains open.
 
 The OpenAI-compatible HTTP server now has opt-in real Tier 1 coverage for
 Qwen2.5-0.5B Q4_K_M through legacy completions, streaming legacy completions,

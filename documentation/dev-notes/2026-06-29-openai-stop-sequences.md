@@ -64,3 +64,23 @@ Observed result:
 The fixture model generates `winner`; all four endpoint shapes now return or
 stream visible text `win` for `stop: "ner"` while preserving usage accounting
 for the generated token.
+
+## Real Tier 1 HTTP Regression
+
+Follow-up command:
+
+```sh
+cargo test -p ferrite-server --test openai_real_tier1_http live_http_server_applies_stop_sequences_with_real_tier1_model -- --ignored --nocapture
+```
+
+Observed result:
+
+- `live_http_server_applies_stop_sequences_with_real_tier1_model`: 1 passed;
+  0 failed; 6 filtered out; finished in 54.21s.
+
+This explicit opt-in run loaded the local
+`target/models/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf` Tier 1 artifact through the
+OpenAI-compatible HTTP server. It verified that `stop: "\n"` trims the known
+legacy completion token for `hello world` to empty visible text, and that
+`stop: "你"` trims the known chat completion token to empty visible content,
+while both responses still report one generated completion token.

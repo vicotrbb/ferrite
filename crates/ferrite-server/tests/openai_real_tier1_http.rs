@@ -137,6 +137,53 @@ async fn live_http_server_streams_chat_with_real_tier1_model(
 
 #[tokio::test]
 #[ignore = "requires local Tier 1 GGUF model artifact"]
+async fn live_http_server_applies_stop_sequences_with_real_tier1_model(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let model_path = real_model_path()?;
+    let server = support::LiveServer::start_with_existing_model(REAL_MODEL_ID, model_path).await?;
+
+    let completion_body = format!(
+        r#"{{"model":"{REAL_MODEL_ID}","prompt":"hello world","max_tokens":1,"stop":"\n"}}"#
+    );
+    let completion_response = send_http_request(
+        server.addr(),
+        "POST",
+        "/v1/completions",
+        completion_body.as_bytes(),
+    )
+    .await?;
+
+    assert!(
+        completion_response.starts_with("HTTP/1.1 200 OK"),
+        "unexpected completion response: {completion_response}"
+    );
+    let completion_body = response_json(&completion_response)?;
+    assert_eq!(completion_body["choices"][0]["text"], "");
+    assert_eq!(completion_body["usage"]["completion_tokens"], 1);
+
+    let chat_body = format!(
+        r#"{{"model":"{REAL_MODEL_ID}","messages":[{{"role":"user","content":"hello world"}}],"max_completion_tokens":1,"stop":"你"}}"#
+    );
+    let chat_response = send_http_request(
+        server.addr(),
+        "POST",
+        "/v1/chat/completions",
+        chat_body.as_bytes(),
+    )
+    .await?;
+
+    assert!(
+        chat_response.starts_with("HTTP/1.1 200 OK"),
+        "unexpected chat response: {chat_response}"
+    );
+    let chat_body = response_json(&chat_response)?;
+    assert_eq!(chat_body["choices"][0]["message"]["content"], "");
+    assert_eq!(chat_body["usage"]["completion_tokens"], 1);
+    Ok(())
+}
+
+#[tokio::test]
+#[ignore = "requires local Tier 1 GGUF model artifact"]
 async fn live_http_server_rejects_concurrent_real_tier1_request(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let model_path = real_model_path()?;

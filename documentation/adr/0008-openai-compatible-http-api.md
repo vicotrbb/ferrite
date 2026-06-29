@@ -242,4 +242,4 @@ Responses API are out of scope until explicit ADRs or plans add them.
 - `documentation/dev-notes/2026-06-29-openai-stop-sequences.md` records
   compatibility evidence for applying supported `stop` sequences at the server
   generation boundary for chat and legacy completions, both non-streaming and
-  streaming.
+  streaming, plus an explicit opt-in real Tier 1 Qwen2.5-0.5B HTTP regression.
