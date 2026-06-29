@@ -1,4 +1,5 @@
 use serde::{Deserialize, Deserializer};
+use serde_json::Value;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ChatContent {
@@ -68,18 +69,36 @@ impl ChatContentWire {
     }
 }
 
-#[derive(Deserialize)]
-#[serde(rename_all = "snake_case")]
-#[serde(tag = "type")]
 enum ContentPart {
-    Text {
-        text: String,
-    },
-    Refusal {
-        refusal: String,
-    },
-    #[serde(other)]
+    Text { text: String },
+    Refusal { refusal: String },
     Unsupported,
+}
+
+impl<'de> Deserialize<'de> for ContentPart {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        Ok(match value.get("type").and_then(Value::as_str) {
+            Some("text") => value
+                .get("text")
+                .and_then(Value::as_str)
+                .map(|text| Self::Text {
+                    text: text.to_owned(),
+                })
+                .unwrap_or(Self::Unsupported),
+            Some("refusal") => value
+                .get("refusal")
+                .and_then(Value::as_str)
+                .map(|refusal| Self::Refusal {
+                    refusal: refusal.to_owned(),
+                })
+                .unwrap_or(Self::Unsupported),
+            _ => Self::Unsupported,
+        })
+    }
 }
 
 impl ContentPart {
@@ -142,6 +161,17 @@ mod tests {
         let content: ChatContent = serde_json::from_str(
             r#"[{"type":"image_url","image_url":{"url":"https://example.test/image.png"}}]"#,
         )?;
+
+        assert_eq!(content.text(), "");
+        assert!(!content.has_refusal_part());
+        assert!(content.has_unsupported_part());
+        Ok(())
+    }
+
+    #[test]
+    fn records_malformed_text_content_parts_for_request_validation(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let content: ChatContent = serde_json::from_str(r#"[{"type":"text"}]"#)?;
 
         assert_eq!(content.text(), "");
         assert!(!content.has_refusal_part());
