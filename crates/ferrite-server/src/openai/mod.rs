@@ -1,4 +1,5 @@
 mod auth;
+mod catalog;
 pub mod error;
 mod generation;
 mod json;
