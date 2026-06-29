@@ -5,6 +5,7 @@ use super::{
     neutral_options::{is_neutral_bool, is_neutral_number},
     prompt_cache_key::is_prompt_cache_key,
     response_format::is_neutral_response_format,
+    safety_identifier::is_safety_identifier,
     stop_sequences::is_neutral_stop_sequences,
     stream_options::StreamOptions,
     tool_options::{is_disabled_parallel_tool_calls, is_empty_tools, is_no_tool_choice},
@@ -68,6 +69,8 @@ pub struct ChatCompletionRequest {
     metadata: Option<Value>,
     #[serde(default)]
     prompt_cache_key: Option<Value>,
+    #[serde(default)]
+    safety_identifier: Option<Value>,
     #[serde(default, flatten)]
     extra_fields: BTreeMap<String, Value>,
 }
@@ -130,6 +133,10 @@ impl ChatCompletionRequest {
             .with_present(
                 "prompt_cache_key",
                 !is_prompt_cache_key(&self.prompt_cache_key),
+            )
+            .with_present(
+                "safety_identifier",
+                !is_safety_identifier(&self.safety_identifier),
             )
             .with_extra_keys(&self.extra_fields)
             .into_vec();

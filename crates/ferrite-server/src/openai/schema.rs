@@ -10,6 +10,7 @@ mod modalities;
 mod neutral_options;
 mod prompt_cache_key;
 mod response_format;
+mod safety_identifier;
 mod stop_sequences;
 mod stream_options;
 mod stream_usage;

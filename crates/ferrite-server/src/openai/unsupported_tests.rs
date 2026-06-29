@@ -129,6 +129,49 @@ async fn chat_endpoint_rejects_malformed_prompt_cache_key() -> Result<(), Box<dy
 }
 
 #[tokio::test]
+async fn chat_endpoint_rejects_malformed_safety_identifier(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let body = post_chat(
+        r#"{
+            "model":"fixture-model",
+            "messages":[{"role":"user","content":"hello"}],
+            "safety_identifier":123
+        }"#,
+    )
+    .await?;
+
+    assert_eq!(body.status, StatusCode::BAD_REQUEST);
+    assert_eq!(body.json["error"]["type"], "invalid_request_error");
+    assert!(body.json["error"]["message"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("safety_identifier"));
+    Ok(())
+}
+
+#[tokio::test]
+async fn chat_endpoint_rejects_overlong_safety_identifier() -> Result<(), Box<dyn std::error::Error>>
+{
+    let safety_identifier = "s".repeat(65);
+    let payload = format!(
+        r#"{{
+            "model":"fixture-model",
+            "messages":[{{"role":"user","content":"hello"}}],
+            "safety_identifier":"{safety_identifier}"
+        }}"#
+    );
+    let body = post_chat(&payload).await?;
+
+    assert_eq!(body.status, StatusCode::BAD_REQUEST);
+    assert_eq!(body.json["error"]["type"], "invalid_request_error");
+    assert!(body.json["error"]["message"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("safety_identifier"));
+    Ok(())
+}
+
+#[tokio::test]
 async fn chat_endpoint_rejects_unknown_fields() -> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat(
         r#"{
@@ -214,13 +257,13 @@ struct JsonResponse {
     json: Value,
 }
 
-async fn post_chat(payload: &'static str) -> Result<JsonResponse, Box<dyn std::error::Error>> {
+async fn post_chat(payload: &str) -> Result<JsonResponse, Box<dyn std::error::Error>> {
     let app = router(ServerState::new("fixture-model".to_owned()));
     let request = Request::builder()
         .method("POST")
         .uri("/v1/chat/completions")
         .header("content-type", "application/json")
-        .body(Body::from(payload))?;
+        .body(Body::from(payload.to_owned()))?;
     let response = app.oneshot(request).await?;
     let status = response.status();
     let bytes = to_bytes(response.into_body(), usize::MAX).await?;
