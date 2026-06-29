@@ -13,40 +13,8 @@ async fn live_http_server_matches_qwen_1_5b_q6_first_tokens_for_reference_prompt
 ) -> Result<(), Box<dyn std::error::Error>> {
     let model_path = qwen_1_5b_q6_model_path()?;
     let server = support::LiveServer::start_with_existing_model(REAL_MODEL_ID, model_path).await?;
-    let cases = [
-        PromptCase {
-            prompt: "hello world",
-            prompt_tokens: 2,
-            text: "\n",
-        },
-        PromptCase {
-            prompt: "The capital of France is",
-            prompt_tokens: 5,
-            text: " Paris",
-        },
-        PromptCase {
-            prompt: "Once upon a time",
-            prompt_tokens: 4,
-            text: ",",
-        },
-        PromptCase {
-            prompt: "Rust is a systems programming language",
-            prompt_tokens: 7,
-            text: " that",
-        },
-        PromptCase {
-            prompt: "Machine learning models can",
-            prompt_tokens: 4,
-            text: " be",
-        },
-        PromptCase {
-            prompt: "The recipe calls for",
-            prompt_tokens: 4,
-            text: " ",
-        },
-    ];
 
-    for case in cases {
+    for case in prompt_cases() {
         let response = send_http_request(
             server.addr(),
             "POST",
@@ -59,11 +27,80 @@ async fn live_http_server_matches_qwen_1_5b_q6_first_tokens_for_reference_prompt
     Ok(())
 }
 
+#[tokio::test]
+#[ignore = "requires local Qwen2.5-1.5B Q6_K GGUF model artifact"]
+async fn live_http_server_matches_qwen_1_5b_q6_chat_first_tokens_for_reference_prompts(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let model_path = qwen_1_5b_q6_model_path()?;
+    let server = support::LiveServer::start_with_existing_model(REAL_MODEL_ID, model_path).await?;
+
+    for case in prompt_cases() {
+        let response = send_http_request(
+            server.addr(),
+            "POST",
+            "/v1/chat/completions",
+            chat_body(case.prompt).as_bytes(),
+        )
+        .await?;
+        assert_qwen_chat_response(&response, case)?;
+    }
+    Ok(())
+}
+
 #[derive(Clone, Copy)]
 struct PromptCase {
     prompt: &'static str,
-    prompt_tokens: u64,
-    text: &'static str,
+    completion_prompt_tokens: u64,
+    completion_text: &'static str,
+    chat_prompt_tokens: u64,
+    chat_content: &'static str,
+}
+
+fn prompt_cases() -> [PromptCase; 6] {
+    [
+        PromptCase {
+            prompt: "hello world",
+            completion_prompt_tokens: 2,
+            completion_text: "\n",
+            chat_prompt_tokens: 8,
+            chat_content: "你好",
+        },
+        PromptCase {
+            prompt: "The capital of France is",
+            completion_prompt_tokens: 5,
+            completion_text: " Paris",
+            chat_prompt_tokens: 11,
+            chat_content: " Paris",
+        },
+        PromptCase {
+            prompt: "Once upon a time",
+            completion_prompt_tokens: 4,
+            completion_text: ",",
+            chat_prompt_tokens: 10,
+            chat_content: "一次",
+        },
+        PromptCase {
+            prompt: "Rust is a systems programming language",
+            completion_prompt_tokens: 7,
+            completion_text: " that",
+            chat_prompt_tokens: 12,
+            chat_content: "你说",
+        },
+        PromptCase {
+            prompt: "Machine learning models can",
+            completion_prompt_tokens: 4,
+            completion_text: " be",
+            chat_prompt_tokens: 10,
+            chat_content: "1",
+        },
+        PromptCase {
+            prompt: "The recipe calls for",
+            completion_prompt_tokens: 4,
+            completion_text: " ",
+            chat_prompt_tokens: 10,
+            chat_content: "2",
+        },
+    ]
 }
 
 fn completion_body(prompt: &str) -> String {
@@ -71,6 +108,20 @@ fn completion_body(prompt: &str) -> String {
         "model": REAL_MODEL_ID,
         "prompt": prompt,
         "max_tokens": 1,
+    })
+    .to_string()
+}
+
+fn chat_body(prompt: &str) -> String {
+    serde_json::json!({
+        "model": REAL_MODEL_ID,
+        "messages": [
+            {
+                "role": "user",
+                "content": prompt,
+            },
+        ],
+        "max_completion_tokens": 1,
     })
     .to_string()
 }
@@ -87,10 +138,35 @@ fn assert_qwen_completion_response(
     let body = response_json(response)?;
     assert_eq!(body["object"], "text_completion");
     assert_eq!(body["model"], REAL_MODEL_ID);
-    assert_eq!(body["choices"][0]["text"], case.text);
-    assert_eq!(body["usage"]["prompt_tokens"], case.prompt_tokens);
+    assert_eq!(body["choices"][0]["text"], case.completion_text);
+    assert_eq!(
+        body["usage"]["prompt_tokens"],
+        case.completion_prompt_tokens
+    );
     assert_eq!(body["usage"]["completion_tokens"], 1);
-    assert_eq!(body["usage"]["total_tokens"], case.prompt_tokens + 1);
+    assert_eq!(
+        body["usage"]["total_tokens"],
+        case.completion_prompt_tokens + 1
+    );
+    Ok(())
+}
+
+fn assert_qwen_chat_response(
+    response: &str,
+    case: PromptCase,
+) -> Result<(), Box<dyn std::error::Error>> {
+    assert!(
+        response.starts_with("HTTP/1.1 200 OK"),
+        "unexpected response for prompt {:?}: {response}",
+        case.prompt
+    );
+    let body = response_json(response)?;
+    assert_eq!(body["object"], "chat.completion");
+    assert_eq!(body["model"], REAL_MODEL_ID);
+    assert_eq!(body["choices"][0]["message"]["content"], case.chat_content);
+    assert_eq!(body["usage"]["prompt_tokens"], case.chat_prompt_tokens);
+    assert_eq!(body["usage"]["completion_tokens"], 1);
+    assert_eq!(body["usage"]["total_tokens"], case.chat_prompt_tokens + 1);
     Ok(())
 }
 
