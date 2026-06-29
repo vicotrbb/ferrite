@@ -10,6 +10,10 @@ and model-not-found generation errors.
 
 This was a proof rerun only. No production code changed in this slice.
 
+A second proof rerun was performed at commit `af6ea08` after the
+method-not-allowed OpenAI error-envelope slice. That rerun used the same default
+local artifact paths and is recorded below.
+
 ## Local Artifacts
 
 The rerun used the default model paths required by the integration tests:
@@ -71,3 +75,40 @@ covered one-token deterministic requests.
 
 It does not prove Tier 2+ model support, long-context behavior, conversation
 quality, or the larger Qwen2.5-1.5B and SmolLM2-1.7B suites.
+
+## Post-Method-Error Rerun
+
+Tree state:
+
+- Commit: `af6ea08`
+- Local artifact paths present:
+  - `target/models/SmolLM2-135M-Instruct-Q4_K_M.gguf`
+  - `target/models/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf`
+
+Tier 0 command:
+
+```sh
+cargo test -p ferrite-server --test openai_real_model_http -- --ignored --nocapture
+```
+
+Observed result:
+
+- 4 ignored tests were explicitly enabled.
+- 4 passed, 0 failed, 0 ignored.
+- Rust test harness duration: 20.13s.
+
+Tier 1 command:
+
+```sh
+cargo test -p ferrite-server --test openai_real_tier1_http -- --ignored --nocapture
+```
+
+Observed result:
+
+- 6 ignored tests were explicitly enabled.
+- 6 passed, 0 failed, 0 ignored.
+- Rust test harness duration: 133.16s.
+
+This confirms a fresh real-model OpenAI HTTP run after the latest route-error
+compatibility work. It still does not prove the larger Tier 1 prompt-regression
+suites or any Tier 2+ models.
