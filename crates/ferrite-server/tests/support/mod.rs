@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 pub mod http;
+pub mod throughput;
 
 use ferrite_server::{runtime::InferenceEngine, state::ServerState};
 use std::{
@@ -22,6 +23,12 @@ pub struct LiveServer {
 impl LiveServer {
     pub async fn start() -> Result<Self, Box<dyn std::error::Error>> {
         Self::start_with_state(|state| state).await
+    }
+
+    pub async fn start_configured(
+        configure: impl FnOnce(ServerState) -> ServerState,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        Self::start_with_state(configure).await
     }
 
     pub async fn start_with_api_key(api_key: &str) -> Result<Self, Box<dyn std::error::Error>> {

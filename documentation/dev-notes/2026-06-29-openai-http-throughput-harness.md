@@ -4,11 +4,11 @@ Date: 2026-06-29
 
 ## Scope
 
-This slice adds a focused fixture-level integration test for measuring
-sequential OpenAI-compatible legacy-completion HTTP request rate. The harness
-uses Ferrite's existing live fixture server and direct HTTP helper, validates
-every response as a successful OpenAI-shaped text completion, and records the
-elapsed time plus derived requests per second.
+This note tracks the fixture-level throughput harness for Ferrite's
+OpenAI-compatible legacy-completion HTTP path. The harness uses Ferrite's
+existing live fixture server and direct HTTP helper, validates every response
+as a successful OpenAI-shaped text completion, and records elapsed time plus
+derived requests per second.
 
 The goal is measurement infrastructure only. This does not prove Tier 1 server
 throughput, multi-client throughput, batching behavior, concurrent successful
@@ -34,10 +34,31 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 ## What Changed
 
 - Added `crates/ferrite-server/tests/openai_http_throughput.rs`.
-- Kept the measurement helper local to the focused integration test instead of
-  expanding the general OpenAI HTTP regression file.
+- Added `crates/ferrite-server/tests/support/throughput.rs` so sequential and
+  queued batch measurement helpers stay out of the endpoint regression tests.
+- Added a fixture-server configuration hook for tests that need bounded
+  inference waiting.
 - Validated each measured request for HTTP `200`, `text_completion` object
   shape, fixture model ID, and deterministic `winner` completion text.
+- Covered both sequential request batches and a queued concurrent batch using
+  Ferrite's single-inference-permit server with a bounded wait window.
+
+Follow-up red:
+
+```text
+cargo test -p ferrite-server --test openai_http_throughput -- --nocapture
+error[E0432]: unresolved import `support::throughput`
+error[E0599]: no associated function or constant named `start_configured`
+```
+
+Follow-up green:
+
+```text
+cargo test -p ferrite-server --test openai_http_throughput -- --nocapture
+test live_http_server_measures_queued_concurrent_completion_request_rate ... ok
+test live_http_server_measures_sequential_completion_request_rate ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+```
 
 ## Remaining Work
 
