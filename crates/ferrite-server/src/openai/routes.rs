@@ -150,7 +150,13 @@ async fn completions(
     .into_response())
 }
 
-async fn method_not_allowed() -> OpenAiHttpError {
+async fn method_not_allowed(
+    State(state): State<ServerState>,
+    headers: HeaderMap,
+) -> OpenAiHttpError {
+    if let Err(error) = ensure_authorized(&state, &headers) {
+        return error;
+    }
     OpenAiHttpError::method_not_allowed()
 }
 

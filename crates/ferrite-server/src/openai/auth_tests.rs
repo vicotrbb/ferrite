@@ -66,6 +66,25 @@ async fn unknown_openai_routes_require_matching_bearer_token(
 }
 
 #[tokio::test]
+async fn wrong_method_openai_routes_require_matching_bearer_token(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let app = router(ServerState::new("fixture-model".to_owned()).with_api_key("local-secret"));
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("GET")
+                .uri("/v1/completions")
+                .body(Body::empty())?,
+        )
+        .await?;
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+    let body = to_json(response.into_body()).await?;
+    assert_eq!(body["error"]["type"], "authentication_error");
+    Ok(())
+}
+
+#[tokio::test]
 async fn health_route_does_not_require_bearer_token() -> Result<(), Box<dyn std::error::Error>> {
     let app = router(ServerState::new("fixture-model".to_owned()).with_api_key("local-secret"));
     let response = app
