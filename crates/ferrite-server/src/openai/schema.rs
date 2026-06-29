@@ -2,6 +2,7 @@ mod catalog;
 mod chat;
 mod chat_content;
 mod chat_messages;
+mod chat_response;
 mod chat_stream;
 mod completion;
 mod completion_prompt;
@@ -31,7 +32,8 @@ mod usage;
 mod user_identifier;
 
 pub use catalog::{HealthResponse, ModelObject, ModelsResponse};
-pub use chat::{ChatCompletionRequest, ChatCompletionResponse, ChatMessage, ChatRole};
+pub use chat::{ChatCompletionRequest, ChatMessage, ChatRole};
+pub use chat_response::ChatCompletionResponse;
 pub use chat_stream::{ChatCompletionStreamChunk, ChatCompletionStreamContext};
 pub use completion::{CompletionRequest, CompletionResponse};
 pub use completion_stream::{CompletionStreamChunk, CompletionStreamContext};
