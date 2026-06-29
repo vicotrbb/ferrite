@@ -1,5 +1,6 @@
 use super::{
-    stream_options::StreamOptions, unix_timestamp, unsupported::UnsupportedFields, usage::Usage,
+    neutral_options::is_neutral_number, stream_options::StreamOptions, unix_timestamp,
+    unsupported::UnsupportedFields, usage::Usage,
 };
 use crate::runtime::GeneratedText;
 use serde::{Deserialize, Serialize};
@@ -85,12 +86,18 @@ impl ChatCompletionRequest {
             .with_present("tool_choice", self.tool_choice.is_some())
             .with_present("parallel_tool_calls", self.parallel_tool_calls.is_some())
             .with_present("response_format", self.response_format.is_some())
-            .with_present("temperature", self.temperature.is_some())
-            .with_present("top_p", self.top_p.is_some())
-            .with_present("n", self.n.is_some())
+            .with_present("temperature", !is_neutral_number(&self.temperature, 0.0))
+            .with_present("top_p", !is_neutral_number(&self.top_p, 1.0))
+            .with_present("n", !is_neutral_number(&self.n, 1.0))
             .with_present("stop", self.stop.is_some())
-            .with_present("presence_penalty", self.presence_penalty.is_some())
-            .with_present("frequency_penalty", self.frequency_penalty.is_some())
+            .with_present(
+                "presence_penalty",
+                !is_neutral_number(&self.presence_penalty, 0.0),
+            )
+            .with_present(
+                "frequency_penalty",
+                !is_neutral_number(&self.frequency_penalty, 0.0),
+            )
             .with_present("logit_bias", self.logit_bias.is_some())
             .with_present("logprobs", self.logprobs.is_some())
             .with_present("top_logprobs", self.top_logprobs.is_some())

@@ -3,6 +3,7 @@ mod chat;
 mod chat_stream;
 mod completion;
 mod completion_stream;
+mod neutral_options;
 mod stream_options;
 mod stream_usage;
 mod unsupported;
