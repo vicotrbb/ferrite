@@ -193,6 +193,9 @@ fn ensure_supported_chat_request(request: &ChatCompletionRequest) -> Result<(), 
 }
 
 fn ensure_model(state: &ServerState, requested_model: &str) -> Result<(), OpenAiHttpError> {
+    if requested_model.is_empty() {
+        return Err(OpenAiHttpError::invalid_request("model is required"));
+    }
     if requested_model == state.model_id() {
         Ok(())
     } else {

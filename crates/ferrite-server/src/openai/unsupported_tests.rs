@@ -28,6 +28,23 @@ async fn chat_endpoint_rejects_tool_fields() -> Result<(), Box<dyn std::error::E
 }
 
 #[tokio::test]
+async fn chat_endpoint_rejects_missing_model() -> Result<(), Box<dyn std::error::Error>> {
+    let body = post_chat(
+        r#"{
+            "messages":[{"role":"user","content":"hello"}]
+        }"#,
+    )
+    .await?;
+
+    assert_eq!(body.status, StatusCode::BAD_REQUEST);
+    assert_eq!(body.json["error"]["type"], "invalid_request_error");
+    let message = body.json["error"]["message"].as_str().unwrap_or_default();
+    assert!(message.contains("model"), "{message}");
+    assert!(!message.contains("malformed JSON"), "{message}");
+    Ok(())
+}
+
+#[tokio::test]
 async fn chat_endpoint_rejects_function_fields() -> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat(
         r#"{
@@ -773,6 +790,23 @@ async fn completion_endpoint_rejects_logprobs_request() -> Result<(), Box<dyn st
         .as_str()
         .unwrap_or_default()
         .contains("logprobs"));
+    Ok(())
+}
+
+#[tokio::test]
+async fn completion_endpoint_rejects_missing_model() -> Result<(), Box<dyn std::error::Error>> {
+    let body = post_completion(
+        r#"{
+            "prompt":"hello"
+        }"#,
+    )
+    .await?;
+
+    assert_eq!(body.status, StatusCode::BAD_REQUEST);
+    assert_eq!(body.json["error"]["type"], "invalid_request_error");
+    let message = body.json["error"]["message"].as_str().unwrap_or_default();
+    assert!(message.contains("model"), "{message}");
+    assert!(!message.contains("malformed JSON"), "{message}");
     Ok(())
 }
 

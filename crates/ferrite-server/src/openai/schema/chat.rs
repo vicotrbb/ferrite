@@ -27,6 +27,7 @@ use std::collections::BTreeMap;
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 pub struct ChatCompletionRequest {
+    #[serde(default)]
     model: String,
     messages: Vec<ChatMessage>,
     #[serde(default)]

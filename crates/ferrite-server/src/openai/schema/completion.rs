@@ -17,6 +17,7 @@ use std::collections::BTreeMap;
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 pub struct CompletionRequest {
+    #[serde(default)]
     model: String,
     prompt: CompletionPrompt,
     #[serde(default)]
