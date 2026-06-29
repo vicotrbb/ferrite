@@ -9,6 +9,7 @@ use axum::{
     body::Body,
     http::{Request, StatusCode},
 };
+use serde_json::Value;
 use tower::ServiceExt;
 
 #[tokio::test]
@@ -78,6 +79,28 @@ async fn completions_stream_endpoint_applies_string_stop_sequence(
 }
 
 #[tokio::test]
+async fn completions_stream_endpoint_flushes_chunks_when_stop_sequence_does_not_match(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let body = post_completion_stream(
+        r#"{"model":"fixture-model","prompt":"hello","max_tokens":2,"stream":true,"stop":"zzz"}"#,
+    )
+    .await?;
+
+    let events = sse_json_events(&body)?;
+    let text_chunks = completion_text_chunks(&events);
+    assert_eq!(text_chunks.len(), 2, "{body}");
+    assert_eq!(text_chunks[0], "winner");
+    assert!(
+        events
+            .iter()
+            .any(|event| event["choices"][0]["finish_reason"] == "length"),
+        "{body}"
+    );
+    assert!(body.contains("data: [DONE]"), "{body}");
+    Ok(())
+}
+
+#[tokio::test]
 async fn chat_stream_endpoint_applies_string_stop_sequence(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat_stream(
@@ -91,6 +114,28 @@ async fn chat_stream_endpoint_applies_string_stop_sequence(
         "{body}"
     );
     assert!(body.contains("\"finish_reason\":\"stop\""), "{body}");
+    assert!(body.contains("data: [DONE]"), "{body}");
+    Ok(())
+}
+
+#[tokio::test]
+async fn chat_stream_endpoint_flushes_chunks_when_stop_sequence_does_not_match(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let body = post_chat_stream(
+        r#"{"model":"fixture-model","messages":[{"role":"user","content":"hello"}],"max_completion_tokens":2,"stream":true,"stop":"zzz"}"#,
+    )
+    .await?;
+
+    let events = sse_json_events(&body)?;
+    let content_chunks = chat_content_chunks(&events);
+    assert_eq!(content_chunks.len(), 2, "{body}");
+    assert_eq!(content_chunks[0], "winner");
+    assert!(
+        events
+            .iter()
+            .any(|event| event["choices"][0]["finish_reason"] == "length"),
+        "{body}"
+    );
     assert!(body.contains("data: [DONE]"), "{body}");
     Ok(())
 }
@@ -159,4 +204,36 @@ async fn post_stream(
     let body = to_text(response.into_body()).await?;
     assert_eq!(status, StatusCode::OK, "{body}");
     Ok(body)
+}
+
+fn sse_json_events(response: &str) -> Result<Vec<Value>, Box<dyn std::error::Error>> {
+    response
+        .lines()
+        .filter_map(|line| line.strip_prefix("data: "))
+        .filter(|payload| *payload != "[DONE]")
+        .map(|payload| Ok(serde_json::from_str(payload)?))
+        .collect()
+}
+
+fn completion_text_chunks(events: &[Value]) -> Vec<&str> {
+    events
+        .iter()
+        .filter_map(|event| {
+            let choice = &event["choices"][0];
+            choice["finish_reason"]
+                .is_null()
+                .then(|| choice["text"].as_str())?
+        })
+        .collect()
+}
+
+fn chat_content_chunks(events: &[Value]) -> Vec<&str> {
+    events
+        .iter()
+        .filter_map(|event| {
+            let choice = &event["choices"][0];
+            (choice["finish_reason"].is_null() && choice["delta"]["role"].is_null())
+                .then(|| choice["delta"]["content"].as_str())?
+        })
+        .collect()
 }

@@ -302,7 +302,14 @@ impl StopSequenceFilter {
                 vec![visible]
             }
         } else {
-            Vec::new()
+            let retained = stop_prefix_suffix_len(&self.pending, &self.stop_sequences);
+            if retained == self.pending.len() {
+                return Vec::new();
+            }
+            let split_index = self.pending.len() - retained;
+            let visible = self.pending[..split_index].to_owned();
+            self.pending = self.pending[split_index..].to_owned();
+            vec![visible]
         }
     }
 
@@ -316,5 +323,40 @@ impl StopSequenceFilter {
         } else {
             vec![self.pending]
         }
+    }
+}
+
+fn stop_prefix_suffix_len(text: &str, stop_sequences: &[String]) -> usize {
+    let mut longest = 0;
+    for stop in stop_sequences.iter().filter(|stop| !stop.is_empty()) {
+        for prefix_len in stop_prefix_lens(stop) {
+            if text.ends_with(&stop[..prefix_len]) {
+                longest = longest.max(prefix_len);
+            }
+        }
+    }
+    longest
+}
+
+fn stop_prefix_lens(stop: &str) -> impl Iterator<Item = usize> + '_ {
+    stop.char_indices()
+        .map(|(index, character)| index + character.len_utf8())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stop_prefix_suffix_len_retains_only_possible_stop_prefix() {
+        assert_eq!(stop_prefix_suffix_len("winner", &[String::from("zzz")]), 0);
+        assert_eq!(
+            stop_prefix_suffix_len("winner n", &[String::from("ner")]),
+            1
+        );
+        assert_eq!(
+            stop_prefix_suffix_len("hello μ", &[String::from("μ-stop")]),
+            "μ".len()
+        );
     }
 }
