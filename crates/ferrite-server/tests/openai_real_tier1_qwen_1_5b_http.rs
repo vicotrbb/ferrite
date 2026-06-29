@@ -78,6 +78,27 @@ async fn live_http_server_chats_with_qwen_1_5b_q8_model() -> Result<(), Box<dyn 
     Ok(())
 }
 
+#[tokio::test]
+#[ignore = "requires local Qwen2.5-1.5B Q8_0 GGUF model artifact"]
+async fn live_http_server_streams_chat_with_qwen_1_5b_q8_model(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let model_path = qwen_1_5b_q8_model_path()?;
+    let server = support::LiveServer::start_with_existing_model(REAL_MODEL_ID, model_path).await?;
+    let request_body = format!(
+        r#"{{"model":"{REAL_MODEL_ID}","messages":[{{"role":"user","content":"hello world"}}],"max_completion_tokens":1,"stream":true}}"#
+    );
+    let response = send_http_request(
+        server.addr(),
+        "POST",
+        "/v1/chat/completions",
+        request_body.as_bytes(),
+    )
+    .await?;
+
+    assert_qwen_1_5b_q8_chat_stream_response(&response);
+    Ok(())
+}
+
 fn qwen_1_5b_q8_model_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
     let model_path = std::env::var_os("FERRITE_QWEN_1_5B_Q8_MODEL")
         .map(PathBuf::from)
@@ -123,6 +144,24 @@ fn assert_qwen_1_5b_q8_chat_response(response: &str) -> Result<(), Box<dyn std::
     assert_eq!(body["usage"]["completion_tokens"], 1);
     assert_eq!(body["usage"]["total_tokens"], 9);
     Ok(())
+}
+
+fn assert_qwen_1_5b_q8_chat_stream_response(response: &str) {
+    assert!(
+        response.starts_with("HTTP/1.1 200 OK"),
+        "unexpected response: {response}"
+    );
+    assert!(
+        response
+            .to_ascii_lowercase()
+            .contains("content-type: text/event-stream"),
+        "unexpected response headers: {response}"
+    );
+    assert!(response.contains("data: {\"id\":\"chatcmpl-ferrite-"));
+    assert!(response.contains("\"object\":\"chat.completion.chunk\""));
+    assert!(response.contains("\"model\":\"qwen2.5-1.5b-q8_0\""));
+    assert!(response.contains("\"delta\":{\"content\":\"你好\"}"));
+    assert!(response.contains("data: [DONE]"));
 }
 
 fn default_model_path() -> PathBuf {
