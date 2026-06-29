@@ -23,10 +23,10 @@ async fn chat_endpoint_reports_max_completion_tokens_param_when_hard_limit_is_ex
     assert_eq!(body.status, StatusCode::BAD_REQUEST);
     assert_eq!(body.json["error"]["type"], "invalid_request_error");
     assert_eq!(body.json["error"]["param"], "max_completion_tokens");
-    assert!(body.json["error"]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("less than or equal to 2"));
+    let message = body.json["error"]["message"].as_str().unwrap_or_default();
+    assert!(message.contains("max_completion_tokens"), "{message}");
+    assert!(message.contains("less than or equal to 2"), "{message}");
+    assert!(!message.contains("max_tokens must"), "{message}");
     Ok(())
 }
 

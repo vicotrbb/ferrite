@@ -8,7 +8,7 @@ use super::{
         HealthResponse, ModelObject, ModelsResponse,
     },
 };
-use crate::state::ServerState;
+use crate::{limits::TokenLimitError, state::ServerState};
 use axum::{
     extract::{OriginalUri, Path, State},
     http::HeaderMap,
@@ -247,11 +247,24 @@ fn normalized_max_tokens(
     value: Option<usize>,
     param: Option<&'static str>,
 ) -> Result<usize, OpenAiHttpError> {
-    state
-        .token_limits()
-        .normalize(value)
-        .map_err(|error| match param {
-            Some(param) => OpenAiHttpError::invalid_request_with_param(error.to_string(), param),
-            None => OpenAiHttpError::invalid_request(error.to_string()),
-        })
+    state.token_limits().normalize(value).map_err(|error| {
+        let message = token_limit_error_message(error, param);
+        match param {
+            Some(param) => OpenAiHttpError::invalid_request_with_param(message, param),
+            None => OpenAiHttpError::invalid_request(message),
+        }
+    })
+}
+
+fn token_limit_error_message(error: TokenLimitError, param: Option<&str>) -> String {
+    let field = param.unwrap_or("max_tokens");
+    match error {
+        TokenLimitError::RequestedMustBePositive => {
+            format!("{field} must be greater than zero")
+        }
+        TokenLimitError::RequestedAboveHard { hard_max_tokens } => {
+            format!("{field} must be less than or equal to {hard_max_tokens}")
+        }
+        _ => error.to_string(),
+    }
 }

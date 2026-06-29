@@ -28,6 +28,9 @@ that parameter as well.
 - Preserved `max_tokens` as the field source on legacy completion requests.
 - Returned `invalid_request_error` with field-specific `error.param` for
   configured hard-limit rejections.
+- Formatted requested token-limit error messages with the actual OpenAI request
+  field name so `max_completion_tokens` errors do not mention only the legacy
+  `max_tokens` field.
 
 ## Verification
 
@@ -71,6 +74,46 @@ Observed results:
 - Workspace clippy passed with `-D warnings`.
 - Workspace tests passed; `ferrite-server` reported 225 library tests passed,
   including the two new token-limit tests.
+- Ignored real-model GGUF HTTP suites remained ignored by the default workspace
+  test command.
+
+Follow-up RED command:
+
+```sh
+cargo test -p ferrite-server openai::token_limit_tests -- --nocapture
+```
+
+Observed result before message-field formatting:
+
+- `chat_endpoint_reports_max_completion_tokens_param_when_hard_limit_is_exceeded`
+  failed because the message was `max_tokens must be less than or equal to 2`.
+
+Follow-up GREEN command:
+
+```sh
+cargo fmt --all
+cargo test -p ferrite-server openai::token_limit_tests -- --nocapture
+```
+
+Observed result:
+
+- `openai::token_limit_tests`: 2 passed, 0 failed.
+
+Follow-up final gates:
+
+```sh
+cargo fmt --all -- --check
+git diff --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace -- --nocapture
+```
+
+Observed results:
+
+- Formatting check passed.
+- Whitespace check passed.
+- Workspace clippy passed with `-D warnings`.
+- Workspace tests passed; `ferrite-server` reported 225 library tests passed.
 - Ignored real-model GGUF HTTP suites remained ignored by the default workspace
   test command.
 
