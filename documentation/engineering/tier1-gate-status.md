@@ -108,8 +108,11 @@ Tier 1 artifacts remains open.
 Qwen2.5-1.5B Q8_0 now has the same one-prompt, four-endpoint stop-sequence
 coverage for the larger local Tier 1 artifact. It verifies non-streaming usage
 accounting and SSE terminal stop chunks for the known one-token `hello world`
-completion and chat paths. Broader real-model `stop` coverage across prompts,
-Qwen2.5-1.5B Q6_K, and SmolLM2-1.7B remains open.
+completion and chat paths.
+Qwen2.5-1.5B Q6_K now has matching one-prompt, four-endpoint stop-sequence
+coverage for the same `hello world` completion and chat paths, using shared
+real-model stop assertion support. Broader real-model `stop` coverage across
+prompts and SmolLM2-1.7B remains open.
 
 The OpenAI-compatible HTTP server now has opt-in real Tier 1 coverage for
 Qwen2.5-0.5B Q4_K_M through legacy completions, streaming legacy completions,

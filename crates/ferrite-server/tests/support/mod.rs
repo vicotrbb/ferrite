@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 pub mod http;
+pub mod stop_sequences;
 pub mod throughput;
 
 use ferrite_server::{runtime::InferenceEngine, state::ServerState};
