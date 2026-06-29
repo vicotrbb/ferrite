@@ -193,6 +193,30 @@ async fn chat_endpoint_rejects_tool_message_without_tool_call_id(
 }
 
 #[tokio::test]
+async fn chat_endpoint_rejects_tool_call_id_on_non_tool_message(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let body = post_chat(
+        r#"{
+            "model":"fixture-model",
+            "messages":[{
+                "role":"user",
+                "content":"hello",
+                "tool_call_id":"call_1"
+            }]
+        }"#,
+    )
+    .await?;
+
+    assert_eq!(body.status, StatusCode::BAD_REQUEST);
+    assert_eq!(body.json["error"]["type"], "invalid_request_error");
+    assert!(body.json["error"]["message"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("messages.tool_call_id"));
+    Ok(())
+}
+
+#[tokio::test]
 async fn chat_endpoint_rejects_json_response_format() -> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat(
         r#"{
