@@ -1,6 +1,7 @@
 use super::{stream_usage::StreamUsage, unix_timestamp, usage::Usage};
 use crate::runtime::GeneratedText;
 use serde::Serialize;
+use serde_json::Value;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct ChatCompletionStreamChunk {
@@ -91,6 +92,7 @@ impl ChatCompletionStreamChunk {
 struct ChatCompletionStreamChoice {
     index: usize,
     delta: ChatCompletionStreamDelta,
+    logprobs: Option<Value>,
     finish_reason: Option<&'static str>,
 }
 
@@ -99,6 +101,7 @@ impl ChatCompletionStreamChoice {
         Self {
             index: 0,
             delta: ChatCompletionStreamDelta::content(content),
+            logprobs: None,
             finish_reason: None,
         }
     }
@@ -107,6 +110,7 @@ impl ChatCompletionStreamChoice {
         Self {
             index: 0,
             delta: ChatCompletionStreamDelta::empty(),
+            logprobs: None,
             finish_reason: Some("stop"),
         }
     }

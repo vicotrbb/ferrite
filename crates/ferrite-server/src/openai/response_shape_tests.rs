@@ -47,9 +47,65 @@ async fn chat_endpoint_returns_openai_message_shape() -> Result<(), Box<dyn std:
     Ok(())
 }
 
+#[tokio::test]
+async fn chat_stream_endpoint_returns_openai_choice_shape() -> Result<(), Box<dyn std::error::Error>>
+{
+    let model_path = write_chat_fixture_model()?;
+    let engine = InferenceEngine::load(&model_path)?;
+    let app = router(ServerState::with_engine("fixture-model".to_owned(), engine));
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/chat/completions")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            r#"{"model":"fixture-model","messages":[{"role":"user","content":"hello"}],"max_completion_tokens":1,"stream":true}"#,
+        ))?;
+    let response = app.oneshot(request).await?;
+    remove_fixture_model(&model_path)?;
+
+    let status = response.status();
+    let body = to_text(response.into_body()).await?;
+    assert_eq!(status, StatusCode::OK, "{body}");
+
+    let events = json_sse_events(&body)?;
+    let token_event = events
+        .iter()
+        .find(|event| event["choices"][0]["delta"]["content"] == "winner")
+        .ok_or("expected token event")?;
+    assert_choice_has_null_logprobs(token_event)?;
+
+    let stop_event = events
+        .iter()
+        .find(|event| event["choices"][0]["finish_reason"] == "stop")
+        .ok_or("expected stop event")?;
+    assert_choice_has_null_logprobs(stop_event)?;
+    Ok(())
+}
+
 async fn to_json(body: Body) -> Result<Value, Box<dyn std::error::Error>> {
+    Ok(serde_json::from_str(&to_text(body).await?)?)
+}
+
+async fn to_text(body: Body) -> Result<String, Box<dyn std::error::Error>> {
     let bytes = to_bytes(body, usize::MAX).await?;
-    Ok(serde_json::from_slice(&bytes)?)
+    Ok(String::from_utf8(bytes.to_vec())?)
+}
+
+fn json_sse_events(body: &str) -> Result<Vec<Value>, Box<dyn std::error::Error>> {
+    body.lines()
+        .filter_map(|line| line.strip_prefix("data: "))
+        .filter(|data| *data != "[DONE]")
+        .map(|data| Ok(serde_json::from_str(data)?))
+        .collect()
+}
+
+fn assert_choice_has_null_logprobs(event: &Value) -> Result<(), Box<dyn std::error::Error>> {
+    let choice = event["choices"][0]
+        .as_object()
+        .ok_or("expected streamed choice object")?;
+    assert!(choice.contains_key("logprobs"), "{event}");
+    assert!(choice["logprobs"].is_null(), "{event}");
+    Ok(())
 }
 
 fn write_chat_fixture_model() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
