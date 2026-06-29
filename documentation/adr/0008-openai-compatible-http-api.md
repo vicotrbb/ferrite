@@ -193,3 +193,7 @@ Responses API are out of scope until explicit ADRs or plans add them.
   records compatibility evidence for returning explicit `messages` and
   `prompt` errors when generation requests omit their required input fields
   instead of JSON body deserialization errors.
+- `documentation/dev-notes/2026-06-29-openai-malformed-model.md` records
+  compatibility evidence for returning explicit `model` errors when generation
+  requests provide malformed model ids instead of JSON body deserialization
+  errors.

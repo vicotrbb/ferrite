@@ -10,6 +10,7 @@ mod logit_bias;
 mod message_metadata;
 mod metadata;
 mod modalities;
+mod model_id;
 mod neutral_options;
 mod prompt_cache_key;
 mod reasoning_effort;

@@ -1,6 +1,7 @@
 use super::{
     completion_prompt::CompletionPrompt,
     logit_bias::is_neutral_logit_bias,
+    model_id::deserialize_model_id,
     neutral_options::{is_neutral_bool, is_neutral_number},
     seed::is_seed,
     stop_sequences::is_neutral_stop_sequences,
@@ -17,7 +18,7 @@ use std::collections::BTreeMap;
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 pub struct CompletionRequest {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_model_id")]
     model: String,
     #[serde(default)]
     prompt: CompletionPrompt,

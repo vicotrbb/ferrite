@@ -5,6 +5,7 @@ use super::{
     message_metadata::is_optional_string,
     metadata::is_valid_metadata,
     modalities::is_text_only_modalities,
+    model_id::deserialize_model_id,
     neutral_options::{is_neutral_bool, is_neutral_number},
     prompt_cache_key::is_prompt_cache_key,
     reasoning_effort::is_no_reasoning_effort,
@@ -27,7 +28,7 @@ use std::collections::BTreeMap;
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 pub struct ChatCompletionRequest {
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_model_id")]
     model: String,
     #[serde(default)]
     messages: Vec<ChatMessage>,
