@@ -103,6 +103,9 @@ reference implementation and benchmarking baseline, not the Ferrite runtime.
 - `documentation/dev-notes/2026-06-28-q8-k-empty-activation-guardrail.md`
   records the non-empty activation block collection invariant for
   `BlockQ8K::quantize_blocks`.
+- `documentation/dev-notes/2026-06-28-q8-k-scale-finite-guardrail.md`
+  records fail-closed finite-scale validation for Q8_K activation
+  quantization.
 - `documentation/dev-notes/2026-06-28-q8-k-neon-signed-scale-guardrail.md`
   records target-specific aarch64 NEON parity against the scalar Q8_K helpers
   for both signed activation-scale polarities.

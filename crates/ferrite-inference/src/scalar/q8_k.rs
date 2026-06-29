@@ -63,6 +63,11 @@ impl BlockQ8K {
         }
 
         let inverse_scale = -127.0 / max;
+        let scale = 1.0 / inverse_scale;
+        if !inverse_scale.is_finite() || !scale.is_finite() {
+            return Err(InferenceError::new("Q8_K activation scale is not finite"));
+        }
+
         let mut qs = [0i8; Q8_K_BLOCK_VALUES];
         for (index, value) in values.iter().enumerate() {
             let quantized = (inverse_scale * *value).round() as i32;
@@ -75,7 +80,7 @@ impl BlockQ8K {
         }
 
         Ok(Self {
-            d: 1.0 / inverse_scale,
+            d: scale,
             qs,
             bsums,
         })
@@ -178,6 +183,20 @@ mod tests {
         };
 
         assert_eq!(err.to_string(), "Q8_K activation value 7 is not finite");
+        Ok(())
+    }
+
+    #[test]
+    fn q8_k_rejects_non_finite_activation_scale() -> Result<(), InferenceError> {
+        let mut values = [0.0; Q8_K_BLOCK_VALUES];
+        values[0] = f32::MIN_POSITIVE;
+
+        let err = match BlockQ8K::quantize(&values) {
+            Ok(_) => return Err(InferenceError::new("non-finite activation scale must fail")),
+            Err(err) => err,
+        };
+
+        assert_eq!(err.to_string(), "Q8_K activation scale is not finite");
         Ok(())
     }
 
