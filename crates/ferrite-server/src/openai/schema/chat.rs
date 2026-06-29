@@ -240,7 +240,7 @@ impl ChatMessage {
 
     fn unsupported_fields(&self) -> Vec<String> {
         UnsupportedFields::new()
-            .with_present("messages.name", !is_optional_string(&self.name))
+            .with_present("messages.name", !self.name_matches_role())
             .with_present("messages.tool_call_id", !self.tool_call_id_matches_role())
             .with_present("messages.tool_calls", !is_empty_tools(&self.tool_calls))
             .with_present(
@@ -249,6 +249,13 @@ impl ChatMessage {
             )
             .with_extra_keys_with_prefix("messages.", &self.extra_fields)
             .into_vec()
+    }
+
+    fn name_matches_role(&self) -> bool {
+        match self.role {
+            ChatRole::Function => self.name.as_ref().is_some_and(Value::is_string),
+            _ => is_optional_string(&self.name),
+        }
     }
 
     fn tool_message_missing_tool_call_id(&self) -> bool {

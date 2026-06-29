@@ -146,6 +146,29 @@ async fn chat_endpoint_rejects_malformed_message_name() -> Result<(), Box<dyn st
 }
 
 #[tokio::test]
+async fn chat_endpoint_rejects_function_message_without_name(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let body = post_chat(
+        r#"{
+            "model":"fixture-model",
+            "messages":[{
+                "role":"function",
+                "content":"hello"
+            }]
+        }"#,
+    )
+    .await?;
+
+    assert_eq!(body.status, StatusCode::BAD_REQUEST);
+    assert_eq!(body.json["error"]["type"], "invalid_request_error");
+    assert!(body.json["error"]["message"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("messages.name"));
+    Ok(())
+}
+
+#[tokio::test]
 async fn chat_endpoint_rejects_malformed_message_tool_call_id(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat(
