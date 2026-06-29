@@ -106,3 +106,75 @@ completion path, and the non-streaming and streaming chat completion paths.
 
 It does not prove broad prompt behavior, longer completions through HTTP,
 x86_64 HTTP behavior, or server throughput.
+
+## Current-Tree Rerun After Stream Role Chunk Compatibility
+
+Tree state:
+
+- Commit: `dcff88a`
+- Model artifact: `target/models/qwen2.5-1.5b-instruct-q8_0.gguf`
+- File size: 1.8 GB
+
+The first current-tree full prompt rerun exposed a stale streaming-chat
+assertion:
+
+```sh
+cargo test -p ferrite-server --test openai_real_tier1_qwen_1_5b_prompts -- --ignored --nocapture
+```
+
+Observed failure:
+
+```text
+thread 'live_http_server_streams_qwen_1_5b_q8_chat_first_tokens_for_reference_prompts' panicked at crates/ferrite-server/tests/openai_real_tier1_qwen_1_5b_prompts.rs:241:5:
+assertion `left == right` failed: unexpected generated chat stream chunks
+  left: ["", "你好"]
+ right: ["你好"]
+
+test live_http_server_matches_qwen_1_5b_q8_first_tokens_for_reference_prompts ... ok
+test live_http_server_matches_qwen_1_5b_q8_chat_first_tokens_for_reference_prompts ... ok
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 782.26s
+```
+
+Root cause: the prompt helper counted Ferrite's OpenAI-style initial assistant
+role chunk as generated content because that chunk has `finish_reason: null` and
+`delta.content: ""`. The current response-shape contract expects this role
+chunk. The prompt helper now collects generated text only from non-terminal
+chunks where `delta.role` is absent, preserving the role chunk while excluding
+it from the generated-content comparison.
+
+Focused rerun of the failed path:
+
+```sh
+cargo test -p ferrite-server --test openai_real_tier1_qwen_1_5b_prompts live_http_server_streams_qwen_1_5b_q8_chat_first_tokens_for_reference_prompts -- --ignored --nocapture
+```
+
+Observed result:
+
+```text
+test live_http_server_streams_qwen_1_5b_q8_chat_first_tokens_for_reference_prompts ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 697.73s
+```
+
+Current-tree reruns of the other prompt paths:
+
+```sh
+cargo test -p ferrite-server --test openai_real_tier1_qwen_1_5b_prompts live_http_server_matches_qwen_1_5b_q8_first_tokens_for_reference_prompts -- --ignored --nocapture
+cargo test -p ferrite-server --test openai_real_tier1_qwen_1_5b_prompts live_http_server_matches_qwen_1_5b_q8_chat_first_tokens_for_reference_prompts -- --ignored --nocapture
+```
+
+Observed results:
+
+```text
+test live_http_server_matches_qwen_1_5b_q8_first_tokens_for_reference_prompts ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 425.72s
+
+test live_http_server_matches_qwen_1_5b_q8_chat_first_tokens_for_reference_prompts ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 611.64s
+```
+
+This rerun confirms the Qwen2.5-1.5B Q8_0 six-prompt legacy completion,
+non-streaming chat, and streaming chat paths at the current tree after aligning
+the streaming-chat assertion with the OpenAI-compatible role-chunk contract.

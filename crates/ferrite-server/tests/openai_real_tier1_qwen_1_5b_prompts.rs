@@ -235,7 +235,8 @@ fn assert_qwen_chat_stream_response(
         .iter()
         .filter_map(|event| {
             let choice = &event["choices"][0];
-            (choice["finish_reason"].is_null()).then(|| choice["delta"]["content"].as_str())?
+            (choice["finish_reason"].is_null() && choice["delta"]["role"].is_null())
+                .then(|| choice["delta"]["content"].as_str())?
         })
         .collect::<Vec<_>>();
     assert_eq!(

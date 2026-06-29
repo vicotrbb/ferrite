@@ -188,3 +188,33 @@ Qwen2.5-1.5B Q8_0 legacy completion serving, both non-streaming and SSE
 streaming, plus chat completion serving, both non-streaming and SSE streaming.
 This follows the CLI throughput slice that measured the same model above
 10 tok/s locally, but HTTP throughput for this model remains unmeasured.
+
+## Current-Tree Rerun After OpenAI Compatibility Slices
+
+Tree state:
+
+- Commit: `dcff88a`
+- Model artifact: `target/models/qwen2.5-1.5b-instruct-q8_0.gguf`
+- File size: 1.8 GB
+
+Command:
+
+```sh
+cargo test -p ferrite-server --test openai_real_tier1_qwen_1_5b_http -- --ignored --nocapture
+```
+
+Observed result:
+
+```text
+test live_http_server_generates_with_qwen_1_5b_q8_model ... ok
+test live_http_server_streams_with_qwen_1_5b_q8_model ... ok
+test live_http_server_streams_chat_with_qwen_1_5b_q8_model ... ok
+test live_http_server_chats_with_qwen_1_5b_q8_model ... ok
+test live_http_server_waits_for_concurrent_qwen_1_5b_q8_request ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 191.88s
+```
+
+This rerun confirms the larger Tier 1 Qwen2.5-1.5B Q8_0 OpenAI HTTP path still
+works after the later compatibility slices, including unique response IDs,
+stream role chunks, and current wait-queue behavior.
