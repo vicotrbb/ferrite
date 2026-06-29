@@ -33,6 +33,7 @@ fn role_label(role: ChatRole) -> &'static str {
         ChatRole::Assistant => "assistant",
         ChatRole::Tool => "tool",
         ChatRole::Function => "function",
+        ChatRole::Unknown => "unknown",
     }
 }
 

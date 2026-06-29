@@ -21,7 +21,7 @@ use super::{
     user_identifier::is_user_identifier,
 };
 use crate::runtime::GeneratedText;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
 
@@ -248,6 +248,7 @@ impl ChatMessage {
 
     fn unsupported_fields(&self) -> Vec<String> {
         UnsupportedFields::new()
+            .with_present("messages.role", self.role == ChatRole::Unknown)
             .with_present("messages.content", !self.content_matches_role())
             .with_present("messages.name", !self.name_matches_role())
             .with_present("messages.tool_call_id", !self.tool_call_id_matches_role())
@@ -296,8 +297,7 @@ impl ChatMessage {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "snake_case")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ChatRole {
     Developer,
     System,
@@ -305,6 +305,25 @@ pub enum ChatRole {
     Assistant,
     Tool,
     Function,
+    Unknown,
+}
+
+impl<'de> Deserialize<'de> for ChatRole {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = Value::deserialize(deserializer)?;
+        Ok(match value.as_str() {
+            Some("developer") => Self::Developer,
+            Some("system") => Self::System,
+            Some("user") => Self::User,
+            Some("assistant") => Self::Assistant,
+            Some("tool") => Self::Tool,
+            Some("function") => Self::Function,
+            _ => Self::Unknown,
+        })
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -375,5 +394,19 @@ impl ChatCompletionMessage {
             refusal: None,
             annotations: Vec::new(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn records_unknown_message_role_for_request_validation(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let message: ChatMessage = serde_json::from_str(r#"{"role":"critic","content":"hello"}"#)?;
+
+        assert_eq!(message.unsupported_fields(), ["messages.role"]);
+        Ok(())
     }
 }
