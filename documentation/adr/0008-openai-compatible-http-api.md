@@ -264,3 +264,6 @@ Responses API are out of scope until explicit ADRs or plans add them.
   records matching SmolLM2-1.7B Q4_K_M stop-sequence evidence across
   non-streaming and streaming completion/chat HTTP paths, plus six-prompt
   legacy completion stop coverage.
+- `documentation/dev-notes/2026-06-29-openai-real-tier1-large-stop-rerun.md`
+  records a fresh larger-artifact Tier 1 stop-sequence rerun after the
+  streaming stop-filter flush fix.
