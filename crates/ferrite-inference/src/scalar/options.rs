@@ -96,6 +96,10 @@ impl Q8KActivationMatvecRoleMask {
         for role in roles {
             mask.insert(role);
         }
+        assert!(
+            mask.0 != 0,
+            "Q8_K activation matvec role scope must not be empty"
+        );
         mask
     }
 
@@ -277,6 +281,14 @@ mod tests {
         assert_eq!(options.q8_k_activation_matvec_roles_label(), "ffn_down");
         assert!(!options.q8_k_activation_matvec_for_role(Q8KActivationMatvecRole::QProj));
         assert!(options.q8_k_activation_matvec_for_role(Q8KActivationMatvecRole::FfnDown));
+    }
+
+    #[test]
+    #[should_panic(expected = "Q8_K activation matvec role scope must not be empty")]
+    fn q8_k_activation_role_scope_rejects_empty_role_set() {
+        let _ = ScalarExecutionOptions::default()
+            .with_q8_k_activation_matvec(true)
+            .with_q8_k_activation_matvec_roles([]);
     }
 
     #[test]
