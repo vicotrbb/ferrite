@@ -28,6 +28,7 @@ pub async fn run_completion_benchmark(
 ) -> Result<ThroughputResult, Box<dyn Error>> {
     let request_body = request_body(config);
     let endpoint = config.endpoint();
+    let stream = config.stream();
     let started = Instant::now();
     let mut completed_requests = 0;
 
@@ -52,7 +53,7 @@ pub async fn run_completion_benchmark(
                 .await
                 .map_err(|error| std::io::Error::other(format!("request task failed: {error}")))?
                 .map_err(std::io::Error::other)?;
-            http::validate_openai_response(endpoint, &response)?;
+            http::validate_openai_response(endpoint, stream, &response)?;
             completed_requests += 1;
         }
     }
@@ -66,7 +67,7 @@ pub async fn run_completion_benchmark(
 pub fn format_result(config: &ThroughputClientConfig, result: ThroughputResult) -> String {
     format!(
         "{}={}\nelapsed_ms={}\nrequests_per_second={:.6}",
-        config.endpoint().metric_name(),
+        config.endpoint().metric_name(config.stream()),
         result.completed_requests,
         result.elapsed.as_millis(),
         result.requests_per_second()
@@ -81,8 +82,9 @@ fn request_body(config: &ThroughputClientConfig) -> String {
 }
 
 fn completion_request_body(config: &ThroughputClientConfig) -> String {
+    let stream = stream_field(config);
     format!(
-        r#"{{"model":{},"prompt":{},"max_tokens":{}}}"#,
+        r#"{{"model":{},"prompt":{},"max_tokens":{}{stream}}}"#,
         serde_json::Value::String(config.model().to_owned()),
         serde_json::Value::String(config.prompt().to_owned()),
         config.max_tokens()
@@ -90,10 +92,19 @@ fn completion_request_body(config: &ThroughputClientConfig) -> String {
 }
 
 fn chat_completion_request_body(config: &ThroughputClientConfig) -> String {
+    let stream = stream_field(config);
     format!(
-        r#"{{"model":{},"messages":[{{"role":"user","content":{}}}],"max_tokens":{}}}"#,
+        r#"{{"model":{},"messages":[{{"role":"user","content":{}}}],"max_tokens":{}{stream}}}"#,
         serde_json::Value::String(config.model().to_owned()),
         serde_json::Value::String(config.prompt().to_owned()),
         config.max_tokens()
     )
+}
+
+fn stream_field(config: &ThroughputClientConfig) -> &'static str {
+    if config.stream() {
+        r#","stream":true"#
+    } else {
+        ""
+    }
 }

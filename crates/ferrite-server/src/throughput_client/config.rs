@@ -9,6 +9,7 @@ pub struct ThroughputClientConfig {
     requests: usize,
     concurrency: usize,
     max_tokens: usize,
+    stream: bool,
     api_key: String,
 }
 
@@ -26,10 +27,12 @@ impl OpenAiEndpoint {
         }
     }
 
-    pub fn metric_name(self) -> &'static str {
-        match self {
-            Self::Completions => "openai_http_completion_requests",
-            Self::ChatCompletions => "openai_http_chat_completion_requests",
+    pub fn metric_name(self, stream: bool) -> &'static str {
+        match (self, stream) {
+            (Self::Completions, false) => "openai_http_completion_requests",
+            (Self::ChatCompletions, false) => "openai_http_chat_completion_requests",
+            (Self::Completions, true) => "openai_http_streaming_completion_requests",
+            (Self::ChatCompletions, true) => "openai_http_streaming_chat_completion_requests",
         }
     }
 }
@@ -80,6 +83,9 @@ impl ThroughputClientConfig {
                         "--max-tokens",
                     )?;
                 }
+                "--stream" => {
+                    config.stream = true;
+                }
                 "--api-key" => {
                     config.api_key = os_string_to_string(next_value(&mut iter, "--api-key")?)?;
                     if config.api_key.trim().is_empty() {
@@ -127,6 +133,10 @@ impl ThroughputClientConfig {
         self.max_tokens
     }
 
+    pub fn stream(&self) -> bool {
+        self.stream
+    }
+
     pub fn api_key(&self) -> &str {
         &self.api_key
     }
@@ -142,6 +152,7 @@ impl Default for ThroughputClientConfig {
             requests: 3,
             concurrency: 1,
             max_tokens: 1,
+            stream: false,
             api_key: "local-secret".to_owned(),
         }
     }
@@ -205,5 +216,5 @@ fn parse_endpoint(value: OsString) -> Result<OpenAiEndpoint, ClientConfigError> 
 }
 
 fn usage() -> &'static str {
-    "usage: ferrite-openai-throughput [--addr 127.0.0.1:8080] [--endpoint completions|chat-completions] [--model ferrite-local] [--prompt 'hello world'] [--requests 3] [--concurrency 1] [--max-tokens 1] [--api-key local-secret]"
+    "usage: ferrite-openai-throughput [--addr 127.0.0.1:8080] [--endpoint completions|chat-completions] [--model ferrite-local] [--prompt 'hello world'] [--requests 3] [--concurrency 1] [--max-tokens 1] [--stream] [--api-key local-secret]"
 }

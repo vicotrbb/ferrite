@@ -29,6 +29,7 @@ Connection: close\r\n\
 
 pub fn validate_openai_response(
     endpoint: OpenAiEndpoint,
+    stream: bool,
     response: &str,
 ) -> Result<(), Box<dyn Error>> {
     if !response.starts_with("HTTP/1.1 200 OK") {
@@ -37,6 +38,9 @@ pub fn validate_openai_response(
     let (_, body) = response
         .split_once("\r\n\r\n")
         .ok_or("expected HTTP response body")?;
+    if stream {
+        return validate_streaming_body(body);
+    }
     let body: serde_json::Value = serde_json::from_str(body)?;
     match endpoint {
         OpenAiEndpoint::Completions => validate_completion_body(&body),
@@ -60,6 +64,16 @@ fn validate_chat_completion_body(body: &serde_json::Value) -> Result<(), Box<dyn
     }
     if !body["choices"][0]["message"]["content"].is_string() {
         return Err("missing chat completion message content".into());
+    }
+    Ok(())
+}
+
+fn validate_streaming_body(body: &str) -> Result<(), Box<dyn Error>> {
+    if !body.lines().any(|line| line.starts_with("data: ")) {
+        return Err("missing streaming data event".into());
+    }
+    if !body.lines().any(|line| line == "data: [DONE]") {
+        return Err("missing streaming done event".into());
     }
     Ok(())
 }

@@ -18,6 +18,7 @@ fn parses_minimal_completion_benchmark_config() -> Result<(), Box<dyn std::error
     assert_eq!(config.concurrency(), 1);
     assert_eq!(config.max_tokens(), 1);
     assert_eq!(config.api_key(), "local-secret");
+    assert!(!config.stream());
     Ok(())
 }
 
@@ -92,5 +93,89 @@ fn formats_chat_completion_result_metric_name() -> Result<(), Box<dyn std::error
         format_result(&config, result),
         "openai_http_chat_completion_requests=2\nelapsed_ms=400\nrequests_per_second=5.000000"
     );
+    Ok(())
+}
+
+#[test]
+fn parses_streaming_benchmark_config() -> Result<(), Box<dyn std::error::Error>> {
+    let config = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--stream"),
+    ])?;
+
+    assert!(config.stream());
+    Ok(())
+}
+
+#[test]
+fn builds_openai_compatible_streaming_completion_request_body(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let config = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--stream"),
+        OsString::from("--model"),
+        OsString::from("fixture-model"),
+        OsString::from("--prompt"),
+        OsString::from("measure this"),
+        OsString::from("--max-tokens"),
+        OsString::from("2"),
+    ])?;
+
+    assert_eq!(
+        request_body(&config),
+        r#"{"model":"fixture-model","prompt":"measure this","max_tokens":2,"stream":true}"#
+    );
+    Ok(())
+}
+
+#[test]
+fn builds_openai_compatible_streaming_chat_completion_request_body(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let config = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--endpoint"),
+        OsString::from("chat-completions"),
+        OsString::from("--stream"),
+        OsString::from("--model"),
+        OsString::from("fixture-model"),
+        OsString::from("--prompt"),
+        OsString::from("measure this"),
+        OsString::from("--max-tokens"),
+        OsString::from("2"),
+    ])?;
+
+    assert_eq!(
+        request_body(&config),
+        r#"{"model":"fixture-model","messages":[{"role":"user","content":"measure this"}],"max_tokens":2,"stream":true}"#
+    );
+    Ok(())
+}
+
+#[test]
+fn formats_streaming_chat_completion_result_metric_name() -> Result<(), Box<dyn std::error::Error>>
+{
+    let config = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--endpoint"),
+        OsString::from("chat-completions"),
+        OsString::from("--stream"),
+    ])?;
+    let result = ThroughputResult {
+        completed_requests: 2,
+        elapsed: std::time::Duration::from_millis(400),
+    };
+
+    assert_eq!(
+        format_result(&config, result),
+        "openai_http_streaming_chat_completion_requests=2\nelapsed_ms=400\nrequests_per_second=5.000000"
+    );
+    Ok(())
+}
+
+#[test]
+fn validates_streaming_response_done_event() -> Result<(), Box<dyn std::error::Error>> {
+    let response = "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\n\r\ndata: {\"choices\":[{\"text\":\"hi\"}]}\n\ndata: [DONE]\n\n";
+
+    http::validate_openai_response(OpenAiEndpoint::Completions, true, response)?;
     Ok(())
 }

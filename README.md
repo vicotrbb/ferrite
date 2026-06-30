@@ -124,12 +124,15 @@ target/release/ferrite-openai-throughput \
 
 Use `--endpoint chat-completions` to measure
 `POST /v1/chat/completions` with the prompt wrapped as a single user message.
-The client prints `openai_http_completion_requests` for legacy completions or
-`openai_http_chat_completion_requests` for chat completions, plus `elapsed_ms`
-and `requests_per_second`. Record throughput claims under
+Use `--stream` to measure OpenAI-style SSE streams for either endpoint. The
+client prints endpoint-specific request counters:
+`openai_http_completion_requests`, `openai_http_chat_completion_requests`,
+`openai_http_streaming_completion_requests`, or
+`openai_http_streaming_chat_completion_requests`, plus `elapsed_ms` and
+`requests_per_second`. Record throughput claims under
 `documentation/benchmarks/` with the exact server/client commands, model, host,
-build mode, endpoint, request count, concurrency, prompt, and generated-token
-count.
+build mode, endpoint, stream mode, request count, concurrency, prompt, and
+generated-token count.
 
 ## CLI Memory Sampling
 
