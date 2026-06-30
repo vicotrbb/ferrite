@@ -77,7 +77,18 @@ pub(super) fn dot(left: &[f32], right: &[f32]) -> Result<f32, InferenceError> {
     if right.iter().any(|value| !value.is_finite()) {
         return Err(InferenceError::new("dot right must be finite"));
     }
-    Ok(left.iter().zip(right.iter()).map(|(a, b)| a * b).sum())
+    let mut sum = 0.0;
+    for (left, right) in left.iter().zip(right.iter()) {
+        let product = *left * *right;
+        if !product.is_finite() {
+            return Err(InferenceError::new("dot result must be finite"));
+        }
+        sum += product;
+        if !sum.is_finite() {
+            return Err(InferenceError::new("dot result must be finite"));
+        }
+    }
+    Ok(sum)
 }
 
 pub(super) fn add_assign(left: &mut [f32], right: &[f32]) -> Result<(), InferenceError> {
@@ -222,6 +233,26 @@ mod tests {
 
             assert!(error.to_string().contains("dot right must be finite"));
         }
+        Ok(())
+    }
+
+    #[test]
+    fn dot_rejects_non_finite_results() -> Result<(), InferenceError> {
+        let product_error = match dot(&[f32::MAX], &[2.0]) {
+            Ok(_) => return Err(InferenceError::new("overflowing dot product should fail")),
+            Err(error) => error,
+        };
+
+        assert!(product_error
+            .to_string()
+            .contains("dot result must be finite"));
+
+        let sum_error = match dot(&[f32::MAX, f32::MAX], &[1.0, 1.0]) {
+            Ok(_) => return Err(InferenceError::new("overflowing dot sum should fail")),
+            Err(error) => error,
+        };
+
+        assert!(sum_error.to_string().contains("dot result must be finite"));
         Ok(())
     }
 

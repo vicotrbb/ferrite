@@ -12,10 +12,14 @@ regressed.
 `dot` now rejects non-finite values in both operands before computing the
 elementwise product sum.
 
+It also rejects finite operands when either an elementwise product or the
+running sum overflows to a non-finite result.
+
 ## Verification
 
 Run the focused regression:
 
 ```sh
 cargo test -p ferrite-inference scalar::math::tests::dot_rejects_non_finite_values -- --nocapture
+cargo test -p ferrite-inference scalar::math::tests::dot_rejects_non_finite_results -- --nocapture
 ```
