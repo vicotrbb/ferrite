@@ -1,12 +1,14 @@
 mod config;
 mod http;
 mod streaming_metrics;
+mod streaming_usage;
 
 #[cfg(test)]
 mod tests;
 
 pub use config::{OpenAiEndpoint, ThroughputClientConfig};
 pub use streaming_metrics::StreamingTimingSummary;
+pub use streaming_usage::StreamingUsageSummary;
 
 use std::{
     error::Error,
@@ -18,6 +20,7 @@ pub struct ThroughputResult {
     pub completed_requests: usize,
     pub elapsed: Duration,
     pub streaming_timing: Option<StreamingTimingSummary>,
+    pub streaming_usage: Option<StreamingUsageSummary>,
 }
 
 impl ThroughputResult {
@@ -35,6 +38,7 @@ pub async fn run_completion_benchmark(
     let started = Instant::now();
     let mut completed_requests = 0;
     let mut streaming_timing = None;
+    let mut streaming_usage = None;
 
     while completed_requests < config.requests() {
         let batch_size = config
@@ -61,6 +65,9 @@ pub async fn run_completion_benchmark(
             if stream && streaming_timing.is_none() {
                 streaming_timing = response.streaming_timing();
             }
+            if stream && streaming_usage.is_none() {
+                streaming_usage = response.streaming_usage();
+            }
             completed_requests += 1;
         }
     }
@@ -69,6 +76,7 @@ pub async fn run_completion_benchmark(
         completed_requests,
         elapsed: started.elapsed(),
         streaming_timing,
+        streaming_usage,
     })
 }
 
@@ -91,6 +99,14 @@ pub fn format_result(config: &ThroughputClientConfig, result: ThroughputResult) 
             summary.p50_token_latency().as_millis(),
             summary.p95_token_latency().as_millis(),
             summary.max_token_latency().as_millis(),
+        ));
+    }
+    if let Some(usage) = result.streaming_usage {
+        output.push_str(&format!(
+            "\nstreaming_usage_prompt_tokens={}\nstreaming_usage_completion_tokens={}\nstreaming_usage_total_tokens={}",
+            usage.prompt_tokens(),
+            usage.completion_tokens(),
+            usage.total_tokens(),
         ));
     }
     output

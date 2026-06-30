@@ -1,4 +1,4 @@
-use super::{OpenAiEndpoint, StreamingTimingSummary};
+use super::{OpenAiEndpoint, StreamingTimingSummary, StreamingUsageSummary};
 use std::{
     error::Error,
     net::SocketAddr,
@@ -13,6 +13,7 @@ use tokio::{
 pub struct OpenAiHttpResponse {
     raw: String,
     streaming_timing: Option<StreamingTimingSummary>,
+    streaming_usage: Option<StreamingUsageSummary>,
 }
 
 impl OpenAiHttpResponse {
@@ -22,6 +23,10 @@ impl OpenAiHttpResponse {
 
     pub fn streaming_timing(&self) -> Option<StreamingTimingSummary> {
         self.streaming_timing
+    }
+
+    pub fn streaming_usage(&self) -> Option<StreamingUsageSummary> {
+        self.streaming_usage
     }
 }
 
@@ -45,9 +50,14 @@ Connection: close\r\n\
     stream.write_all(request.as_bytes()).await?;
     stream.write_all(body).await?;
     let (response, streaming_timing) = read_http_response(&mut stream).await?;
+    let raw = String::from_utf8(response)?;
+    let streaming_usage = raw
+        .split_once("\r\n\r\n")
+        .and_then(|(_, body)| StreamingUsageSummary::from_sse_body(body));
     Ok(OpenAiHttpResponse {
-        raw: String::from_utf8(response)?,
+        raw,
         streaming_timing,
+        streaming_usage,
     })
 }
 

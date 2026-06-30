@@ -89,6 +89,7 @@ fn formats_chat_completion_result_metric_name() -> Result<(), Box<dyn std::error
         completed_requests: 2,
         elapsed: std::time::Duration::from_millis(400),
         streaming_timing: None,
+        streaming_usage: None,
     };
 
     assert_eq!(
@@ -245,6 +246,7 @@ fn formats_streaming_chat_completion_result_metric_name() -> Result<(), Box<dyn 
         completed_requests: 2,
         elapsed: std::time::Duration::from_millis(400),
         streaming_timing: None,
+        streaming_usage: None,
     };
 
     assert_eq!(
@@ -270,12 +272,52 @@ fn formats_streaming_timing_summary() -> Result<(), Box<dyn std::error::Error>> 
             Duration::from_millis(140),
             Duration::from_millis(170),
         ]),
+        streaming_usage: None,
     };
 
     assert_eq!(
         format_result(&config, result),
         "openai_http_streaming_chat_completion_requests=1\nelapsed_ms=400\nrequests_per_second=2.500000\nstreaming_token_events=3\nstreaming_time_to_first_token_ms=100\nstreaming_total_elapsed_ms=170\nstreaming_tokens_per_second=17.647059\nstreaming_token_latency_min_ms=30\nstreaming_token_latency_p50_ms=40\nstreaming_token_latency_p95_ms=100\nstreaming_token_latency_max_ms=100"
     );
+    Ok(())
+}
+
+#[test]
+fn formats_streaming_usage_summary() -> Result<(), Box<dyn std::error::Error>> {
+    let config = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--endpoint"),
+        OsString::from("chat-completions"),
+        OsString::from("--stream"),
+        OsString::from("--stream-usage"),
+    ])?;
+    let result = ThroughputResult {
+        completed_requests: 1,
+        elapsed: Duration::from_millis(400),
+        streaming_timing: None,
+        streaming_usage: Some(StreamingUsageSummary::new(8, 32, 40)),
+    };
+
+    assert_eq!(
+        format_result(&config, result),
+        "openai_http_streaming_chat_completion_requests=1\nelapsed_ms=400\nrequests_per_second=2.500000\nstreaming_usage_prompt_tokens=8\nstreaming_usage_completion_tokens=32\nstreaming_usage_total_tokens=40"
+    );
+    Ok(())
+}
+
+#[test]
+fn extracts_streaming_usage_from_sse_body() -> Result<(), Box<dyn std::error::Error>> {
+    let body = concat!(
+        "data: {\"choices\":[{\"delta\":{\"content\":\"A\"}}],\"usage\":null}\n\n",
+        "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":8,\"completion_tokens\":32,\"total_tokens\":40}}\n\n",
+        "data: [DONE]\n\n",
+    );
+
+    let usage = StreamingUsageSummary::from_sse_body(body).ok_or("expected streaming usage")?;
+
+    assert_eq!(usage.prompt_tokens(), 8);
+    assert_eq!(usage.completion_tokens(), 32);
+    assert_eq!(usage.total_tokens(), 40);
     Ok(())
 }
 
