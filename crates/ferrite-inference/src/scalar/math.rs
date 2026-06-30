@@ -82,6 +82,12 @@ pub(super) fn dot(left: &[f32], right: &[f32]) -> Result<f32, InferenceError> {
 
 pub(super) fn add_assign(left: &mut [f32], right: &[f32]) -> Result<(), InferenceError> {
     ensure_len("residual", right, left.len())?;
+    if left.iter().any(|value| !value.is_finite()) {
+        return Err(InferenceError::new("residual left must be finite"));
+    }
+    if right.iter().any(|value| !value.is_finite()) {
+        return Err(InferenceError::new("residual right must be finite"));
+    }
     for (left, right) in left.iter_mut().zip(right.iter()) {
         *left += right;
     }
@@ -209,6 +215,30 @@ mod tests {
             };
 
             assert!(error.to_string().contains("dot right must be finite"));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn add_assign_rejects_non_finite_values() -> Result<(), InferenceError> {
+        for value in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            let mut left = [1.0, value];
+            let error = match add_assign(&mut left, &[1.0, 1.0]) {
+                Ok(_) => return Err(InferenceError::new("non-finite residual left should fail")),
+                Err(error) => error,
+            };
+
+            assert!(error.to_string().contains("residual left must be finite"));
+        }
+
+        for value in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            let mut left = [1.0, 2.0];
+            let error = match add_assign(&mut left, &[1.0, value]) {
+                Ok(_) => return Err(InferenceError::new("non-finite residual right should fail")),
+                Err(error) => error,
+            };
+
+            assert!(error.to_string().contains("residual right must be finite"));
         }
         Ok(())
     }
