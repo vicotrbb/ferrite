@@ -52,6 +52,12 @@ pub fn argmax(values: &[f32]) -> Result<usize, InferenceError> {
 
 pub(super) fn swiglu(gate: &[f32], up: &[f32]) -> Result<Vec<f32>, InferenceError> {
     ensure_len("ffn up", up, gate.len())?;
+    if gate.iter().any(|value| !value.is_finite()) {
+        return Err(InferenceError::new("swiglu gate must be finite"));
+    }
+    if up.iter().any(|value| !value.is_finite()) {
+        return Err(InferenceError::new("swiglu up must be finite"));
+    }
     Ok(gate
         .iter()
         .zip(up.iter())
@@ -153,6 +159,28 @@ mod tests {
             };
 
             assert!(error.to_string().contains("rms_norm weight must be finite"));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn swiglu_rejects_non_finite_values() -> Result<(), InferenceError> {
+        for value in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            let error = match swiglu(&[1.0, value], &[1.0, 1.0]) {
+                Ok(_) => return Err(InferenceError::new("non-finite swiglu gate should fail")),
+                Err(error) => error,
+            };
+
+            assert!(error.to_string().contains("swiglu gate must be finite"));
+        }
+
+        for value in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            let error = match swiglu(&[1.0, 2.0], &[1.0, value]) {
+                Ok(_) => return Err(InferenceError::new("non-finite swiglu up should fail")),
+                Err(error) => error,
+            };
+
+            assert!(error.to_string().contains("swiglu up must be finite"));
         }
         Ok(())
     }
