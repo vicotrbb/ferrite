@@ -74,6 +74,9 @@ pub(super) fn softmax(values: &[f32]) -> Result<Vec<f32>, InferenceError> {
     if values.is_empty() {
         return Err(InferenceError::new("softmax input must not be empty"));
     }
+    if values.iter().any(|value| !value.is_finite()) {
+        return Err(InferenceError::new("softmax input must be finite"));
+    }
 
     let max = values.iter().copied().fold(f32::NEG_INFINITY, f32::max);
     let mut exp_values = Vec::with_capacity(values.len());
@@ -102,5 +105,23 @@ pub(super) fn ensure_len(
             "{name} length {} does not match expected {expected}",
             values.len()
         )))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn softmax_rejects_non_finite_values() -> Result<(), InferenceError> {
+        for value in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            let error = match softmax(&[0.0, value]) {
+                Ok(_) => return Err(InferenceError::new("non-finite softmax input should fail")),
+                Err(error) => error,
+            };
+
+            assert!(error.to_string().contains("softmax input must be finite"));
+        }
+        Ok(())
     }
 }
