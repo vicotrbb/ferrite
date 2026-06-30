@@ -161,9 +161,19 @@ impl<'a> Reader<'a> {
         }
 
         let dimension_count = usize_from_u64(u64::from(self.read_u32()?), "dimension count")?;
+        if dimension_count == 0 {
+            return Err(GgufError::new(format!(
+                "tensor {name} must have at least one dimension"
+            )));
+        }
+
         let mut dimensions = Vec::with_capacity(dimension_count);
         for _ in 0..dimension_count {
-            dimensions.push(self.read_u64()?);
+            let dimension = self.read_u64()?;
+            if dimension == 0 {
+                return Err(GgufError::new(format!("tensor {name} has zero dimension")));
+            }
+            dimensions.push(dimension);
         }
 
         let ty = GgmlType::from_u32(self.read_u32()?)?;

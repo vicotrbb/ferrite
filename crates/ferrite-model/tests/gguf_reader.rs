@@ -350,3 +350,65 @@ fn rejects_duplicate_tensor_names() -> Result<(), Box<dyn Error>> {
         .contains("duplicate tensor name token_embd.weight"));
     Ok(())
 }
+
+fn gguf_with_single_tensor_shape(dimensions: &[u64]) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    bytes.extend_from_slice(b"GGUF");
+    push_u32(&mut bytes, 3);
+    push_u64(&mut bytes, 1);
+    push_u64(&mut bytes, 3);
+
+    push_kv_string(&mut bytes, "general.architecture", "llama");
+    push_kv_u32(&mut bytes, "general.alignment", 64);
+    push_kv_string_array(&mut bytes, "tokenizer.ggml.tokens", &["<unk>", "hello"]);
+
+    push_tensor_info(
+        &mut bytes,
+        "token_embd.weight",
+        dimensions,
+        GgmlType::F32,
+        0,
+    );
+    align_len(&mut bytes, 64);
+
+    let element_count = dimensions
+        .iter()
+        .try_fold(1usize, |accumulator, dimension| {
+            usize::try_from(*dimension)
+                .ok()
+                .and_then(|dimension| accumulator.checked_mul(dimension))
+        })
+        .unwrap_or(0);
+    bytes.resize(bytes.len() + element_count * 4, 0);
+    bytes
+}
+
+#[test]
+fn rejects_tensors_with_no_dimensions() -> Result<(), Box<dyn Error>> {
+    let bytes = gguf_with_single_tensor_shape(&[]);
+
+    let error = match parse_gguf(&bytes) {
+        Ok(_) => return Err(io::Error::other("empty tensor shape should be rejected").into()),
+        Err(error) => error,
+    };
+
+    assert!(error
+        .to_string()
+        .contains("tensor token_embd.weight must have at least one dimension"));
+    Ok(())
+}
+
+#[test]
+fn rejects_tensors_with_zero_dimensions() -> Result<(), Box<dyn Error>> {
+    let bytes = gguf_with_single_tensor_shape(&[8, 0]);
+
+    let error = match parse_gguf(&bytes) {
+        Ok(_) => return Err(io::Error::other("zero tensor dimension should be rejected").into()),
+        Err(error) => error,
+    };
+
+    assert!(error
+        .to_string()
+        .contains("tensor token_embd.weight has zero dimension"));
+    Ok(())
+}
