@@ -139,7 +139,7 @@ impl CompletionRequest {
         match &self.echo {
             None => true,
             Some(Value::Bool(false)) => true,
-            Some(Value::Bool(true)) => !self.stream(),
+            Some(Value::Bool(true)) => true,
             Some(_) => false,
         }
     }

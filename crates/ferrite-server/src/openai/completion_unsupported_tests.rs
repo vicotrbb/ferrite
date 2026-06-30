@@ -45,14 +45,13 @@ async fn completion_endpoint_rejects_multiple_best_of_candidates(
 }
 
 #[tokio::test]
-async fn completion_endpoint_rejects_streaming_echo_request(
+async fn completion_endpoint_rejects_malformed_echo_request(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let body = post_completion_json(
         r#"{
             "model":"fixture-model",
             "prompt":"hello",
-            "stream":true,
-            "echo":true
+            "echo":"yes"
         }"#,
     )
     .await?;

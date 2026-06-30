@@ -135,12 +135,14 @@ async fn completions(
     let engine = required_engine(&state)?;
     let permit = acquire_inference_permit(&state).await?;
     if let Some(prompt) = stream_prompt {
+        let echo_prompt = request.echo().then(|| prompt.clone());
         return Ok(completion_stream_response(
             engine,
             state.model_id().to_owned(),
             prompt,
             max_tokens,
-            CompletionStreamOptions::new(request.stop_sequences(), request.stream_include_usage()),
+            CompletionStreamOptions::new(request.stop_sequences(), request.stream_include_usage())
+                .with_echo_prompt(echo_prompt),
             permit,
         ));
     }

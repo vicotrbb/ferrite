@@ -12,6 +12,7 @@ use tokio::sync::OwnedSemaphorePermit;
 pub(super) struct CompletionStreamOptions {
     stop_sequences: Vec<String>,
     include_usage: bool,
+    echo_prompt: Option<String>,
 }
 
 impl CompletionStreamOptions {
@@ -19,7 +20,13 @@ impl CompletionStreamOptions {
         Self {
             stop_sequences,
             include_usage,
+            echo_prompt: None,
         }
+    }
+
+    pub(super) fn with_echo_prompt(mut self, prompt: Option<String>) -> Self {
+        self.echo_prompt = prompt;
+        self
     }
 }
 
@@ -53,6 +60,11 @@ pub(super) fn completion_stream_response(
 ) -> Response {
     let include_usage = options.include_usage;
     let context = CompletionStreamContext::new(model).with_usage_field(include_usage);
+    let initial_chunks = options
+        .echo_prompt
+        .into_iter()
+        .map(|prompt| context.token(prompt))
+        .collect();
     let token_context = context.clone();
     stream_generated_text(
         StreamGenerationInput::new(
@@ -60,7 +72,7 @@ pub(super) fn completion_stream_response(
             prompt,
             max_tokens,
             options.stop_sequences,
-            Vec::new(),
+            initial_chunks,
         ),
         move |piece| token_context.token(piece.to_owned()),
         move |generated| {

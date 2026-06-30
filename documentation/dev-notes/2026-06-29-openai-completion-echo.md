@@ -22,9 +22,8 @@ addition to the generated completion. Ferrite already keeps the request prompt
 at the OpenAI server layer, so this can be implemented without leaking
 HTTP-specific types into the inference core.
 
-Streaming `echo: true` remains unsupported in this slice. Ferrite's streaming
-path emits token chunks as generation progresses; echoing the prompt there
-needs separate chunk-shape decisions and client compatibility evidence.
+Streaming `echo: true` remained unsupported in this slice. It was added later
+in `documentation/dev-notes/2026-06-30-openai-streaming-completion-echo.md`.
 
 ## Change
 
@@ -72,5 +71,6 @@ Observed result:
 
 ## Limits
 
-This slice does not support streaming echo, token-level logprobs for echoed
-prompt tokens, or ignored real-model GGUF HTTP suites.
+This slice did not support streaming echo when it landed. Token-level logprobs
+for echoed prompt tokens and ignored real-model GGUF HTTP suites remained out
+of scope.

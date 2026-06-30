@@ -35,6 +35,36 @@ async fn completions_endpoint_streams_openai_sse_chunks() -> Result<(), Box<dyn 
 }
 
 #[tokio::test]
+async fn completions_endpoint_streams_echo_prompt_when_requested(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let model_path = write_fixture_model()?;
+    let engine = InferenceEngine::load(&model_path)?;
+    let app = router(ServerState::with_engine("fixture-model".to_owned(), engine));
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/completions")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            r#"{"model":"fixture-model","prompt":"hello","max_tokens":1,"stream":true,"echo":true}"#,
+        ))?;
+    let response = app.oneshot(request).await?;
+    remove_fixture_model(&model_path)?;
+
+    let status = response.status();
+    let body = to_text(response.into_body()).await?;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let prompt_position = body
+        .find("\"text\":\"hello\"")
+        .ok_or("missing echo prompt")?;
+    let generated_position = body
+        .find("\"text\":\"winner\"")
+        .ok_or("missing generated token")?;
+    assert!(prompt_position < generated_position, "{body}");
+    assert!(body.contains("data: [DONE]"));
+    Ok(())
+}
+
+#[tokio::test]
 async fn chat_endpoint_streams_openai_sse_chunks() -> Result<(), Box<dyn std::error::Error>> {
     let model_path = write_chat_fixture_model()?;
     let engine = InferenceEngine::load(&model_path)?;
