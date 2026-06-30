@@ -91,8 +91,8 @@ local 32-token streaming chat-completion server memory samples, and
 SmolLM2-1.7B Q4_K_M now has the matching bounded local streaming chat memory
 shape. Qwen2.5-1.5B Q8_0, Qwen2.5-1.5B Q6_K, and SmolLM2-1.7B Q4_K_M now also
 have bounded two-client streaming chat memory overlap samples under the
-single-inference-permit queue. Qwen2.5-1.5B Q8_0 now also has a bounded
-three-client streaming chat memory overlap sample.
+single-inference-permit queue. Qwen2.5-1.5B Q8_0 and Q6_K now also have
+bounded three-client streaming chat memory overlap samples.
 The full Tier 1 throughput gate remains open because broader models,
 quantizations, prompts, x86_64 throughput, full-tier memory posture, and HTTP
 throughput are not yet proven.
@@ -227,6 +227,7 @@ OpenAI API parity.
 
 | Criterion | Status | Evidence |
 | --- | --- | --- |
+| OpenAI-compatible Qwen2.5-1.5B Q6_K three-client streaming chat memory | Bounded locally for three overlapping streaming `POST /v1/chat/completions` clients with 32 completion tokens each and a configured 60s wait window; broad high concurrency, queue fairness beyond this three-client shape, leak freedom, x86_64 behavior, and broader prompts remain unproven | `documentation/benchmarks/2026-06-30-tier1-qwen2-1-5b-q6-http-chat-stream-three-client-memory.md`; Qwen2.5-1.5B Q6_K sampled 974,028,800 bytes after health, peaked at 2,435,694,592 bytes during the three-client probe, sampled 1,516,142,592 bytes after all clients completed, and sampled 1,516,142,592 bytes after a two-second idle sample; all three clients returned HTTP `200`, emitted `[DONE]`, produced 34 SSE event chunks, and included usage with 8 prompt tokens, 32 completion tokens, and 40 total tokens; observed finish order was `first_then_second_then_third` |
 | GQA variants 1:1, 3:1, 4:1, 6:1, 7:1 | Proven for scalar attention harness | `documentation/dev-notes/2026-06-27-tier1-gqa-ratio-harness.md`; `cargo test -p ferrite-inference gqa_broadcasts_kv_heads_for_tier1_ratios -- --nocapture` |
 | RoPE `head_dim=64` and `head_dim=128` | Proven for scalar RoPE harness | `documentation/dev-notes/2026-06-27-tier1-rope-head-dim-harness.md`; `cargo test -p ferrite-inference rope_rotates_full_tier1_head_dimensions -- --nocapture` |
 | KV cache grows and shrinks across turns | Proven for scalar session cache | `documentation/dev-notes/2026-06-27-tier1-session-cache-truncation.md`; `cargo test -p ferrite-inference --test scalar_session_cache -- --nocapture` |
