@@ -81,6 +81,27 @@ async fn live_http_server_chats_with_qwen_1_5b_q8_model() -> Result<(), Box<dyn 
 
 #[tokio::test]
 #[ignore = "requires local Qwen2.5-1.5B Q8_0 GGUF model artifact"]
+async fn live_http_server_chats_32_tokens_with_qwen_1_5b_q8_model(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let model_path = qwen_1_5b_q8_model_path()?;
+    let server = support::LiveServer::start_with_existing_model(REAL_MODEL_ID, model_path).await?;
+    let request_body = format!(
+        r#"{{"model":"{REAL_MODEL_ID}","messages":[{{"role":"user","content":"hello world"}}],"max_completion_tokens":32}}"#
+    );
+    let response = send_http_request(
+        server.addr(),
+        "POST",
+        "/v1/chat/completions",
+        request_body.as_bytes(),
+    )
+    .await?;
+
+    assert_qwen_1_5b_q8_32_token_chat_response(&response)?;
+    Ok(())
+}
+
+#[tokio::test]
+#[ignore = "requires local Qwen2.5-1.5B Q8_0 GGUF model artifact"]
 async fn live_http_server_streams_chat_with_qwen_1_5b_q8_model(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let model_path = qwen_1_5b_q8_model_path()?;
@@ -201,6 +222,30 @@ fn assert_qwen_1_5b_q8_chat_response(response: &str) -> Result<(), Box<dyn std::
     assert_eq!(body["usage"]["prompt_tokens"], 8);
     assert_eq!(body["usage"]["completion_tokens"], 1);
     assert_eq!(body["usage"]["total_tokens"], 9);
+    Ok(())
+}
+
+fn assert_qwen_1_5b_q8_32_token_chat_response(
+    response: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    assert!(
+        response.starts_with("HTTP/1.1 200 OK"),
+        "unexpected response: {response}"
+    );
+    let body = response_json(response)?;
+    assert_eq!(body["object"], "chat.completion");
+    assert_eq!(body["model"], REAL_MODEL_ID);
+    assert_eq!(body["choices"][0]["message"]["role"], "assistant");
+    assert_eq!(body["choices"][0]["finish_reason"], "length");
+    assert!(
+        body["choices"][0]["message"]["content"]
+            .as_str()
+            .is_some_and(|content| !content.is_empty()),
+        "unexpected response body: {body}"
+    );
+    assert_eq!(body["usage"]["prompt_tokens"], 8);
+    assert_eq!(body["usage"]["completion_tokens"], 32);
+    assert_eq!(body["usage"]["total_tokens"], 40);
     Ok(())
 }
 

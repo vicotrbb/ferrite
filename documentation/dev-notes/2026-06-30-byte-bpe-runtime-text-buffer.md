@@ -75,6 +75,15 @@ total_tokens=40
 A second identical request also returned HTTP `200` with
 `object=chat.completion`, `finish_reason=length`, and `completion_tokens=32`.
 
+Follow-up regression coverage:
+
+```text
+cargo test --release -p ferrite-server --test openai_real_tier1_qwen_1_5b_http \
+  live_http_server_chats_32_tokens_with_qwen_1_5b_q8_model -- --ignored --test-threads=1
+test live_http_server_chats_32_tokens_with_qwen_1_5b_q8_model ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 6.91s
+```
+
 ## Remaining Limits
 
 This proves the specific incomplete UTF-8 token decode failure is fixed for the
