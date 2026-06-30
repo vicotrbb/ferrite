@@ -97,6 +97,12 @@ streaming chat memory overlap samples.
 The full Tier 1 throughput gate remains open because broader models,
 quantizations, prompts, x86_64 throughput, full-tier memory posture, and HTTP
 throughput are not yet proven.
+The next OpenAI-compatible HTTP proof milestone is the dedicated long-chat gate
+defined in `documentation/engineering/tier1-openai-long-chat-gate.md`: 256,
+512, and 1024-token streaming chat responses, repeated multi-turn
+conversations, RSS sampling before and after requests, per-token latency,
+stop/EOS behavior, and reconnect/error behavior. No Tier 1 long-chat readiness
+claim should be made until that gate has model-by-model evidence.
 The Qwen2.5-1.5B Q8_0 OpenAI-compatible HTTP path now also has a debug
 test-profile throughput harness check for three sequential one-token legacy
 completion requests and three queued one-token legacy completion requests. This
