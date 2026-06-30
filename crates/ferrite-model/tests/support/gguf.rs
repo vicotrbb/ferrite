@@ -92,6 +92,10 @@ pub(crate) fn minimal_llama_gguf_with_block_count(block_count: u64) -> Vec<u8> {
     minimal_llama_gguf_with_options(0, 2048, 8, block_count, 16, 2, 1)
 }
 
+pub(crate) fn minimal_llama_gguf_with_feed_forward_length(feed_forward_length: u64) -> Vec<u8> {
+    minimal_llama_gguf_with_options(0, 2048, 8, 2, feed_forward_length, 2, 1)
+}
+
 pub(crate) fn minimal_llama_gguf_with_attention_head_count(attention_head_count: u64) -> Vec<u8> {
     minimal_llama_gguf_with_options(0, 2048, 8, 2, 16, attention_head_count, 1)
 }
