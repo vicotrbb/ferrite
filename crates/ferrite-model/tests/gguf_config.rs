@@ -6,8 +6,8 @@ use std::io;
 use support::gguf::{
     minimal_llama_gguf, minimal_llama_gguf_with_attention_head_count,
     minimal_llama_gguf_with_attention_head_count_kv, minimal_llama_gguf_with_attention_heads,
-    minimal_llama_gguf_with_context_length, minimal_llama_gguf_with_embedding_length,
-    minimal_qwen2_gguf,
+    minimal_llama_gguf_with_block_count, minimal_llama_gguf_with_context_length,
+    minimal_llama_gguf_with_embedding_length, minimal_qwen2_gguf,
 };
 
 #[test]
@@ -86,6 +86,24 @@ fn rejects_zero_embedding_length_in_model_config() -> Result<(), Box<dyn Error>>
     assert!(error
         .to_string()
         .contains("llama.embedding_length must be greater than zero"));
+    Ok(())
+}
+
+#[test]
+fn rejects_zero_block_count_in_model_config() -> Result<(), Box<dyn Error>> {
+    let bytes = minimal_llama_gguf_with_block_count(0);
+    let file = parse_gguf(&bytes)?;
+
+    let error = match file.llama_config() {
+        Ok(_) => {
+            return Err(io::Error::other("zero block count should be rejected").into());
+        }
+        Err(error) => error,
+    };
+
+    assert!(error
+        .to_string()
+        .contains("llama.block_count must be greater than zero"));
     Ok(())
 }
 

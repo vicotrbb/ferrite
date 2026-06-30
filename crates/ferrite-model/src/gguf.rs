@@ -94,7 +94,7 @@ impl GgufFile {
             architecture,
             context_length: self.required_nonzero_count(&format!("{prefix}.context_length"))?,
             embedding_length,
-            block_count: self.required_count(&format!("{prefix}.block_count"))?,
+            block_count: self.required_nonzero_count(&format!("{prefix}.block_count"))?,
             feed_forward_length: self.required_count(&format!("{prefix}.feed_forward_length"))?,
             attention_head_count,
             attention_head_count_kv,
