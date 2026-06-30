@@ -3,6 +3,7 @@ use serde_json::Value;
 pub(super) fn is_seed(value: &Option<Value>) -> bool {
     match value {
         None => true,
+        Some(Value::Null) => true,
         Some(Value::Number(number)) => number.as_i64().is_some(),
         Some(_) => false,
     }
@@ -23,6 +24,11 @@ mod tests {
         assert!(is_seed(&Some(json!(0))));
         assert!(is_seed(&Some(json!(42))));
         assert!(is_seed(&Some(json!(-42))));
+    }
+
+    #[test]
+    fn null_seed_is_valid() {
+        assert!(is_seed(&Some(Value::Null)));
     }
 
     #[test]

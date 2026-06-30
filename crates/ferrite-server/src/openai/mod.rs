@@ -54,6 +54,8 @@ mod route_streaming_tests;
 #[cfg(test)]
 mod routes_tests;
 #[cfg(test)]
+mod seed_tests;
+#[cfg(test)]
 mod service_tier_tests;
 mod stop_filter;
 #[cfg(test)]
