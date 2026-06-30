@@ -21,6 +21,24 @@ async fn live_http_server_accepts_openai_style_model_list() -> Result<(), Box<dy
 }
 
 #[tokio::test]
+async fn live_http_server_accepts_openai_style_model_retrieve(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let server = support::LiveServer::start().await?;
+    let path = format!("/v1/models/{}", support::MODEL_ID);
+    let response = send_http_request(server.addr(), "GET", &path, &[]).await?;
+
+    assert!(
+        response.starts_with("HTTP/1.1 200 OK"),
+        "unexpected response: {response}"
+    );
+    let body = response_json(&response)?;
+    assert_eq!(body["id"], support::MODEL_ID);
+    assert_eq!(body["object"], "model");
+    assert_eq!(body["owned_by"], "ferrite");
+    Ok(())
+}
+
+#[tokio::test]
 async fn live_http_server_accepts_openai_style_chat_request(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let server = support::LiveServer::start().await?;
