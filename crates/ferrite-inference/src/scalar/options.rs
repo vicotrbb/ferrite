@@ -73,16 +73,21 @@ impl Q8KActivationMatvecRole {
             return Err("Q8_K activation matvec role list must not be empty".to_owned());
         }
 
-        value
-            .split(',')
-            .map(|part| {
-                if part.is_empty() {
-                    Err("Q8_K activation matvec role list contains an empty item".to_owned())
-                } else {
-                    Self::parse(part)
-                }
-            })
-            .collect()
+        let mut roles = Vec::new();
+        for part in value.split(',') {
+            if part.is_empty() {
+                return Err("Q8_K activation matvec role list contains an empty item".to_owned());
+            }
+            let role = Self::parse(part)?;
+            if roles.contains(&role) {
+                return Err(format!(
+                    "duplicate Q8_K activation matvec role {}",
+                    role.as_str()
+                ));
+            }
+            roles.push(role);
+        }
+        Ok(roles)
     }
 }
 
@@ -313,6 +318,17 @@ mod tests {
         );
         assert!(Q8KActivationMatvecRole::parse_list("q_proj,,output").is_err());
         assert!(Q8KActivationMatvecRole::parse_list("unknown").is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn q8_k_activation_roles_reject_duplicate_cli_names() -> Result<(), String> {
+        let err = match Q8KActivationMatvecRole::parse_list("ffn_up,ffn_up") {
+            Ok(_) => return Err("duplicate Q8_K activation role should fail".to_owned()),
+            Err(err) => err,
+        };
+
+        assert_eq!(err, "duplicate Q8_K activation matvec role ffn_up");
         Ok(())
     }
 }
