@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::ops::Range;
 
@@ -177,13 +177,23 @@ pub fn parse_gguf(bytes: &[u8]) -> Result<GgufFile, GgufError> {
         validate_metadata_key(&key)?;
         let value_type = MetadataValueType::from_u32(reader.read_u32()?)?;
         let value = reader.read_metadata_value(value_type)?;
-        metadata.insert(key, value);
+        if metadata.insert(key.clone(), value).is_some() {
+            return Err(GgufError::new(format!("duplicate metadata key {key}")));
+        }
     }
 
     let alignment = read_alignment(&metadata)?;
     let mut raw_tensors = Vec::with_capacity(usize_from_u64(tensor_count, "tensor count")?);
+    let mut tensor_names = BTreeSet::new();
     for _ in 0..tensor_count {
-        raw_tensors.push(reader.read_tensor_info(alignment)?);
+        let raw_tensor = reader.read_tensor_info(alignment)?;
+        if !tensor_names.insert(raw_tensor.name.clone()) {
+            return Err(GgufError::new(format!(
+                "duplicate tensor name {}",
+                raw_tensor.name
+            )));
+        }
+        raw_tensors.push(raw_tensor);
     }
 
     let data_start = align_offset(

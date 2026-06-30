@@ -299,3 +299,54 @@ fn rejects_invalid_metadata_keys() -> Result<(), Box<dyn Error>> {
         .contains("metadata key is not valid GGUF lower_snake_case hierarchy"));
     Ok(())
 }
+
+#[test]
+fn rejects_duplicate_metadata_keys() -> Result<(), Box<dyn Error>> {
+    let mut bytes = Vec::new();
+    bytes.extend_from_slice(b"GGUF");
+    push_u32(&mut bytes, 3);
+    push_u64(&mut bytes, 0);
+    push_u64(&mut bytes, 2);
+    push_kv_string(&mut bytes, "general.architecture", "llama");
+    push_kv_string(&mut bytes, "general.architecture", "qwen2");
+
+    let error = match parse_gguf(&bytes) {
+        Ok(_) => return Err(io::Error::other("duplicate metadata key should be rejected").into()),
+        Err(error) => error,
+    };
+
+    assert!(error
+        .to_string()
+        .contains("duplicate metadata key general.architecture"));
+    Ok(())
+}
+
+#[test]
+fn rejects_duplicate_tensor_names() -> Result<(), Box<dyn Error>> {
+    let mut bytes = Vec::new();
+    bytes.extend_from_slice(b"GGUF");
+    push_u32(&mut bytes, 3);
+    push_u64(&mut bytes, 2);
+    push_u64(&mut bytes, 3);
+
+    push_kv_string(&mut bytes, "general.architecture", "llama");
+    push_kv_u32(&mut bytes, "general.alignment", 64);
+    push_kv_string_array(&mut bytes, "tokenizer.ggml.tokens", &["<unk>", "hello"]);
+
+    push_tensor_info(&mut bytes, "token_embd.weight", &[1], GgmlType::F32, 0);
+    push_tensor_info(&mut bytes, "token_embd.weight", &[1], GgmlType::F32, 64);
+    align_len(&mut bytes, 64);
+    bytes.extend_from_slice(&1.0f32.to_le_bytes());
+    bytes.resize(bytes.len() + 60, 0);
+    bytes.extend_from_slice(&2.0f32.to_le_bytes());
+
+    let error = match parse_gguf(&bytes) {
+        Ok(_) => return Err(io::Error::other("duplicate tensor name should be rejected").into()),
+        Err(error) => error,
+    };
+
+    assert!(error
+        .to_string()
+        .contains("duplicate tensor name token_embd.weight"));
+    Ok(())
+}
