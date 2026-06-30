@@ -1,4 +1,7 @@
-use super::{id::response_id, stream_usage::StreamUsage, unix_timestamp, usage::Usage};
+use super::{
+    id::response_id, stream_obfuscation::stream_obfuscation, stream_usage::StreamUsage,
+    unix_timestamp, usage::Usage,
+};
 use crate::runtime::{GeneratedText, GenerationFinishReason};
 use serde::Serialize;
 use serde_json::Value;
@@ -14,6 +17,8 @@ pub struct ChatCompletionStreamChunk {
     service_tier: Option<&'static str>,
     choices: Vec<ChatCompletionStreamChoice>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    obfuscation: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     usage: Option<StreamUsage>,
 }
 
@@ -23,6 +28,7 @@ pub struct ChatCompletionStreamContext {
     created: u64,
     model: String,
     include_usage: bool,
+    include_obfuscation: bool,
     service_tier: Option<&'static str>,
 }
 
@@ -34,12 +40,18 @@ impl ChatCompletionStreamContext {
             created,
             model,
             include_usage: false,
+            include_obfuscation: false,
             service_tier: None,
         }
     }
 
     pub fn with_usage_field(mut self, include_usage: bool) -> Self {
         self.include_usage = include_usage;
+        self
+    }
+
+    pub fn with_obfuscation_field(mut self, include_obfuscation: bool) -> Self {
+        self.include_obfuscation = include_obfuscation;
         self
     }
 
@@ -57,6 +69,7 @@ impl ChatCompletionStreamContext {
             system_fingerprint: None,
             service_tier: self.service_tier,
             choices: vec![ChatCompletionStreamChoice::content(content)],
+            obfuscation: self.obfuscation(),
             usage: self.null_usage(),
         }
     }
@@ -70,6 +83,7 @@ impl ChatCompletionStreamContext {
             system_fingerprint: None,
             service_tier: self.service_tier,
             choices: vec![ChatCompletionStreamChoice::role()],
+            obfuscation: self.obfuscation(),
             usage: self.null_usage(),
         }
     }
@@ -83,6 +97,7 @@ impl ChatCompletionStreamContext {
             system_fingerprint: None,
             service_tier: self.service_tier,
             choices: vec![ChatCompletionStreamChoice::finish(reason)],
+            obfuscation: self.obfuscation(),
             usage: self.null_usage(),
         }
     }
@@ -96,8 +111,13 @@ impl ChatCompletionStreamContext {
             system_fingerprint: None,
             service_tier: self.service_tier,
             choices: Vec::new(),
+            obfuscation: self.obfuscation(),
             usage: Some(StreamUsage::value(Usage::from_generation(generated))),
         }
+    }
+
+    fn obfuscation(&self) -> Option<String> {
+        self.include_obfuscation.then(stream_obfuscation)
     }
 
     fn null_usage(&self) -> Option<StreamUsage> {

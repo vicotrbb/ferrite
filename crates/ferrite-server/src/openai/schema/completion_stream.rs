@@ -1,4 +1,7 @@
-use super::{id::response_id, stream_usage::StreamUsage, unix_timestamp, usage::Usage};
+use super::{
+    id::response_id, stream_obfuscation::stream_obfuscation, stream_usage::StreamUsage,
+    unix_timestamp, usage::Usage,
+};
 use crate::runtime::{GeneratedText, GenerationFinishReason};
 use serde::Serialize;
 use serde_json::Value;
@@ -12,6 +15,8 @@ pub struct CompletionStreamChunk {
     system_fingerprint: Option<String>,
     choices: Vec<CompletionStreamChoice>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    obfuscation: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     usage: Option<StreamUsage>,
 }
 
@@ -21,6 +26,7 @@ pub struct CompletionStreamContext {
     created: u64,
     model: String,
     include_usage: bool,
+    include_obfuscation: bool,
 }
 
 impl CompletionStreamContext {
@@ -31,11 +37,17 @@ impl CompletionStreamContext {
             created,
             model,
             include_usage: false,
+            include_obfuscation: false,
         }
     }
 
     pub fn with_usage_field(mut self, include_usage: bool) -> Self {
         self.include_usage = include_usage;
+        self
+    }
+
+    pub fn with_obfuscation_field(mut self, include_obfuscation: bool) -> Self {
+        self.include_obfuscation = include_obfuscation;
         self
     }
 
@@ -47,6 +59,7 @@ impl CompletionStreamContext {
             model: self.model.clone(),
             system_fingerprint: None,
             choices: vec![CompletionStreamChoice::content(text)],
+            obfuscation: self.obfuscation(),
             usage: self.null_usage(),
         }
     }
@@ -59,6 +72,7 @@ impl CompletionStreamContext {
             model: self.model.clone(),
             system_fingerprint: None,
             choices: vec![CompletionStreamChoice::finish(reason)],
+            obfuscation: self.obfuscation(),
             usage: self.null_usage(),
         }
     }
@@ -71,8 +85,13 @@ impl CompletionStreamContext {
             model: self.model.clone(),
             system_fingerprint: None,
             choices: Vec::new(),
+            obfuscation: self.obfuscation(),
             usage: Some(StreamUsage::value(Usage::from_generation(generated))),
         }
+    }
+
+    fn obfuscation(&self) -> Option<String> {
+        self.include_obfuscation.then(stream_obfuscation)
     }
 
     fn null_usage(&self) -> Option<StreamUsage> {

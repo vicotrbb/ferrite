@@ -136,6 +136,12 @@ impl ChatCompletionRequest {
             .is_some_and(StreamOptions::include_usage)
     }
 
+    pub fn stream_include_obfuscation(&self) -> bool {
+        self.stream_options
+            .as_ref()
+            .is_some_and(StreamOptions::include_obfuscation)
+    }
+
     pub fn response_service_tier(&self) -> Option<&'static str> {
         response_service_tier(&self.service_tier)
     }

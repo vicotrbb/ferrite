@@ -105,7 +105,7 @@ async fn completion_stream_helper_emits_tokens_from_generation_callback(
         "fixture-model".to_owned(),
         "hello".to_owned(),
         1,
-        super::stream_generation::CompletionStreamOptions::new(Vec::new(), false),
+        super::stream_generation::CompletionStreamOptions::new(Vec::new(), false, false),
         permit,
     );
     let body = to_text(response.into_body()).await?;

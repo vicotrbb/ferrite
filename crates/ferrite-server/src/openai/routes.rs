@@ -72,6 +72,7 @@ async fn chat_completions(
             ChatStreamOptions::new(
                 request.stop_sequences(),
                 request.stream_include_usage(),
+                request.stream_include_obfuscation(),
                 request.response_service_tier(),
             ),
             permit,
@@ -141,8 +142,12 @@ async fn completions(
             state.model_id().to_owned(),
             prompt,
             max_tokens,
-            CompletionStreamOptions::new(request.stop_sequences(), request.stream_include_usage())
-                .with_echo_prompt(echo_prompt),
+            CompletionStreamOptions::new(
+                request.stop_sequences(),
+                request.stream_include_usage(),
+                request.stream_include_obfuscation(),
+            )
+            .with_echo_prompt(echo_prompt),
             permit,
         ));
     }

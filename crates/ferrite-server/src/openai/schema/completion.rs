@@ -88,6 +88,12 @@ impl CompletionRequest {
             .is_some_and(StreamOptions::include_usage)
     }
 
+    pub fn stream_include_obfuscation(&self) -> bool {
+        self.stream_options
+            .as_ref()
+            .is_some_and(StreamOptions::include_obfuscation)
+    }
+
     pub fn echo(&self) -> bool {
         self.echo.as_ref().is_some_and(|value| value == true)
     }

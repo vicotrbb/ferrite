@@ -8,9 +8,12 @@ Ferrite now treats `stream_options.include_obfuscation` precisely instead of
 rejecting the field unconditionally.
 
 `include_obfuscation: false` is accepted as a harmless no-op because Ferrite
-does not emit obfuscation fields. `include_obfuscation: true` is still rejected
-with an OpenAI-shaped invalid-request error because Ferrite does not implement
-stream obfuscation.
+did not emit obfuscation fields in this slice. `include_obfuscation: true` was
+still rejected here with an OpenAI-shaped invalid-request error because Ferrite
+did not yet implement stream obfuscation.
+
+Enabled stream obfuscation was added later in
+`documentation/dev-notes/2026-06-30-openai-stream-obfuscation-enabled.md`.
 
 ## Implementation Notes
 

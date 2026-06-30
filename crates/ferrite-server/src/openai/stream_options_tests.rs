@@ -89,9 +89,11 @@ async fn chat_stream_endpoint_accepts_disabled_obfuscation(
 }
 
 #[tokio::test]
-async fn completion_stream_endpoint_rejects_enabled_obfuscation(
+async fn completion_stream_endpoint_emits_obfuscation_when_requested(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let app = router(ServerState::new("fixture-model".to_owned()));
+    let model_path = write_fixture_model()?;
+    let engine = InferenceEngine::load(&model_path)?;
+    let app = router(ServerState::with_engine("fixture-model".to_owned(), engine));
     let request = Request::builder()
         .method("POST")
         .uri("/v1/completions")
@@ -100,10 +102,37 @@ async fn completion_stream_endpoint_rejects_enabled_obfuscation(
             r#"{"model":"fixture-model","prompt":"hello","stream":true,"stream_options":{"include_obfuscation":true}}"#,
         ))?;
     let response = app.oneshot(request).await?;
+    remove_fixture_model(&model_path)?;
 
-    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(response.status(), StatusCode::OK);
     let body = to_text(response.into_body()).await?;
-    assert!(body.contains("stream_options.include_obfuscation"));
+    assert!(body.contains("\"text\":\"winner\""));
+    assert!(body.contains("\"obfuscation\":\""));
+    assert!(body.contains("data: [DONE]"));
+    Ok(())
+}
+
+#[tokio::test]
+async fn chat_stream_endpoint_emits_obfuscation_when_requested(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let model_path = write_chat_fixture_model()?;
+    let engine = InferenceEngine::load(&model_path)?;
+    let app = router(ServerState::with_engine("fixture-model".to_owned(), engine));
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/chat/completions")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            r#"{"model":"fixture-model","messages":[{"role":"user","content":"hello"}],"max_completion_tokens":1,"stream":true,"stream_options":{"include_obfuscation":true}}"#,
+        ))?;
+    let response = app.oneshot(request).await?;
+    remove_fixture_model(&model_path)?;
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_text(response.into_body()).await?;
+    assert!(body.contains("\"delta\":{\"content\":\"winner\"}"));
+    assert!(body.contains("\"obfuscation\":\""));
+    assert!(body.contains("data: [DONE]"));
     Ok(())
 }
 

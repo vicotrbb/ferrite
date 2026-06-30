@@ -18,14 +18,15 @@ impl StreamOptions {
         self.include_usage.unwrap_or(false)
     }
 
+    pub fn include_obfuscation(&self) -> bool {
+        self.include_obfuscation.unwrap_or(false)
+    }
+
     pub fn unsupported_request_fields(&self) -> Vec<String> {
         UnsupportedFields::new()
             .with_present("stream_options", self.malformed_options)
             .with_present("include_usage", self.malformed_include_usage)
-            .with_present(
-                "include_obfuscation",
-                self.malformed_include_obfuscation || self.include_obfuscation.unwrap_or(false),
-            )
+            .with_present("include_obfuscation", self.malformed_include_obfuscation)
             .with_extra_keys(&self.extra_fields)
             .into_vec()
             .into_iter()
@@ -96,6 +97,25 @@ mod tests {
         let options: StreamOptions = serde_json::from_str(r#"{"include_usage":true}"#)?;
 
         assert!(options.include_usage());
+        assert!(!options.include_obfuscation());
+        assert!(options.unsupported_request_fields().is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn deserializes_enabled_obfuscation_stream_option() -> Result<(), Box<dyn std::error::Error>> {
+        let options: StreamOptions = serde_json::from_str(r#"{"include_obfuscation":true}"#)?;
+
+        assert!(options.include_obfuscation());
+        assert!(options.unsupported_request_fields().is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn deserializes_disabled_obfuscation_stream_option() -> Result<(), Box<dyn std::error::Error>> {
+        let options: StreamOptions = serde_json::from_str(r#"{"include_obfuscation":false}"#)?;
+
+        assert!(!options.include_obfuscation());
         assert!(options.unsupported_request_fields().is_empty());
         Ok(())
     }

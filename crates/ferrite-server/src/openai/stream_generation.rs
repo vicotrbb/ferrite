@@ -12,14 +12,20 @@ use tokio::sync::OwnedSemaphorePermit;
 pub(super) struct CompletionStreamOptions {
     stop_sequences: Vec<String>,
     include_usage: bool,
+    include_obfuscation: bool,
     echo_prompt: Option<String>,
 }
 
 impl CompletionStreamOptions {
-    pub(super) fn new(stop_sequences: Vec<String>, include_usage: bool) -> Self {
+    pub(super) fn new(
+        stop_sequences: Vec<String>,
+        include_usage: bool,
+        include_obfuscation: bool,
+    ) -> Self {
         Self {
             stop_sequences,
             include_usage,
+            include_obfuscation,
             echo_prompt: None,
         }
     }
@@ -33,6 +39,7 @@ impl CompletionStreamOptions {
 pub(super) struct ChatStreamOptions {
     stop_sequences: Vec<String>,
     include_usage: bool,
+    include_obfuscation: bool,
     service_tier: Option<&'static str>,
 }
 
@@ -40,11 +47,13 @@ impl ChatStreamOptions {
     pub(super) fn new(
         stop_sequences: Vec<String>,
         include_usage: bool,
+        include_obfuscation: bool,
         service_tier: Option<&'static str>,
     ) -> Self {
         Self {
             stop_sequences,
             include_usage,
+            include_obfuscation,
             service_tier,
         }
     }
@@ -59,7 +68,9 @@ pub(super) fn completion_stream_response(
     permit: OwnedSemaphorePermit,
 ) -> Response {
     let include_usage = options.include_usage;
-    let context = CompletionStreamContext::new(model).with_usage_field(include_usage);
+    let context = CompletionStreamContext::new(model)
+        .with_usage_field(include_usage)
+        .with_obfuscation_field(options.include_obfuscation);
     let initial_chunks = options
         .echo_prompt
         .into_iter()
@@ -97,6 +108,7 @@ pub(super) fn chat_stream_response(
     let include_usage = options.include_usage;
     let context = ChatCompletionStreamContext::new(model)
         .with_usage_field(include_usage)
+        .with_obfuscation_field(options.include_obfuscation)
         .with_service_tier(options.service_tier);
     let token_context = context.clone();
     stream_generated_text(
