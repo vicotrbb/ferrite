@@ -154,6 +154,41 @@ async fn completion_endpoint_reports_max_tokens_param_when_hard_limit_is_exceede
     Ok(())
 }
 
+#[tokio::test]
+async fn endpoints_report_token_limit_param_when_zero_is_requested(
+) -> Result<(), Box<dyn std::error::Error>> {
+    for (uri, payload, param) in [
+        (
+            "/v1/chat/completions",
+            r#"{
+                "model":"fixture-model",
+                "messages":[{"role":"user","content":"hello"}],
+                "max_completion_tokens":0
+            }"#,
+            "max_completion_tokens",
+        ),
+        (
+            "/v1/completions",
+            r#"{
+                "model":"fixture-model",
+                "prompt":"hello",
+                "max_tokens":0
+            }"#,
+            "max_tokens",
+        ),
+    ] {
+        let body = post_json(uri, payload).await?;
+
+        assert_eq!(body.status, StatusCode::BAD_REQUEST);
+        assert_eq!(body.json["error"]["type"], "invalid_request_error");
+        assert_eq!(body.json["error"]["param"], param, "{}", body.json);
+        let message = body.json["error"]["message"].as_str().unwrap_or_default();
+        assert!(message.contains(param), "{message}");
+        assert!(message.contains("greater than zero"), "{message}");
+    }
+    Ok(())
+}
+
 struct JsonResponse {
     status: StatusCode,
     json: Value,
