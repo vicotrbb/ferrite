@@ -96,6 +96,22 @@ async fn chat_endpoint_rejects_malformed_safety_identifier(
 }
 
 #[tokio::test]
+async fn chat_endpoint_accepts_null_safety_identifier() -> Result<(), Box<dyn std::error::Error>> {
+    let body = post_chat_json(
+        r#"{
+            "model":"fixture-model",
+            "messages":[{"role":"user","content":"hello"}],
+            "safety_identifier":null
+        }"#,
+    )
+    .await?;
+
+    assert_eq!(body.status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(body.json["error"]["type"], "server_error");
+    Ok(())
+}
+
+#[tokio::test]
 async fn chat_endpoint_rejects_overlong_safety_identifier() -> Result<(), Box<dyn std::error::Error>>
 {
     let safety_identifier = "s".repeat(65);

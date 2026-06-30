@@ -5,6 +5,7 @@ const MAX_SAFETY_IDENTIFIER_CHARS: usize = 64;
 pub(super) fn is_safety_identifier(value: &Option<Value>) -> bool {
     match value {
         None => true,
+        Some(Value::Null) => true,
         Some(Value::String(value)) => value.chars().count() <= MAX_SAFETY_IDENTIFIER_CHARS,
         Some(_) => false,
     }
@@ -24,6 +25,11 @@ mod tests {
     fn short_string_safety_identifier_is_valid() {
         assert!(is_safety_identifier(&Some(json!("hashed-local-user"))));
         assert!(is_safety_identifier(&Some(json!(""))));
+    }
+
+    #[test]
+    fn null_safety_identifier_is_valid() {
+        assert!(is_safety_identifier(&Some(Value::Null)));
     }
 
     #[test]
