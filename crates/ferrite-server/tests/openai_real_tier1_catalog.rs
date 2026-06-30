@@ -6,6 +6,7 @@ use tokio::sync::Mutex;
 
 const DEFAULT_MODEL_PATH: &str = "target/models/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf";
 const REAL_MODEL_ID: &str = "qwen2.5-0.5b-q4_k_m-catalog";
+const PROVIDER_MODEL_ID: &str = "Qwen/Qwen2.5-0.5B-Instruct-Q4_K_M";
 static REAL_MODEL_TEST_LOCK: Mutex<()> = Mutex::const_new(());
 
 #[tokio::test]
@@ -39,6 +40,34 @@ async fn live_http_server_lists_and_retrieves_real_tier1_model(
     assert_eq!(retrieve_body["id"], REAL_MODEL_ID);
     assert_eq!(retrieve_body["object"], "model");
     assert_eq!(retrieve_body["owned_by"], "ferrite");
+
+    Ok(())
+}
+
+#[tokio::test]
+#[ignore = "requires local Qwen2.5-0.5B Q4_K_M GGUF model artifact"]
+async fn live_http_server_retrieves_real_tier1_provider_style_model_id(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let _test_lock = REAL_MODEL_TEST_LOCK.lock().await;
+    let server =
+        support::LiveServer::start_with_existing_model(PROVIDER_MODEL_ID, real_model_path()?)
+            .await?;
+
+    let response = send_http_request(
+        server.addr(),
+        "GET",
+        "/v1/models/Qwen%2FQwen2.5-0.5B-Instruct-Q4_K_M",
+        &[],
+    )
+    .await?;
+    assert!(
+        response.starts_with("HTTP/1.1 200 OK"),
+        "unexpected response: {response}"
+    );
+    let body = response_json(&response)?;
+    assert_eq!(body["id"], PROVIDER_MODEL_ID);
+    assert_eq!(body["object"], "model");
+    assert_eq!(body["owned_by"], "ferrite");
 
     Ok(())
 }

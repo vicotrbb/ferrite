@@ -86,6 +86,21 @@ test live_http_server_lists_and_retrieves_real_tier1_model ... ok
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.99s
 ```
 
+Repeatable ignored raw HTTP provider-style id test:
+
+```sh
+cargo test -p ferrite-server --test openai_real_tier1_catalog live_http_server_retrieves_real_tier1_provider_style_model_id -- --ignored --nocapture
+```
+
+Result:
+
+```text
+running 1 test
+test live_http_server_retrieves_real_tier1_provider_style_model_id ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.91s
+```
+
 The probe used Python `urllib` with `Authorization: Bearer local-secret`.
 
 Result:
@@ -128,8 +143,10 @@ Ferrite's OpenAI-compatible catalog route exposes a loaded real Qwen2.5-0.5B
 Q4_K_M model through `GET /v1/models` and `GET /v1/models/{model}` with
 OpenAI-shaped model objects. The route is now covered by a one-off raw HTTP
 real-model probe, a repeatable raw HTTP real-model integration test, and a
-repeatable `async-openai` real-model integration test. This strengthens the
-local base-URL service path for users wiring OpenAI-compatible clients to a
+repeatable `async-openai` real-model integration test. A separate raw HTTP
+real-model check verifies retrieval when the loaded model id contains a
+provider-style slash and the request path percent-encodes it. This strengthens
+the local base-URL service path for users wiring OpenAI-compatible clients to a
 Ferrite server.
 
 This remains a single-model, local aarch64 proof. It does not prove dynamic
