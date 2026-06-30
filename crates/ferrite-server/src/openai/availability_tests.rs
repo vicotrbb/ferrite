@@ -97,6 +97,7 @@ async fn completions_endpoint_returns_model_not_found_for_unknown_model(
     let body = to_json(response.into_body()).await?;
     assert_eq!(body["error"]["type"], "invalid_request_error");
     assert_eq!(body["error"]["code"], "model_not_found");
+    assert_eq!(body["error"]["param"], "model", "{body}");
     assert!(body["error"]["message"]
         .as_str()
         .unwrap_or_default()
@@ -121,6 +122,7 @@ async fn chat_endpoint_returns_model_not_found_for_unknown_model(
     let body = to_json(response.into_body()).await?;
     assert_eq!(body["error"]["type"], "invalid_request_error");
     assert_eq!(body["error"]["code"], "model_not_found");
+    assert_eq!(body["error"]["param"], "model", "{body}");
     assert!(body["error"]["message"]
         .as_str()
         .unwrap_or_default()

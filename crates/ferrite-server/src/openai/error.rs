@@ -85,11 +85,14 @@ impl OpenAiHttpError {
         let model = model.as_ref();
         Self {
             status: StatusCode::NOT_FOUND,
-            body: OpenAiErrorResponse::new(OpenAiErrorBody::with_code(
-                format!("model {model} is not loaded"),
-                "invalid_request_error",
-                "model_not_found",
-            )),
+            body: OpenAiErrorResponse::new(
+                OpenAiErrorBody::with_code(
+                    format!("model {model} is not loaded"),
+                    "invalid_request_error",
+                    "model_not_found",
+                )
+                .with_param("model"),
+            ),
         }
     }
 
