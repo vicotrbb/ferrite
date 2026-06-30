@@ -3,6 +3,7 @@ use serde_json::Value;
 pub(super) fn is_text_only_modalities(value: &Option<Value>) -> bool {
     match value {
         None => true,
+        Some(Value::Null) => true,
         Some(Value::Array(items)) => {
             matches!(items.as_slice(), [Value::String(item)] if item == "text")
         }
@@ -23,6 +24,11 @@ mod tests {
     #[test]
     fn explicit_text_modalities_are_text_only() {
         assert!(is_text_only_modalities(&Some(json!(["text"]))));
+    }
+
+    #[test]
+    fn null_modalities_are_text_only() {
+        assert!(is_text_only_modalities(&Some(Value::Null)));
     }
 
     #[test]
