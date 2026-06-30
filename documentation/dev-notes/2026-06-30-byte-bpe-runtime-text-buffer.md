@@ -97,13 +97,23 @@ cargo test --release -p ferrite-server --test openai_real_tier1_qwen_1_5b_q8_lon
   live_http_server_queues_behind_32_token_qwen_1_5b_q8_stream -- --ignored --test-threads=1
 test live_http_server_queues_behind_32_token_qwen_1_5b_q8_stream ... ok
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.93s
+
+cargo test --release -p ferrite-server --test openai_real_tier1_qwen_1_5b_q8_long_completion_stream \
+  live_http_server_streams_32_token_completion_with_qwen_1_5b_q8_model -- --ignored --test-threads=1
+test live_http_server_streams_32_token_completion_with_qwen_1_5b_q8_model ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.05s
+
+cargo test --release -p ferrite-server --test openai_client_real_tier1_qwen_1_5b_q8_long_completion \
+  async_openai_client_completes_32_tokens_with_qwen_1_5b_q8_model -- --ignored --test-threads=1
+test async_openai_client_completes_32_tokens_with_qwen_1_5b_q8_model ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.66s
 ```
 
 ## Remaining Limits
 
 This proves the specific incomplete UTF-8 token decode failure is fixed for the
-tested Qwen2.5-1.5B Q8_0 non-streaming chat, SSE chat, and standard
-`async-openai` client chat shapes. It also proves one bounded queued-request
-shape behind a 32-token Qwen2.5-1.5B Q8_0 chat stream. It does not prove all
-streaming endpoints, high-concurrency behavior, long-running leak freedom, or
-complete Tier 1 memory posture.
+tested Qwen2.5-1.5B Q8_0 32-token chat and legacy completion shapes across raw
+HTTP, SSE, and standard `async-openai` client calls. It also proves one bounded
+queued-request shape behind a 32-token Qwen2.5-1.5B Q8_0 chat stream. It does
+not prove every Tier 1 model or quantization, high-concurrency behavior,
+long-running leak freedom, or complete Tier 1 memory posture.
