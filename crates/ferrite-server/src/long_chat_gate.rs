@@ -198,3 +198,7 @@ pub fn format_scenarios(config: &LongChatGateConfig) -> String {
         .collect::<Vec<_>>()
         .join("\n")
 }
+
+pub fn format_report(config: &LongChatGateConfig) -> String {
+    format!("{}\n{}", format_plan(config), format_scenarios(config))
+}

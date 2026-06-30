@@ -1,4 +1,6 @@
-use ferrite_server::long_chat_gate::{format_plan, format_scenarios, LongChatGateConfig};
+use ferrite_server::long_chat_gate::{
+    format_plan, format_report, format_scenarios, LongChatGateConfig,
+};
 use std::ffi::OsString;
 
 #[test]
@@ -113,6 +115,24 @@ fn formats_long_chat_gate_scenarios() -> Result<(), Box<dyn std::error::Error>> 
     assert_eq!(
         format_scenarios(&config),
         "long_chat_scenario=turn:1,max_tokens:256\nlong_chat_scenario=turn:1,max_tokens:512\nlong_chat_scenario=turn:2,max_tokens:256\nlong_chat_scenario=turn:2,max_tokens:512\nlong_chat_scenario=turn:3,max_tokens:256\nlong_chat_scenario=turn:3,max_tokens:512\nlong_chat_scenario=turn:4,max_tokens:256\nlong_chat_scenario=turn:4,max_tokens:512"
+    );
+    Ok(())
+}
+
+#[test]
+fn formats_long_chat_gate_report_with_plan_and_scenarios() -> Result<(), Box<dyn std::error::Error>>
+{
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--token-lengths"),
+        OsString::from("256,512"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+    ])?;
+
+    assert_eq!(
+        format_report(&config),
+        "long_chat_token_lengths=256,512\nlong_chat_turns=4\nlong_chat_planned_scenarios=8\nlong_chat_scenario=turn:1,max_tokens:256\nlong_chat_scenario=turn:1,max_tokens:512\nlong_chat_scenario=turn:2,max_tokens:256\nlong_chat_scenario=turn:2,max_tokens:512\nlong_chat_scenario=turn:3,max_tokens:256\nlong_chat_scenario=turn:3,max_tokens:512\nlong_chat_scenario=turn:4,max_tokens:256\nlong_chat_scenario=turn:4,max_tokens:512"
     );
     Ok(())
 }

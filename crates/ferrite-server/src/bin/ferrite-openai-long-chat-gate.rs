@@ -1,4 +1,4 @@
-use ferrite_server::long_chat_gate::{format_plan, LongChatGateConfig};
+use ferrite_server::long_chat_gate::{format_report, LongChatGateConfig};
 
 fn main() {
     if let Err(error) = run() {
@@ -9,6 +9,6 @@ fn main() {
 
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     let config = LongChatGateConfig::parse(std::env::args_os())?;
-    println!("{}", format_plan(&config));
+    println!("{}", format_report(&config));
     Ok(())
 }
