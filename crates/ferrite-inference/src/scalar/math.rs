@@ -5,6 +5,11 @@ pub fn rms_norm(input: &[f32], weight: &[f32], epsilon: f32) -> Result<Vec<f32>,
         return Err(InferenceError::new("rms_norm input must not be empty"));
     }
     ensure_len("rms_norm weight", weight, input.len())?;
+    if !epsilon.is_finite() || epsilon < 0.0 {
+        return Err(InferenceError::new(
+            "rms_norm epsilon must be finite and non-negative",
+        ));
+    }
 
     let mean_square = input.iter().map(|value| value * value).sum::<f32>() / input.len() as f32;
     let scale = (mean_square + epsilon).sqrt();

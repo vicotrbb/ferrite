@@ -30,6 +30,23 @@ fn rms_norm_uses_scalar_root_mean_square_reference() -> Result<(), Box<dyn Error
 }
 
 #[test]
+fn rms_norm_rejects_invalid_epsilon() -> Result<(), Box<dyn Error>> {
+    for epsilon in [-1.0, f32::NAN, f32::INFINITY] {
+        let error = match rms_norm(&[1.0, 2.0], &[1.0, 1.0], epsilon) {
+            Ok(_) => {
+                return Err(io::Error::other("invalid RMS norm epsilon should be rejected").into());
+            }
+            Err(error) => error,
+        };
+
+        assert!(error
+            .to_string()
+            .contains("rms_norm epsilon must be finite and non-negative"));
+    }
+    Ok(())
+}
+
+#[test]
 fn matrix_vector_multiply_rejects_shape_mismatch() -> Result<(), Box<dyn Error>> {
     let matrix = Matrix::from_row_major(2, 3, vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0])?;
 
