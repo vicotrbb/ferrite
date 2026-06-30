@@ -50,6 +50,20 @@ curl http://127.0.0.1:8080/v1/models/ferrite-local \
   -H 'authorization: Bearer local-secret'
 ```
 
+Model IDs may use provider-style names with slashes, matching common OpenAI
+client and Hugging Face workflows:
+
+```sh
+cargo run --release -p ferrite-server -- \
+  --model target/models/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf \
+  --model-id Qwen/Qwen2.5-0.5B-Instruct-Q4_K_M \
+  --bind 127.0.0.1:8080 \
+  --api-key local-secret
+
+curl 'http://127.0.0.1:8080/v1/models/Qwen/Qwen2.5-0.5B-Instruct-Q4_K_M' \
+  -H 'authorization: Bearer local-secret'
+```
+
 Example completion request:
 
 ```sh
