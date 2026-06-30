@@ -6,7 +6,7 @@ use std::io;
 use support::gguf::{
     minimal_llama_gguf, minimal_llama_gguf_with_attention_head_count,
     minimal_llama_gguf_with_attention_head_count_kv, minimal_llama_gguf_with_attention_heads,
-    minimal_qwen2_gguf,
+    minimal_llama_gguf_with_embedding_length, minimal_qwen2_gguf,
 };
 
 #[test]
@@ -49,6 +49,24 @@ fn derives_architecture_aware_llama_config() -> Result<(), Box<dyn Error>> {
     assert_eq!(config.value_length, 4);
     assert_eq!(config.rope_dimension_count, 4);
     assert_eq!(config.gqa_ratio(), Some(2));
+    Ok(())
+}
+
+#[test]
+fn rejects_zero_embedding_length_in_model_config() -> Result<(), Box<dyn Error>> {
+    let bytes = minimal_llama_gguf_with_embedding_length(0);
+    let file = parse_gguf(&bytes)?;
+
+    let error = match file.llama_config() {
+        Ok(_) => {
+            return Err(io::Error::other("zero embedding length should be rejected").into());
+        }
+        Err(error) => error,
+    };
+
+    assert!(error
+        .to_string()
+        .contains("llama.embedding_length must be greater than zero"));
     Ok(())
 }
 

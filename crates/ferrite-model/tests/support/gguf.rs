@@ -80,21 +80,25 @@ pub(crate) fn minimal_llama_gguf() -> Vec<u8> {
     minimal_llama_gguf_with_tensor_offset(0)
 }
 
+pub(crate) fn minimal_llama_gguf_with_embedding_length(embedding_length: u64) -> Vec<u8> {
+    minimal_llama_gguf_with_options(0, embedding_length, 2, 1)
+}
+
 pub(crate) fn minimal_llama_gguf_with_attention_head_count(attention_head_count: u64) -> Vec<u8> {
-    minimal_llama_gguf_with_options(0, attention_head_count, 1)
+    minimal_llama_gguf_with_options(0, 8, attention_head_count, 1)
 }
 
 pub(crate) fn minimal_llama_gguf_with_attention_head_count_kv(
     attention_head_count_kv: u32,
 ) -> Vec<u8> {
-    minimal_llama_gguf_with_options(0, 2, attention_head_count_kv)
+    minimal_llama_gguf_with_options(0, 8, 2, attention_head_count_kv)
 }
 
 pub(crate) fn minimal_llama_gguf_with_attention_heads(
     attention_head_count: u64,
     attention_head_count_kv: u32,
 ) -> Vec<u8> {
-    minimal_llama_gguf_with_options(0, attention_head_count, attention_head_count_kv)
+    minimal_llama_gguf_with_options(0, 8, attention_head_count, attention_head_count_kv)
 }
 
 pub(crate) fn minimal_qwen2_gguf() -> Vec<u8> {
@@ -132,11 +136,12 @@ pub(crate) fn minimal_qwen2_gguf() -> Vec<u8> {
 }
 
 pub(crate) fn minimal_llama_gguf_with_tensor_offset(tensor_offset: u64) -> Vec<u8> {
-    minimal_llama_gguf_with_options(tensor_offset, 2, 1)
+    minimal_llama_gguf_with_options(tensor_offset, 8, 2, 1)
 }
 
 fn minimal_llama_gguf_with_options(
     tensor_offset: u64,
+    embedding_length: u64,
     attention_head_count: u64,
     attention_head_count_kv: u32,
 ) -> Vec<u8> {
@@ -150,7 +155,7 @@ fn minimal_llama_gguf_with_options(
     push_kv_u32(&mut bytes, "general.quantization_version", 2);
     push_kv_u32(&mut bytes, "general.alignment", 64);
     push_kv_u64(&mut bytes, "llama.context_length", 2048);
-    push_kv_u64(&mut bytes, "llama.embedding_length", 8);
+    push_kv_u64(&mut bytes, "llama.embedding_length", embedding_length);
     push_kv_u64(&mut bytes, "llama.block_count", 2);
     push_kv_u64(&mut bytes, "llama.feed_forward_length", 16);
     push_kv_u64(

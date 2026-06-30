@@ -64,7 +64,8 @@ impl GgufFile {
         architecture: ModelArchitecture,
     ) -> Result<LlamaConfig, GgufError> {
         let prefix = architecture.metadata_prefix();
-        let embedding_length = self.required_count(&format!("{prefix}.embedding_length"))?;
+        let embedding_length =
+            self.required_nonzero_count(&format!("{prefix}.embedding_length"))?;
         let attention_head_count =
             self.required_nonzero_count(&format!("{prefix}.attention.head_count"))?;
         let default_head_dimension = embedding_length / attention_head_count;
