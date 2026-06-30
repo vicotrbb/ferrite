@@ -171,9 +171,12 @@ async fn completions(
 async fn method_not_allowed(
     State(state): State<ServerState>,
     headers: HeaderMap,
+    OriginalUri(uri): OriginalUri,
 ) -> OpenAiHttpError {
-    if let Err(error) = ensure_authorized(&state, &headers) {
-        return error;
+    if uri.path().starts_with("/v1/") {
+        if let Err(error) = ensure_authorized(&state, &headers) {
+            return error;
+        }
     }
     OpenAiHttpError::method_not_allowed()
 }

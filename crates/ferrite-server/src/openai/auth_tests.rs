@@ -117,6 +117,26 @@ async fn health_route_does_not_require_bearer_token() -> Result<(), Box<dyn std:
     Ok(())
 }
 
+#[tokio::test]
+async fn wrong_method_health_route_does_not_require_bearer_token(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let app = router(ServerState::new("fixture-model".to_owned()).with_api_key("local-secret"));
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/health")
+                .body(Body::empty())?,
+        )
+        .await?;
+
+    assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
+    let body = to_json(response.into_body()).await?;
+    assert_eq!(body["error"]["type"], "invalid_request_error");
+    assert_eq!(body["error"]["code"], "method_not_allowed");
+    Ok(())
+}
+
 async fn get_models(
     authorization: Option<&str>,
 ) -> Result<JsonResponse, Box<dyn std::error::Error>> {
