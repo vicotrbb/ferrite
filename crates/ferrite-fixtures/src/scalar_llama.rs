@@ -54,7 +54,7 @@ pub fn scalar_llama_q8_0_gguf_fixture() -> Vec<u8> {
     push_kv_u64(&mut bytes, "llama.attention.head_count_kv", 1);
     push_kv_u64(&mut bytes, "llama.attention.key_length", 32);
     push_kv_u64(&mut bytes, "llama.attention.value_length", 32);
-    push_kv_u64(&mut bytes, "llama.rope.dimension_count", 0);
+    push_kv_u64(&mut bytes, "llama.rope.dimension_count", 2);
     push_kv_string(&mut bytes, "tokenizer.ggml.model", "llama");
     push_kv_string_array(&mut bytes, "tokenizer.ggml.tokens", &["<unk>", "winner"]);
 
@@ -100,7 +100,7 @@ pub fn scalar_llama_q5_0_gguf_fixture() -> Vec<u8> {
     push_kv_u64(&mut bytes, "llama.attention.head_count_kv", 1);
     push_kv_u64(&mut bytes, "llama.attention.key_length", 32);
     push_kv_u64(&mut bytes, "llama.attention.value_length", 32);
-    push_kv_u64(&mut bytes, "llama.rope.dimension_count", 0);
+    push_kv_u64(&mut bytes, "llama.rope.dimension_count", 2);
     push_kv_string(&mut bytes, "tokenizer.ggml.model", "llama");
     push_kv_string_array(&mut bytes, "tokenizer.ggml.tokens", &["<unk>", "winner"]);
 
@@ -146,7 +146,7 @@ pub fn scalar_llama_q4_k_gguf_fixture() -> Vec<u8> {
     push_kv_u64(&mut bytes, "llama.attention.head_count_kv", 1);
     push_kv_u64(&mut bytes, "llama.attention.key_length", 64);
     push_kv_u64(&mut bytes, "llama.attention.value_length", 64);
-    push_kv_u64(&mut bytes, "llama.rope.dimension_count", 0);
+    push_kv_u64(&mut bytes, "llama.rope.dimension_count", 2);
     push_kv_string(&mut bytes, "tokenizer.ggml.model", "llama");
     push_kv_string_array(
         &mut bytes,
@@ -196,7 +196,7 @@ pub fn scalar_llama_q6_k_gguf_fixture() -> Vec<u8> {
     push_kv_u64(&mut bytes, "llama.attention.head_count_kv", 1);
     push_kv_u64(&mut bytes, "llama.attention.key_length", 64);
     push_kv_u64(&mut bytes, "llama.attention.value_length", 64);
-    push_kv_u64(&mut bytes, "llama.rope.dimension_count", 0);
+    push_kv_u64(&mut bytes, "llama.rope.dimension_count", 2);
     push_kv_string(&mut bytes, "tokenizer.ggml.model", "llama");
     push_kv_string_array(
         &mut bytes,
