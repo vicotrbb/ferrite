@@ -55,6 +55,11 @@ pub(super) fn validate_config(config: &ScalarLlamaConfig) -> Result<(), Inferenc
             config.rope_freq_base
         )));
     }
+    if !config.rms_norm_epsilon.is_finite() || config.rms_norm_epsilon < 0.0 {
+        return Err(InferenceError::new(
+            "rms norm epsilon must be finite and non-negative",
+        ));
+    }
 
     Ok(())
 }

@@ -15,8 +15,8 @@ use std::io;
 use support::assertions::assert_close;
 use support::fixtures::qwen2_fixture_from_llama_fixture;
 use support::models::{
-    causal_attention_model, documented_argmax_model, model_with_rope_freq_base,
-    prompt_causal_attention_model, value_bias_model,
+    causal_attention_model, documented_argmax_model, model_with_rms_norm_epsilon,
+    model_with_rope_freq_base, prompt_causal_attention_model, value_bias_model,
 };
 
 #[test]
@@ -95,6 +95,23 @@ fn scalar_config_rejects_non_finite_rope_freq_base() -> Result<(), Box<dyn Error
         assert!(error
             .to_string()
             .contains("rope frequency base must be finite"));
+    }
+    Ok(())
+}
+
+#[test]
+fn scalar_config_rejects_invalid_rms_norm_epsilon() -> Result<(), Box<dyn Error>> {
+    for rms_norm_epsilon in [-1.0, f32::NAN, f32::INFINITY] {
+        let error = match model_with_rms_norm_epsilon(rms_norm_epsilon) {
+            Ok(_) => {
+                return Err(io::Error::other("invalid RMS norm epsilon should be rejected").into());
+            }
+            Err(error) => error,
+        };
+
+        assert!(error
+            .to_string()
+            .contains("rms norm epsilon must be finite and non-negative"));
     }
     Ok(())
 }
