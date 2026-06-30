@@ -34,6 +34,7 @@ pub async fn run_completion_benchmark(
     let stream = config.stream();
     let started = Instant::now();
     let mut completed_requests = 0;
+    let mut streaming_timing = None;
 
     while completed_requests < config.requests() {
         let batch_size = config
@@ -56,7 +57,10 @@ pub async fn run_completion_benchmark(
                 .await
                 .map_err(|error| std::io::Error::other(format!("request task failed: {error}")))?
                 .map_err(std::io::Error::other)?;
-            http::validate_openai_response(endpoint, stream, &response)?;
+            http::validate_openai_response(endpoint, stream, response.raw())?;
+            if stream && streaming_timing.is_none() {
+                streaming_timing = response.streaming_timing();
+            }
             completed_requests += 1;
         }
     }
@@ -64,7 +68,7 @@ pub async fn run_completion_benchmark(
     Ok(ThroughputResult {
         completed_requests,
         elapsed: started.elapsed(),
-        streaming_timing: None,
+        streaming_timing,
     })
 }
 

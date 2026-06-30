@@ -209,6 +209,78 @@ fn validates_streaming_response_done_event() -> Result<(), Box<dyn std::error::E
 }
 
 #[test]
+fn derives_streaming_timing_from_incremental_response_snapshots(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let base = "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\n\r\n";
+    let role_event = r#"data: {"choices":[{"delta":{"role":"assistant"}}]}"#;
+    let first_token_event = r#"data: {"choices":[{"delta":{"content":"A"}}]}"#;
+    let second_token_event = r#"data: {"choices":[{"delta":{"content":"B"}}]}"#;
+    let third_token_event = r#"data: {"choices":[{"text":"C"}]}"#;
+    let done_event = "data: [DONE]";
+    let snapshots = [
+        (base.to_owned(), Duration::from_millis(10)),
+        (format!("{base}{role_event}\n\n"), Duration::from_millis(20)),
+        (
+            format!("{base}{role_event}\n\n{first_token_event}\n\n"),
+            Duration::from_millis(50),
+        ),
+        (
+            format!("{base}{role_event}\n\n{first_token_event}\n\n{second_token_event}\n\n"),
+            Duration::from_millis(80),
+        ),
+        (
+            format!(
+                "{base}{role_event}\n\n{first_token_event}\n\n{second_token_event}\n\n{third_token_event}\n\n{done_event}\n\n"
+            ),
+            Duration::from_millis(140),
+        ),
+    ];
+
+    let summary = http::streaming_timing_from_response_snapshots(
+        snapshots
+            .iter()
+            .map(|(response, offset)| (response.as_bytes(), *offset)),
+    )
+    .ok_or("expected streaming timing summary")?;
+
+    assert_eq!(summary.token_events(), 3);
+    assert_eq!(summary.time_to_first_token(), Duration::from_millis(50));
+    assert_eq!(summary.total_elapsed(), Duration::from_millis(140));
+    assert_eq!(summary.min_token_latency(), Duration::from_millis(30));
+    assert_eq!(summary.p50_token_latency(), Duration::from_millis(50));
+    assert_eq!(summary.p95_token_latency(), Duration::from_millis(60));
+    assert_eq!(summary.max_token_latency(), Duration::from_millis(60));
+    Ok(())
+}
+
+#[test]
+fn waits_for_completed_sse_event_before_recording_streaming_timing(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let base = "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\n\r\n";
+    let token_event = r#"data: {"choices":[{"delta":{"content":"A"}}]}"#;
+    let snapshots = [
+        (base.to_owned(), Duration::from_millis(10)),
+        (format!("{base}{token_event}"), Duration::from_millis(50)),
+        (
+            format!("{base}{token_event}\n\n"),
+            Duration::from_millis(80),
+        ),
+    ];
+
+    let summary = http::streaming_timing_from_response_snapshots(
+        snapshots
+            .iter()
+            .map(|(response, offset)| (response.as_bytes(), *offset)),
+    )
+    .ok_or("expected streaming timing summary")?;
+
+    assert_eq!(summary.token_events(), 1);
+    assert_eq!(summary.time_to_first_token(), Duration::from_millis(80));
+    assert_eq!(summary.total_elapsed(), Duration::from_millis(80));
+    Ok(())
+}
+
+#[test]
 fn summarizes_streaming_token_arrival_latencies() -> Result<(), Box<dyn std::error::Error>> {
     let summary = StreamingTimingSummary::from_event_offsets(&[
         Duration::from_millis(100),
