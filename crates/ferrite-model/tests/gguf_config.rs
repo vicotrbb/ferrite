@@ -183,7 +183,7 @@ fn rejects_zero_rope_dimension_count_in_model_config() -> Result<(), Box<dyn Err
 
 #[test]
 fn rejects_rope_dimension_count_larger_than_key_length() -> Result<(), Box<dyn Error>> {
-    let bytes = minimal_llama_gguf_with_rope_dimension_count(5);
+    let bytes = minimal_llama_gguf_with_rope_dimension_count(6);
     let file = parse_gguf(&bytes)?;
 
     let error = match file.llama_config() {
@@ -197,8 +197,26 @@ fn rejects_rope_dimension_count_larger_than_key_length() -> Result<(), Box<dyn E
     };
 
     assert!(error.to_string().contains(
-        "llama.rope.dimension_count 5 must be less than or equal to llama.attention.key_length 4"
+        "llama.rope.dimension_count 6 must be less than or equal to llama.attention.key_length 4"
     ));
+    Ok(())
+}
+
+#[test]
+fn rejects_odd_rope_dimension_count() -> Result<(), Box<dyn Error>> {
+    let bytes = minimal_llama_gguf_with_rope_dimension_count(3);
+    let file = parse_gguf(&bytes)?;
+
+    let error = match file.llama_config() {
+        Ok(_) => {
+            return Err(io::Error::other("odd rope dimension count should be rejected").into());
+        }
+        Err(error) => error,
+    };
+
+    assert!(error
+        .to_string()
+        .contains("llama.rope.dimension_count 3 must be even"));
     Ok(())
 }
 

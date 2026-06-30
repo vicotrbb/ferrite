@@ -322,6 +322,12 @@ fn validate_rope_dimension_layout(
     key_length: u64,
     rope_dimension_count: u64,
 ) -> Result<(), GgufError> {
+    if !rope_dimension_count.is_multiple_of(2) {
+        return Err(GgufError::new(format!(
+            "{prefix}.rope.dimension_count {rope_dimension_count} must be even"
+        )));
+    }
+
     if rope_dimension_count > key_length {
         return Err(GgufError::new(format!(
             "{prefix}.rope.dimension_count {rope_dimension_count} must be less than or equal to {prefix}.attention.key_length {key_length}"
