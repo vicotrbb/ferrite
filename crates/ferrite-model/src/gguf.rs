@@ -84,6 +84,10 @@ impl GgufFile {
                     )));
                 }
             };
+        let attention_head_count_kv = self
+            .optional_nonzero_count(&format!("{prefix}.attention.head_count_kv"))?
+            .unwrap_or(attention_head_count);
+        validate_attention_head_layout(prefix, attention_head_count, attention_head_count_kv)?;
 
         Ok(LlamaConfig {
             architecture,
@@ -92,9 +96,7 @@ impl GgufFile {
             block_count: self.required_count(&format!("{prefix}.block_count"))?,
             feed_forward_length: self.required_count(&format!("{prefix}.feed_forward_length"))?,
             attention_head_count,
-            attention_head_count_kv: self
-                .optional_nonzero_count(&format!("{prefix}.attention.head_count_kv"))?
-                .unwrap_or(attention_head_count),
+            attention_head_count_kv,
             key_length,
             value_length,
             attention_layer_norm_rms_epsilon: self
@@ -281,6 +283,20 @@ fn read_alignment(metadata: &BTreeMap<String, MetadataValue>) -> Result<u64, Ggu
     }
 
     Ok(alignment)
+}
+
+fn validate_attention_head_layout(
+    prefix: &str,
+    attention_head_count: u64,
+    attention_head_count_kv: u64,
+) -> Result<(), GgufError> {
+    if !attention_head_count.is_multiple_of(attention_head_count_kv) {
+        return Err(GgufError::new(format!(
+            "{prefix}.attention.head_count {attention_head_count} must be divisible by {prefix}.attention.head_count_kv {attention_head_count_kv}"
+        )));
+    }
+
+    Ok(())
 }
 
 fn align_offset(offset: u64, alignment: u64) -> Result<u64, GgufError> {

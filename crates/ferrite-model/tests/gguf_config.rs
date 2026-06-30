@@ -5,7 +5,8 @@ use std::error::Error;
 use std::io;
 use support::gguf::{
     minimal_llama_gguf, minimal_llama_gguf_with_attention_head_count,
-    minimal_llama_gguf_with_attention_head_count_kv, minimal_qwen2_gguf,
+    minimal_llama_gguf_with_attention_head_count_kv, minimal_llama_gguf_with_attention_heads,
+    minimal_qwen2_gguf,
 };
 
 #[test]
@@ -84,6 +85,27 @@ fn rejects_zero_attention_kv_head_count_in_model_config() -> Result<(), Box<dyn 
     assert!(error
         .to_string()
         .contains("llama.attention.head_count_kv must be greater than zero"));
+    Ok(())
+}
+
+#[test]
+fn rejects_kv_head_count_that_does_not_divide_attention_heads() -> Result<(), Box<dyn Error>> {
+    let bytes = minimal_llama_gguf_with_attention_heads(3, 2);
+    let file = parse_gguf(&bytes)?;
+
+    let error = match file.llama_config() {
+        Ok(_) => {
+            return Err(io::Error::other(
+                "non-divisible KV attention head count should be rejected",
+            )
+            .into());
+        }
+        Err(error) => error,
+    };
+
+    assert!(error.to_string().contains(
+        "llama.attention.head_count 3 must be divisible by llama.attention.head_count_kv 2"
+    ));
     Ok(())
 }
 

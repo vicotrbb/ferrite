@@ -90,6 +90,13 @@ pub(crate) fn minimal_llama_gguf_with_attention_head_count_kv(
     minimal_llama_gguf_with_options(0, 2, attention_head_count_kv)
 }
 
+pub(crate) fn minimal_llama_gguf_with_attention_heads(
+    attention_head_count: u64,
+    attention_head_count_kv: u32,
+) -> Vec<u8> {
+    minimal_llama_gguf_with_options(0, attention_head_count, attention_head_count_kv)
+}
+
 pub(crate) fn minimal_qwen2_gguf() -> Vec<u8> {
     let mut bytes = Vec::new();
     bytes.extend_from_slice(b"GGUF");
