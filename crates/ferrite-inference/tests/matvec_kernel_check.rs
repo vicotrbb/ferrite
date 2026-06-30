@@ -66,6 +66,27 @@ fn q8_matvec_rejects_non_finite_vector_values() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+fn q8_matrix_rejects_non_finite_scale_values() -> Result<(), Box<dyn Error>> {
+    for scale_bits in [0x7c00, 0xfc00, 0x7e00] {
+        let error = match Matrix::from_q8_0_row_major_bytes(
+            1,
+            32,
+            q8_row_with_scale_bits(scale_bits, 1, 32),
+        ) {
+            Ok(_) => {
+                return Err(io::Error::other("non-finite Q8_0 matrix scale should fail").into());
+            }
+            Err(error) => error,
+        };
+
+        assert!(error
+            .to_string()
+            .contains("Q8_0 matrix scale values must be finite"));
+    }
+    Ok(())
+}
+
+#[test]
 fn q5_matvec_check_uses_decoded_scalar_reference() -> Result<(), Box<dyn Error>> {
     let mut bytes = Vec::new();
     bytes.extend(q5_0_block_with_value(1));
@@ -167,8 +188,12 @@ fn matvec_check_rejects_negative_relative_tolerance() -> Result<(), Box<dyn Erro
 }
 
 fn q8_row(value: i8, count: usize) -> Vec<u8> {
+    q8_row_with_scale_bits(0x3c00, value, count)
+}
+
+fn q8_row_with_scale_bits(scale_bits: u16, value: i8, count: usize) -> Vec<u8> {
     let mut bytes = Vec::new();
-    bytes.extend_from_slice(&0x3c00u16.to_le_bytes());
+    bytes.extend_from_slice(&scale_bits.to_le_bytes());
     bytes.extend(std::iter::repeat_n(value as u8, count));
     bytes
 }
