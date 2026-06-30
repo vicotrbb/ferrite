@@ -28,6 +28,9 @@ pub(super) fn apply_rope_with_layout(
     rope_freq_base: f32,
     layout: RopeLayout,
 ) -> Result<Vec<f32>, InferenceError> {
+    if values.iter().any(|value| !value.is_finite()) {
+        return Err(InferenceError::new("rope input must be finite"));
+    }
     if rope_dimension_count == 0 {
         return Ok(values.to_vec());
     }
@@ -136,6 +139,19 @@ mod tests {
         assert_close(rotated[2], 1.0_f32.sin());
         assert_close(rotated[1], -1.0_f32.sin());
         assert_close(rotated[3], 1.0_f32.cos());
+        Ok(())
+    }
+
+    #[test]
+    fn rope_rejects_non_finite_values() -> Result<(), InferenceError> {
+        for value in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            let error = match apply_rope(&[1.0, value], 1, 2, 10_000.0) {
+                Ok(_) => return Err(InferenceError::new("non-finite rope input should fail")),
+                Err(error) => error,
+            };
+
+            assert!(error.to_string().contains("rope input must be finite"));
+        }
         Ok(())
     }
 }
