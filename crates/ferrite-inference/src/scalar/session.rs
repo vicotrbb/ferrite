@@ -294,8 +294,44 @@ fn add_optional_bias(values: &mut [f32], bias: Option<&[f32]>) -> Result<(), Inf
     };
 
     super::math::ensure_len("projection bias", bias, values.len())?;
+    if values.iter().any(|value| !value.is_finite()) {
+        return Err(InferenceError::new("projection values must be finite"));
+    }
+    if bias.iter().any(|value| !value.is_finite()) {
+        return Err(InferenceError::new("projection bias must be finite"));
+    }
+    for (value, bias) in values.iter().zip(bias.iter()) {
+        let result = *value + *bias;
+        if !result.is_finite() {
+            return Err(InferenceError::new("projection bias result must be finite"));
+        }
+    }
     for (value, bias) in values.iter_mut().zip(bias.iter()) {
-        *value += bias;
+        *value += *bias;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn add_optional_bias_rejects_non_finite_results() -> Result<(), InferenceError> {
+        let mut values = [f32::MAX];
+        let error = match add_optional_bias(&mut values, Some(&[f32::MAX])) {
+            Ok(_) => {
+                return Err(InferenceError::new(
+                    "overflowing projection bias should fail",
+                ))
+            }
+            Err(error) => error,
+        };
+
+        assert!(error
+            .to_string()
+            .contains("projection bias result must be finite"));
+        assert_eq!(values, [f32::MAX]);
+        Ok(())
+    }
 }
