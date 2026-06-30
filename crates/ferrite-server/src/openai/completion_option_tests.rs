@@ -33,6 +33,11 @@ async fn completions_endpoint_accepts_disabled_echo() -> Result<(), Box<dyn std:
 }
 
 #[tokio::test]
+async fn completions_endpoint_accepts_null_echo() -> Result<(), Box<dyn std::error::Error>> {
+    assert_completion_option_is_accepted(r#""echo":null"#).await
+}
+
+#[tokio::test]
 async fn completions_endpoint_echoes_prompt_when_requested(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let body = accepted_completion_option_response(r#""echo":true"#).await?;
