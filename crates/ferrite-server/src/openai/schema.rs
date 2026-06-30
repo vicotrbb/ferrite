@@ -7,6 +7,7 @@ mod chat_response;
 mod chat_stream;
 mod completion;
 mod completion_prompt;
+mod completion_response;
 mod completion_stream;
 mod function_options;
 mod id;
@@ -37,7 +38,8 @@ pub use chat::ChatCompletionRequest;
 pub use chat_message::{ChatMessage, ChatRole};
 pub use chat_response::ChatCompletionResponse;
 pub use chat_stream::{ChatCompletionStreamChunk, ChatCompletionStreamContext};
-pub use completion::{CompletionRequest, CompletionResponse};
+pub use completion::CompletionRequest;
+pub use completion_response::CompletionResponse;
 pub use completion_stream::{CompletionStreamChunk, CompletionStreamContext};
 
 use std::time::{SystemTime, UNIX_EPOCH};
