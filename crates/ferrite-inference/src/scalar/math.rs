@@ -71,6 +71,12 @@ fn silu(value: f32) -> f32 {
 
 pub(super) fn dot(left: &[f32], right: &[f32]) -> Result<f32, InferenceError> {
     ensure_len("dot right", right, left.len())?;
+    if left.iter().any(|value| !value.is_finite()) {
+        return Err(InferenceError::new("dot left must be finite"));
+    }
+    if right.iter().any(|value| !value.is_finite()) {
+        return Err(InferenceError::new("dot right must be finite"));
+    }
     Ok(left.iter().zip(right.iter()).map(|(a, b)| a * b).sum())
 }
 
@@ -181,6 +187,28 @@ mod tests {
             };
 
             assert!(error.to_string().contains("swiglu up must be finite"));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn dot_rejects_non_finite_values() -> Result<(), InferenceError> {
+        for value in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            let error = match dot(&[1.0, value], &[1.0, 1.0]) {
+                Ok(_) => return Err(InferenceError::new("non-finite dot left should fail")),
+                Err(error) => error,
+            };
+
+            assert!(error.to_string().contains("dot left must be finite"));
+        }
+
+        for value in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            let error = match dot(&[1.0, 2.0], &[1.0, value]) {
+                Ok(_) => return Err(InferenceError::new("non-finite dot right should fail")),
+                Err(error) => error,
+            };
+
+            assert!(error.to_string().contains("dot right must be finite"));
         }
         Ok(())
     }
