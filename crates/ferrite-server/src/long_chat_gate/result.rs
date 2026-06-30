@@ -60,5 +60,26 @@ pub fn format_scenario_result(result: &LongChatScenarioResult) -> String {
             usage.total_tokens()
         ));
     }
+    if let Some(timing) = throughput.streaming_timing {
+        output.push_str(&format!(
+            "\nlong_chat_result_streaming_token_events={}\nlong_chat_result_time_to_first_token_ms={}\nlong_chat_result_streaming_total_elapsed_ms={}\nlong_chat_result_streaming_tokens_per_second={:.6}\nlong_chat_result_token_latency_min_ms={}\nlong_chat_result_token_latency_p50_ms={}\nlong_chat_result_token_latency_p95_ms={}\nlong_chat_result_token_latency_max_ms={}",
+            timing.token_events(),
+            timing.time_to_first_token().as_millis(),
+            timing.total_elapsed().as_millis(),
+            timing.tokens_per_second(),
+            timing.min_token_latency().as_millis(),
+            timing.p50_token_latency().as_millis(),
+            timing.p95_token_latency().as_millis(),
+            timing.max_token_latency().as_millis()
+        ));
+    }
+    if let Some(rss) = throughput.rss {
+        output.push_str(&format!(
+            "\nlong_chat_result_server_rss_before_bytes={}\nlong_chat_result_server_rss_after_bytes={}\nlong_chat_result_server_rss_idle_bytes={}",
+            rss.before_bytes(),
+            rss.after_bytes(),
+            rss.idle_bytes()
+        ));
+    }
     output
 }

@@ -3,8 +3,8 @@ use ferrite_server::long_chat_gate::{
     LongChatScenarioResult,
 };
 use ferrite_server::throughput_client::{
-    OpenAiEndpoint, StreamingFinishSummary, StreamingUsageSummary, ThroughputClientConfig,
-    ThroughputResult,
+    OpenAiEndpoint, RssSummary, StreamingFinishSummary, StreamingTimingSummary,
+    StreamingUsageSummary, ThroughputClientConfig, ThroughputResult,
 };
 use std::ffi::OsString;
 use std::time::Duration;
@@ -302,16 +302,20 @@ fn formats_long_chat_scenario_result() -> Result<(), Box<dyn std::error::Error>>
         completed_requests: 1,
         elapsed: Duration::from_millis(400),
         streaming_finish: Some(StreamingFinishSummary::new("length")),
-        streaming_timing: None,
+        streaming_timing: StreamingTimingSummary::from_event_offsets(&[
+            Duration::from_millis(100),
+            Duration::from_millis(140),
+            Duration::from_millis(170),
+        ]),
         streaming_usage: Some(StreamingUsageSummary::new(16, 256, 272)),
-        rss: None,
+        rss: Some(RssSummary::new(1000, 2000, 1500)),
     };
 
     let result = LongChatScenarioResult::new(&scenario, throughput);
 
     assert_eq!(
         format_scenario_result(&result),
-        "long_chat_result=model:fixture-model,turn:2,max_tokens:256\nlong_chat_result_completed_requests=1\nlong_chat_result_elapsed_ms=400\nlong_chat_result_finish_reason=length\nlong_chat_result_usage_prompt_tokens=16\nlong_chat_result_usage_completion_tokens=256\nlong_chat_result_usage_total_tokens=272"
+        "long_chat_result=model:fixture-model,turn:2,max_tokens:256\nlong_chat_result_completed_requests=1\nlong_chat_result_elapsed_ms=400\nlong_chat_result_finish_reason=length\nlong_chat_result_usage_prompt_tokens=16\nlong_chat_result_usage_completion_tokens=256\nlong_chat_result_usage_total_tokens=272\nlong_chat_result_streaming_token_events=3\nlong_chat_result_time_to_first_token_ms=100\nlong_chat_result_streaming_total_elapsed_ms=170\nlong_chat_result_streaming_tokens_per_second=17.647059\nlong_chat_result_token_latency_min_ms=30\nlong_chat_result_token_latency_p50_ms=40\nlong_chat_result_token_latency_p95_ms=100\nlong_chat_result_token_latency_max_ms=100\nlong_chat_result_server_rss_before_bytes=1000\nlong_chat_result_server_rss_after_bytes=2000\nlong_chat_result_server_rss_idle_bytes=1500"
     );
     Ok(())
 }
