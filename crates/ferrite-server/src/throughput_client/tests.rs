@@ -21,6 +21,8 @@ fn parses_minimal_completion_benchmark_config() -> Result<(), Box<dyn std::error
     assert_eq!(config.api_key(), "local-secret");
     assert_eq!(config.rss_pid(), None);
     assert_eq!(config.stop(), None);
+    assert_eq!(config.assistant_context(), None);
+    assert_eq!(config.follow_up(), None);
     assert!(!config.stream());
     Ok(())
 }
@@ -126,6 +128,32 @@ fn builds_openai_compatible_chat_stop_request_body() -> Result<(), Box<dyn std::
 }
 
 #[test]
+fn builds_openai_compatible_second_turn_chat_request_body() -> Result<(), Box<dyn std::error::Error>>
+{
+    let config = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--endpoint"),
+        OsString::from("chat-completions"),
+        OsString::from("--model"),
+        OsString::from("fixture-model"),
+        OsString::from("--prompt"),
+        OsString::from("first question"),
+        OsString::from("--assistant-context"),
+        OsString::from("first answer"),
+        OsString::from("--follow-up"),
+        OsString::from("second question"),
+        OsString::from("--max-tokens"),
+        OsString::from("2"),
+    ])?;
+
+    assert_eq!(
+        request_body(&config),
+        r#"{"model":"fixture-model","messages":[{"role":"user","content":"first question"},{"role":"assistant","content":"first answer"},{"role":"user","content":"second question"}],"max_tokens":2}"#
+    );
+    Ok(())
+}
+
+#[test]
 fn formats_chat_completion_result_metric_name() -> Result<(), Box<dyn std::error::Error>> {
     let config = ThroughputClientConfig::parse([
         OsString::from("ferrite-openai-throughput"),
@@ -210,6 +238,49 @@ fn parses_stop_sequence_benchmark_config() -> Result<(), Box<dyn std::error::Err
 
     assert_eq!(config.stop(), Some("###"));
     Ok(())
+}
+
+#[test]
+fn parses_second_turn_chat_context_config() -> Result<(), Box<dyn std::error::Error>> {
+    let config = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--endpoint"),
+        OsString::from("chat-completions"),
+        OsString::from("--assistant-context"),
+        OsString::from("first answer"),
+        OsString::from("--follow-up"),
+        OsString::from("second question"),
+    ])?;
+
+    assert_eq!(config.assistant_context(), Some("first answer"));
+    assert_eq!(config.follow_up(), Some("second question"));
+    Ok(())
+}
+
+#[test]
+fn rejects_partial_second_turn_chat_context() {
+    let result = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--endpoint"),
+        OsString::from("chat-completions"),
+        OsString::from("--assistant-context"),
+        OsString::from("first answer"),
+    ]);
+
+    assert!(result.is_err());
+}
+
+#[test]
+fn rejects_second_turn_context_for_legacy_completions() {
+    let result = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--assistant-context"),
+        OsString::from("first answer"),
+        OsString::from("--follow-up"),
+        OsString::from("second question"),
+    ]);
+
+    assert!(result.is_err());
 }
 
 #[test]

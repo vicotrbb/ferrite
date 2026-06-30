@@ -6,6 +6,8 @@ pub struct ThroughputClientConfig {
     endpoint: OpenAiEndpoint,
     model: String,
     prompt: String,
+    assistant_context: Option<String>,
+    follow_up: Option<String>,
     stop: Option<String>,
     requests: usize,
     concurrency: usize,
@@ -71,6 +73,23 @@ impl ThroughputClientConfig {
                 "--prompt" => {
                     config.prompt = os_string_to_string(next_value(&mut iter, "--prompt")?)?;
                 }
+                "--assistant-context" => {
+                    let assistant_context =
+                        os_string_to_string(next_value(&mut iter, "--assistant-context")?)?;
+                    if assistant_context.is_empty() {
+                        return Err(ClientConfigError::new(
+                            "--assistant-context must not be empty",
+                        ));
+                    }
+                    config.assistant_context = Some(assistant_context);
+                }
+                "--follow-up" => {
+                    let follow_up = os_string_to_string(next_value(&mut iter, "--follow-up")?)?;
+                    if follow_up.is_empty() {
+                        return Err(ClientConfigError::new("--follow-up must not be empty"));
+                    }
+                    config.follow_up = Some(follow_up);
+                }
                 "--stop" => {
                     let stop = os_string_to_string(next_value(&mut iter, "--stop")?)?;
                     if stop.is_empty() {
@@ -132,6 +151,17 @@ impl ThroughputClientConfig {
         if config.stream_usage && !config.stream {
             return Err(ClientConfigError::new("--stream-usage requires --stream"));
         }
+        if config.assistant_context.is_some() != config.follow_up.is_some() {
+            return Err(ClientConfigError::new(
+                "--assistant-context and --follow-up must be provided together",
+            ));
+        }
+        if config.assistant_context.is_some() && config.endpoint != OpenAiEndpoint::ChatCompletions
+        {
+            return Err(ClientConfigError::new(
+                "--assistant-context and --follow-up require --endpoint chat-completions",
+            ));
+        }
 
         Ok(config)
     }
@@ -150,6 +180,14 @@ impl ThroughputClientConfig {
 
     pub fn prompt(&self) -> &str {
         &self.prompt
+    }
+
+    pub fn assistant_context(&self) -> Option<&str> {
+        self.assistant_context.as_deref()
+    }
+
+    pub fn follow_up(&self) -> Option<&str> {
+        self.follow_up.as_deref()
     }
 
     pub fn stop(&self) -> Option<&str> {
@@ -196,6 +234,8 @@ impl Default for ThroughputClientConfig {
             endpoint: OpenAiEndpoint::Completions,
             model: "ferrite-local".to_owned(),
             prompt: "hello world".to_owned(),
+            assistant_context: None,
+            follow_up: None,
             stop: None,
             requests: 3,
             concurrency: 1,
@@ -291,5 +331,5 @@ fn parse_endpoint(value: OsString) -> Result<OpenAiEndpoint, ClientConfigError> 
 }
 
 fn usage() -> &'static str {
-    "usage: ferrite-openai-throughput [--addr 127.0.0.1:8080] [--endpoint completions|chat-completions] [--model ferrite-local] [--prompt 'hello world'] [--stop STOP] [--requests 3] [--concurrency 1] [--max-tokens 1] [--stream] [--stream-usage] [--rss-pid PID] [--rss-idle-ms 2000] [--api-key local-secret]"
+    "usage: ferrite-openai-throughput [--addr 127.0.0.1:8080] [--endpoint completions|chat-completions] [--model ferrite-local] [--prompt 'hello world'] [--assistant-context TEXT --follow-up TEXT] [--stop STOP] [--requests 3] [--concurrency 1] [--max-tokens 1] [--stream] [--stream-usage] [--rss-pid PID] [--rss-idle-ms 2000] [--api-key local-secret]"
 }
