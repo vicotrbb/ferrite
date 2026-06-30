@@ -12,10 +12,14 @@ layers.
 `add_assign` now rejects non-finite values in both the left hidden-state buffer
 and the right residual vector before applying the in-place addition.
 
+It also preflights each finite `left + right` result and rejects overflow to a
+non-finite residual result before mutating the hidden-state buffer.
+
 ## Verification
 
 Run the focused regression:
 
 ```sh
 cargo test -p ferrite-inference scalar::math::tests::add_assign_rejects_non_finite_values -- --nocapture
+cargo test -p ferrite-inference scalar::math::tests::add_assign_rejects_non_finite_results -- --nocapture
 ```

@@ -88,8 +88,14 @@ pub(super) fn add_assign(left: &mut [f32], right: &[f32]) -> Result<(), Inferenc
     if right.iter().any(|value| !value.is_finite()) {
         return Err(InferenceError::new("residual right must be finite"));
     }
+    for (left, right) in left.iter().zip(right.iter()) {
+        let result = *left + *right;
+        if !result.is_finite() {
+            return Err(InferenceError::new("residual result must be finite"));
+        }
+    }
     for (left, right) in left.iter_mut().zip(right.iter()) {
-        *left += right;
+        *left += *right;
     }
     Ok(())
 }
@@ -240,6 +246,23 @@ mod tests {
 
             assert!(error.to_string().contains("residual right must be finite"));
         }
+        Ok(())
+    }
+
+    #[test]
+    fn add_assign_rejects_non_finite_results() -> Result<(), InferenceError> {
+        let mut left = [f32::MAX];
+        let error = match add_assign(&mut left, &[f32::MAX]) {
+            Ok(_) => {
+                return Err(InferenceError::new(
+                    "overflowing residual result should fail",
+                ))
+            }
+            Err(error) => error,
+        };
+
+        assert!(error.to_string().contains("residual result must be finite"));
+        assert_eq!(left, [f32::MAX]);
         Ok(())
     }
 }
