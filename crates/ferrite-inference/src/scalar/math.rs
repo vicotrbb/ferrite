@@ -58,11 +58,15 @@ pub(super) fn swiglu(gate: &[f32], up: &[f32]) -> Result<Vec<f32>, InferenceErro
     if up.iter().any(|value| !value.is_finite()) {
         return Err(InferenceError::new("swiglu up must be finite"));
     }
-    Ok(gate
-        .iter()
-        .zip(up.iter())
-        .map(|(gate, up)| silu(*gate) * up)
-        .collect())
+    let mut output = Vec::with_capacity(gate.len());
+    for (gate, up) in gate.iter().zip(up.iter()) {
+        let value = silu(*gate) * *up;
+        if !value.is_finite() {
+            return Err(InferenceError::new("swiglu result must be finite"));
+        }
+        output.push(value);
+    }
+    Ok(output)
 }
 
 fn silu(value: f32) -> f32 {
@@ -211,6 +215,17 @@ mod tests {
 
             assert!(error.to_string().contains("swiglu up must be finite"));
         }
+        Ok(())
+    }
+
+    #[test]
+    fn swiglu_rejects_non_finite_results() -> Result<(), InferenceError> {
+        let error = match swiglu(&[f32::MAX], &[2.0]) {
+            Ok(_) => return Err(InferenceError::new("overflowing swiglu result should fail")),
+            Err(error) => error,
+        };
+
+        assert!(error.to_string().contains("swiglu result must be finite"));
         Ok(())
     }
 
