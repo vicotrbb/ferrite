@@ -1,4 +1,5 @@
 mod config;
+mod error_probe;
 mod report;
 mod result;
 mod runner;
@@ -6,6 +7,7 @@ mod scenario;
 mod throughput;
 
 pub use config::{LongChatGateConfig, LongChatGateError};
+pub use error_probe::{format_error_probe_result, LongChatErrorProbeResult};
 pub use report::{format_plan, format_report, format_scenarios};
 pub use result::{format_scenario_result, LongChatScenarioResult};
 pub use scenario::LongChatScenario;

@@ -1,6 +1,6 @@
 use ferrite_server::long_chat_gate::{
-    format_plan, format_report, format_scenario_result, format_scenarios, LongChatGateConfig,
-    LongChatScenarioResult,
+    format_error_probe_result, format_plan, format_report, format_scenario_result,
+    format_scenarios, LongChatErrorProbeResult, LongChatGateConfig, LongChatScenarioResult,
 };
 use ferrite_server::throughput_client::{
     OpenAiEndpoint, RssSummary, StreamingFinishSummary, StreamingTimingSummary,
@@ -17,6 +17,7 @@ fn defaults_to_required_long_chat_token_lengths_and_turns() -> Result<(), Box<dy
     assert_eq!(config.token_lengths(), &[256, 512, 1024]);
     assert_eq!(config.turns(), 4);
     assert!(!config.execute());
+    assert!(!config.error_probe());
     assert_eq!(
         config.models(),
         &[
@@ -56,6 +57,7 @@ fn parses_custom_long_chat_token_lengths_turns_and_models() -> Result<(), Box<dy
         OsString::from("<STOP>"),
         OsString::from("--rss-pid"),
         OsString::from("4242"),
+        OsString::from("--error-probe"),
     ])?;
 
     assert_eq!(config.token_lengths(), &[128, 256]);
@@ -70,6 +72,7 @@ fn parses_custom_long_chat_token_lengths_turns_and_models() -> Result<(), Box<dy
     assert_eq!(config.follow_up(), "second turn");
     assert_eq!(config.stop(), Some("<STOP>"));
     assert_eq!(config.rss_pid(), Some(4242));
+    assert!(config.error_probe());
     Ok(())
 }
 
@@ -346,6 +349,16 @@ fn formats_long_chat_scenario_result() -> Result<(), Box<dyn std::error::Error>>
         "long_chat_result=model:fixture-model,turn:2,max_tokens:256\nlong_chat_result_completed_requests=1\nlong_chat_result_elapsed_ms=400\nlong_chat_result_finish_reason=length\nlong_chat_result_usage_prompt_tokens=16\nlong_chat_result_usage_completion_tokens=256\nlong_chat_result_usage_total_tokens=272\nlong_chat_result_streaming_token_events=3\nlong_chat_result_time_to_first_token_ms=100\nlong_chat_result_streaming_total_elapsed_ms=170\nlong_chat_result_streaming_tokens_per_second=17.647059\nlong_chat_result_token_latency_min_ms=30\nlong_chat_result_token_latency_p50_ms=40\nlong_chat_result_token_latency_p95_ms=100\nlong_chat_result_token_latency_max_ms=100\nlong_chat_result_server_rss_before_bytes=1000\nlong_chat_result_server_rss_after_bytes=2000\nlong_chat_result_server_rss_idle_bytes=1500"
     );
     Ok(())
+}
+
+#[test]
+fn formats_long_chat_error_probe_result() {
+    let result = LongChatErrorProbeResult::new(401, true);
+
+    assert_eq!(
+        format_error_probe_result(&result),
+        "long_chat_error_probe_unauthorized_status=401\nlong_chat_error_probe_reconnect_completed=true"
+    );
 }
 
 #[test]
