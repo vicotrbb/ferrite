@@ -1,4 +1,5 @@
 use super::*;
+use std::time::Duration;
 use std::{ffi::OsString, net::SocketAddr};
 
 #[test]
@@ -177,5 +178,26 @@ fn validates_streaming_response_done_event() -> Result<(), Box<dyn std::error::E
     let response = "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\n\r\ndata: {\"choices\":[{\"text\":\"hi\"}]}\n\ndata: [DONE]\n\n";
 
     http::validate_openai_response(OpenAiEndpoint::Completions, true, response)?;
+    Ok(())
+}
+
+#[test]
+fn summarizes_streaming_token_arrival_latencies() -> Result<(), Box<dyn std::error::Error>> {
+    let summary = StreamingTimingSummary::from_event_offsets(&[
+        Duration::from_millis(100),
+        Duration::from_millis(140),
+        Duration::from_millis(170),
+        Duration::from_millis(260),
+    ])
+    .ok_or("expected timing summary")?;
+
+    assert_eq!(summary.token_events(), 4);
+    assert_eq!(summary.time_to_first_token(), Duration::from_millis(100));
+    assert_eq!(summary.total_elapsed(), Duration::from_millis(260));
+    assert_eq!(summary.min_token_latency(), Duration::from_millis(30));
+    assert_eq!(summary.p50_token_latency(), Duration::from_millis(40));
+    assert_eq!(summary.p95_token_latency(), Duration::from_millis(100));
+    assert_eq!(summary.max_token_latency(), Duration::from_millis(100));
+    assert!((summary.tokens_per_second() - 15.384615).abs() < 0.000001);
     Ok(())
 }

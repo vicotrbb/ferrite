@@ -1,10 +1,12 @@
 mod config;
 mod http;
+mod streaming_metrics;
 
 #[cfg(test)]
 mod tests;
 
 pub use config::{OpenAiEndpoint, ThroughputClientConfig};
+pub use streaming_metrics::StreamingTimingSummary;
 
 use std::{
     error::Error,
