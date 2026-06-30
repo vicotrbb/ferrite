@@ -20,6 +20,7 @@ fn parses_minimal_completion_benchmark_config() -> Result<(), Box<dyn std::error
     assert_eq!(config.max_tokens(), 1);
     assert_eq!(config.api_key(), "local-secret");
     assert_eq!(config.rss_pid(), None);
+    assert_eq!(config.stop(), None);
     assert!(!config.stream());
     Ok(())
 }
@@ -41,6 +42,28 @@ fn builds_openai_compatible_completion_request_body() -> Result<(), Box<dyn std:
     assert_eq!(
         completion_request_body(&config),
         r#"{"model":"fixture-model","prompt":"measure this","max_tokens":2}"#
+    );
+    Ok(())
+}
+
+#[test]
+fn builds_openai_compatible_completion_stop_request_body() -> Result<(), Box<dyn std::error::Error>>
+{
+    let config = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--model"),
+        OsString::from("fixture-model"),
+        OsString::from("--prompt"),
+        OsString::from("measure this"),
+        OsString::from("--max-tokens"),
+        OsString::from("2"),
+        OsString::from("--stop"),
+        OsString::from("###"),
+    ])?;
+
+    assert_eq!(
+        completion_request_body(&config),
+        r####"{"model":"fixture-model","prompt":"measure this","max_tokens":2,"stop":"###"}"####
     );
     Ok(())
 }
@@ -75,6 +98,29 @@ fn builds_openai_compatible_chat_completion_request_body() -> Result<(), Box<dyn
     assert_eq!(
         request_body(&config),
         r#"{"model":"fixture-model","messages":[{"role":"user","content":"measure this"}],"max_tokens":2}"#
+    );
+    Ok(())
+}
+
+#[test]
+fn builds_openai_compatible_chat_stop_request_body() -> Result<(), Box<dyn std::error::Error>> {
+    let config = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--endpoint"),
+        OsString::from("chat-completions"),
+        OsString::from("--model"),
+        OsString::from("fixture-model"),
+        OsString::from("--prompt"),
+        OsString::from("measure this"),
+        OsString::from("--max-tokens"),
+        OsString::from("2"),
+        OsString::from("--stop"),
+        OsString::from("###"),
+    ])?;
+
+    assert_eq!(
+        request_body(&config),
+        r####"{"model":"fixture-model","messages":[{"role":"user","content":"measure this"}],"max_tokens":2,"stop":"###"}"####
     );
     Ok(())
 }
@@ -149,6 +195,29 @@ fn rejects_zero_rss_idle_delay() {
         OsString::from("1234"),
         OsString::from("--rss-idle-ms"),
         OsString::from("0"),
+    ]);
+
+    assert!(result.is_err());
+}
+
+#[test]
+fn parses_stop_sequence_benchmark_config() -> Result<(), Box<dyn std::error::Error>> {
+    let config = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--stop"),
+        OsString::from("###"),
+    ])?;
+
+    assert_eq!(config.stop(), Some("###"));
+    Ok(())
+}
+
+#[test]
+fn rejects_empty_stop_sequence() {
+    let result = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--stop"),
+        OsString::from(""),
     ]);
 
     assert!(result.is_err());

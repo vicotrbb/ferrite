@@ -182,10 +182,11 @@ fn request_body(config: &ThroughputClientConfig) -> String {
 }
 
 fn completion_request_body(config: &ThroughputClientConfig) -> String {
+    let stop = stop_field(config);
     let stream = stream_field(config);
     let stream_options = stream_options_field(config);
     format!(
-        r#"{{"model":{},"prompt":{},"max_tokens":{}{stream}{stream_options}}}"#,
+        r#"{{"model":{},"prompt":{},"max_tokens":{}{stop}{stream}{stream_options}}}"#,
         serde_json::Value::String(config.model().to_owned()),
         serde_json::Value::String(config.prompt().to_owned()),
         config.max_tokens()
@@ -193,10 +194,11 @@ fn completion_request_body(config: &ThroughputClientConfig) -> String {
 }
 
 fn chat_completion_request_body(config: &ThroughputClientConfig) -> String {
+    let stop = stop_field(config);
     let stream = stream_field(config);
     let stream_options = stream_options_field(config);
     format!(
-        r#"{{"model":{},"messages":[{{"role":"user","content":{}}}],"max_tokens":{}{stream}{stream_options}}}"#,
+        r#"{{"model":{},"messages":[{{"role":"user","content":{}}}],"max_tokens":{}{stop}{stream}{stream_options}}}"#,
         serde_json::Value::String(config.model().to_owned()),
         serde_json::Value::String(config.prompt().to_owned()),
         config.max_tokens()
@@ -209,6 +211,13 @@ fn stream_field(config: &ThroughputClientConfig) -> &'static str {
     } else {
         ""
     }
+}
+
+fn stop_field(config: &ThroughputClientConfig) -> String {
+    config
+        .stop()
+        .map(|stop| format!(r#","stop":{}"#, serde_json::Value::String(stop.to_owned())))
+        .unwrap_or_default()
 }
 
 fn stream_options_field(config: &ThroughputClientConfig) -> &'static str {

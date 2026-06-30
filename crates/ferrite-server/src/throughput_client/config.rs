@@ -6,6 +6,7 @@ pub struct ThroughputClientConfig {
     endpoint: OpenAiEndpoint,
     model: String,
     prompt: String,
+    stop: Option<String>,
     requests: usize,
     concurrency: usize,
     max_tokens: usize,
@@ -69,6 +70,13 @@ impl ThroughputClientConfig {
                 }
                 "--prompt" => {
                     config.prompt = os_string_to_string(next_value(&mut iter, "--prompt")?)?;
+                }
+                "--stop" => {
+                    let stop = os_string_to_string(next_value(&mut iter, "--stop")?)?;
+                    if stop.is_empty() {
+                        return Err(ClientConfigError::new("--stop must not be empty"));
+                    }
+                    config.stop = Some(stop);
                 }
                 "--requests" => {
                     config.requests =
@@ -144,6 +152,10 @@ impl ThroughputClientConfig {
         &self.prompt
     }
 
+    pub fn stop(&self) -> Option<&str> {
+        self.stop.as_deref()
+    }
+
     pub fn requests(&self) -> usize {
         self.requests
     }
@@ -184,6 +196,7 @@ impl Default for ThroughputClientConfig {
             endpoint: OpenAiEndpoint::Completions,
             model: "ferrite-local".to_owned(),
             prompt: "hello world".to_owned(),
+            stop: None,
             requests: 3,
             concurrency: 1,
             max_tokens: 1,
@@ -278,5 +291,5 @@ fn parse_endpoint(value: OsString) -> Result<OpenAiEndpoint, ClientConfigError> 
 }
 
 fn usage() -> &'static str {
-    "usage: ferrite-openai-throughput [--addr 127.0.0.1:8080] [--endpoint completions|chat-completions] [--model ferrite-local] [--prompt 'hello world'] [--requests 3] [--concurrency 1] [--max-tokens 1] [--stream] [--stream-usage] [--rss-pid PID] [--rss-idle-ms 2000] [--api-key local-secret]"
+    "usage: ferrite-openai-throughput [--addr 127.0.0.1:8080] [--endpoint completions|chat-completions] [--model ferrite-local] [--prompt 'hello world'] [--stop STOP] [--requests 3] [--concurrency 1] [--max-tokens 1] [--stream] [--stream-usage] [--rss-pid PID] [--rss-idle-ms 2000] [--api-key local-secret]"
 }
