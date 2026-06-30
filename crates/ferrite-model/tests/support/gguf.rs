@@ -157,6 +157,13 @@ pub(crate) fn minimal_llama_gguf_with_rope_dimension_count(rope_dimension_count:
     })
 }
 
+pub(crate) fn minimal_llama_gguf_with_rope_freq_base(rope_freq_base: f32) -> Vec<u8> {
+    minimal_llama_gguf_with_options(LlamaGgufOptions {
+        rope_freq_base,
+        ..LlamaGgufOptions::default()
+    })
+}
+
 pub(crate) fn minimal_qwen2_gguf() -> Vec<u8> {
     let mut bytes = Vec::new();
     bytes.extend_from_slice(b"GGUF");
@@ -209,6 +216,7 @@ struct LlamaGgufOptions {
     key_length: u32,
     value_length: u32,
     rope_dimension_count: u32,
+    rope_freq_base: f32,
 }
 
 impl Default for LlamaGgufOptions {
@@ -224,6 +232,7 @@ impl Default for LlamaGgufOptions {
             key_length: 4,
             value_length: 4,
             rope_dimension_count: 4,
+            rope_freq_base: 10000.0,
         }
     }
 }
@@ -276,7 +285,7 @@ fn minimal_llama_gguf_with_options(options: LlamaGgufOptions) -> Vec<u8> {
         "llama.rope.dimension_count",
         options.rope_dimension_count,
     );
-    push_kv_f32(&mut bytes, "llama.rope.freq_base", 10000.0);
+    push_kv_f32(&mut bytes, "llama.rope.freq_base", options.rope_freq_base);
     push_kv_string_array(&mut bytes, "tokenizer.ggml.tokens", &["<unk>", "hello"]);
 
     push_tensor_info(

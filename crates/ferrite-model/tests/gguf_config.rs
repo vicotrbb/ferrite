@@ -9,7 +9,8 @@ use support::gguf::{
     minimal_llama_gguf_with_block_count, minimal_llama_gguf_with_context_length,
     minimal_llama_gguf_with_embedding_length, minimal_llama_gguf_with_feed_forward_length,
     minimal_llama_gguf_with_key_length, minimal_llama_gguf_with_rope_dimension_count,
-    minimal_llama_gguf_with_value_length, minimal_qwen2_gguf,
+    minimal_llama_gguf_with_rope_freq_base, minimal_llama_gguf_with_value_length,
+    minimal_qwen2_gguf,
 };
 
 #[test]
@@ -217,6 +218,29 @@ fn rejects_odd_rope_dimension_count() -> Result<(), Box<dyn Error>> {
     assert!(error
         .to_string()
         .contains("llama.rope.dimension_count 3 must be even"));
+    Ok(())
+}
+
+#[test]
+fn rejects_non_positive_rope_freq_base() -> Result<(), Box<dyn Error>> {
+    for rope_freq_base in [0.0, -1.0] {
+        let bytes = minimal_llama_gguf_with_rope_freq_base(rope_freq_base);
+        let file = parse_gguf(&bytes)?;
+
+        let error = match file.llama_config() {
+            Ok(_) => {
+                return Err(io::Error::other(
+                    "non-positive rope frequency base should be rejected",
+                )
+                .into());
+            }
+            Err(error) => error,
+        };
+
+        assert!(error.to_string().contains(&format!(
+            "llama.rope.freq_base {rope_freq_base} must be positive"
+        )));
+    }
     Ok(())
 }
 

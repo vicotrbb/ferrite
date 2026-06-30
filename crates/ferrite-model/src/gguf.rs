@@ -91,6 +91,8 @@ impl GgufFile {
             .unwrap_or(attention_head_count);
         validate_attention_head_layout(prefix, attention_head_count, attention_head_count_kv)?;
         validate_rope_dimension_layout(prefix, key_length, rope_dimension_count)?;
+        let rope_freq_base = self.optional_f32(&format!("{prefix}.rope.freq_base"))?;
+        validate_rope_freq_base(prefix, rope_freq_base)?;
 
         Ok(LlamaConfig {
             architecture,
@@ -106,7 +108,7 @@ impl GgufFile {
             attention_layer_norm_rms_epsilon: self
                 .optional_f32(&format!("{prefix}.attention.layer_norm_rms_epsilon"))?,
             rope_dimension_count,
-            rope_freq_base: self.optional_f32(&format!("{prefix}.rope.freq_base"))?,
+            rope_freq_base,
         })
     }
 
@@ -332,6 +334,18 @@ fn validate_rope_dimension_layout(
         return Err(GgufError::new(format!(
             "{prefix}.rope.dimension_count {rope_dimension_count} must be less than or equal to {prefix}.attention.key_length {key_length}"
         )));
+    }
+
+    Ok(())
+}
+
+fn validate_rope_freq_base(prefix: &str, rope_freq_base: Option<f32>) -> Result<(), GgufError> {
+    if let Some(value) = rope_freq_base {
+        if value <= 0.0 {
+            return Err(GgufError::new(format!(
+                "{prefix}.rope.freq_base {value} must be positive"
+            )));
+        }
     }
 
     Ok(())
