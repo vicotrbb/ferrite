@@ -81,7 +81,11 @@ fn minimal_llama_gguf() -> Vec<u8> {
 }
 
 fn minimal_llama_gguf_with_attention_head_count(attention_head_count: u64) -> Vec<u8> {
-    minimal_llama_gguf_with_options(0, attention_head_count)
+    minimal_llama_gguf_with_options(0, attention_head_count, 1)
+}
+
+fn minimal_llama_gguf_with_attention_head_count_kv(attention_head_count_kv: u32) -> Vec<u8> {
+    minimal_llama_gguf_with_options(0, 2, attention_head_count_kv)
 }
 
 fn minimal_qwen2_gguf() -> Vec<u8> {
@@ -119,10 +123,14 @@ fn minimal_qwen2_gguf() -> Vec<u8> {
 }
 
 fn minimal_llama_gguf_with_tensor_offset(tensor_offset: u64) -> Vec<u8> {
-    minimal_llama_gguf_with_options(tensor_offset, 2)
+    minimal_llama_gguf_with_options(tensor_offset, 2, 1)
 }
 
-fn minimal_llama_gguf_with_options(tensor_offset: u64, attention_head_count: u64) -> Vec<u8> {
+fn minimal_llama_gguf_with_options(
+    tensor_offset: u64,
+    attention_head_count: u64,
+    attention_head_count_kv: u32,
+) -> Vec<u8> {
     let mut bytes = Vec::new();
     bytes.extend_from_slice(b"GGUF");
     push_u32(&mut bytes, 3);
@@ -141,7 +149,11 @@ fn minimal_llama_gguf_with_options(tensor_offset: u64, attention_head_count: u64
         "llama.attention.head_count",
         attention_head_count,
     );
-    push_kv_u32(&mut bytes, "llama.attention.head_count_kv", 1);
+    push_kv_u32(
+        &mut bytes,
+        "llama.attention.head_count_kv",
+        attention_head_count_kv,
+    );
     push_kv_u32(&mut bytes, "llama.attention.key_length", 4);
     push_kv_u32(&mut bytes, "llama.attention.value_length", 4);
     push_kv_f32(
@@ -265,6 +277,24 @@ fn rejects_zero_attention_head_count_in_model_config() -> Result<(), Box<dyn Err
     assert!(error
         .to_string()
         .contains("llama.attention.head_count must be greater than zero"));
+    Ok(())
+}
+
+#[test]
+fn rejects_zero_attention_kv_head_count_in_model_config() -> Result<(), Box<dyn Error>> {
+    let bytes = minimal_llama_gguf_with_attention_head_count_kv(0);
+    let file = parse_gguf(&bytes)?;
+
+    let error = match file.llama_config() {
+        Ok(_) => {
+            return Err(io::Error::other("zero KV attention head count should be rejected").into());
+        }
+        Err(error) => error,
+    };
+
+    assert!(error
+        .to_string()
+        .contains("llama.attention.head_count_kv must be greater than zero"));
     Ok(())
 }
 

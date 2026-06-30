@@ -93,7 +93,7 @@ impl GgufFile {
             feed_forward_length: self.required_count(&format!("{prefix}.feed_forward_length"))?,
             attention_head_count,
             attention_head_count_kv: self
-                .optional_count(&format!("{prefix}.attention.head_count_kv"))?
+                .optional_nonzero_count(&format!("{prefix}.attention.head_count_kv"))?
                 .unwrap_or(attention_head_count),
             key_length,
             value_length,
@@ -115,6 +115,18 @@ impl GgufFile {
             return Err(GgufError::new(format!("{key} must be greater than zero")));
         }
         Ok(value)
+    }
+
+    fn optional_nonzero_count(&self, key: &str) -> Result<Option<u64>, GgufError> {
+        self.optional_count(key)?
+            .map(|value| {
+                if value == 0 {
+                    Err(GgufError::new(format!("{key} must be greater than zero")))
+                } else {
+                    Ok(value)
+                }
+            })
+            .transpose()
     }
 
     fn optional_count(&self, key: &str) -> Result<Option<u64>, GgufError> {
