@@ -151,35 +151,7 @@ pub(crate) fn model_with_rope_freq_base(
 ) -> Result<ScalarLlamaModel, Box<dyn Error>> {
     let mut config = scalar_config(4);
     config.rope_freq_base = rope_freq_base;
-    let identity = identity_2x2()?;
-    let model = ScalarLlamaModel::new(
-        config,
-        ScalarLlamaWeights {
-            token_embedding: Matrix::from_row_major(
-                4,
-                2,
-                vec![
-                    1.0, 0.0, // token 0
-                    0.0, 1.0, // token 1
-                    1.0, 1.0, // token 2
-                    0.0, 0.0, // token 3
-                ],
-            )?,
-            output_norm: vec![1.0, 1.0],
-            output: ScalarLlamaOutputWeights::untied(Matrix::from_row_major(
-                4,
-                2,
-                vec![
-                    0.0, 0.0, // token 0
-                    1.0, 0.0, // token 1
-                    0.0, 1.0, // token 2
-                    -1.0, -1.0, // token 3
-                ],
-            )?),
-            layers: vec![identity_layer(identity.clone(), zero_2x2()?, identity)?],
-        },
-    )?;
-    Ok(model)
+    model_with_config_and_output_norm(config, vec![1.0, 1.0])
 }
 
 pub(crate) fn model_with_rms_norm_epsilon(
@@ -187,6 +159,19 @@ pub(crate) fn model_with_rms_norm_epsilon(
 ) -> Result<ScalarLlamaModel, Box<dyn Error>> {
     let mut config = scalar_config(4);
     config.rms_norm_epsilon = rms_norm_epsilon;
+    model_with_config_and_output_norm(config, vec![1.0, 1.0])
+}
+
+pub(crate) fn model_with_output_norm_value(
+    output_norm_value: f32,
+) -> Result<ScalarLlamaModel, Box<dyn Error>> {
+    model_with_config_and_output_norm(scalar_config(4), vec![1.0, output_norm_value])
+}
+
+fn model_with_config_and_output_norm(
+    config: ScalarLlamaConfig,
+    output_norm: Vec<f32>,
+) -> Result<ScalarLlamaModel, Box<dyn Error>> {
     let identity = identity_2x2()?;
     let model = ScalarLlamaModel::new(
         config,
@@ -201,7 +186,7 @@ pub(crate) fn model_with_rms_norm_epsilon(
                     0.0, 0.0, // token 3
                 ],
             )?,
-            output_norm: vec![1.0, 1.0],
+            output_norm,
             output: ScalarLlamaOutputWeights::untied(Matrix::from_row_major(
                 4,
                 2,

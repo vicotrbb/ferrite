@@ -15,8 +15,9 @@ use std::io;
 use support::assertions::assert_close;
 use support::fixtures::qwen2_fixture_from_llama_fixture;
 use support::models::{
-    causal_attention_model, documented_argmax_model, model_with_rms_norm_epsilon,
-    model_with_rope_freq_base, prompt_causal_attention_model, value_bias_model,
+    causal_attention_model, documented_argmax_model, model_with_output_norm_value,
+    model_with_rms_norm_epsilon, model_with_rope_freq_base, prompt_causal_attention_model,
+    value_bias_model,
 };
 
 #[test]
@@ -193,6 +194,23 @@ fn scalar_config_rejects_invalid_rms_norm_epsilon() -> Result<(), Box<dyn Error>
         assert!(error
             .to_string()
             .contains("rms norm epsilon must be finite and non-negative"));
+    }
+    Ok(())
+}
+
+#[test]
+fn scalar_weights_reject_non_finite_output_norm_values() -> Result<(), Box<dyn Error>> {
+    for output_norm_value in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+        let error = match model_with_output_norm_value(output_norm_value) {
+            Ok(_) => {
+                return Err(io::Error::other("non-finite output norm should be rejected").into());
+            }
+            Err(error) => error,
+        };
+
+        assert!(error
+            .to_string()
+            .contains("output_norm values must be finite"));
     }
     Ok(())
 }

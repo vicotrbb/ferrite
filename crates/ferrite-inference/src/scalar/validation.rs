@@ -77,7 +77,7 @@ pub(super) fn validate_weights(
     if let Some(output) = weights.output.untied_matrix() {
         ensure_matrix_shape("output", output, config.vocab_size, config.hidden_size)?;
     }
-    ensure_len("output_norm", &weights.output_norm, config.hidden_size)?;
+    ensure_vector("output_norm", &weights.output_norm, config.hidden_size)?;
 
     let kv_width = config
         .attention_head_count_kv
@@ -86,12 +86,12 @@ pub(super) fn validate_weights(
 
     for (index, layer) in weights.layers.iter().enumerate() {
         let prefix = format!("layer {index}");
-        ensure_len(
+        ensure_vector(
             &format!("{prefix} attn_norm"),
             &layer.attn_norm,
             config.hidden_size,
         )?;
-        ensure_len(
+        ensure_vector(
             &format!("{prefix} ffn_norm"),
             &layer.ffn_norm,
             config.hidden_size,
@@ -102,7 +102,7 @@ pub(super) fn validate_weights(
             config.hidden_size,
             config.hidden_size,
         )?;
-        ensure_optional_len(
+        ensure_optional_vector(
             &format!("{prefix} q_bias"),
             layer.q_bias.as_deref(),
             config.hidden_size,
@@ -113,7 +113,7 @@ pub(super) fn validate_weights(
             kv_width,
             config.hidden_size,
         )?;
-        ensure_optional_len(
+        ensure_optional_vector(
             &format!("{prefix} k_bias"),
             layer.k_bias.as_deref(),
             kv_width,
@@ -124,7 +124,7 @@ pub(super) fn validate_weights(
             kv_width,
             config.hidden_size,
         )?;
-        ensure_optional_len(
+        ensure_optional_vector(
             &format!("{prefix} v_bias"),
             layer.v_bias.as_deref(),
             kv_width,
@@ -158,15 +158,23 @@ pub(super) fn validate_weights(
     Ok(())
 }
 
-fn ensure_optional_len(
+fn ensure_optional_vector(
     name: &str,
     values: Option<&[f32]>,
     expected: usize,
 ) -> Result<(), InferenceError> {
     match values {
-        Some(values) => ensure_len(name, values, expected),
+        Some(values) => ensure_vector(name, values, expected),
         None => Ok(()),
     }
+}
+
+fn ensure_vector(name: &str, values: &[f32], expected: usize) -> Result<(), InferenceError> {
+    ensure_len(name, values, expected)?;
+    if values.iter().any(|value| !value.is_finite()) {
+        return Err(InferenceError::new(format!("{name} values must be finite")));
+    }
+    Ok(())
 }
 
 fn ensure_matrix_shape(
