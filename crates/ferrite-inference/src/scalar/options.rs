@@ -78,6 +78,12 @@ impl Q8KActivationMatvecRole {
             if part.is_empty() {
                 return Err("Q8_K activation matvec role list contains an empty item".to_owned());
             }
+            if part == "all" {
+                return Err(
+                    "Q8_K activation matvec role alias all cannot be combined with other roles"
+                        .to_owned(),
+                );
+            }
             let role = Self::parse(part)?;
             if roles.contains(&role) {
                 return Err(format!(
@@ -329,6 +335,20 @@ mod tests {
         };
 
         assert_eq!(err, "duplicate Q8_K activation matvec role ffn_up");
+        Ok(())
+    }
+
+    #[test]
+    fn q8_k_activation_roles_reject_mixed_all_alias() -> Result<(), String> {
+        let err = match Q8KActivationMatvecRole::parse_list("all,ffn_up") {
+            Ok(_) => return Err("mixed all Q8_K activation role should fail".to_owned()),
+            Err(err) => err,
+        };
+
+        assert_eq!(
+            err,
+            "Q8_K activation matvec role alias all cannot be combined with other roles"
+        );
         Ok(())
     }
 }

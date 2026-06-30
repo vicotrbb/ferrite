@@ -140,6 +140,9 @@ reference implementation and benchmarking baseline, not the Ferrite runtime.
 - `documentation/dev-notes/2026-06-29-q8-k-all-role-scope-alias.md` records
   the CLI round-trip guardrail that accepts `all` as the explicit full Q8_K
   role scope without changing default dispatch.
+- `documentation/dev-notes/2026-06-30-q8-k-all-role-alias-guardrail.md`
+  records the parser guardrail that rejects mixed `all` alias role scopes
+  before they can be confused with named role lists.
 - `documentation/dev-notes/2026-06-28-q8-k-single-role-probes.md` records the
   first single-role SmolLM2 probes; only `ffn_up` matched both fixed prompts,
   and it still requires broader parity evidence.
