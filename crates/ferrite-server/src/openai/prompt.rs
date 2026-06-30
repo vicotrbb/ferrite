@@ -5,8 +5,9 @@ use super::{
 
 pub fn render_chat_prompt(messages: &[ChatMessage]) -> Result<String, OpenAiHttpError> {
     if messages.is_empty() {
-        return Err(OpenAiHttpError::invalid_request(
+        return Err(OpenAiHttpError::invalid_request_with_param(
             "messages must contain at least one item",
+            "messages",
         ));
     }
 

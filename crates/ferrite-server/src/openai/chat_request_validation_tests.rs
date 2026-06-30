@@ -90,6 +90,26 @@ async fn chat_endpoint_rejects_non_array_messages() -> Result<(), Box<dyn std::e
 }
 
 #[tokio::test]
+async fn chat_endpoint_reports_messages_param_for_empty_messages(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let body = post_chat_json(
+        r#"{
+            "model":"fixture-model",
+            "messages":[]
+        }"#,
+    )
+    .await?;
+
+    assert_eq!(body.status, StatusCode::BAD_REQUEST);
+    assert_eq!(body.json["error"]["type"], "invalid_request_error");
+    assert_eq!(body.json["error"]["param"], "messages", "{}", body.json);
+    let message = body.json["error"]["message"].as_str().unwrap_or_default();
+    assert!(message.contains("messages must contain at least one item"));
+    assert!(!message.contains("malformed JSON"), "{message}");
+    Ok(())
+}
+
+#[tokio::test]
 async fn chat_endpoint_rejects_non_object_message_items() -> Result<(), Box<dyn std::error::Error>>
 {
     let body = post_chat_json(
