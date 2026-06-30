@@ -1,33 +1,23 @@
+mod support;
+
 use ferrite_fixtures::{
     scalar_llama_bf16_gguf_fixture, scalar_llama_f16_gguf_fixture, scalar_llama_f32_gguf_fixture,
     scalar_llama_q4_k_gguf_fixture, scalar_llama_q5_0_gguf_fixture, scalar_llama_q6_k_gguf_fixture,
     scalar_llama_q8_0_gguf_fixture, scalar_llama_tied_output_f32_gguf_fixture,
 };
 use ferrite_inference::scalar::{
-    apply_rope, argmax, rms_norm, Matrix, RopeLayout, ScalarExecutionOptions, ScalarLlamaConfig,
-    ScalarLlamaLayerWeights, ScalarLlamaModel, ScalarLlamaOutputWeights, ScalarLlamaWeights,
+    apply_rope, argmax, rms_norm, Matrix, ScalarExecutionOptions, ScalarLlamaModel,
 };
 use ferrite_model::gguf::parse_gguf;
 use ferrite_model::tokenizer::GgufTokenizer;
 use std::error::Error;
 use std::io;
-
-fn assert_close(actual: f32, expected: f32) {
-    let diff = (actual - expected).abs();
-    assert!(
-        diff <= 0.0001,
-        "expected {actual} to be within 0.0001 of {expected}; diff={diff}"
-    );
-}
-
-fn qwen2_fixture_from_llama_fixture(mut bytes: Vec<u8>) -> Vec<u8> {
-    for index in 0..bytes.len().saturating_sub(4) {
-        if &bytes[index..index + 5] == b"llama" {
-            bytes[index..index + 5].copy_from_slice(b"qwen2");
-        }
-    }
-    bytes
-}
+use support::assertions::assert_close;
+use support::fixtures::qwen2_fixture_from_llama_fixture;
+use support::models::{
+    causal_attention_model, documented_argmax_model, prompt_causal_attention_model,
+    value_bias_model,
+};
 
 #[test]
 fn rms_norm_uses_scalar_root_mean_square_reference() -> Result<(), Box<dyn Error>> {
@@ -56,57 +46,7 @@ fn matrix_vector_multiply_rejects_shape_mismatch() -> Result<(), Box<dyn Error>>
 
 #[test]
 fn single_token_llama_reference_path_produces_documented_argmax() -> Result<(), Box<dyn Error>> {
-    let identity = Matrix::from_row_major(2, 2, vec![1.0, 0.0, 0.0, 1.0])?;
-    let config = ScalarLlamaConfig {
-        vocab_size: 3,
-        hidden_size: 2,
-        intermediate_size: 2,
-        attention_head_count: 1,
-        attention_head_count_kv: 1,
-        head_dim: 2,
-        rope_dimension_count: 2,
-        rope_freq_base: 10_000.0,
-        rope_layout: RopeLayout::AdjacentPairs,
-        rms_norm_epsilon: 0.0,
-    };
-    let model = ScalarLlamaModel::new(
-        config,
-        ScalarLlamaWeights {
-            token_embedding: Matrix::from_row_major(
-                3,
-                2,
-                vec![
-                    1.0, 1.0, // token 0
-                    0.0, 1.0, // token 1
-                    2.0, -1.0, // token 2
-                ],
-            )?,
-            output_norm: vec![1.0, 1.0],
-            output: ScalarLlamaOutputWeights::untied(Matrix::from_row_major(
-                3,
-                2,
-                vec![
-                    0.1, 0.1, // token 0 logit = 0.2 after final norm
-                    0.2, 0.0, // token 1 logit = 0.2 after final norm
-                    1.0, 0.5, // token 2 logit = 1.5 after final norm
-                ],
-            )?),
-            layers: vec![ScalarLlamaLayerWeights {
-                attn_norm: vec![1.0, 1.0],
-                q_proj: identity.clone(),
-                q_bias: None,
-                k_proj: identity.clone(),
-                k_bias: None,
-                v_proj: identity.clone(),
-                v_bias: None,
-                o_proj: identity.clone(),
-                ffn_norm: vec![1.0, 1.0],
-                ffn_gate: identity.clone(),
-                ffn_up: identity.clone(),
-                ffn_down: identity,
-            }],
-        },
-    )?;
+    let model = documented_argmax_model()?;
 
     let next = model.next_token(0)?;
 
@@ -120,58 +60,7 @@ fn single_token_llama_reference_path_produces_documented_argmax() -> Result<(), 
 
 #[test]
 fn attention_value_projection_bias_contributes_to_hidden_state() -> Result<(), Box<dyn Error>> {
-    let zero = Matrix::from_row_major(2, 2, vec![0.0; 4])?;
-    let identity = Matrix::from_row_major(2, 2, vec![1.0, 0.0, 0.0, 1.0])?;
-    let config = ScalarLlamaConfig {
-        vocab_size: 3,
-        hidden_size: 2,
-        intermediate_size: 2,
-        attention_head_count: 1,
-        attention_head_count_kv: 1,
-        head_dim: 2,
-        rope_dimension_count: 0,
-        rope_freq_base: 10_000.0,
-        rope_layout: RopeLayout::AdjacentPairs,
-        rms_norm_epsilon: 0.0,
-    };
-    let model = ScalarLlamaModel::new(
-        config,
-        ScalarLlamaWeights {
-            token_embedding: Matrix::from_row_major(
-                3,
-                2,
-                vec![
-                    1.0, 0.0, // token 0
-                    0.0, 0.0, // token 1
-                    0.0, 0.0, // token 2
-                ],
-            )?,
-            output_norm: vec![1.0, 1.0],
-            output: ScalarLlamaOutputWeights::untied(Matrix::from_row_major(
-                3,
-                2,
-                vec![
-                    0.0, 0.0, // token 0
-                    1.0, 0.0, // token 1 follows the original hidden state
-                    0.0, 1.0, // token 2 follows the value bias contribution
-                ],
-            )?),
-            layers: vec![ScalarLlamaLayerWeights {
-                attn_norm: vec![1.0, 1.0],
-                q_proj: zero.clone(),
-                q_bias: None,
-                k_proj: zero.clone(),
-                k_bias: None,
-                v_proj: zero.clone(),
-                v_bias: Some(vec![0.0, 3.0]),
-                o_proj: identity.clone(),
-                ffn_norm: vec![1.0, 1.0],
-                ffn_gate: zero.clone(),
-                ffn_up: identity,
-                ffn_down: zero,
-            }],
-        },
-    )?;
+    let model = value_bias_model()?;
 
     let next = model.next_token(0)?;
 
@@ -193,59 +82,7 @@ fn rope_rotates_even_odd_pairs_by_position_and_frequency() -> Result<(), Box<dyn
 
 #[test]
 fn prompt_path_uses_causal_kv_attention_for_latest_token() -> Result<(), Box<dyn Error>> {
-    let identity = Matrix::from_row_major(2, 2, vec![1.0, 0.0, 0.0, 1.0])?;
-    let config = ScalarLlamaConfig {
-        vocab_size: 4,
-        hidden_size: 2,
-        intermediate_size: 2,
-        attention_head_count: 1,
-        attention_head_count_kv: 1,
-        head_dim: 2,
-        rope_dimension_count: 0,
-        rope_freq_base: 10_000.0,
-        rope_layout: RopeLayout::AdjacentPairs,
-        rms_norm_epsilon: 0.0,
-    };
-    let model = ScalarLlamaModel::new(
-        config,
-        ScalarLlamaWeights {
-            token_embedding: Matrix::from_row_major(
-                4,
-                2,
-                vec![
-                    1.0, 0.0, // token 0
-                    0.0, 1.0, // token 1
-                    0.0, 0.0, // token 2
-                    0.0, 0.0, // token 3
-                ],
-            )?,
-            output_norm: vec![1.0, 1.0],
-            output: ScalarLlamaOutputWeights::untied(Matrix::from_row_major(
-                4,
-                2,
-                vec![
-                    0.0, 0.0, // token 0
-                    1.0, 0.0, // token 1 follows attention toward prior token
-                    0.0, 1.0, // token 2 follows current token
-                    -1.0, -1.0, // token 3
-                ],
-            )?),
-            layers: vec![ScalarLlamaLayerWeights {
-                attn_norm: vec![1.0, 1.0],
-                q_proj: identity.clone(),
-                q_bias: None,
-                k_proj: identity.clone(),
-                k_bias: None,
-                v_proj: identity.clone(),
-                v_bias: None,
-                o_proj: identity.clone(),
-                ffn_norm: vec![1.0, 1.0],
-                ffn_gate: Matrix::from_row_major(2, 2, vec![0.0; 4])?,
-                ffn_up: identity.clone(),
-                ffn_down: identity,
-            }],
-        },
-    )?;
+    let model = prompt_causal_attention_model()?;
 
     let next = model.next_token_for_prompt(&[0, 1])?;
 
@@ -256,59 +93,7 @@ fn prompt_path_uses_causal_kv_attention_for_latest_token() -> Result<(), Box<dyn
 
 #[test]
 fn scalar_session_reuses_cached_prompt_state_incrementally() -> Result<(), Box<dyn Error>> {
-    let identity = Matrix::from_row_major(2, 2, vec![1.0, 0.0, 0.0, 1.0])?;
-    let config = ScalarLlamaConfig {
-        vocab_size: 4,
-        hidden_size: 2,
-        intermediate_size: 2,
-        attention_head_count: 1,
-        attention_head_count_kv: 1,
-        head_dim: 2,
-        rope_dimension_count: 0,
-        rope_freq_base: 10_000.0,
-        rope_layout: RopeLayout::AdjacentPairs,
-        rms_norm_epsilon: 0.0,
-    };
-    let model = ScalarLlamaModel::new(
-        config,
-        ScalarLlamaWeights {
-            token_embedding: Matrix::from_row_major(
-                4,
-                2,
-                vec![
-                    1.0, 0.0, // token 0
-                    0.0, 1.0, // token 1
-                    1.0, 1.0, // token 2
-                    0.0, 0.0, // token 3
-                ],
-            )?,
-            output_norm: vec![1.0, 1.0],
-            output: ScalarLlamaOutputWeights::untied(Matrix::from_row_major(
-                4,
-                2,
-                vec![
-                    0.0, 0.0, // token 0
-                    1.0, 0.0, // token 1
-                    0.0, 1.0, // token 2
-                    -1.0, -1.0, // token 3
-                ],
-            )?),
-            layers: vec![ScalarLlamaLayerWeights {
-                attn_norm: vec![1.0, 1.0],
-                q_proj: identity.clone(),
-                q_bias: None,
-                k_proj: identity.clone(),
-                k_bias: None,
-                v_proj: identity.clone(),
-                v_bias: None,
-                o_proj: identity.clone(),
-                ffn_norm: vec![1.0, 1.0],
-                ffn_gate: Matrix::from_row_major(2, 2, vec![0.0; 4])?,
-                ffn_up: identity.clone(),
-                ffn_down: identity,
-            }],
-        },
-    )?;
+    let model = causal_attention_model()?;
 
     let mut session = model.start_session();
     let prompt_next = session.accept_prompt(&[0, 1])?;
@@ -327,59 +112,7 @@ fn scalar_session_reuses_cached_prompt_state_incrementally() -> Result<(), Box<d
 
 #[test]
 fn scalar_session_accepts_token_id_without_returning_logits() -> Result<(), Box<dyn Error>> {
-    let identity = Matrix::from_row_major(2, 2, vec![1.0, 0.0, 0.0, 1.0])?;
-    let config = ScalarLlamaConfig {
-        vocab_size: 4,
-        hidden_size: 2,
-        intermediate_size: 2,
-        attention_head_count: 1,
-        attention_head_count_kv: 1,
-        head_dim: 2,
-        rope_dimension_count: 0,
-        rope_freq_base: 10_000.0,
-        rope_layout: RopeLayout::AdjacentPairs,
-        rms_norm_epsilon: 0.0,
-    };
-    let model = ScalarLlamaModel::new(
-        config,
-        ScalarLlamaWeights {
-            token_embedding: Matrix::from_row_major(
-                4,
-                2,
-                vec![
-                    1.0, 0.0, // token 0
-                    0.0, 1.0, // token 1
-                    1.0, 1.0, // token 2
-                    0.0, 0.0, // token 3
-                ],
-            )?,
-            output_norm: vec![1.0, 1.0],
-            output: ScalarLlamaOutputWeights::untied(Matrix::from_row_major(
-                4,
-                2,
-                vec![
-                    0.0, 0.0, // token 0
-                    1.0, 0.0, // token 1
-                    0.0, 1.0, // token 2
-                    -1.0, -1.0, // token 3
-                ],
-            )?),
-            layers: vec![ScalarLlamaLayerWeights {
-                attn_norm: vec![1.0, 1.0],
-                q_proj: identity.clone(),
-                q_bias: None,
-                k_proj: identity.clone(),
-                k_bias: None,
-                v_proj: identity.clone(),
-                v_bias: None,
-                o_proj: identity.clone(),
-                ffn_norm: vec![1.0, 1.0],
-                ffn_gate: Matrix::from_row_major(2, 2, vec![0.0; 4])?,
-                ffn_up: identity.clone(),
-                ffn_down: identity,
-            }],
-        },
-    )?;
+    let model = causal_attention_model()?;
 
     let mut logits_session = model.start_session();
     let mut token_id_session = model.start_session();
@@ -396,59 +129,7 @@ fn scalar_session_accepts_token_id_without_returning_logits() -> Result<(), Box<
 
 #[test]
 fn scalar_session_generates_token_ids_without_returning_logits() -> Result<(), Box<dyn Error>> {
-    let identity = Matrix::from_row_major(2, 2, vec![1.0, 0.0, 0.0, 1.0])?;
-    let config = ScalarLlamaConfig {
-        vocab_size: 4,
-        hidden_size: 2,
-        intermediate_size: 2,
-        attention_head_count: 1,
-        attention_head_count_kv: 1,
-        head_dim: 2,
-        rope_dimension_count: 0,
-        rope_freq_base: 10_000.0,
-        rope_layout: RopeLayout::AdjacentPairs,
-        rms_norm_epsilon: 0.0,
-    };
-    let model = ScalarLlamaModel::new(
-        config,
-        ScalarLlamaWeights {
-            token_embedding: Matrix::from_row_major(
-                4,
-                2,
-                vec![
-                    1.0, 0.0, // token 0
-                    0.0, 1.0, // token 1
-                    1.0, 1.0, // token 2
-                    0.0, 0.0, // token 3
-                ],
-            )?,
-            output_norm: vec![1.0, 1.0],
-            output: ScalarLlamaOutputWeights::untied(Matrix::from_row_major(
-                4,
-                2,
-                vec![
-                    0.0, 0.0, // token 0
-                    1.0, 0.0, // token 1
-                    0.0, 1.0, // token 2
-                    -1.0, -1.0, // token 3
-                ],
-            )?),
-            layers: vec![ScalarLlamaLayerWeights {
-                attn_norm: vec![1.0, 1.0],
-                q_proj: identity.clone(),
-                q_bias: None,
-                k_proj: identity.clone(),
-                k_bias: None,
-                v_proj: identity.clone(),
-                v_bias: None,
-                o_proj: identity.clone(),
-                ffn_norm: vec![1.0, 1.0],
-                ffn_gate: Matrix::from_row_major(2, 2, vec![0.0; 4])?,
-                ffn_up: identity.clone(),
-                ffn_down: identity,
-            }],
-        },
-    )?;
+    let model = causal_attention_model()?;
 
     let mut logits_session = model.start_session();
     let mut token_id_session = model.start_session();
@@ -472,59 +153,7 @@ fn scalar_session_generates_token_ids_without_returning_logits() -> Result<(), B
 
 #[test]
 fn scalar_model_reports_weight_and_session_kv_cache_bytes() -> Result<(), Box<dyn Error>> {
-    let identity = Matrix::from_row_major(2, 2, vec![1.0, 0.0, 0.0, 1.0])?;
-    let config = ScalarLlamaConfig {
-        vocab_size: 4,
-        hidden_size: 2,
-        intermediate_size: 2,
-        attention_head_count: 1,
-        attention_head_count_kv: 1,
-        head_dim: 2,
-        rope_dimension_count: 0,
-        rope_freq_base: 10_000.0,
-        rope_layout: RopeLayout::AdjacentPairs,
-        rms_norm_epsilon: 0.0,
-    };
-    let model = ScalarLlamaModel::new(
-        config,
-        ScalarLlamaWeights {
-            token_embedding: Matrix::from_row_major(
-                4,
-                2,
-                vec![
-                    1.0, 0.0, // token 0
-                    0.0, 1.0, // token 1
-                    1.0, 1.0, // token 2
-                    0.0, 0.0, // token 3
-                ],
-            )?,
-            output_norm: vec![1.0, 1.0],
-            output: ScalarLlamaOutputWeights::untied(Matrix::from_row_major(
-                4,
-                2,
-                vec![
-                    0.0, 0.0, // token 0
-                    1.0, 0.0, // token 1
-                    0.0, 1.0, // token 2
-                    -1.0, -1.0, // token 3
-                ],
-            )?),
-            layers: vec![ScalarLlamaLayerWeights {
-                attn_norm: vec![1.0, 1.0],
-                q_proj: identity.clone(),
-                q_bias: None,
-                k_proj: identity.clone(),
-                k_bias: None,
-                v_proj: identity.clone(),
-                v_bias: None,
-                o_proj: identity.clone(),
-                ffn_norm: vec![1.0, 1.0],
-                ffn_gate: Matrix::from_row_major(2, 2, vec![0.0; 4])?,
-                ffn_up: identity.clone(),
-                ffn_down: identity,
-            }],
-        },
-    )?;
+    let model = causal_attention_model()?;
 
     assert_eq!(model.scalar_weight_bytes(), 200);
 
