@@ -52,6 +52,11 @@ async fn completions_endpoint_accepts_empty_logit_bias() -> Result<(), Box<dyn s
 }
 
 #[tokio::test]
+async fn completions_endpoint_accepts_null_logprobs() -> Result<(), Box<dyn std::error::Error>> {
+    assert_completion_option_is_accepted(r#""logprobs":null"#).await
+}
+
+#[tokio::test]
 async fn completions_endpoint_accepts_user_identifier() -> Result<(), Box<dyn std::error::Error>> {
     assert_completion_option_is_accepted(r#""user":"local-user-1""#).await
 }
