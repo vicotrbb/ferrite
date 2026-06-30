@@ -46,6 +46,9 @@ pub(super) fn causal_attention(
         for (position, value) in values_by_position.iter().enumerate() {
             ensure_len("cached value", value, expected_kv)?;
             let value_slice = &value[kv_start..kv_start + config.head_dim];
+            if value_slice.iter().any(|value| !value.is_finite()) {
+                return Err(InferenceError::new("cached value must be finite"));
+            }
             for dimension in 0..config.head_dim {
                 output[query_start + dimension] += weights[position] * value_slice[dimension];
             }
@@ -97,6 +100,26 @@ mod tests {
                     "heads_per_kv={heads_per_kv}, query_head={query_head}"
                 );
             }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn attention_rejects_non_finite_cached_values() -> Result<(), InferenceError> {
+        let config = config_for_ratio(1);
+        let query = vec![1.0; config.hidden_size];
+        let keys = vec![vec![0.0; config.attention_head_count_kv * config.head_dim]];
+
+        for value in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            let mut values = vec![0.0; config.attention_head_count_kv * config.head_dim];
+            values[0] = value;
+
+            let error = match causal_attention(&config, &query, &keys, &[values]) {
+                Ok(_) => return Err(InferenceError::new("non-finite cached value should fail")),
+                Err(error) => error,
+            };
+
+            assert!(error.to_string().contains("cached value must be finite"));
         }
         Ok(())
     }
