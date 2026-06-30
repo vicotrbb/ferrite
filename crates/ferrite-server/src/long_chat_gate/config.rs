@@ -7,6 +7,7 @@ pub struct LongChatGateConfig {
     api_key: String,
     execute: bool,
     error_probe: bool,
+    disconnect_probe: bool,
     models: Vec<String>,
     prompt: String,
     assistant_context: String,
@@ -42,6 +43,9 @@ impl LongChatGateConfig {
                 }
                 "--error-probe" => {
                     config.error_probe = true;
+                }
+                "--disconnect-probe" => {
+                    config.disconnect_probe = true;
                 }
                 "--models" => {
                     config.models =
@@ -117,6 +121,10 @@ impl LongChatGateConfig {
         self.error_probe
     }
 
+    pub fn disconnect_probe(&self) -> bool {
+        self.disconnect_probe
+    }
+
     pub fn token_lengths(&self) -> &[usize] {
         &self.token_lengths
     }
@@ -177,6 +185,7 @@ impl Default for LongChatGateConfig {
             api_key: "local-secret".to_owned(),
             execute: false,
             error_probe: false,
+            disconnect_probe: false,
             models: vec![
                 "Qwen2.5-0.5B-Instruct-Q4_K_M".to_owned(),
                 "Qwen2.5-1.5B-Instruct-Q8_0".to_owned(),
@@ -297,5 +306,5 @@ fn os_string_to_string(value: OsString) -> Result<String, LongChatGateError> {
 }
 
 fn usage() -> &'static str {
-    "usage: ferrite-openai-long-chat-gate [--execute] [--error-probe] [--addr 127.0.0.1:8080] [--api-key local-secret] [--models MODEL[,MODEL...]] [--prompt TEXT] [--assistant-context TEXT] [--follow-up TEXT] [--stop TEXT] [--expect-finish-reason REASON] [--rss-pid PID] [--token-lengths 256,512,1024] [--turns 4]"
+    "usage: ferrite-openai-long-chat-gate [--execute] [--error-probe] [--disconnect-probe] [--addr 127.0.0.1:8080] [--api-key local-secret] [--models MODEL[,MODEL...]] [--prompt TEXT] [--assistant-context TEXT] [--follow-up TEXT] [--stop TEXT] [--expect-finish-reason REASON] [--rss-pid PID] [--token-lengths 256,512,1024] [--turns 4]"
 }

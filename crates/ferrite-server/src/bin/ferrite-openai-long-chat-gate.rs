@@ -1,5 +1,6 @@
 use ferrite_server::long_chat_gate::{
-    format_error_probe_result, format_report, format_scenario_result, LongChatGateConfig,
+    format_disconnect_probe_result, format_error_probe_result, format_report,
+    format_scenario_result, LongChatGateConfig,
 };
 
 #[tokio::main]
@@ -17,6 +18,12 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         println!(
             "{}",
             format_error_probe_result(&config.run_error_probe().await?)
+        );
+    }
+    if config.disconnect_probe() {
+        println!(
+            "{}",
+            format_disconnect_probe_result(&config.run_disconnect_probe().await?)
         );
     }
     if config.execute() {

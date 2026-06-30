@@ -1,6 +1,7 @@
 use ferrite_server::long_chat_gate::{
-    format_error_probe_result, format_plan, format_report, format_scenario_result,
-    format_scenarios, LongChatErrorProbeResult, LongChatGateConfig, LongChatScenarioResult,
+    format_disconnect_probe_result, format_error_probe_result, format_plan, format_report,
+    format_scenario_result, format_scenarios, LongChatDisconnectProbeResult,
+    LongChatErrorProbeResult, LongChatGateConfig, LongChatScenarioResult,
 };
 use ferrite_server::throughput_client::{
     OpenAiEndpoint, RssSummary, StreamingFinishSummary, StreamingTimingSummary,
@@ -18,6 +19,7 @@ fn defaults_to_required_long_chat_token_lengths_and_turns() -> Result<(), Box<dy
     assert_eq!(config.turns(), 4);
     assert!(!config.execute());
     assert!(!config.error_probe());
+    assert!(!config.disconnect_probe());
     assert_eq!(
         config.models(),
         &[
@@ -58,6 +60,7 @@ fn parses_custom_long_chat_token_lengths_turns_and_models() -> Result<(), Box<dy
         OsString::from("--rss-pid"),
         OsString::from("4242"),
         OsString::from("--error-probe"),
+        OsString::from("--disconnect-probe"),
         OsString::from("--expect-finish-reason"),
         OsString::from("stop"),
     ])?;
@@ -75,6 +78,7 @@ fn parses_custom_long_chat_token_lengths_turns_and_models() -> Result<(), Box<dy
     assert_eq!(config.stop(), Some("<STOP>"));
     assert_eq!(config.rss_pid(), Some(4242));
     assert!(config.error_probe());
+    assert!(config.disconnect_probe());
     assert_eq!(config.expected_finish_reason(), Some("stop"));
     Ok(())
 }
@@ -361,6 +365,16 @@ fn formats_long_chat_error_probe_result() {
     assert_eq!(
         format_error_probe_result(&result),
         "long_chat_error_probe_unauthorized_status=401\nlong_chat_error_probe_reconnect_completed=true"
+    );
+}
+
+#[test]
+fn formats_long_chat_disconnect_probe_result() {
+    let result = LongChatDisconnectProbeResult::new(true, true);
+
+    assert_eq!(
+        format_disconnect_probe_result(&result),
+        "long_chat_disconnect_probe_aborted_after_generated_event=true\nlong_chat_disconnect_probe_reconnect_completed=true"
     );
 }
 
