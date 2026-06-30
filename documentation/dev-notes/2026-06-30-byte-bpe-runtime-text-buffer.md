@@ -82,11 +82,16 @@ cargo test --release -p ferrite-server --test openai_real_tier1_qwen_1_5b_http \
   live_http_server_chats_32_tokens_with_qwen_1_5b_q8_model -- --ignored --test-threads=1
 test live_http_server_chats_32_tokens_with_qwen_1_5b_q8_model ... ok
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 6.91s
+
+cargo test --release -p ferrite-server --test openai_real_tier1_qwen_1_5b_q8_long_stream \
+  live_http_server_streams_32_token_chat_with_qwen_1_5b_q8_model -- --ignored --test-threads=1
+test live_http_server_streams_32_token_chat_with_qwen_1_5b_q8_model ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.77s
 ```
 
 ## Remaining Limits
 
 This proves the specific incomplete UTF-8 token decode failure is fixed for the
-tested Qwen2.5-1.5B Q8_0 chat shape. It does not prove SSE streaming text
-framing, concurrent request behavior, long-running leak freedom, or complete
-Tier 1 memory posture.
+tested Qwen2.5-1.5B Q8_0 non-streaming and SSE chat shapes. It does not prove
+all streaming endpoints, concurrent request behavior, long-running leak
+freedom, or complete Tier 1 memory posture.
