@@ -191,3 +191,22 @@ fn bpe_decodes_gpt2_byte_alphabet_tokens() -> Result<(), Box<dyn Error>> {
     assert_eq!(tokenizer.decode(&[9, 8, 19, 18])?, " hello\ncafé");
     Ok(())
 }
+
+#[test]
+fn bpe_reports_incomplete_utf8_for_partial_byte_token() -> Result<(), Box<dyn Error>> {
+    let bytes = byte_bpe_tokenizer_fixture();
+    let file = parse_gguf(&bytes)?;
+    let tokenizer = GgufTokenizer::from_gguf(&file)?;
+
+    let error = match tokenizer.decode(&[13]) {
+        Ok(_) => return Err(io::Error::other("partial UTF-8 token should not decode").into()),
+        Err(error) => error,
+    };
+    assert!(error.is_incomplete_utf8());
+    assert_eq!(tokenizer.decode_if_complete(&[13])?, None);
+    assert_eq!(
+        tokenizer.decode_if_complete(&[13, 14])?,
+        Some("é".to_owned())
+    );
+    Ok(())
+}

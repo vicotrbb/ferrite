@@ -11,8 +11,14 @@ pub(super) fn decode(ids: &[usize], tokens: &[String]) -> Result<String, Tokeniz
             bytes.push(unicode_to_byte(value)?);
         }
     }
-    String::from_utf8(bytes)
-        .map_err(|error| TokenizerError::new(format!("BPE decoded invalid UTF-8: {error}")))
+    String::from_utf8(bytes).map_err(|error| {
+        let message = format!("BPE decoded invalid UTF-8: {error}");
+        if error.utf8_error().error_len().is_none() {
+            TokenizerError::incomplete_utf8(message)
+        } else {
+            TokenizerError::new(message)
+        }
+    })
 }
 
 pub(super) fn encode(

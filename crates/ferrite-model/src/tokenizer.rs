@@ -82,6 +82,14 @@ impl GgufTokenizer {
         Ok(output)
     }
 
+    pub fn decode_if_complete(&self, ids: &[usize]) -> Result<Option<String>, TokenizerError> {
+        match self.decode(ids) {
+            Ok(text) => Ok(Some(text)),
+            Err(error) if error.is_incomplete_utf8() => Ok(None),
+            Err(error) => Err(error),
+        }
+    }
+
     pub fn encode_atomic(&self, input: &str) -> Result<Vec<usize>, TokenizerError> {
         let mut output = Vec::new();
         let mut cursor = 0usize;
@@ -159,13 +167,32 @@ impl TokenType {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TokenizerError {
     message: String,
+    kind: TokenizerErrorKind,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum TokenizerErrorKind {
+    Other,
+    IncompleteUtf8,
 }
 
 impl TokenizerError {
     pub(crate) fn new(message: impl Into<String>) -> Self {
         Self {
             message: message.into(),
+            kind: TokenizerErrorKind::Other,
         }
+    }
+
+    pub(crate) fn incomplete_utf8(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+            kind: TokenizerErrorKind::IncompleteUtf8,
+        }
+    }
+
+    pub fn is_incomplete_utf8(&self) -> bool {
+        self.kind == TokenizerErrorKind::IncompleteUtf8
     }
 }
 

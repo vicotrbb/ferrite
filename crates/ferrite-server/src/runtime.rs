@@ -58,13 +58,20 @@ impl InferenceEngine {
         let mut token_id = next.token_id;
         let mut generated_token_ids = Vec::with_capacity(max_tokens);
         let mut token_texts = Vec::with_capacity(max_tokens);
+        let mut token_text_buffer = TokenTextBuffer::new();
         let mut finish_reason = GenerationFinishReason::Length;
 
         for _ in 0..max_tokens {
             generated_token_ids.push(token_id);
-            let token_text = self.decode_token(token_id)?;
-            let control = on_token(&token_text)?;
-            token_texts.push(token_text);
+            let control = token_text_buffer.emit_ready_text(
+                &generated_token_ids,
+                |ids| self.decode_token_text(ids),
+                |token_text| {
+                    let control = on_token(token_text)?;
+                    token_texts.push(token_text.to_owned());
+                    Ok(control)
+                },
+            )?;
             if control == GenerationControl::Stop {
                 finish_reason = GenerationFinishReason::Stop;
                 break;
@@ -91,10 +98,40 @@ impl InferenceEngine {
         ))
     }
 
-    fn decode_token(&self, token_id: usize) -> Result<String, RuntimeError> {
+    fn decode_token_text(&self, token_ids: &[usize]) -> Result<Option<String>, RuntimeError> {
         self.tokenizer
-            .decode(&[token_id])
-            .map_err(|error| RuntimeError::new(format!("failed to decode token: {error}")))
+            .decode_if_complete(token_ids)
+            .map_err(|error| RuntimeError::new(format!("failed to decode token text: {error}")))
+    }
+}
+
+#[derive(Debug, Default)]
+struct TokenTextBuffer {
+    emitted_token_count: usize,
+}
+
+impl TokenTextBuffer {
+    fn new() -> Self {
+        Self::default()
+    }
+
+    fn emit_ready_text(
+        &mut self,
+        generated_token_ids: &[usize],
+        decode: impl FnOnce(&[usize]) -> Result<Option<String>, RuntimeError>,
+        mut on_text: impl FnMut(&str) -> Result<GenerationControl, RuntimeError>,
+    ) -> Result<GenerationControl, RuntimeError> {
+        if self.emitted_token_count >= generated_token_ids.len() {
+            return Ok(GenerationControl::Continue);
+        }
+
+        let pending_token_ids = &generated_token_ids[self.emitted_token_count..];
+        let Some(text) = decode(pending_token_ids)? else {
+            return Ok(GenerationControl::Continue);
+        };
+
+        self.emitted_token_count = generated_token_ids.len();
+        on_text(&text)
     }
 }
 
@@ -205,6 +242,44 @@ mod tests {
         assert_eq!(generated.text(), "winner");
         assert_eq!(generated.token_texts(), pieces);
         Ok(())
+    }
+
+    #[test]
+    fn token_text_buffer_waits_for_decodable_utf8_sequence(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut buffer = TokenTextBuffer::new();
+        let mut generated_token_ids = vec![13];
+        let mut pieces = Vec::new();
+
+        let control =
+            buffer.emit_ready_text(&generated_token_ids, decode_partial_bpe, |piece| {
+                pieces.push(piece.to_owned());
+                Ok(GenerationControl::Continue)
+            })?;
+
+        assert_eq!(control, GenerationControl::Continue);
+        assert!(pieces.is_empty());
+
+        generated_token_ids.push(14);
+        let control =
+            buffer.emit_ready_text(&generated_token_ids, decode_partial_bpe, |piece| {
+                pieces.push(piece.to_owned());
+                Ok(GenerationControl::Continue)
+            })?;
+
+        assert_eq!(control, GenerationControl::Continue);
+        assert_eq!(pieces, ["é"]);
+        Ok(())
+    }
+
+    fn decode_partial_bpe(ids: &[usize]) -> Result<Option<String>, RuntimeError> {
+        match ids {
+            [13] => Ok(None),
+            [13, 14] => Ok(Some("é".to_owned())),
+            other => Err(RuntimeError::new(format!(
+                "unexpected token ids: {other:?}"
+            ))),
+        }
     }
 
     fn write_fixture_model() -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
