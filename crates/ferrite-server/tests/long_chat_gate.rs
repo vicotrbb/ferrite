@@ -1,4 +1,4 @@
-use ferrite_server::long_chat_gate::LongChatGateConfig;
+use ferrite_server::long_chat_gate::{format_plan, LongChatGateConfig};
 use std::ffi::OsString;
 
 #[test]
@@ -56,5 +56,22 @@ fn rejects_empty_long_chat_token_lengths() -> Result<(), Box<dyn std::error::Err
     };
 
     assert!(error.to_string().contains("--token-lengths"), "{error}");
+    Ok(())
+}
+
+#[test]
+fn formats_long_chat_gate_plan_summary() -> Result<(), Box<dyn std::error::Error>> {
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--token-lengths"),
+        OsString::from("256,512,1024"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+    ])?;
+
+    assert_eq!(
+        format_plan(&config),
+        "long_chat_token_lengths=256,512,1024\nlong_chat_turns=4\nlong_chat_planned_scenarios=12"
+    );
     Ok(())
 }

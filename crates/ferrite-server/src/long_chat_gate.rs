@@ -44,6 +44,10 @@ impl LongChatGateConfig {
     pub fn turns(&self) -> usize {
         self.turns
     }
+
+    pub fn planned_scenarios(&self) -> usize {
+        self.token_lengths.len() * self.turns
+    }
 }
 
 impl Default for LongChatGateConfig {
@@ -134,4 +138,18 @@ fn os_string_to_string(value: OsString) -> Result<String, LongChatGateError> {
 
 fn usage() -> &'static str {
     "usage: ferrite-openai-long-chat-gate [--token-lengths 256,512,1024] [--turns 4]"
+}
+
+pub fn format_plan(config: &LongChatGateConfig) -> String {
+    let token_lengths = config
+        .token_lengths()
+        .iter()
+        .map(usize::to_string)
+        .collect::<Vec<_>>()
+        .join(",");
+    format!(
+        "long_chat_token_lengths={token_lengths}\nlong_chat_turns={}\nlong_chat_planned_scenarios={}",
+        config.turns(),
+        config.planned_scenarios()
+    )
 }
