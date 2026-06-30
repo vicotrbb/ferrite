@@ -19,6 +19,7 @@ fn parses_minimal_completion_benchmark_config() -> Result<(), Box<dyn std::error
     assert_eq!(config.concurrency(), 1);
     assert_eq!(config.max_tokens(), 1);
     assert_eq!(config.api_key(), "local-secret");
+    assert_eq!(config.rss_pid(), None);
     assert!(!config.stream());
     Ok(())
 }
@@ -90,6 +91,7 @@ fn formats_chat_completion_result_metric_name() -> Result<(), Box<dyn std::error
         elapsed: std::time::Duration::from_millis(400),
         streaming_timing: None,
         streaming_usage: None,
+        rss: None,
     };
 
     assert_eq!(
@@ -121,6 +123,34 @@ fn parses_stream_usage_benchmark_config() -> Result<(), Box<dyn std::error::Erro
     assert!(config.stream());
     assert!(config.stream_usage());
     Ok(())
+}
+
+#[test]
+fn parses_rss_sampling_benchmark_config() -> Result<(), Box<dyn std::error::Error>> {
+    let config = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--rss-pid"),
+        OsString::from("1234"),
+        OsString::from("--rss-idle-ms"),
+        OsString::from("1500"),
+    ])?;
+
+    assert_eq!(config.rss_pid(), Some(1234));
+    assert_eq!(config.rss_idle_delay(), Duration::from_millis(1500));
+    Ok(())
+}
+
+#[test]
+fn rejects_zero_rss_idle_delay() {
+    let result = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--rss-pid"),
+        OsString::from("1234"),
+        OsString::from("--rss-idle-ms"),
+        OsString::from("0"),
+    ]);
+
+    assert!(result.is_err());
 }
 
 #[test]
@@ -247,6 +277,7 @@ fn formats_streaming_chat_completion_result_metric_name() -> Result<(), Box<dyn 
         elapsed: std::time::Duration::from_millis(400),
         streaming_timing: None,
         streaming_usage: None,
+        rss: None,
     };
 
     assert_eq!(
@@ -273,6 +304,7 @@ fn formats_streaming_timing_summary() -> Result<(), Box<dyn std::error::Error>> 
             Duration::from_millis(170),
         ]),
         streaming_usage: None,
+        rss: None,
     };
 
     assert_eq!(
@@ -296,12 +328,41 @@ fn formats_streaming_usage_summary() -> Result<(), Box<dyn std::error::Error>> {
         elapsed: Duration::from_millis(400),
         streaming_timing: None,
         streaming_usage: Some(StreamingUsageSummary::new(8, 32, 40)),
+        rss: None,
     };
 
     assert_eq!(
         format_result(&config, result),
         "openai_http_streaming_chat_completion_requests=1\nelapsed_ms=400\nrequests_per_second=2.500000\nstreaming_usage_prompt_tokens=8\nstreaming_usage_completion_tokens=32\nstreaming_usage_total_tokens=40"
     );
+    Ok(())
+}
+
+#[test]
+fn formats_rss_sampling_summary() -> Result<(), Box<dyn std::error::Error>> {
+    let config = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--rss-pid"),
+        OsString::from("1234"),
+    ])?;
+    let result = ThroughputResult {
+        completed_requests: 1,
+        elapsed: Duration::from_millis(400),
+        streaming_timing: None,
+        streaming_usage: None,
+        rss: Some(RssSummary::new(1000, 2000, 1500)),
+    };
+
+    assert_eq!(
+        format_result(&config, result),
+        "openai_http_completion_requests=1\nelapsed_ms=400\nrequests_per_second=2.500000\nserver_rss_before_bytes=1000\nserver_rss_after_bytes=2000\nserver_rss_idle_bytes=1500"
+    );
+    Ok(())
+}
+
+#[test]
+fn parses_ps_rss_kib_output_as_bytes() -> Result<(), Box<dyn std::error::Error>> {
+    assert_eq!(RssSummary::parse_ps_rss_bytes("  2048\n")?, 2_097_152);
     Ok(())
 }
 

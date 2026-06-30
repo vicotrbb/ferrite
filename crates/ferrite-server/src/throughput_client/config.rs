@@ -1,4 +1,4 @@
-use std::{error::Error, ffi::OsString, fmt, net::SocketAddr};
+use std::{error::Error, ffi::OsString, fmt, net::SocketAddr, time::Duration};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ThroughputClientConfig {
@@ -11,6 +11,8 @@ pub struct ThroughputClientConfig {
     max_tokens: usize,
     stream: bool,
     stream_usage: bool,
+    rss_pid: Option<u32>,
+    rss_idle_delay: Duration,
     api_key: String,
 }
 
@@ -90,6 +92,19 @@ impl ThroughputClientConfig {
                 "--stream-usage" => {
                     config.stream_usage = true;
                 }
+                "--rss-pid" => {
+                    config.rss_pid = Some(parse_positive_u32(
+                        next_value(&mut iter, "--rss-pid")?,
+                        "--rss-pid",
+                    )?);
+                }
+                "--rss-idle-ms" => {
+                    let milliseconds = parse_positive_u64(
+                        next_value(&mut iter, "--rss-idle-ms")?,
+                        "--rss-idle-ms",
+                    )?;
+                    config.rss_idle_delay = Duration::from_millis(milliseconds);
+                }
                 "--api-key" => {
                     config.api_key = os_string_to_string(next_value(&mut iter, "--api-key")?)?;
                     if config.api_key.trim().is_empty() {
@@ -149,6 +164,14 @@ impl ThroughputClientConfig {
         self.stream_usage
     }
 
+    pub fn rss_pid(&self) -> Option<u32> {
+        self.rss_pid
+    }
+
+    pub fn rss_idle_delay(&self) -> Duration {
+        self.rss_idle_delay
+    }
+
     pub fn api_key(&self) -> &str {
         &self.api_key
     }
@@ -166,6 +189,8 @@ impl Default for ThroughputClientConfig {
             max_tokens: 1,
             stream: false,
             stream_usage: false,
+            rss_pid: None,
+            rss_idle_delay: Duration::from_secs(2),
             api_key: "local-secret".to_owned(),
         }
     }
@@ -218,6 +243,30 @@ fn parse_positive_usize(value: OsString, flag: &str) -> Result<usize, ClientConf
     Ok(parsed)
 }
 
+fn parse_positive_u32(value: OsString, flag: &str) -> Result<u32, ClientConfigError> {
+    let parsed: u32 = os_string_to_string(value)?
+        .parse()
+        .map_err(|error| ClientConfigError::new(format!("invalid {flag}: {error}")))?;
+    if parsed == 0 {
+        return Err(ClientConfigError::new(format!(
+            "{flag} must be greater than 0"
+        )));
+    }
+    Ok(parsed)
+}
+
+fn parse_positive_u64(value: OsString, flag: &str) -> Result<u64, ClientConfigError> {
+    let parsed: u64 = os_string_to_string(value)?
+        .parse()
+        .map_err(|error| ClientConfigError::new(format!("invalid {flag}: {error}")))?;
+    if parsed == 0 {
+        return Err(ClientConfigError::new(format!(
+            "{flag} must be greater than 0"
+        )));
+    }
+    Ok(parsed)
+}
+
 fn parse_endpoint(value: OsString) -> Result<OpenAiEndpoint, ClientConfigError> {
     match os_string_to_string(value)?.as_str() {
         "completions" => Ok(OpenAiEndpoint::Completions),
@@ -229,5 +278,5 @@ fn parse_endpoint(value: OsString) -> Result<OpenAiEndpoint, ClientConfigError> 
 }
 
 fn usage() -> &'static str {
-    "usage: ferrite-openai-throughput [--addr 127.0.0.1:8080] [--endpoint completions|chat-completions] [--model ferrite-local] [--prompt 'hello world'] [--requests 3] [--concurrency 1] [--max-tokens 1] [--stream] [--stream-usage] [--api-key local-secret]"
+    "usage: ferrite-openai-throughput [--addr 127.0.0.1:8080] [--endpoint completions|chat-completions] [--model ferrite-local] [--prompt 'hello world'] [--requests 3] [--concurrency 1] [--max-tokens 1] [--stream] [--stream-usage] [--rss-pid PID] [--rss-idle-ms 2000] [--api-key local-secret]"
 }

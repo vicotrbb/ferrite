@@ -1,5 +1,6 @@
 mod config;
 mod http;
+mod rss;
 mod streaming_metrics;
 mod streaming_usage;
 
@@ -7,6 +8,7 @@ mod streaming_usage;
 mod tests;
 
 pub use config::{OpenAiEndpoint, ThroughputClientConfig};
+pub use rss::RssSummary;
 pub use streaming_metrics::StreamingTimingSummary;
 pub use streaming_usage::StreamingUsageSummary;
 
@@ -21,6 +23,7 @@ pub struct ThroughputResult {
     pub elapsed: Duration,
     pub streaming_timing: Option<StreamingTimingSummary>,
     pub streaming_usage: Option<StreamingUsageSummary>,
+    pub rss: Option<RssSummary>,
 }
 
 impl ThroughputResult {
@@ -36,6 +39,40 @@ pub async fn run_completion_benchmark(
     let endpoint = config.endpoint();
     let stream = config.stream();
     let started = Instant::now();
+    let (run, rss) = if let Some(pid) = config.rss_pid() {
+        let (run, rss) = RssSummary::sample_around(pid, config.rss_idle_delay(), async {
+            run_requests(config, &request_body, endpoint, stream).await
+        })
+        .await?;
+        (run, Some(rss))
+    } else {
+        (
+            run_requests(config, &request_body, endpoint, stream).await?,
+            None,
+        )
+    };
+
+    Ok(ThroughputResult {
+        completed_requests: run.completed_requests,
+        elapsed: started.elapsed(),
+        streaming_timing: run.streaming_timing,
+        streaming_usage: run.streaming_usage,
+        rss,
+    })
+}
+
+struct RequestRun {
+    completed_requests: usize,
+    streaming_timing: Option<StreamingTimingSummary>,
+    streaming_usage: Option<StreamingUsageSummary>,
+}
+
+async fn run_requests(
+    config: &ThroughputClientConfig,
+    request_body: &str,
+    endpoint: OpenAiEndpoint,
+    stream: bool,
+) -> Result<RequestRun, Box<dyn Error>> {
     let mut completed_requests = 0;
     let mut streaming_timing = None;
     let mut streaming_usage = None;
@@ -46,7 +83,7 @@ pub async fn run_completion_benchmark(
             .min(config.requests().saturating_sub(completed_requests));
         let mut tasks = Vec::with_capacity(batch_size);
         for _ in 0..batch_size {
-            let request_body = request_body.clone();
+            let request_body = request_body.to_owned();
             let api_key = config.api_key().to_owned();
             let addr = config.addr();
             tasks.push(tokio::spawn(async move {
@@ -77,9 +114,8 @@ pub async fn run_completion_benchmark(
         }
     }
 
-    Ok(ThroughputResult {
+    Ok(RequestRun {
         completed_requests,
-        elapsed: started.elapsed(),
         streaming_timing,
         streaming_usage,
     })
@@ -112,6 +148,14 @@ pub fn format_result(config: &ThroughputClientConfig, result: ThroughputResult) 
             usage.prompt_tokens(),
             usage.completion_tokens(),
             usage.total_tokens(),
+        ));
+    }
+    if let Some(rss) = result.rss {
+        output.push_str(&format!(
+            "\nserver_rss_before_bytes={}\nserver_rss_after_bytes={}\nserver_rss_idle_bytes={}",
+            rss.before_bytes(),
+            rss.after_bytes(),
+            rss.idle_bytes(),
         ));
     }
     output
