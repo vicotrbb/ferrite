@@ -3,6 +3,7 @@ use serde_json::Value;
 pub(super) fn is_neutral_response_format(value: &Option<Value>) -> bool {
     match value {
         None => true,
+        Some(Value::Null) => true,
         Some(Value::Object(fields)) => fields
             .get("type")
             .and_then(Value::as_str)
@@ -24,6 +25,11 @@ mod tests {
     #[test]
     fn text_response_format_is_neutral() {
         assert!(is_neutral_response_format(&Some(json!({"type": "text"}))));
+    }
+
+    #[test]
+    fn null_response_format_is_neutral() {
+        assert!(is_neutral_response_format(&Some(Value::Null)));
     }
 
     #[test]

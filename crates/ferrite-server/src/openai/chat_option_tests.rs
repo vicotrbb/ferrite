@@ -44,6 +44,11 @@ async fn chat_endpoint_accepts_text_response_format() -> Result<(), Box<dyn std:
 }
 
 #[tokio::test]
+async fn chat_endpoint_accepts_null_response_format() -> Result<(), Box<dyn std::error::Error>> {
+    assert_chat_option_is_accepted(r#""response_format":null"#).await
+}
+
+#[tokio::test]
 async fn chat_endpoint_accepts_text_only_modalities() -> Result<(), Box<dyn std::error::Error>> {
     assert_chat_option_is_accepted(r#""modalities":["text"]"#).await
 }
