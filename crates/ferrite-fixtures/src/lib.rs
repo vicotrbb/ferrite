@@ -1,6 +1,7 @@
 mod chat_llama;
 mod gguf_writer;
 mod scalar_llama;
+mod scalar_llama_tensors;
 
 pub use chat_llama::scalar_llama_chat_f32_gguf_fixture;
 pub use scalar_llama::{
