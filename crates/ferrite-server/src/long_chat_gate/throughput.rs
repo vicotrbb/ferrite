@@ -1,7 +1,16 @@
 use super::{LongChatGateConfig, LongChatScenario};
-use std::ffi::OsString;
+use crate::throughput_client::ThroughputClientConfig;
+use std::{error::Error, ffi::OsString};
 
 impl LongChatGateConfig {
+    pub fn throughput_configs(&self) -> Result<Vec<ThroughputClientConfig>, Box<dyn Error>> {
+        self.scenarios()
+            .iter()
+            .map(|scenario| ThroughputClientConfig::parse(self.throughput_args(scenario)))
+            .map(|result| result.map_err(|error| Box::new(error) as Box<dyn Error>))
+            .collect()
+    }
+
     pub fn throughput_args(&self, scenario: &LongChatScenario<'_>) -> Vec<OsString> {
         [
             "ferrite-openai-throughput",

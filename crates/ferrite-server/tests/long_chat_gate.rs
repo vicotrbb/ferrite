@@ -242,6 +242,39 @@ fn builds_streaming_chat_throughput_args_for_scenario() -> Result<(), Box<dyn st
 }
 
 #[test]
+fn builds_typed_throughput_configs_for_all_scenarios() -> Result<(), Box<dyn std::error::Error>> {
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--models"),
+        OsString::from("model-a,model-b"),
+        OsString::from("--token-lengths"),
+        OsString::from("256,512"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+    ])?;
+
+    let throughput_configs = config.throughput_configs()?;
+
+    assert_eq!(throughput_configs.len(), 16);
+    assert_eq!(throughput_configs[0].model(), "model-a");
+    assert_eq!(throughput_configs[0].max_tokens(), 256);
+    assert_eq!(throughput_configs[7].model(), "model-a");
+    assert_eq!(throughput_configs[7].max_tokens(), 512);
+    assert_eq!(throughput_configs[8].model(), "model-b");
+    assert_eq!(throughput_configs[8].max_tokens(), 256);
+    assert_eq!(throughput_configs[15].model(), "model-b");
+    assert_eq!(throughput_configs[15].max_tokens(), 512);
+    assert!(throughput_configs
+        .iter()
+        .all(|config| config.endpoint() == OpenAiEndpoint::ChatCompletions));
+    assert!(throughput_configs.iter().all(|config| config.stream()));
+    assert!(throughput_configs
+        .iter()
+        .all(|config| config.stream_usage()));
+    Ok(())
+}
+
+#[test]
 fn rejects_empty_long_chat_prompt() -> Result<(), Box<dyn std::error::Error>> {
     let result = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),
