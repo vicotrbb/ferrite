@@ -412,3 +412,18 @@ fn rejects_tensors_with_zero_dimensions() -> Result<(), Box<dyn Error>> {
         .contains("tensor token_embd.weight has zero dimension"));
     Ok(())
 }
+
+#[test]
+fn rejects_tensors_with_too_many_dimensions() -> Result<(), Box<dyn Error>> {
+    let bytes = gguf_with_single_tensor_shape(&[1, 1, 1, 1, 1]);
+
+    let error = match parse_gguf(&bytes) {
+        Ok(_) => return Err(io::Error::other("over-rank tensor shape should be rejected").into()),
+        Err(error) => error,
+    };
+
+    assert!(error
+        .to_string()
+        .contains("tensor token_embd.weight has 5 dimensions; maximum supported is 4"));
+    Ok(())
+}

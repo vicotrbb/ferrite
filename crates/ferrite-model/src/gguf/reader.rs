@@ -1,5 +1,7 @@
 use super::{usize_from_u64, GgmlType, GgufError, MetadataValue, MetadataValueType};
 
+const MAX_TENSOR_DIMENSIONS: usize = 4;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct RawTensorInfo {
     pub(super) name: String,
@@ -164,6 +166,11 @@ impl<'a> Reader<'a> {
         if dimension_count == 0 {
             return Err(GgufError::new(format!(
                 "tensor {name} must have at least one dimension"
+            )));
+        }
+        if dimension_count > MAX_TENSOR_DIMENSIONS {
+            return Err(GgufError::new(format!(
+                "tensor {name} has {dimension_count} dimensions; maximum supported is {MAX_TENSOR_DIMENSIONS}"
             )));
         }
 
