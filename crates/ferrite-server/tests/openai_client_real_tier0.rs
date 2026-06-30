@@ -1,30 +1,19 @@
 mod support;
 
 use async_openai::types::chat::Prompt;
-use async_openai::{
-    config::OpenAIConfig,
-    types::{
-        chat::{
-            ChatCompletionRequestMessage, ChatCompletionRequestUserMessage,
-            ChatCompletionStreamOptions, CreateChatCompletionRequest,
-        },
-        completions::CreateCompletionRequest,
+use async_openai::types::{
+    chat::{
+        ChatCompletionRequestMessage, ChatCompletionRequestUserMessage,
+        ChatCompletionStreamOptions, CreateChatCompletionRequest,
     },
-    Client,
+    completions::CreateCompletionRequest,
 };
 use std::path::PathBuf;
+use support::openai_client::ferrite_client;
 use tokio_stream::StreamExt;
 
 const DEFAULT_MODEL_PATH: &str = "target/models/SmolLM2-135M-Instruct-Q4_K_M.gguf";
 const REAL_MODEL_ID: &str = "smollm2-135m";
-
-fn ferrite_client(server: &support::LiveServer) -> Client<OpenAIConfig> {
-    Client::with_config(
-        OpenAIConfig::new()
-            .with_api_base(format!("http://{}/v1", server.addr()))
-            .with_api_key("local-test"),
-    )
-}
 
 #[tokio::test]
 #[ignore = "requires local Tier 0 GGUF model artifact"]
@@ -32,7 +21,7 @@ async fn async_openai_client_generates_with_real_tier0_model(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let server =
         support::LiveServer::start_with_existing_model(REAL_MODEL_ID, real_model_path()?).await?;
-    let client = ferrite_client(&server);
+    let client = ferrite_client(&server, "local-test");
 
     let response = client
         .completions()
@@ -60,7 +49,7 @@ async fn async_openai_client_streams_with_real_tier0_model(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let server =
         support::LiveServer::start_with_existing_model(REAL_MODEL_ID, real_model_path()?).await?;
-    let client = ferrite_client(&server);
+    let client = ferrite_client(&server, "local-test");
 
     let mut stream = client
         .completions()
@@ -99,7 +88,7 @@ async fn async_openai_client_chats_with_real_tier0_model() -> Result<(), Box<dyn
 {
     let server =
         support::LiveServer::start_with_existing_model(REAL_MODEL_ID, real_model_path()?).await?;
-    let client = ferrite_client(&server);
+    let client = ferrite_client(&server, "local-test");
 
     let response = client.chat().create(chat_request()).await?;
 
@@ -119,7 +108,7 @@ async fn async_openai_client_streams_chat_with_real_tier0_model(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let server =
         support::LiveServer::start_with_existing_model(REAL_MODEL_ID, real_model_path()?).await?;
-    let client = ferrite_client(&server);
+    let client = ferrite_client(&server, "local-test");
     let mut request = chat_request();
     request.stream_options = Some(ChatCompletionStreamOptions {
         include_usage: Some(true),

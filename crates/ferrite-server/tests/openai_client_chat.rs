@@ -1,22 +1,11 @@
 mod support;
 
-use async_openai::{
-    config::OpenAIConfig,
-    types::chat::{
-        ChatCompletionRequestMessage, ChatCompletionRequestUserMessage,
-        ChatCompletionStreamOptions, CreateChatCompletionRequest,
-    },
-    Client,
+use async_openai::types::chat::{
+    ChatCompletionRequestMessage, ChatCompletionRequestUserMessage, ChatCompletionStreamOptions,
+    CreateChatCompletionRequest,
 };
+use support::openai_client::ferrite_client;
 use tokio_stream::StreamExt;
-
-fn ferrite_client(server: &support::LiveServer, api_key: &str) -> Client<OpenAIConfig> {
-    Client::with_config(
-        OpenAIConfig::new()
-            .with_api_base(format!("http://{}/v1", server.addr()))
-            .with_api_key(api_key),
-    )
-}
 
 fn chat_request() -> CreateChatCompletionRequest {
     CreateChatCompletionRequest {

@@ -1,19 +1,11 @@
 mod support;
 
-use async_openai::{config::OpenAIConfig, Client};
-
-fn ferrite_client(server: &support::LiveServer) -> Client<OpenAIConfig> {
-    Client::with_config(
-        OpenAIConfig::new()
-            .with_api_base(format!("http://{}/v1", server.addr()))
-            .with_api_key("local-test"),
-    )
-}
+use support::openai_client::ferrite_client;
 
 #[tokio::test]
 async fn async_openai_client_lists_ferrite_model() -> Result<(), Box<dyn std::error::Error>> {
     let server = support::LiveServer::start().await?;
-    let client = ferrite_client(&server);
+    let client = ferrite_client(&server, "local-test");
 
     let response = client.models().list().await?;
 
@@ -28,7 +20,7 @@ async fn async_openai_client_lists_ferrite_model() -> Result<(), Box<dyn std::er
 #[tokio::test]
 async fn async_openai_client_retrieves_ferrite_model() -> Result<(), Box<dyn std::error::Error>> {
     let server = support::LiveServer::start().await?;
-    let client = ferrite_client(&server);
+    let client = ferrite_client(&server, "local-test");
 
     let response = client.models().retrieve(support::MODEL_ID).await?;
 

@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 pub mod http;
+pub mod openai_client;
 pub mod stop_sequences;
 pub mod throughput;
 

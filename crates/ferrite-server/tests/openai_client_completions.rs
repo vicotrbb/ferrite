@@ -1,25 +1,16 @@
 mod support;
 
 use async_openai::types::chat::Prompt;
-use async_openai::{
-    config::OpenAIConfig,
-    types::{chat::ChatCompletionStreamOptions, completions::CreateCompletionRequest},
-    Client,
+use async_openai::types::{
+    chat::ChatCompletionStreamOptions, completions::CreateCompletionRequest,
 };
+use support::openai_client::ferrite_client;
 use tokio_stream::StreamExt;
-
-fn ferrite_client(server: &support::LiveServer) -> Client<OpenAIConfig> {
-    Client::with_config(
-        OpenAIConfig::new()
-            .with_api_base(format!("http://{}/v1", server.addr()))
-            .with_api_key("local-test"),
-    )
-}
 
 #[tokio::test]
 async fn async_openai_client_creates_legacy_completion() -> Result<(), Box<dyn std::error::Error>> {
     let server = support::LiveServer::start().await?;
-    let client = ferrite_client(&server);
+    let client = ferrite_client(&server, "local-test");
 
     let response = client
         .completions()
@@ -44,7 +35,7 @@ async fn async_openai_client_creates_legacy_completion() -> Result<(), Box<dyn s
 #[tokio::test]
 async fn async_openai_client_streams_legacy_completion() -> Result<(), Box<dyn std::error::Error>> {
     let server = support::LiveServer::start().await?;
-    let client = ferrite_client(&server);
+    let client = ferrite_client(&server, "local-test");
 
     let mut stream = client
         .completions()
