@@ -6,7 +6,7 @@ use super::{
         acquire_inference_permit, ensure_model, ensure_supported_chat_request,
         ensure_supported_completion_request, normalized_max_tokens, required_engine,
     },
-    json::OpenAiJson,
+    json::AuthorizedOpenAiJson,
     prompt::render_chat_prompt,
     schema::{
         ChatCompletionRequest, ChatCompletionResponse, CompletionRequest, CompletionResponse,
@@ -54,10 +54,8 @@ pub fn router(state: ServerState) -> Router {
 
 async fn chat_completions(
     State(state): State<ServerState>,
-    headers: HeaderMap,
-    OpenAiJson(request): OpenAiJson<ChatCompletionRequest>,
+    AuthorizedOpenAiJson(request): AuthorizedOpenAiJson<ChatCompletionRequest>,
 ) -> Result<Response, OpenAiHttpError> {
-    ensure_authorized(&state, &headers)?;
     ensure_model(&state, request.model())?;
     ensure_supported_chat_request(&request)?;
     let prompt = render_chat_prompt(request.messages())?;
@@ -97,10 +95,8 @@ async fn chat_completions(
 
 async fn completions(
     State(state): State<ServerState>,
-    headers: HeaderMap,
-    OpenAiJson(request): OpenAiJson<CompletionRequest>,
+    AuthorizedOpenAiJson(request): AuthorizedOpenAiJson<CompletionRequest>,
 ) -> Result<Response, OpenAiHttpError> {
-    ensure_authorized(&state, &headers)?;
     ensure_model(&state, request.model())?;
     ensure_supported_completion_request(&request)?;
     if request.prompts().is_empty() {

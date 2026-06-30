@@ -1,21 +1,23 @@
-use super::error::OpenAiHttpError;
+use super::{auth::ensure_authorized, error::OpenAiHttpError};
+use crate::state::ServerState;
 use axum::{
     async_trait,
     extract::{rejection::JsonRejection, FromRequest, Request},
     Json,
 };
 
-pub struct OpenAiJson<T>(pub T);
+pub struct AuthorizedOpenAiJson<T>(pub T);
 
 #[async_trait]
-impl<S, T> FromRequest<S> for OpenAiJson<T>
+impl<T> FromRequest<ServerState> for AuthorizedOpenAiJson<T>
 where
-    Json<T>: FromRequest<S, Rejection = JsonRejection>,
-    S: Send + Sync,
+    Json<T>: FromRequest<ServerState, Rejection = JsonRejection>,
+    T: Send,
 {
     type Rejection = OpenAiHttpError;
 
-    async fn from_request(request: Request, state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_request(request: Request, state: &ServerState) -> Result<Self, Self::Rejection> {
+        ensure_authorized(state, request.headers())?;
         Json::<T>::from_request(request, state)
             .await
             .map(|Json(value)| Self(value))
