@@ -314,6 +314,61 @@ fn formats_long_chat_scenario_result() -> Result<(), Box<dyn std::error::Error>>
 }
 
 #[test]
+fn runs_long_chat_gate_with_injected_executor() -> Result<(), Box<dyn std::error::Error>> {
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--models"),
+        OsString::from("fixture-model"),
+        OsString::from("--token-lengths"),
+        OsString::from("256,512"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+    ])?;
+    let mut observed = Vec::new();
+
+    let results = config.run_with_executor(|throughput| {
+        observed.push((throughput.model().to_owned(), throughput.max_tokens()));
+        Ok(ThroughputResult {
+            completed_requests: throughput.requests(),
+            elapsed: Duration::from_millis(10 * throughput.max_tokens() as u64),
+            streaming_finish: Some(StreamingFinishSummary::new("length")),
+            streaming_timing: None,
+            streaming_usage: Some(StreamingUsageSummary::new(
+                8,
+                throughput.max_tokens() as u64,
+                throughput.max_tokens() as u64 + 8,
+            )),
+            rss: None,
+        })
+    })?;
+
+    assert_eq!(
+        observed,
+        [
+            ("fixture-model".to_owned(), 256),
+            ("fixture-model".to_owned(), 512),
+            ("fixture-model".to_owned(), 256),
+            ("fixture-model".to_owned(), 512),
+            ("fixture-model".to_owned(), 256),
+            ("fixture-model".to_owned(), 512),
+            ("fixture-model".to_owned(), 256),
+            ("fixture-model".to_owned(), 512),
+        ]
+    );
+    assert_eq!(results.len(), 8);
+    assert_eq!(results[0].model(), "fixture-model");
+    assert_eq!(results[0].turn(), 1);
+    assert_eq!(results[0].token_length(), 256);
+    assert_eq!(
+        results[0].throughput().streaming_usage,
+        Some(StreamingUsageSummary::new(8, 256, 264))
+    );
+    assert_eq!(results[7].turn(), 4);
+    assert_eq!(results[7].token_length(), 512);
+    Ok(())
+}
+
+#[test]
 fn rejects_empty_long_chat_prompt() -> Result<(), Box<dyn std::error::Error>> {
     let result = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),

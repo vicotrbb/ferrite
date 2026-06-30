@@ -1,6 +1,7 @@
 mod config;
 mod report;
 mod result;
+mod runner;
 mod scenario;
 mod throughput;
 
