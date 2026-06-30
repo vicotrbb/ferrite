@@ -63,3 +63,31 @@ including SSE streaming for both endpoint families.
 This is real Tier 1 Qwen2.5-1.5B Q8_0 client proof only. It does not prove the
 Q6_K artifact through `async-openai`, throughput targets, memory budgets,
 multi-client concurrency, or full OpenAI API parity.
+
+## Current-Tree Rerun
+
+After the OpenAI request authentication-order hardening and the fresh Tier 0 /
+0.5B client reruns, the same ignored larger Tier 1 client proof was rerun
+against commit `2c1115c`.
+
+Command:
+
+```sh
+cargo test -p ferrite-server --test openai_client_real_tier1_qwen_1_5b -- --ignored --nocapture
+```
+
+Observed result:
+
+```text
+running 4 tests
+test async_openai_client_chats_with_qwen_1_5b_q8_model has been running for over 60 seconds
+test async_openai_client_generates_with_qwen_1_5b_q8_model has been running for over 60 seconds
+test async_openai_client_streams_chat_with_qwen_1_5b_q8_model has been running for over 60 seconds
+test async_openai_client_streams_with_qwen_1_5b_q8_model has been running for over 60 seconds
+test async_openai_client_streams_chat_with_qwen_1_5b_q8_model ... ok
+test async_openai_client_generates_with_qwen_1_5b_q8_model ... ok
+test async_openai_client_chats_with_qwen_1_5b_q8_model ... ok
+test async_openai_client_streams_with_qwen_1_5b_q8_model ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 236.44s
+```
