@@ -14,6 +14,9 @@ input vector and the weight vector before computing the mean square.
 It also rejects finite inputs when the RMS scale calculation overflows to a
 non-finite value.
 
+It also rejects finite input and weight values when the final normalized output
+overflows to a non-finite value.
+
 ## Verification
 
 Run the focused regression:
@@ -21,4 +24,5 @@ Run the focused regression:
 ```sh
 cargo test -p ferrite-inference scalar::math::tests::rms_norm_rejects_non_finite_values -- --nocapture
 cargo test -p ferrite-inference scalar::math::tests::rms_norm_rejects_non_finite_scale -- --nocapture
+cargo test -p ferrite-inference scalar::math::tests::rms_norm_rejects_non_finite_output -- --nocapture
 ```

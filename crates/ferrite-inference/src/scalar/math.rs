@@ -26,11 +26,15 @@ pub fn rms_norm(input: &[f32], weight: &[f32], epsilon: f32) -> Result<Vec<f32>,
         return Err(InferenceError::new("rms_norm scale must be finite"));
     }
 
-    Ok(input
-        .iter()
-        .zip(weight.iter())
-        .map(|(value, weight)| value / scale * weight)
-        .collect())
+    let mut output = Vec::with_capacity(input.len());
+    for (value, weight) in input.iter().zip(weight.iter()) {
+        let normalized = value / scale * weight;
+        if !normalized.is_finite() {
+            return Err(InferenceError::new("rms_norm output must be finite"));
+        }
+        output.push(normalized);
+    }
+    Ok(output)
 }
 
 pub fn argmax(values: &[f32]) -> Result<usize, InferenceError> {
@@ -211,6 +215,21 @@ mod tests {
         };
 
         assert!(error.to_string().contains("rms_norm scale must be finite"));
+        Ok(())
+    }
+
+    #[test]
+    fn rms_norm_rejects_non_finite_output() -> Result<(), InferenceError> {
+        let error = match rms_norm(&[1.0, 0.0], &[f32::MAX, 1.0], 0.0) {
+            Ok(_) => {
+                return Err(InferenceError::new(
+                    "overflowing rms_norm output should fail",
+                ))
+            }
+            Err(error) => error,
+        };
+
+        assert!(error.to_string().contains("rms_norm output must be finite"));
         Ok(())
     }
 
