@@ -129,6 +129,36 @@ async fn chat_endpoint_returns_model_not_found_for_unknown_model(
 }
 
 #[tokio::test]
+async fn endpoints_report_model_param_when_model_is_missing(
+) -> Result<(), Box<dyn std::error::Error>> {
+    for (uri, payload) in [
+        ("/v1/completions", r#"{"prompt":"hello","max_tokens":1}"#),
+        (
+            "/v1/chat/completions",
+            r#"{"messages":[{"role":"user","content":"hello"}],"max_completion_tokens":1}"#,
+        ),
+    ] {
+        let app = router(ServerState::new("fixture-model".to_owned()));
+        let request = Request::builder()
+            .method("POST")
+            .uri(uri)
+            .header("content-type", "application/json")
+            .body(Body::from(payload))?;
+        let response = app.oneshot(request).await?;
+
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        let body = to_json(response.into_body()).await?;
+        assert_eq!(body["error"]["type"], "invalid_request_error");
+        assert_eq!(body["error"]["param"], "model", "{body}");
+        assert!(body["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("model is required"));
+    }
+    Ok(())
+}
+
+#[tokio::test]
 async fn streaming_completion_prompt_validation_runs_before_engine_availability(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let app = router(ServerState::new("fixture-model".to_owned()));
