@@ -211,7 +211,10 @@ The same local `/v1` surface now also has real Tier 1 `async-openai` client
 proofs for Qwen2.5-0.5B Q4_K_M, Qwen2.5-1.5B Q8_0, Qwen2.5-1.5B Q6_K, and
 SmolLM2-1.7B Q4_K_M across legacy completions, streaming legacy completions,
 chat completions, and streaming chat completions. This proves standard
-OpenAI-compatible Rust client wiring for those local real-model paths; it does
+OpenAI-compatible Rust client wiring for those local real-model paths. The
+Qwen2.5-0.5B Q4_K_M `async-openai` suite was rerun after enabling default
+stream obfuscation in reusable stream contexts and still passed all four
+create/stream paths with `stream_options.include_obfuscation: null`. This does
 not prove full API parity, production multi-client concurrency, or broader
 client ecosystem compatibility.
 
