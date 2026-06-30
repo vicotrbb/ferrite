@@ -48,6 +48,16 @@ impl LongChatGateConfig {
     pub fn planned_scenarios(&self) -> usize {
         self.token_lengths.len() * self.turns
     }
+
+    pub fn scenarios(&self) -> Vec<LongChatScenario> {
+        let mut scenarios = Vec::with_capacity(self.planned_scenarios());
+        for turn in 1..=self.turns {
+            for token_length in &self.token_lengths {
+                scenarios.push(LongChatScenario::new(turn, *token_length));
+            }
+        }
+        scenarios
+    }
 }
 
 impl Default for LongChatGateConfig {
@@ -79,6 +89,26 @@ impl fmt::Display for LongChatGateError {
 }
 
 impl Error for LongChatGateError {}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct LongChatScenario {
+    turn: usize,
+    token_length: usize,
+}
+
+impl LongChatScenario {
+    fn new(turn: usize, token_length: usize) -> Self {
+        Self { turn, token_length }
+    }
+
+    pub fn turn(&self) -> usize {
+        self.turn
+    }
+
+    pub fn token_length(&self) -> usize {
+        self.token_length
+    }
+}
 
 fn next_value(
     iter: &mut impl Iterator<Item = OsString>,
@@ -152,4 +182,19 @@ pub fn format_plan(config: &LongChatGateConfig) -> String {
         config.turns(),
         config.planned_scenarios()
     )
+}
+
+pub fn format_scenarios(config: &LongChatGateConfig) -> String {
+    config
+        .scenarios()
+        .iter()
+        .map(|scenario| {
+            format!(
+                "long_chat_scenario=turn:{},max_tokens:{}",
+                scenario.turn(),
+                scenario.token_length()
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
