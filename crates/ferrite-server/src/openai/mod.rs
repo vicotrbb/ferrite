@@ -66,3 +66,5 @@ mod test_support;
 mod token_limit_tests;
 #[cfg(test)]
 mod unsupported_tests;
+#[cfg(test)]
+mod user_identifier_tests;
