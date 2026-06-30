@@ -28,6 +28,9 @@ pub fn argmax(values: &[f32]) -> Result<usize, InferenceError> {
     if values.is_empty() {
         return Err(InferenceError::new("argmax input must not be empty"));
     }
+    if values.iter().any(|value| !value.is_finite()) {
+        return Err(InferenceError::new("argmax input must be finite"));
+    }
 
     let mut best_index = 0usize;
     let mut best_value = values[0];

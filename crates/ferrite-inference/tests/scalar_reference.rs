@@ -76,6 +76,19 @@ fn single_token_llama_reference_path_produces_documented_argmax() -> Result<(), 
 }
 
 #[test]
+fn argmax_rejects_non_finite_values() -> Result<(), Box<dyn Error>> {
+    for value in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+        let error = match argmax(&[0.0, value, 1.0]) {
+            Ok(_) => return Err(io::Error::other("non-finite argmax input should fail").into()),
+            Err(error) => error,
+        };
+
+        assert!(error.to_string().contains("argmax input must be finite"));
+    }
+    Ok(())
+}
+
+#[test]
 fn attention_value_projection_bias_contributes_to_hidden_state() -> Result<(), Box<dyn Error>> {
     let model = value_bias_model()?;
 
