@@ -433,22 +433,26 @@ fn rejects_unexpected_long_chat_finish_reason() -> Result<(), Box<dyn std::error
         OsString::from("stop"),
     ])?;
 
-    let error = config
-        .run_with_executor(|throughput| {
-            Ok(ThroughputResult {
-                completed_requests: throughput.requests(),
-                elapsed: Duration::from_millis(10),
-                streaming_finish: Some(StreamingFinishSummary::new("length")),
-                streaming_timing: None,
-                streaming_usage: Some(StreamingUsageSummary::new(
-                    8,
-                    throughput.max_tokens() as u64,
-                    throughput.max_tokens() as u64 + 8,
-                )),
-                rss: None,
-            })
+    let result = config.run_with_executor(|throughput| {
+        Ok(ThroughputResult {
+            completed_requests: throughput.requests(),
+            elapsed: Duration::from_millis(10),
+            streaming_finish: Some(StreamingFinishSummary::new("length")),
+            streaming_timing: None,
+            streaming_usage: Some(StreamingUsageSummary::new(
+                8,
+                throughput.max_tokens() as u64,
+                throughput.max_tokens() as u64 + 8,
+            )),
+            rss: None,
         })
-        .expect_err("expected finish reason mismatch");
+    });
+    let error = match result {
+        Ok(results) => {
+            return Err(format!("expected finish reason mismatch, got {results:?}").into())
+        }
+        Err(error) => error,
+    };
 
     assert!(
         error
@@ -474,18 +478,22 @@ fn rejects_missing_long_chat_finish_reason_when_expected() -> Result<(), Box<dyn
         OsString::from("stop"),
     ])?;
 
-    let error = config
-        .run_with_executor(|throughput| {
-            Ok(ThroughputResult {
-                completed_requests: throughput.requests(),
-                elapsed: Duration::from_millis(10),
-                streaming_finish: None,
-                streaming_timing: None,
-                streaming_usage: None,
-                rss: None,
-            })
+    let result = config.run_with_executor(|throughput| {
+        Ok(ThroughputResult {
+            completed_requests: throughput.requests(),
+            elapsed: Duration::from_millis(10),
+            streaming_finish: None,
+            streaming_timing: None,
+            streaming_usage: None,
+            rss: None,
         })
-        .expect_err("expected missing finish reason error");
+    });
+    let error = match result {
+        Ok(results) => {
+            return Err(format!("expected missing finish reason error, got {results:?}").into())
+        }
+        Err(error) => error,
+    };
 
     assert!(
         error
