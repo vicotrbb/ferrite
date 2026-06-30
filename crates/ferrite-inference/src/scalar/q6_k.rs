@@ -156,6 +156,18 @@ pub(super) fn q6_k_storage_bytes(value_count: usize) -> Result<usize, InferenceE
         .ok_or_else(|| InferenceError::new("Q6_K byte length overflow"))
 }
 
+pub(super) fn validate_q6_k_finite_scales(bytes: &[u8]) -> Result<(), InferenceError> {
+    for block in bytes.chunks_exact(Q6_K_BLOCK_BYTES) {
+        let scale = f16_bits_to_f32(u16::from_le_bytes([block[208], block[209]]));
+        if !scale.is_finite() {
+            return Err(InferenceError::new(
+                "Q6_K matrix scale values must be finite",
+            ));
+        }
+    }
+    Ok(())
+}
+
 pub(super) fn decode_q6_k_values(
     bytes: &[u8],
     value_count: usize,

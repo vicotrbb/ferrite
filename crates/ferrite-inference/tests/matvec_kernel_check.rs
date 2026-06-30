@@ -180,6 +180,27 @@ fn q6_k_matvec_check_uses_decoded_scalar_reference() -> Result<(), Box<dyn Error
 }
 
 #[test]
+fn q6_k_matrix_rejects_non_finite_scale_values() -> Result<(), Box<dyn Error>> {
+    for scale_bits in [0x7c00, 0xfc00, 0x7e00] {
+        let error = match Matrix::from_q6_k_row_major_bytes(
+            1,
+            256,
+            q6_k_block_with_scale_bits(scale_bits, -32),
+        ) {
+            Ok(_) => {
+                return Err(io::Error::other("non-finite Q6_K matrix scale should fail").into());
+            }
+            Err(error) => error,
+        };
+
+        assert!(error
+            .to_string()
+            .contains("Q6_K matrix scale values must be finite"));
+    }
+    Ok(())
+}
+
+#[test]
 fn q6_k_matvec_accepts_q8_k_execution_options() -> Result<(), Box<dyn Error>> {
     let matrix = Matrix::from_q6_k_row_major_bytes(1, 256, q6_k_block_with_value(-32))?;
 
@@ -276,6 +297,10 @@ fn q4_k_block_with_scale_bits(scale_bits: u16, min_bits: u16, value: u8) -> Vec<
 }
 
 fn q6_k_block_with_value(value: i32) -> Vec<u8> {
+    q6_k_block_with_scale_bits(0x3c00, value)
+}
+
+fn q6_k_block_with_scale_bits(scale_bits: u16, value: i32) -> Vec<u8> {
     assert_eq!(
         value, -32,
         "this compact Q6_K fixture helper only encodes -32"
@@ -283,7 +308,7 @@ fn q6_k_block_with_value(value: i32) -> Vec<u8> {
 
     let mut block = vec![0u8; 128 + 64];
     block.extend(vec![1u8; 16]);
-    block.extend_from_slice(&0x3c00u16.to_le_bytes());
+    block.extend_from_slice(&scale_bits.to_le_bytes());
     block
 }
 
