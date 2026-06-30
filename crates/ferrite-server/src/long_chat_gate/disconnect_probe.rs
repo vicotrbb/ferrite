@@ -1,8 +1,9 @@
 use super::LongChatGateConfig;
-use std::{error::Error, net::SocketAddr};
+use std::{error::Error, net::SocketAddr, time::Duration};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
+    time::sleep,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -41,8 +42,7 @@ impl LongChatGateConfig {
         }
 
         let reconnect_body = self.disconnect_probe_body(1)?;
-        let reconnect = send_chat_stream_probe(addr, self.api_key(), &reconnect_body).await?;
-        validate_reconnect_response(&reconnect)?;
+        reconnect_until_completed(addr, self.api_key(), &reconnect_body).await?;
         Ok(LongChatDisconnectProbeResult::new(true, true))
     }
 
@@ -106,6 +106,34 @@ async fn send_chat_stream_probe(
     Ok(String::from_utf8(response)?)
 }
 
+async fn reconnect_until_completed(
+    addr: SocketAddr,
+    api_key: &str,
+    body: &str,
+) -> Result<(), Box<dyn Error>> {
+    let mut last_status = None;
+    for _ in 0..20 {
+        let response = send_chat_stream_probe(addr, api_key, body).await?;
+        let status = http_status(&response)?;
+        if status == 200 {
+            return validate_reconnect_response(&response);
+        }
+        if !is_retryable_reconnect_status(status) {
+            return Err(format!("expected reconnect probe status 200, got {status}").into());
+        }
+        last_status = Some(status);
+        sleep(Duration::from_millis(250)).await;
+    }
+
+    Err(format!(
+        "reconnect probe did not complete after retryable status {}",
+        last_status
+            .map(|status| status.to_string())
+            .unwrap_or_else(|| "unknown".to_owned())
+    )
+    .into())
+}
+
 async fn write_chat_stream_request(
     stream: &mut TcpStream,
     addr: SocketAddr,
@@ -157,6 +185,10 @@ fn http_status(response: &str) -> Result<u16, Box<dyn Error>> {
     Ok(status)
 }
 
+fn is_retryable_reconnect_status(status: u16) -> bool {
+    status == 429
+}
+
 fn has_generated_stream_event(response: &str) -> bool {
     response
         .split_once("\r\n\r\n")
@@ -185,4 +217,14 @@ fn event_has_generated_text(event: serde_json::Value) -> bool {
                 .and_then(serde_json::Value::as_str)
                 .is_some_and(|text| !text.is_empty())
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn treats_rate_limited_reconnect_as_retryable() {
+        assert!(is_retryable_reconnect_status(429));
+    }
 }
