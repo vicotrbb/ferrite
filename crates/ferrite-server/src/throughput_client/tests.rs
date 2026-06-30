@@ -110,6 +110,39 @@ fn parses_streaming_benchmark_config() -> Result<(), Box<dyn std::error::Error>>
 }
 
 #[test]
+fn parses_stream_usage_benchmark_config() -> Result<(), Box<dyn std::error::Error>> {
+    let config = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--stream"),
+        OsString::from("--stream-usage"),
+    ])?;
+
+    assert!(config.stream());
+    assert!(config.stream_usage());
+    Ok(())
+}
+
+#[test]
+fn rejects_stream_usage_without_streaming() -> Result<(), Box<dyn std::error::Error>> {
+    let result = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--stream-usage"),
+    ]);
+    let error = match result {
+        Ok(config) => return Err(format!("expected error, got config: {config:?}").into()),
+        Err(error) => error,
+    };
+
+    assert!(
+        error
+            .to_string()
+            .contains("--stream-usage requires --stream"),
+        "{error}"
+    );
+    Ok(())
+}
+
+#[test]
 fn builds_openai_compatible_streaming_completion_request_body(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let config = ThroughputClientConfig::parse([
@@ -126,6 +159,28 @@ fn builds_openai_compatible_streaming_completion_request_body(
     assert_eq!(
         request_body(&config),
         r#"{"model":"fixture-model","prompt":"measure this","max_tokens":2,"stream":true}"#
+    );
+    Ok(())
+}
+
+#[test]
+fn builds_openai_compatible_streaming_completion_usage_request_body(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let config = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--stream"),
+        OsString::from("--stream-usage"),
+        OsString::from("--model"),
+        OsString::from("fixture-model"),
+        OsString::from("--prompt"),
+        OsString::from("measure this"),
+        OsString::from("--max-tokens"),
+        OsString::from("2"),
+    ])?;
+
+    assert_eq!(
+        request_body(&config),
+        r#"{"model":"fixture-model","prompt":"measure this","max_tokens":2,"stream":true,"stream_options":{"include_usage":true}}"#
     );
     Ok(())
 }
@@ -149,6 +204,30 @@ fn builds_openai_compatible_streaming_chat_completion_request_body(
     assert_eq!(
         request_body(&config),
         r#"{"model":"fixture-model","messages":[{"role":"user","content":"measure this"}],"max_tokens":2,"stream":true}"#
+    );
+    Ok(())
+}
+
+#[test]
+fn builds_openai_compatible_streaming_chat_usage_request_body(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let config = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--endpoint"),
+        OsString::from("chat-completions"),
+        OsString::from("--stream"),
+        OsString::from("--stream-usage"),
+        OsString::from("--model"),
+        OsString::from("fixture-model"),
+        OsString::from("--prompt"),
+        OsString::from("measure this"),
+        OsString::from("--max-tokens"),
+        OsString::from("2"),
+    ])?;
+
+    assert_eq!(
+        request_body(&config),
+        r#"{"model":"fixture-model","messages":[{"role":"user","content":"measure this"}],"max_tokens":2,"stream":true,"stream_options":{"include_usage":true}}"#
     );
     Ok(())
 }

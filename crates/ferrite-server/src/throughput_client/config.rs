@@ -10,6 +10,7 @@ pub struct ThroughputClientConfig {
     concurrency: usize,
     max_tokens: usize,
     stream: bool,
+    stream_usage: bool,
     api_key: String,
 }
 
@@ -86,6 +87,9 @@ impl ThroughputClientConfig {
                 "--stream" => {
                     config.stream = true;
                 }
+                "--stream-usage" => {
+                    config.stream_usage = true;
+                }
                 "--api-key" => {
                     config.api_key = os_string_to_string(next_value(&mut iter, "--api-key")?)?;
                     if config.api_key.trim().is_empty() {
@@ -100,6 +104,10 @@ impl ThroughputClientConfig {
                     )));
                 }
             }
+        }
+
+        if config.stream_usage && !config.stream {
+            return Err(ClientConfigError::new("--stream-usage requires --stream"));
         }
 
         Ok(config)
@@ -137,6 +145,10 @@ impl ThroughputClientConfig {
         self.stream
     }
 
+    pub fn stream_usage(&self) -> bool {
+        self.stream_usage
+    }
+
     pub fn api_key(&self) -> &str {
         &self.api_key
     }
@@ -153,6 +165,7 @@ impl Default for ThroughputClientConfig {
             concurrency: 1,
             max_tokens: 1,
             stream: false,
+            stream_usage: false,
             api_key: "local-secret".to_owned(),
         }
     }
@@ -216,5 +229,5 @@ fn parse_endpoint(value: OsString) -> Result<OpenAiEndpoint, ClientConfigError> 
 }
 
 fn usage() -> &'static str {
-    "usage: ferrite-openai-throughput [--addr 127.0.0.1:8080] [--endpoint completions|chat-completions] [--model ferrite-local] [--prompt 'hello world'] [--requests 3] [--concurrency 1] [--max-tokens 1] [--stream] [--api-key local-secret]"
+    "usage: ferrite-openai-throughput [--addr 127.0.0.1:8080] [--endpoint completions|chat-completions] [--model ferrite-local] [--prompt 'hello world'] [--requests 3] [--concurrency 1] [--max-tokens 1] [--stream] [--stream-usage] [--api-key local-secret]"
 }
