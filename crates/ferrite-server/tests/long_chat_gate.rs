@@ -1,8 +1,13 @@
 use ferrite_server::long_chat_gate::{
-    format_plan, format_report, format_scenarios, LongChatGateConfig,
+    format_plan, format_report, format_scenario_result, format_scenarios, LongChatGateConfig,
+    LongChatScenarioResult,
 };
-use ferrite_server::throughput_client::{OpenAiEndpoint, ThroughputClientConfig};
+use ferrite_server::throughput_client::{
+    OpenAiEndpoint, StreamingFinishSummary, StreamingUsageSummary, ThroughputClientConfig,
+    ThroughputResult,
+};
 use std::ffi::OsString;
+use std::time::Duration;
 
 #[test]
 fn defaults_to_required_long_chat_token_lengths_and_turns() -> Result<(), Box<dyn std::error::Error>>
@@ -271,6 +276,40 @@ fn builds_typed_throughput_configs_for_all_scenarios() -> Result<(), Box<dyn std
     assert!(throughput_configs
         .iter()
         .all(|config| config.stream_usage()));
+    Ok(())
+}
+
+#[test]
+fn formats_long_chat_scenario_result() -> Result<(), Box<dyn std::error::Error>> {
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--models"),
+        OsString::from("fixture-model"),
+        OsString::from("--token-lengths"),
+        OsString::from("256"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+    ])?;
+    let scenario = config
+        .scenarios()
+        .into_iter()
+        .nth(1)
+        .ok_or("expected second scenario")?;
+    let throughput = ThroughputResult {
+        completed_requests: 1,
+        elapsed: Duration::from_millis(400),
+        streaming_finish: Some(StreamingFinishSummary::new("length")),
+        streaming_timing: None,
+        streaming_usage: Some(StreamingUsageSummary::new(16, 256, 272)),
+        rss: None,
+    };
+
+    let result = LongChatScenarioResult::new(&scenario, throughput);
+
+    assert_eq!(
+        format_scenario_result(&result),
+        "long_chat_result=model:fixture-model,turn:2,max_tokens:256\nlong_chat_result_completed_requests=1\nlong_chat_result_elapsed_ms=400\nlong_chat_result_finish_reason=length\nlong_chat_result_usage_prompt_tokens=16\nlong_chat_result_usage_completion_tokens=256\nlong_chat_result_usage_total_tokens=272"
+    );
     Ok(())
 }
 
