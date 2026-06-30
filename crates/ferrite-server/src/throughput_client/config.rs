@@ -3,12 +3,35 @@ use std::{error::Error, ffi::OsString, fmt, net::SocketAddr};
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ThroughputClientConfig {
     addr: SocketAddr,
+    endpoint: OpenAiEndpoint,
     model: String,
     prompt: String,
     requests: usize,
     concurrency: usize,
     max_tokens: usize,
     api_key: String,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OpenAiEndpoint {
+    Completions,
+    ChatCompletions,
+}
+
+impl OpenAiEndpoint {
+    pub fn path(self) -> &'static str {
+        match self {
+            Self::Completions => "/v1/completions",
+            Self::ChatCompletions => "/v1/chat/completions",
+        }
+    }
+
+    pub fn metric_name(self) -> &'static str {
+        match self {
+            Self::Completions => "openai_http_completion_requests",
+            Self::ChatCompletions => "openai_http_chat_completion_requests",
+        }
+    }
 }
 
 impl ThroughputClientConfig {
@@ -34,6 +57,9 @@ impl ThroughputClientConfig {
                     if config.model.trim().is_empty() {
                         return Err(ClientConfigError::new("--model must not be empty"));
                     }
+                }
+                "--endpoint" => {
+                    config.endpoint = parse_endpoint(next_value(&mut iter, "--endpoint")?)?;
                 }
                 "--prompt" => {
                     config.prompt = os_string_to_string(next_value(&mut iter, "--prompt")?)?;
@@ -77,6 +103,10 @@ impl ThroughputClientConfig {
         self.addr
     }
 
+    pub fn endpoint(&self) -> OpenAiEndpoint {
+        self.endpoint
+    }
+
     pub fn model(&self) -> &str {
         &self.model
     }
@@ -106,6 +136,7 @@ impl Default for ThroughputClientConfig {
     fn default() -> Self {
         Self {
             addr: SocketAddr::from(([127, 0, 0, 1], 8080)),
+            endpoint: OpenAiEndpoint::Completions,
             model: "ferrite-local".to_owned(),
             prompt: "hello world".to_owned(),
             requests: 3,
@@ -163,6 +194,16 @@ fn parse_positive_usize(value: OsString, flag: &str) -> Result<usize, ClientConf
     Ok(parsed)
 }
 
+fn parse_endpoint(value: OsString) -> Result<OpenAiEndpoint, ClientConfigError> {
+    match os_string_to_string(value)?.as_str() {
+        "completions" => Ok(OpenAiEndpoint::Completions),
+        "chat-completions" => Ok(OpenAiEndpoint::ChatCompletions),
+        other => Err(ClientConfigError::new(format!(
+            "invalid --endpoint: {other}; expected completions or chat-completions"
+        ))),
+    }
+}
+
 fn usage() -> &'static str {
-    "usage: ferrite-openai-throughput [--addr 127.0.0.1:8080] [--model ferrite-local] [--prompt 'hello world'] [--requests 3] [--concurrency 1] [--max-tokens 1] [--api-key local-secret]"
+    "usage: ferrite-openai-throughput [--addr 127.0.0.1:8080] [--endpoint completions|chat-completions] [--model ferrite-local] [--prompt 'hello world'] [--requests 3] [--concurrency 1] [--max-tokens 1] [--api-key local-secret]"
 }

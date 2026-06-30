@@ -113,6 +113,7 @@ target/release/ferrite-server \
 
 target/release/ferrite-openai-throughput \
   --addr 127.0.0.1:8080 \
+  --endpoint completions \
   --model qwen2.5-1.5b-q8_0 \
   --prompt 'hello world' \
   --requests 3 \
@@ -121,10 +122,14 @@ target/release/ferrite-openai-throughput \
   --api-key local-secret
 ```
 
-The client prints `openai_http_completion_requests`, `elapsed_ms`, and
-`requests_per_second`. Record throughput claims under `documentation/benchmarks/`
-with the exact server/client commands, model, host, build mode, request count,
-concurrency, prompt, and generated-token count.
+Use `--endpoint chat-completions` to measure
+`POST /v1/chat/completions` with the prompt wrapped as a single user message.
+The client prints `openai_http_completion_requests` for legacy completions or
+`openai_http_chat_completion_requests` for chat completions, plus `elapsed_ms`
+and `requests_per_second`. Record throughput claims under
+`documentation/benchmarks/` with the exact server/client commands, model, host,
+build mode, endpoint, request count, concurrency, prompt, and generated-token
+count.
 
 ## CLI Memory Sampling
 

@@ -1,17 +1,19 @@
+use super::OpenAiEndpoint;
 use std::{error::Error, net::SocketAddr};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
 };
 
-pub async fn send_completion_request(
+pub async fn send_openai_request(
     addr: SocketAddr,
     api_key: &str,
+    path: &str,
     body: &[u8],
 ) -> Result<String, Box<dyn Error>> {
     let mut stream = TcpStream::connect(addr).await?;
     let request = format!(
-        "POST /v1/completions HTTP/1.1\r\n\
+        "POST {path} HTTP/1.1\r\n\
 Host: {addr}\r\n\
 Authorization: Bearer {api_key}\r\n\
 Content-Type: application/json\r\n\
@@ -25,7 +27,10 @@ Connection: close\r\n\
     Ok(String::from_utf8(read_http_response(&mut stream).await?)?)
 }
 
-pub fn validate_completion_response(response: &str) -> Result<(), Box<dyn Error>> {
+pub fn validate_openai_response(
+    endpoint: OpenAiEndpoint,
+    response: &str,
+) -> Result<(), Box<dyn Error>> {
     if !response.starts_with("HTTP/1.1 200 OK") {
         return Err(format!("unexpected response: {response}").into());
     }
@@ -33,11 +38,28 @@ pub fn validate_completion_response(response: &str) -> Result<(), Box<dyn Error>
         .split_once("\r\n\r\n")
         .ok_or("expected HTTP response body")?;
     let body: serde_json::Value = serde_json::from_str(body)?;
+    match endpoint {
+        OpenAiEndpoint::Completions => validate_completion_body(&body),
+        OpenAiEndpoint::ChatCompletions => validate_chat_completion_body(&body),
+    }
+}
+
+fn validate_completion_body(body: &serde_json::Value) -> Result<(), Box<dyn Error>> {
     if body["object"] != "text_completion" {
         return Err(format!("unexpected completion object: {}", body["object"]).into());
     }
     if !body["choices"][0]["text"].is_string() {
         return Err("missing completion text".into());
+    }
+    Ok(())
+}
+
+fn validate_chat_completion_body(body: &serde_json::Value) -> Result<(), Box<dyn Error>> {
+    if body["object"] != "chat.completion" {
+        return Err(format!("unexpected chat completion object: {}", body["object"]).into());
+    }
+    if !body["choices"][0]["message"]["content"].is_string() {
+        return Err("missing chat completion message content".into());
     }
     Ok(())
 }

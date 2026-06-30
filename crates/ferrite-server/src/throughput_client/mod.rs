@@ -4,7 +4,7 @@ mod http;
 #[cfg(test)]
 mod tests;
 
-pub use config::ThroughputClientConfig;
+pub use config::{OpenAiEndpoint, ThroughputClientConfig};
 
 use std::{
     error::Error,
@@ -26,7 +26,8 @@ impl ThroughputResult {
 pub async fn run_completion_benchmark(
     config: &ThroughputClientConfig,
 ) -> Result<ThroughputResult, Box<dyn Error>> {
-    let request_body = completion_request_body(config);
+    let request_body = request_body(config);
+    let endpoint = config.endpoint();
     let started = Instant::now();
     let mut completed_requests = 0;
 
@@ -40,7 +41,7 @@ pub async fn run_completion_benchmark(
             let api_key = config.api_key().to_owned();
             let addr = config.addr();
             tasks.push(tokio::spawn(async move {
-                http::send_completion_request(addr, &api_key, request_body.as_bytes())
+                http::send_openai_request(addr, &api_key, endpoint.path(), request_body.as_bytes())
                     .await
                     .map_err(|error| error.to_string())
             }));
@@ -51,7 +52,7 @@ pub async fn run_completion_benchmark(
                 .await
                 .map_err(|error| std::io::Error::other(format!("request task failed: {error}")))?
                 .map_err(std::io::Error::other)?;
-            http::validate_completion_response(&response)?;
+            http::validate_openai_response(endpoint, &response)?;
             completed_requests += 1;
         }
     }
@@ -62,18 +63,35 @@ pub async fn run_completion_benchmark(
     })
 }
 
-pub fn format_result(result: ThroughputResult) -> String {
+pub fn format_result(config: &ThroughputClientConfig, result: ThroughputResult) -> String {
     format!(
-        "openai_http_completion_requests={}\nelapsed_ms={}\nrequests_per_second={:.6}",
+        "{}={}\nelapsed_ms={}\nrequests_per_second={:.6}",
+        config.endpoint().metric_name(),
         result.completed_requests,
         result.elapsed.as_millis(),
         result.requests_per_second()
     )
 }
 
+fn request_body(config: &ThroughputClientConfig) -> String {
+    match config.endpoint() {
+        OpenAiEndpoint::Completions => completion_request_body(config),
+        OpenAiEndpoint::ChatCompletions => chat_completion_request_body(config),
+    }
+}
+
 fn completion_request_body(config: &ThroughputClientConfig) -> String {
     format!(
         r#"{{"model":{},"prompt":{},"max_tokens":{}}}"#,
+        serde_json::Value::String(config.model().to_owned()),
+        serde_json::Value::String(config.prompt().to_owned()),
+        config.max_tokens()
+    )
+}
+
+fn chat_completion_request_body(config: &ThroughputClientConfig) -> String {
+    format!(
+        r#"{{"model":{},"messages":[{{"role":"user","content":{}}}],"max_tokens":{}}}"#,
         serde_json::Value::String(config.model().to_owned()),
         serde_json::Value::String(config.prompt().to_owned()),
         config.max_tokens()

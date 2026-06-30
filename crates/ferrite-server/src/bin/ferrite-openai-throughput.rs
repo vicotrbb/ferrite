@@ -13,6 +13,6 @@ async fn main() {
 async fn run() -> Result<(), Box<dyn std::error::Error>> {
     let config = ThroughputClientConfig::parse(std::env::args_os())?;
     let result = run_completion_benchmark(&config).await?;
-    println!("{}", format_result(result));
+    println!("{}", format_result(&config, result));
     Ok(())
 }
