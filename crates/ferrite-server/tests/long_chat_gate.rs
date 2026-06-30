@@ -58,6 +58,8 @@ fn parses_custom_long_chat_token_lengths_turns_and_models() -> Result<(), Box<dy
         OsString::from("--rss-pid"),
         OsString::from("4242"),
         OsString::from("--error-probe"),
+        OsString::from("--expect-finish-reason"),
+        OsString::from("stop"),
     ])?;
 
     assert_eq!(config.token_lengths(), &[128, 256]);
@@ -73,6 +75,7 @@ fn parses_custom_long_chat_token_lengths_turns_and_models() -> Result<(), Box<dy
     assert_eq!(config.stop(), Some("<STOP>"));
     assert_eq!(config.rss_pid(), Some(4242));
     assert!(config.error_probe());
+    assert_eq!(config.expected_finish_reason(), Some("stop"));
     Ok(())
 }
 
@@ -413,6 +416,83 @@ fn runs_long_chat_gate_with_injected_executor() -> Result<(), Box<dyn std::error
     );
     assert_eq!(results[7].turn(), 4);
     assert_eq!(results[7].token_length(), 512);
+    Ok(())
+}
+
+#[test]
+fn rejects_unexpected_long_chat_finish_reason() -> Result<(), Box<dyn std::error::Error>> {
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--models"),
+        OsString::from("fixture-model"),
+        OsString::from("--token-lengths"),
+        OsString::from("256"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+        OsString::from("--expect-finish-reason"),
+        OsString::from("stop"),
+    ])?;
+
+    let error = config
+        .run_with_executor(|throughput| {
+            Ok(ThroughputResult {
+                completed_requests: throughput.requests(),
+                elapsed: Duration::from_millis(10),
+                streaming_finish: Some(StreamingFinishSummary::new("length")),
+                streaming_timing: None,
+                streaming_usage: Some(StreamingUsageSummary::new(
+                    8,
+                    throughput.max_tokens() as u64,
+                    throughput.max_tokens() as u64 + 8,
+                )),
+                rss: None,
+            })
+        })
+        .expect_err("expected finish reason mismatch");
+
+    assert!(
+        error
+            .to_string()
+            .contains("expected finish_reason stop, got length"),
+        "{error}"
+    );
+    Ok(())
+}
+
+#[test]
+fn rejects_missing_long_chat_finish_reason_when_expected() -> Result<(), Box<dyn std::error::Error>>
+{
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--models"),
+        OsString::from("fixture-model"),
+        OsString::from("--token-lengths"),
+        OsString::from("256"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+        OsString::from("--expect-finish-reason"),
+        OsString::from("stop"),
+    ])?;
+
+    let error = config
+        .run_with_executor(|throughput| {
+            Ok(ThroughputResult {
+                completed_requests: throughput.requests(),
+                elapsed: Duration::from_millis(10),
+                streaming_finish: None,
+                streaming_timing: None,
+                streaming_usage: None,
+                rss: None,
+            })
+        })
+        .expect_err("expected missing finish reason error");
+
+    assert!(
+        error
+            .to_string()
+            .contains("expected finish_reason stop, got none"),
+        "{error}"
+    );
     Ok(())
 }
 

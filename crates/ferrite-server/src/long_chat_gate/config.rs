@@ -12,6 +12,7 @@ pub struct LongChatGateConfig {
     assistant_context: String,
     follow_up: String,
     stop: Option<String>,
+    expected_finish_reason: Option<String>,
     rss_pid: Option<u32>,
     token_lengths: Vec<usize>,
     turns: usize,
@@ -66,6 +67,12 @@ impl LongChatGateConfig {
                     config.stop = Some(parse_non_empty_string(
                         next_value(&mut iter, "--stop")?,
                         "--stop",
+                    )?);
+                }
+                "--expect-finish-reason" => {
+                    config.expected_finish_reason = Some(parse_non_empty_string(
+                        next_value(&mut iter, "--expect-finish-reason")?,
+                        "--expect-finish-reason",
                     )?);
                 }
                 "--rss-pid" => {
@@ -134,6 +141,10 @@ impl LongChatGateConfig {
         self.stop.as_deref()
     }
 
+    pub fn expected_finish_reason(&self) -> Option<&str> {
+        self.expected_finish_reason.as_deref()
+    }
+
     pub fn rss_pid(&self) -> Option<u32> {
         self.rss_pid
     }
@@ -176,6 +187,7 @@ impl Default for LongChatGateConfig {
             assistant_context: "CPU inference prioritizes memory locality, predictable scheduling, and efficient token streaming.".to_owned(),
             follow_up: "Continue with the operational risks for a long streaming chat.".to_owned(),
             stop: None,
+            expected_finish_reason: None,
             rss_pid: None,
             token_lengths: vec![256, 512, 1024],
             turns: 4,
@@ -285,5 +297,5 @@ fn os_string_to_string(value: OsString) -> Result<String, LongChatGateError> {
 }
 
 fn usage() -> &'static str {
-    "usage: ferrite-openai-long-chat-gate [--execute] [--error-probe] [--addr 127.0.0.1:8080] [--api-key local-secret] [--models MODEL[,MODEL...]] [--prompt TEXT] [--assistant-context TEXT] [--follow-up TEXT] [--stop TEXT] [--rss-pid PID] [--token-lengths 256,512,1024] [--turns 4]"
+    "usage: ferrite-openai-long-chat-gate [--execute] [--error-probe] [--addr 127.0.0.1:8080] [--api-key local-secret] [--models MODEL[,MODEL...]] [--prompt TEXT] [--assistant-context TEXT] [--follow-up TEXT] [--stop TEXT] [--expect-finish-reason REASON] [--rss-pid PID] [--token-lengths 256,512,1024] [--turns 4]"
 }

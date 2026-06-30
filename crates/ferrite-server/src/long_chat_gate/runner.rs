@@ -12,6 +12,7 @@ impl LongChatGateConfig {
 
         for (scenario, throughput_config) in scenarios.iter().zip(throughput_configs.iter()) {
             let throughput = run_completion_benchmark(throughput_config).await?;
+            self.validate_finish_reason(&throughput)?;
             results.push(LongChatScenarioResult::new(scenario, throughput));
         }
 
@@ -27,12 +28,28 @@ impl LongChatGateConfig {
         let mut results = Vec::with_capacity(scenarios.len());
 
         for (scenario, throughput_config) in scenarios.iter().zip(throughput_configs.iter()) {
-            results.push(LongChatScenarioResult::new(
-                scenario,
-                executor(throughput_config)?,
-            ));
+            let throughput = executor(throughput_config)?;
+            self.validate_finish_reason(&throughput)?;
+            results.push(LongChatScenarioResult::new(scenario, throughput));
         }
 
         Ok(results)
+    }
+
+    fn validate_finish_reason(&self, throughput: &ThroughputResult) -> Result<(), Box<dyn Error>> {
+        let Some(expected) = self.expected_finish_reason() else {
+            return Ok(());
+        };
+        let Some(actual) = throughput
+            .streaming_finish
+            .as_ref()
+            .map(|finish| finish.reason())
+        else {
+            return Err(format!("expected finish_reason {expected}, got none").into());
+        };
+        if actual != expected {
+            return Err(format!("expected finish_reason {expected}, got {actual}").into());
+        }
+        Ok(())
     }
 }
