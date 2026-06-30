@@ -73,7 +73,7 @@ impl GgufFile {
             .optional_nonzero_count(&format!("{prefix}.attention.key_length"))?
             .unwrap_or(default_head_dimension);
         let value_length = self
-            .optional_count(&format!("{prefix}.attention.value_length"))?
+            .optional_nonzero_count(&format!("{prefix}.attention.value_length"))?
             .unwrap_or(default_head_dimension);
         let rope_dimension_count =
             match self.optional_count(&format!("{prefix}.rope.dimension_count"))? {

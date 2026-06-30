@@ -142,6 +142,13 @@ pub(crate) fn minimal_llama_gguf_with_key_length(key_length: u32) -> Vec<u8> {
     })
 }
 
+pub(crate) fn minimal_llama_gguf_with_value_length(value_length: u32) -> Vec<u8> {
+    minimal_llama_gguf_with_options(LlamaGgufOptions {
+        value_length,
+        ..LlamaGgufOptions::default()
+    })
+}
+
 pub(crate) fn minimal_qwen2_gguf() -> Vec<u8> {
     let mut bytes = Vec::new();
     bytes.extend_from_slice(b"GGUF");
