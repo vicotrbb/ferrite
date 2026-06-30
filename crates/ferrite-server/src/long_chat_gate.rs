@@ -1,8 +1,15 @@
+mod throughput;
+
 use std::{error::Error, ffi::OsString, fmt};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LongChatGateConfig {
+    addr: String,
+    api_key: String,
     models: Vec<String>,
+    prompt: String,
+    assistant_context: String,
+    follow_up: String,
     token_lengths: Vec<usize>,
     turns: usize,
 }
@@ -18,9 +25,33 @@ impl LongChatGateConfig {
                 .to_str()
                 .ok_or_else(|| LongChatGateError::new("arguments must be valid UTF-8"))?;
             match flag {
+                "--addr" => {
+                    config.addr =
+                        parse_non_empty_string(next_value(&mut iter, "--addr")?, "--addr")?;
+                }
+                "--api-key" => {
+                    config.api_key =
+                        parse_non_empty_string(next_value(&mut iter, "--api-key")?, "--api-key")?;
+                }
                 "--models" => {
                     config.models =
                         parse_non_empty_list(next_value(&mut iter, "--models")?, "--models")?;
+                }
+                "--prompt" => {
+                    config.prompt =
+                        parse_non_empty_string(next_value(&mut iter, "--prompt")?, "--prompt")?;
+                }
+                "--assistant-context" => {
+                    config.assistant_context = parse_non_empty_string(
+                        next_value(&mut iter, "--assistant-context")?,
+                        "--assistant-context",
+                    )?;
+                }
+                "--follow-up" => {
+                    config.follow_up = parse_non_empty_string(
+                        next_value(&mut iter, "--follow-up")?,
+                        "--follow-up",
+                    )?;
                 }
                 "--token-lengths" => {
                     config.token_lengths =
@@ -42,12 +73,32 @@ impl LongChatGateConfig {
         Ok(config)
     }
 
+    pub fn addr(&self) -> &str {
+        &self.addr
+    }
+
+    pub fn api_key(&self) -> &str {
+        &self.api_key
+    }
+
     pub fn token_lengths(&self) -> &[usize] {
         &self.token_lengths
     }
 
     pub fn models(&self) -> &[String] {
         &self.models
+    }
+
+    pub fn prompt(&self) -> &str {
+        &self.prompt
+    }
+
+    pub fn assistant_context(&self) -> &str {
+        &self.assistant_context
+    }
+
+    pub fn follow_up(&self) -> &str {
+        &self.follow_up
     }
 
     pub fn turns(&self) -> usize {
@@ -74,12 +125,17 @@ impl LongChatGateConfig {
 impl Default for LongChatGateConfig {
     fn default() -> Self {
         Self {
+            addr: "127.0.0.1:8080".to_owned(),
+            api_key: "local-secret".to_owned(),
             models: vec![
                 "Qwen2.5-0.5B-Instruct-Q4_K_M".to_owned(),
                 "Qwen2.5-1.5B-Instruct-Q8_0".to_owned(),
                 "Qwen2.5-1.5B-Instruct-Q6_K".to_owned(),
                 "SmolLM2-1.7B-Instruct-Q4_K_M".to_owned(),
             ],
+            prompt: "Write a concise paragraph about CPU inference.".to_owned(),
+            assistant_context: "CPU inference prioritizes memory locality, predictable scheduling, and efficient token streaming.".to_owned(),
+            follow_up: "Continue with the operational risks for a long streaming chat.".to_owned(),
             token_lengths: vec![256, 512, 1024],
             turns: 4,
         }
@@ -152,12 +208,7 @@ fn parse_token_lengths(value: OsString) -> Result<Vec<usize>, LongChatGateError>
 }
 
 fn parse_non_empty_list(value: OsString, flag: &str) -> Result<Vec<String>, LongChatGateError> {
-    let value = os_string_to_string(value)?;
-    if value.trim().is_empty() {
-        return Err(LongChatGateError::new(format!(
-            "{flag} must contain at least one value"
-        )));
-    }
+    let value = parse_non_empty_string(value, flag)?;
 
     value
         .split(',')
@@ -171,6 +222,16 @@ fn parse_non_empty_list(value: OsString, flag: &str) -> Result<Vec<String>, Long
             Ok(part.to_owned())
         })
         .collect()
+}
+
+fn parse_non_empty_string(value: OsString, flag: &str) -> Result<String, LongChatGateError> {
+    let value = os_string_to_string(value)?;
+    if value.trim().is_empty() {
+        return Err(LongChatGateError::new(format!(
+            "{flag} must contain at least one value"
+        )));
+    }
+    Ok(value)
 }
 
 fn parse_turns(value: OsString) -> Result<usize, LongChatGateError> {
@@ -200,7 +261,7 @@ fn os_string_to_string(value: OsString) -> Result<String, LongChatGateError> {
 }
 
 fn usage() -> &'static str {
-    "usage: ferrite-openai-long-chat-gate [--models MODEL[,MODEL...]] [--token-lengths 256,512,1024] [--turns 4]"
+    "usage: ferrite-openai-long-chat-gate [--addr 127.0.0.1:8080] [--api-key local-secret] [--models MODEL[,MODEL...]] [--prompt TEXT] [--assistant-context TEXT] [--follow-up TEXT] [--token-lengths 256,512,1024] [--turns 4]"
 }
 
 pub fn format_plan(config: &LongChatGateConfig) -> String {
