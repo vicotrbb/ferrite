@@ -2,15 +2,18 @@ mod support;
 
 use std::path::PathBuf;
 use support::http::{response_json, send_http_request};
+use tokio::sync::Mutex;
 use tokio::time::{sleep, Duration};
 
 const DEFAULT_MODEL_PATH: &str = "target/models/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf";
 const REAL_MODEL_ID: &str = "qwen2.5-0.5b";
+static REAL_MODEL_TEST_LOCK: Mutex<()> = Mutex::const_new(());
 
 #[tokio::test]
 #[ignore = "requires local Tier 1 GGUF model artifact"]
 async fn live_http_server_generates_with_real_tier1_model() -> Result<(), Box<dyn std::error::Error>>
 {
+    let _test_lock = REAL_MODEL_TEST_LOCK.lock().await;
     let model_path = real_model_path()?;
     let server = support::LiveServer::start_with_existing_model(REAL_MODEL_ID, model_path).await?;
     let request_body =
@@ -41,6 +44,7 @@ async fn live_http_server_generates_with_real_tier1_model() -> Result<(), Box<dy
 #[ignore = "requires local Tier 1 GGUF model artifact"]
 async fn live_http_server_streams_with_real_tier1_model() -> Result<(), Box<dyn std::error::Error>>
 {
+    let _test_lock = REAL_MODEL_TEST_LOCK.lock().await;
     let model_path = real_model_path()?;
     let server = support::LiveServer::start_with_existing_model(REAL_MODEL_ID, model_path).await?;
     let request_body = format!(
@@ -74,6 +78,7 @@ async fn live_http_server_streams_with_real_tier1_model() -> Result<(), Box<dyn 
 #[tokio::test]
 #[ignore = "requires local Tier 1 GGUF model artifact"]
 async fn live_http_server_chats_with_real_tier1_model() -> Result<(), Box<dyn std::error::Error>> {
+    let _test_lock = REAL_MODEL_TEST_LOCK.lock().await;
     let model_path = real_model_path()?;
     let server = support::LiveServer::start_with_existing_model(REAL_MODEL_ID, model_path).await?;
     let request_body = format!(
@@ -105,6 +110,7 @@ async fn live_http_server_chats_with_real_tier1_model() -> Result<(), Box<dyn st
 #[ignore = "requires local Tier 1 GGUF model artifact"]
 async fn live_http_server_streams_chat_with_real_tier1_model(
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let _test_lock = REAL_MODEL_TEST_LOCK.lock().await;
     let model_path = real_model_path()?;
     let server = support::LiveServer::start_with_existing_model(REAL_MODEL_ID, model_path).await?;
     let request_body = format!(
@@ -139,6 +145,7 @@ async fn live_http_server_streams_chat_with_real_tier1_model(
 #[ignore = "requires local Tier 1 GGUF model artifact"]
 async fn live_http_server_rejects_concurrent_real_tier1_request(
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let _test_lock = REAL_MODEL_TEST_LOCK.lock().await;
     let model_path = real_model_path()?;
     let server = support::LiveServer::start_with_existing_model(REAL_MODEL_ID, model_path).await?;
     let addr = server.addr();
@@ -193,6 +200,7 @@ async fn live_http_server_rejects_concurrent_real_tier1_request(
 #[ignore = "requires local Tier 1 GGUF model artifact"]
 async fn live_http_server_waits_for_concurrent_real_tier1_request(
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let _test_lock = REAL_MODEL_TEST_LOCK.lock().await;
     let model_path = real_model_path()?;
     let server = support::LiveServer::start_with_existing_model_configured(
         REAL_MODEL_ID,
