@@ -110,14 +110,17 @@ async fn run_requests(
                 config.stream_usage(),
                 response.raw(),
             )?;
+            let response_finish = response.streaming_finish();
+            let response_usage = response.streaming_usage();
+            validate_streaming_token_count(config, response_finish.as_ref(), response_usage)?;
             if stream && streaming_timing.is_none() {
                 streaming_timing = response.streaming_timing();
             }
             if stream && streaming_finish.is_none() {
-                streaming_finish = response.streaming_finish();
+                streaming_finish = response_finish;
             }
             if stream && streaming_usage.is_none() {
-                streaming_usage = response.streaming_usage();
+                streaming_usage = response_usage;
             }
             completed_requests += 1;
         }
@@ -172,6 +175,34 @@ pub fn format_result(config: &ThroughputClientConfig, result: ThroughputResult) 
         ));
     }
     output
+}
+
+fn validate_streaming_token_count(
+    config: &ThroughputClientConfig,
+    finish: Option<&StreamingFinishSummary>,
+    usage: Option<StreamingUsageSummary>,
+) -> Result<(), Box<dyn Error>> {
+    if !config.stream() || !config.stream_usage() {
+        return Ok(());
+    }
+
+    let Some(finish) = finish else {
+        return Ok(());
+    };
+    let Some(usage) = usage else {
+        return Ok(());
+    };
+
+    if finish.reason() == "length" && usage.completion_tokens() != config.max_tokens() as u64 {
+        return Err(format!(
+            "streaming usage completion_tokens {} did not match requested max_tokens {}",
+            usage.completion_tokens(),
+            config.max_tokens()
+        )
+        .into());
+    }
+
+    Ok(())
 }
 
 fn request_body(config: &ThroughputClientConfig) -> String {

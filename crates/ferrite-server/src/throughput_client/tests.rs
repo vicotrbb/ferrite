@@ -567,6 +567,70 @@ fn extracts_streaming_usage_from_sse_body() -> Result<(), Box<dyn std::error::Er
 }
 
 #[test]
+fn accepts_length_streaming_usage_matching_requested_max_tokens(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let config = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--stream"),
+        OsString::from("--stream-usage"),
+        OsString::from("--max-tokens"),
+        OsString::from("32"),
+    ])?;
+
+    validate_streaming_token_count(
+        &config,
+        Some(&StreamingFinishSummary::new("length")),
+        Some(StreamingUsageSummary::new(8, 32, 40)),
+    )?;
+    Ok(())
+}
+
+#[test]
+fn rejects_length_streaming_usage_below_requested_max_tokens(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let config = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--stream"),
+        OsString::from("--stream-usage"),
+        OsString::from("--max-tokens"),
+        OsString::from("32"),
+    ])?;
+
+    let result = validate_streaming_token_count(
+        &config,
+        Some(&StreamingFinishSummary::new("length")),
+        Some(StreamingUsageSummary::new(8, 31, 39)),
+    );
+    let error = match result {
+        Ok(()) => return Err("expected streaming token-count validation error".into()),
+        Err(error) => error,
+    };
+
+    assert!(error.to_string().contains("completion_tokens"), "{error}");
+    assert!(error.to_string().contains("max_tokens"), "{error}");
+    Ok(())
+}
+
+#[test]
+fn accepts_stop_streaming_usage_below_requested_max_tokens(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let config = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--stream"),
+        OsString::from("--stream-usage"),
+        OsString::from("--max-tokens"),
+        OsString::from("32"),
+    ])?;
+
+    validate_streaming_token_count(
+        &config,
+        Some(&StreamingFinishSummary::new("stop")),
+        Some(StreamingUsageSummary::new(8, 4, 12)),
+    )?;
+    Ok(())
+}
+
+#[test]
 fn validates_streaming_response_done_event() -> Result<(), Box<dyn std::error::Error>> {
     let response = "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\n\r\ndata: {\"choices\":[{\"text\":\"hi\",\"finish_reason\":\"length\"}]}\n\ndata: [DONE]\n\n";
 
