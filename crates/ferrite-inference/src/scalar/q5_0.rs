@@ -33,6 +33,18 @@ pub(super) fn q5_0_row_bytes(cols: usize) -> Result<usize, InferenceError> {
         .ok_or_else(|| InferenceError::new("Q5_0 byte length overflow"))
 }
 
+pub(super) fn validate_q5_0_finite_scales(bytes: &[u8]) -> Result<(), InferenceError> {
+    for block in bytes.chunks_exact(Q5_0_BLOCK_BYTES) {
+        let scale = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
+        if !scale.is_finite() {
+            return Err(InferenceError::new(
+                "Q5_0 matrix scale values must be finite",
+            ));
+        }
+    }
+    Ok(())
+}
+
 pub(super) fn q5_0_mul_vec(
     bytes: &[u8],
     rows: usize,
