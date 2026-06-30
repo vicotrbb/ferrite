@@ -37,7 +37,7 @@ impl CompletionStreamContext {
             created,
             model,
             include_usage: false,
-            include_obfuscation: false,
+            include_obfuscation: true,
         }
     }
 
@@ -174,5 +174,28 @@ mod tests {
             context.token("hello".to_owned()).id,
             context.finish(GenerationFinishReason::Stop).id
         );
+    }
+
+    #[test]
+    fn completion_stream_context_emits_obfuscation_by_default(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let context = CompletionStreamContext::new("fixture-model".to_owned());
+        let chunk = serde_json::to_value(context.token("hello".to_owned()))?;
+
+        assert!(chunk["obfuscation"]
+            .as_str()
+            .is_some_and(|value| !value.is_empty()));
+        Ok(())
+    }
+
+    #[test]
+    fn completion_stream_context_can_disable_obfuscation() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let context =
+            CompletionStreamContext::new("fixture-model".to_owned()).with_obfuscation_field(false);
+        let chunk = serde_json::to_value(context.token("hello".to_owned()))?;
+
+        assert!(chunk.get("obfuscation").is_none());
+        Ok(())
     }
 }
