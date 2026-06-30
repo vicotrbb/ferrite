@@ -8,6 +8,9 @@ pub(super) fn is_valid_metadata(value: &Option<Value>) -> bool {
     let Some(value) = value else {
         return true;
     };
+    if value.is_null() {
+        return true;
+    }
     let Some(metadata) = value.as_object() else {
         return false;
     };
@@ -28,6 +31,11 @@ mod tests {
     #[test]
     fn missing_metadata_is_valid() {
         assert!(is_valid_metadata(&None));
+    }
+
+    #[test]
+    fn null_metadata_is_valid() {
+        assert!(is_valid_metadata(&Some(Value::Null)));
     }
 
     #[test]

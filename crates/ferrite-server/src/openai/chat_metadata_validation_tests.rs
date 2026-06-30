@@ -2,6 +2,22 @@ use super::test_support::post_chat_json;
 use axum::http::StatusCode;
 
 #[tokio::test]
+async fn chat_endpoint_accepts_null_metadata() -> Result<(), Box<dyn std::error::Error>> {
+    let body = post_chat_json(
+        r#"{
+            "model":"fixture-model",
+            "messages":[{"role":"user","content":"hello"}],
+            "metadata":null
+        }"#,
+    )
+    .await?;
+
+    assert_eq!(body.status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(body.json["error"]["type"], "server_error");
+    Ok(())
+}
+
+#[tokio::test]
 async fn chat_endpoint_rejects_malformed_metadata() -> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat_json(
         r#"{
