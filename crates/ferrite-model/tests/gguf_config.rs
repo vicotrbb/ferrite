@@ -8,9 +8,9 @@ use support::gguf::{
     minimal_llama_gguf_with_attention_head_count_kv, minimal_llama_gguf_with_attention_heads,
     minimal_llama_gguf_with_block_count, minimal_llama_gguf_with_context_length,
     minimal_llama_gguf_with_embedding_length, minimal_llama_gguf_with_feed_forward_length,
-    minimal_llama_gguf_with_key_length, minimal_llama_gguf_with_rope_dimension_count,
-    minimal_llama_gguf_with_rope_freq_base, minimal_llama_gguf_with_value_length,
-    minimal_qwen2_gguf,
+    minimal_llama_gguf_with_key_length, minimal_llama_gguf_with_layer_norm_rms_epsilon,
+    minimal_llama_gguf_with_rope_dimension_count, minimal_llama_gguf_with_rope_freq_base,
+    minimal_llama_gguf_with_value_length, minimal_qwen2_gguf,
 };
 
 #[test]
@@ -262,6 +262,29 @@ fn rejects_non_finite_rope_freq_base() -> Result<(), Box<dyn Error>> {
         assert!(error
             .to_string()
             .contains("llama.rope.freq_base must be finite"));
+    }
+    Ok(())
+}
+
+#[test]
+fn rejects_invalid_attention_layer_norm_rms_epsilon() -> Result<(), Box<dyn Error>> {
+    for layer_norm_rms_epsilon in [-1.0, f32::NAN, f32::INFINITY] {
+        let bytes = minimal_llama_gguf_with_layer_norm_rms_epsilon(layer_norm_rms_epsilon);
+        let file = parse_gguf(&bytes)?;
+
+        let error = match file.llama_config() {
+            Ok(_) => {
+                return Err(io::Error::other(
+                    "invalid attention layer norm RMS epsilon should be rejected",
+                )
+                .into());
+            }
+            Err(error) => error,
+        };
+
+        assert!(error
+            .to_string()
+            .contains("llama.attention.layer_norm_rms_epsilon must be finite and non-negative"));
     }
     Ok(())
 }

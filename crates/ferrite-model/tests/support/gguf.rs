@@ -164,6 +164,15 @@ pub(crate) fn minimal_llama_gguf_with_rope_freq_base(rope_freq_base: f32) -> Vec
     })
 }
 
+pub(crate) fn minimal_llama_gguf_with_layer_norm_rms_epsilon(
+    layer_norm_rms_epsilon: f32,
+) -> Vec<u8> {
+    minimal_llama_gguf_with_options(LlamaGgufOptions {
+        layer_norm_rms_epsilon,
+        ..LlamaGgufOptions::default()
+    })
+}
+
 pub(crate) fn minimal_qwen2_gguf() -> Vec<u8> {
     let mut bytes = Vec::new();
     bytes.extend_from_slice(b"GGUF");
@@ -217,6 +226,7 @@ struct LlamaGgufOptions {
     value_length: u32,
     rope_dimension_count: u32,
     rope_freq_base: f32,
+    layer_norm_rms_epsilon: f32,
 }
 
 impl Default for LlamaGgufOptions {
@@ -233,6 +243,7 @@ impl Default for LlamaGgufOptions {
             value_length: 4,
             rope_dimension_count: 4,
             rope_freq_base: 10000.0,
+            layer_norm_rms_epsilon: 0.00001,
         }
     }
 }
@@ -278,7 +289,7 @@ fn minimal_llama_gguf_with_options(options: LlamaGgufOptions) -> Vec<u8> {
     push_kv_f32(
         &mut bytes,
         "llama.attention.layer_norm_rms_epsilon",
-        0.00001,
+        options.layer_norm_rms_epsilon,
     );
     push_kv_u32(
         &mut bytes,

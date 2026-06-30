@@ -93,6 +93,9 @@ impl GgufFile {
         validate_rope_dimension_layout(prefix, key_length, rope_dimension_count)?;
         let rope_freq_base = self.optional_f32(&format!("{prefix}.rope.freq_base"))?;
         validate_rope_freq_base(prefix, rope_freq_base)?;
+        let attention_layer_norm_rms_epsilon =
+            self.optional_f32(&format!("{prefix}.attention.layer_norm_rms_epsilon"))?;
+        validate_attention_layer_norm_rms_epsilon(prefix, attention_layer_norm_rms_epsilon)?;
 
         Ok(LlamaConfig {
             architecture,
@@ -105,8 +108,7 @@ impl GgufFile {
             attention_head_count_kv,
             key_length,
             value_length,
-            attention_layer_norm_rms_epsilon: self
-                .optional_f32(&format!("{prefix}.attention.layer_norm_rms_epsilon"))?,
+            attention_layer_norm_rms_epsilon,
             rope_dimension_count,
             rope_freq_base,
         })
@@ -350,6 +352,21 @@ fn validate_rope_freq_base(prefix: &str, rope_freq_base: Option<f32>) -> Result<
         if value <= 0.0 {
             return Err(GgufError::new(format!(
                 "{prefix}.rope.freq_base {value} must be positive"
+            )));
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_attention_layer_norm_rms_epsilon(
+    prefix: &str,
+    epsilon: Option<f32>,
+) -> Result<(), GgufError> {
+    if let Some(value) = epsilon {
+        if !value.is_finite() || value < 0.0 {
+            return Err(GgufError::new(format!(
+                "{prefix}.attention.layer_norm_rms_epsilon must be finite and non-negative"
             )));
         }
     }
