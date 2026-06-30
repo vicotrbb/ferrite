@@ -89,6 +89,7 @@ impl GgufFile {
             .optional_nonzero_count(&format!("{prefix}.attention.head_count_kv"))?
             .unwrap_or(attention_head_count);
         validate_attention_head_layout(prefix, attention_head_count, attention_head_count_kv)?;
+        validate_rope_dimension_layout(prefix, key_length, rope_dimension_count)?;
 
         Ok(LlamaConfig {
             architecture,
@@ -295,6 +296,20 @@ fn validate_attention_head_layout(
     if !attention_head_count.is_multiple_of(attention_head_count_kv) {
         return Err(GgufError::new(format!(
             "{prefix}.attention.head_count {attention_head_count} must be divisible by {prefix}.attention.head_count_kv {attention_head_count_kv}"
+        )));
+    }
+
+    Ok(())
+}
+
+fn validate_rope_dimension_layout(
+    prefix: &str,
+    key_length: u64,
+    rope_dimension_count: u64,
+) -> Result<(), GgufError> {
+    if rope_dimension_count > key_length {
+        return Err(GgufError::new(format!(
+            "{prefix}.rope.dimension_count {rope_dimension_count} must be less than or equal to {prefix}.attention.key_length {key_length}"
         )));
     }
 
