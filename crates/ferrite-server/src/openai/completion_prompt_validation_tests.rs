@@ -91,3 +91,33 @@ async fn completion_endpoint_rejects_token_prompt_array_batch(
     assert!(!message.contains("malformed JSON"), "{message}");
     Ok(())
 }
+
+#[tokio::test]
+async fn completion_endpoint_reports_prompt_param_for_empty_or_whitespace_prompt(
+) -> Result<(), Box<dyn std::error::Error>> {
+    for (payload, expected_message) in [
+        (
+            r#"{
+                "model":"fixture-model",
+                "prompt":[]
+            }"#,
+            "prompt must contain at least one item",
+        ),
+        (
+            r#"{
+                "model":"fixture-model",
+                "prompt":"   "
+            }"#,
+            "prompt must contain non-whitespace text",
+        ),
+    ] {
+        let body = post_completion_json(payload).await?;
+
+        assert_eq!(body.status, StatusCode::BAD_REQUEST);
+        assert_eq!(body.json["error"]["type"], "invalid_request_error");
+        assert_eq!(body.json["error"]["param"], "prompt", "{}", body.json);
+        let message = body.json["error"]["message"].as_str().unwrap_or_default();
+        assert!(message.contains(expected_message), "{message}");
+    }
+    Ok(())
+}

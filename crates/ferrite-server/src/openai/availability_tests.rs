@@ -176,6 +176,7 @@ async fn streaming_completion_prompt_validation_runs_before_engine_availability(
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     let body = to_json(response.into_body()).await?;
     assert_eq!(body["error"]["type"], "invalid_request_error");
+    assert_eq!(body["error"]["param"], "prompt", "{body}");
     assert!(body["error"]["message"]
         .as_str()
         .unwrap_or_default()

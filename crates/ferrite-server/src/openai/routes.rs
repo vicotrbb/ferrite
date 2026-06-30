@@ -104,8 +104,9 @@ async fn completions(
     ensure_model(&state, request.model())?;
     ensure_supported_completion_request(&request)?;
     if request.prompts().is_empty() {
-        return Err(OpenAiHttpError::invalid_request(
+        return Err(OpenAiHttpError::invalid_request_with_param(
             "prompt must contain at least one item",
+            "prompt",
         ));
     }
     if request
@@ -113,8 +114,9 @@ async fn completions(
         .iter()
         .any(|prompt| prompt.trim().is_empty())
     {
-        return Err(OpenAiHttpError::invalid_request(
+        return Err(OpenAiHttpError::invalid_request_with_param(
             "prompt must contain non-whitespace text",
+            "prompt",
         ));
     }
     let max_tokens =
@@ -124,8 +126,9 @@ async fn completions(
             request
                 .single_prompt()
                 .ok_or_else(|| {
-                    OpenAiHttpError::invalid_request(
+                    OpenAiHttpError::invalid_request_with_param(
                         "streaming completions require exactly one text prompt",
+                        "prompt",
                     )
                 })?
                 .to_owned(),
