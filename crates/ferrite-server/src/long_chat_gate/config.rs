@@ -5,6 +5,7 @@ use std::{error::Error, ffi::OsString, fmt};
 pub struct LongChatGateConfig {
     addr: String,
     api_key: String,
+    execute: bool,
     models: Vec<String>,
     prompt: String,
     assistant_context: String,
@@ -31,6 +32,9 @@ impl LongChatGateConfig {
                 "--api-key" => {
                     config.api_key =
                         parse_non_empty_string(next_value(&mut iter, "--api-key")?, "--api-key")?;
+                }
+                "--execute" => {
+                    config.execute = true;
                 }
                 "--models" => {
                     config.models =
@@ -80,6 +84,10 @@ impl LongChatGateConfig {
         &self.api_key
     }
 
+    pub fn execute(&self) -> bool {
+        self.execute
+    }
+
     pub fn token_lengths(&self) -> &[usize] {
         &self.token_lengths
     }
@@ -126,6 +134,7 @@ impl Default for LongChatGateConfig {
         Self {
             addr: "127.0.0.1:8080".to_owned(),
             api_key: "local-secret".to_owned(),
+            execute: false,
             models: vec![
                 "Qwen2.5-0.5B-Instruct-Q4_K_M".to_owned(),
                 "Qwen2.5-1.5B-Instruct-Q8_0".to_owned(),
@@ -231,5 +240,5 @@ fn os_string_to_string(value: OsString) -> Result<String, LongChatGateError> {
 }
 
 fn usage() -> &'static str {
-    "usage: ferrite-openai-long-chat-gate [--addr 127.0.0.1:8080] [--api-key local-secret] [--models MODEL[,MODEL...]] [--prompt TEXT] [--assistant-context TEXT] [--follow-up TEXT] [--token-lengths 256,512,1024] [--turns 4]"
+    "usage: ferrite-openai-long-chat-gate [--execute] [--addr 127.0.0.1:8080] [--api-key local-secret] [--models MODEL[,MODEL...]] [--prompt TEXT] [--assistant-context TEXT] [--follow-up TEXT] [--token-lengths 256,512,1024] [--turns 4]"
 }

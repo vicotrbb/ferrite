@@ -16,6 +16,7 @@ fn defaults_to_required_long_chat_token_lengths_and_turns() -> Result<(), Box<dy
 
     assert_eq!(config.token_lengths(), &[256, 512, 1024]);
     assert_eq!(config.turns(), 4);
+    assert!(!config.execute());
     assert_eq!(
         config.models(),
         &[
@@ -34,6 +35,7 @@ fn parses_custom_long_chat_token_lengths_turns_and_models() -> Result<(), Box<dy
 {
     let config = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--execute"),
         OsString::from("--token-lengths"),
         OsString::from("128,256"),
         OsString::from("--turns"),
@@ -54,6 +56,7 @@ fn parses_custom_long_chat_token_lengths_turns_and_models() -> Result<(), Box<dy
 
     assert_eq!(config.token_lengths(), &[128, 256]);
     assert_eq!(config.turns(), 5);
+    assert!(config.execute());
     assert_eq!(config.models(), &["model-a", "model-b"]);
     assert_eq!(config.planned_scenarios(), 20);
     assert_eq!(config.addr(), "127.0.0.1:18080");
