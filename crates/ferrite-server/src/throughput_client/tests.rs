@@ -88,6 +88,7 @@ fn formats_chat_completion_result_metric_name() -> Result<(), Box<dyn std::error
     let result = ThroughputResult {
         completed_requests: 2,
         elapsed: std::time::Duration::from_millis(400),
+        streaming_timing: None,
     };
 
     assert_eq!(
@@ -164,11 +165,37 @@ fn formats_streaming_chat_completion_result_metric_name() -> Result<(), Box<dyn 
     let result = ThroughputResult {
         completed_requests: 2,
         elapsed: std::time::Duration::from_millis(400),
+        streaming_timing: None,
     };
 
     assert_eq!(
         format_result(&config, result),
         "openai_http_streaming_chat_completion_requests=2\nelapsed_ms=400\nrequests_per_second=5.000000"
+    );
+    Ok(())
+}
+
+#[test]
+fn formats_streaming_timing_summary() -> Result<(), Box<dyn std::error::Error>> {
+    let config = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--endpoint"),
+        OsString::from("chat-completions"),
+        OsString::from("--stream"),
+    ])?;
+    let result = ThroughputResult {
+        completed_requests: 1,
+        elapsed: Duration::from_millis(400),
+        streaming_timing: StreamingTimingSummary::from_event_offsets(&[
+            Duration::from_millis(100),
+            Duration::from_millis(140),
+            Duration::from_millis(170),
+        ]),
+    };
+
+    assert_eq!(
+        format_result(&config, result),
+        "openai_http_streaming_chat_completion_requests=1\nelapsed_ms=400\nrequests_per_second=2.500000\nstreaming_token_events=3\nstreaming_time_to_first_token_ms=100\nstreaming_total_elapsed_ms=170\nstreaming_tokens_per_second=17.647059\nstreaming_token_latency_min_ms=30\nstreaming_token_latency_p50_ms=40\nstreaming_token_latency_p95_ms=100\nstreaming_token_latency_max_ms=100"
     );
     Ok(())
 }

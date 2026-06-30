@@ -17,6 +17,7 @@ use std::{
 pub struct ThroughputResult {
     pub completed_requests: usize,
     pub elapsed: Duration,
+    pub streaming_timing: Option<StreamingTimingSummary>,
 }
 
 impl ThroughputResult {
@@ -63,17 +64,32 @@ pub async fn run_completion_benchmark(
     Ok(ThroughputResult {
         completed_requests,
         elapsed: started.elapsed(),
+        streaming_timing: None,
     })
 }
 
 pub fn format_result(config: &ThroughputClientConfig, result: ThroughputResult) -> String {
-    format!(
+    let mut output = format!(
         "{}={}\nelapsed_ms={}\nrequests_per_second={:.6}",
         config.endpoint().metric_name(config.stream()),
         result.completed_requests,
         result.elapsed.as_millis(),
         result.requests_per_second()
-    )
+    );
+    if let Some(summary) = result.streaming_timing {
+        output.push_str(&format!(
+            "\nstreaming_token_events={}\nstreaming_time_to_first_token_ms={}\nstreaming_total_elapsed_ms={}\nstreaming_tokens_per_second={:.6}\nstreaming_token_latency_min_ms={}\nstreaming_token_latency_p50_ms={}\nstreaming_token_latency_p95_ms={}\nstreaming_token_latency_max_ms={}",
+            summary.token_events(),
+            summary.time_to_first_token().as_millis(),
+            summary.total_elapsed().as_millis(),
+            summary.tokens_per_second(),
+            summary.min_token_latency().as_millis(),
+            summary.p50_token_latency().as_millis(),
+            summary.p95_token_latency().as_millis(),
+            summary.max_token_latency().as_millis(),
+        ));
+    }
+    output
 }
 
 fn request_body(config: &ThroughputClientConfig) -> String {
