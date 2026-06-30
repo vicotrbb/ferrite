@@ -46,6 +46,9 @@ pub(super) fn validate_config(config: &ScalarLlamaConfig) -> Result<(), Inferenc
             config.rope_dimension_count
         )));
     }
+    if !config.rope_freq_base.is_finite() {
+        return Err(InferenceError::new("rope frequency base must be finite"));
+    }
     if config.rope_freq_base <= 0.0 {
         return Err(InferenceError::new(format!(
             "rope frequency base {} must be positive",

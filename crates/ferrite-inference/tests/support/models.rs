@@ -146,6 +146,42 @@ pub(crate) fn causal_attention_model() -> Result<ScalarLlamaModel, Box<dyn Error
     Ok(model)
 }
 
+pub(crate) fn model_with_rope_freq_base(
+    rope_freq_base: f32,
+) -> Result<ScalarLlamaModel, Box<dyn Error>> {
+    let mut config = scalar_config(4);
+    config.rope_freq_base = rope_freq_base;
+    let identity = identity_2x2()?;
+    let model = ScalarLlamaModel::new(
+        config,
+        ScalarLlamaWeights {
+            token_embedding: Matrix::from_row_major(
+                4,
+                2,
+                vec![
+                    1.0, 0.0, // token 0
+                    0.0, 1.0, // token 1
+                    1.0, 1.0, // token 2
+                    0.0, 0.0, // token 3
+                ],
+            )?,
+            output_norm: vec![1.0, 1.0],
+            output: ScalarLlamaOutputWeights::untied(Matrix::from_row_major(
+                4,
+                2,
+                vec![
+                    0.0, 0.0, // token 0
+                    1.0, 0.0, // token 1
+                    0.0, 1.0, // token 2
+                    -1.0, -1.0, // token 3
+                ],
+            )?),
+            layers: vec![identity_layer(identity.clone(), zero_2x2()?, identity)?],
+        },
+    )?;
+    Ok(model)
+}
+
 fn scalar_config(vocab_size: usize) -> ScalarLlamaConfig {
     scalar_config_with_rope_dimensions(vocab_size, 0)
 }

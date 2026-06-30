@@ -15,8 +15,8 @@ use std::io;
 use support::assertions::assert_close;
 use support::fixtures::qwen2_fixture_from_llama_fixture;
 use support::models::{
-    causal_attention_model, documented_argmax_model, prompt_causal_attention_model,
-    value_bias_model,
+    causal_attention_model, documented_argmax_model, model_with_rope_freq_base,
+    prompt_causal_attention_model, value_bias_model,
 };
 
 #[test]
@@ -77,6 +77,25 @@ fn rope_rotates_even_odd_pairs_by_position_and_frequency() -> Result<(), Box<dyn
     assert_close(rotated[1], 1.0_f32.sin());
     assert_close(rotated[2], -1.0_f32.sin());
     assert_close(rotated[3], 1.0_f32.cos());
+    Ok(())
+}
+
+#[test]
+fn scalar_config_rejects_non_finite_rope_freq_base() -> Result<(), Box<dyn Error>> {
+    for rope_freq_base in [f32::NAN, f32::INFINITY] {
+        let error = match model_with_rope_freq_base(rope_freq_base) {
+            Ok(_) => {
+                return Err(
+                    io::Error::other("non-finite rope frequency base should be rejected").into(),
+                );
+            }
+            Err(error) => error,
+        };
+
+        assert!(error
+            .to_string()
+            .contains("rope frequency base must be finite"));
+    }
     Ok(())
 }
 
