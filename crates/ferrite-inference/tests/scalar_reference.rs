@@ -77,6 +77,23 @@ fn matrix_from_row_major_rejects_non_finite_values() -> Result<(), Box<dyn Error
 }
 
 #[test]
+fn matrix_vector_multiply_rejects_non_finite_vector_values() -> Result<(), Box<dyn Error>> {
+    let matrix = Matrix::from_row_major(1, 2, vec![1.0, 1.0])?;
+
+    for value in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+        let error = match matrix.mul_vec(&[1.0, value]) {
+            Ok(_) => return Err(io::Error::other("non-finite vector value should fail").into()),
+            Err(error) => error,
+        };
+
+        assert!(error
+            .to_string()
+            .contains("F32 matvec vector values must be finite"));
+    }
+    Ok(())
+}
+
+#[test]
 fn single_token_llama_reference_path_produces_documented_argmax() -> Result<(), Box<dyn Error>> {
     let model = documented_argmax_model()?;
 

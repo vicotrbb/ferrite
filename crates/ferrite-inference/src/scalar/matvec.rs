@@ -35,6 +35,11 @@ pub(super) fn f32_mul_vec(
             vector.len()
         )));
     }
+    if vector.iter().any(|value| !value.is_finite()) {
+        return Err(InferenceError::new(
+            "F32 matvec vector values must be finite",
+        ));
+    }
     let expected = rows
         .checked_mul(cols)
         .ok_or_else(|| InferenceError::new("F32 matrix value count overflow"))?;
