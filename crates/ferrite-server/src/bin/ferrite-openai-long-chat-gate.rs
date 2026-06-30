@@ -2,6 +2,7 @@ use ferrite_server::long_chat_gate::{
     format_disconnect_probe_result, format_error_probe_result, format_report,
     format_scenario_result, LongChatGateConfig,
 };
+use std::io::Write;
 
 #[tokio::main]
 async fn main() {
@@ -27,9 +28,14 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
     if config.execute() {
-        for result in config.run().await? {
-            println!("{}", format_scenario_result(&result));
-        }
+        let mut stdout = std::io::stdout();
+        config
+            .run_with_observer(|result| {
+                writeln!(stdout, "{}", format_scenario_result(result))?;
+                stdout.flush()?;
+                Ok(())
+            })
+            .await?;
     }
     Ok(())
 }

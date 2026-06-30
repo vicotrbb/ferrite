@@ -434,6 +434,58 @@ fn runs_long_chat_gate_with_injected_executor() -> Result<(), Box<dyn std::error
 }
 
 #[test]
+fn observes_long_chat_results_as_each_scenario_finishes() -> Result<(), Box<dyn std::error::Error>>
+{
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--models"),
+        OsString::from("fixture-model"),
+        OsString::from("--token-lengths"),
+        OsString::from("256,512"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+    ])?;
+    let mut observed = Vec::new();
+
+    let results = config.run_with_executor_and_observer(
+        |throughput| {
+            Ok(ThroughputResult {
+                completed_requests: throughput.requests(),
+                elapsed: Duration::from_millis(10 * throughput.max_tokens() as u64),
+                streaming_finish: Some(StreamingFinishSummary::new("length")),
+                streaming_timing: None,
+                streaming_usage: Some(StreamingUsageSummary::new(
+                    8,
+                    throughput.max_tokens() as u64,
+                    throughput.max_tokens() as u64 + 8,
+                )),
+                rss: None,
+            })
+        },
+        |result| {
+            observed.push((result.turn(), result.token_length()));
+            Ok(())
+        },
+    )?;
+
+    assert_eq!(
+        observed,
+        [
+            (1, 256),
+            (1, 512),
+            (2, 256),
+            (2, 512),
+            (3, 256),
+            (3, 512),
+            (4, 256),
+            (4, 512),
+        ]
+    );
+    assert_eq!(results.len(), observed.len());
+    Ok(())
+}
+
+#[test]
 fn rejects_unexpected_long_chat_finish_reason() -> Result<(), Box<dyn std::error::Error>> {
     let config = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),
