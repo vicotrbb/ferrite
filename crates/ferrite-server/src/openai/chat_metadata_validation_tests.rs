@@ -59,6 +59,22 @@ async fn chat_endpoint_rejects_malformed_prompt_cache_key() -> Result<(), Box<dy
 }
 
 #[tokio::test]
+async fn chat_endpoint_accepts_null_prompt_cache_key() -> Result<(), Box<dyn std::error::Error>> {
+    let body = post_chat_json(
+        r#"{
+            "model":"fixture-model",
+            "messages":[{"role":"user","content":"hello"}],
+            "prompt_cache_key":null
+        }"#,
+    )
+    .await?;
+
+    assert_eq!(body.status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(body.json["error"]["type"], "server_error");
+    Ok(())
+}
+
+#[tokio::test]
 async fn chat_endpoint_rejects_malformed_safety_identifier(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat_json(
