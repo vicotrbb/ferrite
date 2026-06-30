@@ -27,6 +27,14 @@ impl LiveServer {
         Self::start_with_state(|state| state).await
     }
 
+    pub async fn start_with_model_id(model_id: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        let model_path = write_fixture_model()?;
+        Self::start_with_loaded_model(model_id, &model_path, Some(model_path.clone()), |state| {
+            state
+        })
+        .await
+    }
+
     pub async fn start_configured(
         configure: impl FnOnce(ServerState) -> ServerState,
     ) -> Result<Self, Box<dyn std::error::Error>> {

@@ -39,6 +39,30 @@ async fn live_http_server_accepts_openai_style_model_retrieve(
 }
 
 #[tokio::test]
+async fn live_http_server_retrieves_encoded_slash_model_id(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let model_id = "HuggingFaceTB/SmolLM2-135M-Instruct";
+    let server = support::LiveServer::start_with_model_id(model_id).await?;
+    let response = send_http_request(
+        server.addr(),
+        "GET",
+        "/v1/models/HuggingFaceTB%2FSmolLM2-135M-Instruct",
+        &[],
+    )
+    .await?;
+
+    assert!(
+        response.starts_with("HTTP/1.1 200 OK"),
+        "unexpected response: {response}"
+    );
+    let body = response_json(&response)?;
+    assert_eq!(body["id"], model_id);
+    assert_eq!(body["object"], "model");
+    assert_eq!(body["owned_by"], "ferrite");
+    Ok(())
+}
+
+#[tokio::test]
 async fn live_http_server_accepts_openai_style_chat_request(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let server = support::LiveServer::start().await?;
