@@ -1,3 +1,4 @@
+use ferrite_inference::scalar::Q8KActivationMatvecRole;
 use std::error::Error;
 use std::ffi::OsString;
 use std::io;
@@ -14,7 +15,7 @@ pub struct CliArgs {
     pub profile_next_token: bool,
     pub profile_benchmark_token: bool,
     pub experimental_q8_k_activation_matvec: bool,
-    pub experimental_q8_k_activation_roles: Option<String>,
+    pub experimental_q8_k_activation_roles: Option<Vec<Q8KActivationMatvecRole>>,
     pub compare_q8_k_activation_matvec: bool,
     pub stream: bool,
     pub sleep_after_load_ms: Option<u64>,
@@ -111,10 +112,12 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
                 experimental_q8_k_activation_matvec = true;
             }
             "--experimental-q8-k-activation-roles" => {
-                experimental_q8_k_activation_roles = Some(os_string_to_string(next_value(
+                let roles = os_string_to_string(next_value(
                     &mut iter,
                     "--experimental-q8-k-activation-roles",
-                )?)?);
+                )?)?;
+                experimental_q8_k_activation_roles =
+                    Some(Q8KActivationMatvecRole::parse_list(&roles).map_err(io::Error::other)?);
             }
             "--compare-q8-k-activation-matvec" => {
                 compare_q8_k_activation_matvec = true;
@@ -291,4 +294,36 @@ fn parse_token_ids(value: OsString) -> Result<Vec<usize>, Box<dyn Error>> {
 
 fn usage() -> &'static str {
     "usage: ferrite --model <path.gguf> (--prompt <text> | --prompt-token-ids <id[,id...]>) [--expect-token-id <id>] [--top-logits <count>] [--profile-next-token] [--generate-tokens <count>] [--expect-generated-token-ids <id[,id...]>] [--stream] [--benchmark-runs <count>] [--profile-benchmark-token] [--sleep-after-load-ms <ms>] [--experimental-q8-k-activation-matvec] [--experimental-q8-k-activation-roles <role[,role...]>] [--compare-q8-k-activation-matvec]"
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse;
+    use std::{error::Error, ffi::OsString, io};
+
+    #[test]
+    fn rejects_unknown_q8_k_activation_roles_before_required_inputs() -> Result<(), Box<dyn Error>>
+    {
+        let error = match parse([
+            OsString::from("ferrite"),
+            OsString::from("--experimental-q8-k-activation-matvec"),
+            OsString::from("--experimental-q8-k-activation-roles"),
+            OsString::from("unknown"),
+        ]) {
+            Ok(_) => {
+                return Err(
+                    io::Error::other("unknown Q8_K role should fail argument parsing").into(),
+                );
+            }
+            Err(error) => error,
+        };
+
+        assert!(
+            error
+                .to_string()
+                .contains("unknown Q8_K activation matvec role unknown"),
+            "unexpected error: {error}"
+        );
+        Ok(())
+    }
 }

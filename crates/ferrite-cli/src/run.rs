@@ -2,8 +2,8 @@ use crate::args::{self, PromptSource};
 use crate::benchmark::profile_first_benchmark_token;
 use crate::profile::{print_benchmark_token_profile, print_next_token_profile};
 use ferrite_inference::scalar::{
-    NextToken, ProfiledNextToken, Q8KActivationMatvecPolicy, Q8KActivationMatvecRole,
-    ScalarExecutionOptions, ScalarLlamaModel, ScalarLlamaSession,
+    NextToken, ProfiledNextToken, Q8KActivationMatvecPolicy, ScalarExecutionOptions,
+    ScalarLlamaModel, ScalarLlamaSession,
 };
 use ferrite_model::gguf::parse_gguf;
 use ferrite_model::tokenizer::GgufTokenizer;
@@ -37,10 +37,8 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
     let mut execution_options = ScalarExecutionOptions::default()
         .with_q8_k_activation_matvec_policy(q8_k_activation_matvec_policy)
         .with_q8_k_activation_matvec_comparison(args.compare_q8_k_activation_matvec);
-    if let Some(roles) = args.experimental_q8_k_activation_roles.as_deref() {
-        execution_options = execution_options.with_q8_k_activation_matvec_roles(
-            Q8KActivationMatvecRole::parse_list(roles).map_err(io::Error::other)?,
-        );
+    if let Some(roles) = args.experimental_q8_k_activation_roles {
+        execution_options = execution_options.with_q8_k_activation_matvec_roles(roles);
     }
     let mut session = model.start_session_with_options(execution_options);
     let (next, profile) = accept_prompt(&mut session, &prompt_token_ids, args.profile_next_token)?;
