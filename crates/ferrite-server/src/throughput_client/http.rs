@@ -64,16 +64,17 @@ Connection: close\r\n\
 pub fn validate_openai_response(
     endpoint: OpenAiEndpoint,
     stream: bool,
+    expect_stream_usage: bool,
     response: &str,
 ) -> Result<(), Box<dyn Error>> {
     if !response.starts_with("HTTP/1.1 200 OK") {
         return Err(format!("unexpected response: {response}").into());
     }
-    let (_, body) = response
+    let (headers, body) = response
         .split_once("\r\n\r\n")
         .ok_or("expected HTTP response body")?;
     if stream {
-        return validate_streaming_body(body);
+        return validate_streaming_response(headers, body, expect_stream_usage);
     }
     let body: serde_json::Value = serde_json::from_str(body)?;
     match endpoint {
@@ -102,14 +103,45 @@ fn validate_chat_completion_body(body: &serde_json::Value) -> Result<(), Box<dyn
     Ok(())
 }
 
-fn validate_streaming_body(body: &str) -> Result<(), Box<dyn Error>> {
-    if !body.lines().any(|line| line.starts_with("data: ")) {
-        return Err("missing streaming data event".into());
+fn validate_streaming_response(
+    headers: &str,
+    body: &str,
+    expect_stream_usage: bool,
+) -> Result<(), Box<dyn Error>> {
+    let content_type = header_value(headers, "content-type").unwrap_or_default();
+    if !content_type
+        .split(';')
+        .next()
+        .is_some_and(|value| value.trim().eq_ignore_ascii_case("text/event-stream"))
+    {
+        return Err(
+            format!("expected text/event-stream content type, got {content_type:?}").into(),
+        );
     }
-    if !body.lines().any(|line| line == "data: [DONE]") {
-        return Err("missing streaming done event".into());
+    let done_events = body.lines().filter(|line| *line == "data: [DONE]").count();
+    if done_events != 1 {
+        return Err(format!("expected exactly one streaming done event, got {done_events}").into());
+    }
+    let has_json_event = body
+        .lines()
+        .filter_map(|line| line.strip_prefix("data: "))
+        .map(str::trim)
+        .filter(|data| *data != "[DONE]")
+        .any(|data| serde_json::from_str::<serde_json::Value>(data).is_ok());
+    if !has_json_event {
+        return Err("missing streaming JSON data event".into());
+    }
+    if expect_stream_usage && StreamingUsageSummary::from_sse_body(body).is_none() {
+        return Err("missing streaming usage chunk".into());
     }
     Ok(())
+}
+
+fn header_value<'a>(headers: &'a str, name: &str) -> Option<&'a str> {
+    headers.lines().find_map(|line| {
+        let (candidate, value) = line.split_once(':')?;
+        candidate.eq_ignore_ascii_case(name).then_some(value.trim())
+    })
 }
 
 async fn read_http_response(

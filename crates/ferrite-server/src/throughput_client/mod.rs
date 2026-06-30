@@ -61,7 +61,12 @@ pub async fn run_completion_benchmark(
                 .await
                 .map_err(|error| std::io::Error::other(format!("request task failed: {error}")))?
                 .map_err(std::io::Error::other)?;
-            http::validate_openai_response(endpoint, stream, response.raw())?;
+            http::validate_openai_response(
+                endpoint,
+                stream,
+                config.stream_usage(),
+                response.raw(),
+            )?;
             if stream && streaming_timing.is_none() {
                 streaming_timing = response.streaming_timing();
             }

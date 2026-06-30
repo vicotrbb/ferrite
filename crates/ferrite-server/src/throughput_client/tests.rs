@@ -325,8 +325,76 @@ fn extracts_streaming_usage_from_sse_body() -> Result<(), Box<dyn std::error::Er
 fn validates_streaming_response_done_event() -> Result<(), Box<dyn std::error::Error>> {
     let response = "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\n\r\ndata: {\"choices\":[{\"text\":\"hi\"}]}\n\ndata: [DONE]\n\n";
 
-    http::validate_openai_response(OpenAiEndpoint::Completions, true, response)?;
+    http::validate_openai_response(OpenAiEndpoint::Completions, true, false, response)?;
     Ok(())
+}
+
+#[test]
+fn rejects_streaming_response_without_sse_content_type() -> Result<(), Box<dyn std::error::Error>> {
+    let response = "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\n\r\ndata: {\"choices\":[{\"text\":\"hi\"}]}\n\ndata: [DONE]\n\n";
+
+    let error = validate_stream_error(response, false)?;
+
+    assert!(error.to_string().contains("text/event-stream"), "{error}");
+    Ok(())
+}
+
+#[test]
+fn rejects_streaming_response_with_duplicate_done_events() -> Result<(), Box<dyn std::error::Error>>
+{
+    let response = "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\n\r\ndata: {\"choices\":[{\"text\":\"hi\"}]}\n\ndata: [DONE]\n\ndata: [DONE]\n\n";
+
+    let error = validate_stream_error(response, false)?;
+
+    assert!(
+        error.to_string().contains("exactly one streaming done"),
+        "{error}"
+    );
+    Ok(())
+}
+
+#[test]
+fn rejects_streaming_response_without_json_data_chunk() -> Result<(), Box<dyn std::error::Error>> {
+    let response = "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\n\r\ndata: [DONE]\n\n";
+
+    let error = validate_stream_error(response, false)?;
+
+    assert!(
+        error
+            .to_string()
+            .contains("missing streaming JSON data event"),
+        "{error}"
+    );
+    Ok(())
+}
+
+#[test]
+fn rejects_streaming_usage_response_without_usage_chunk() -> Result<(), Box<dyn std::error::Error>>
+{
+    let response = "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\n\r\ndata: {\"choices\":[{\"text\":\"hi\"}],\"usage\":null}\n\ndata: [DONE]\n\n";
+
+    let error = validate_stream_error(response, true)?;
+
+    assert!(
+        error.to_string().contains("missing streaming usage"),
+        "{error}"
+    );
+    Ok(())
+}
+
+fn validate_stream_error(
+    response: &str,
+    expect_stream_usage: bool,
+) -> Result<Box<dyn std::error::Error>, Box<dyn std::error::Error>> {
+    match http::validate_openai_response(
+        OpenAiEndpoint::Completions,
+        true,
+        expect_stream_usage,
+        response,
+    ) {
+        Ok(()) => Err("expected streaming validation error".into()),
+        Err(error) => Ok(error),
+    }
 }
 
 #[test]
