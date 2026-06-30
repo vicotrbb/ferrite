@@ -3,7 +3,7 @@ use super::{
     id::response_id,
     logit_bias::is_neutral_logit_bias,
     model_id::deserialize_model_id,
-    neutral_options::{is_neutral_bool, is_neutral_number, is_neutral_number_in},
+    neutral_options::{is_neutral_number, is_neutral_number_in},
     seed::is_seed,
     stop_sequences::{is_supported_stop_sequences, stop_sequences},
     stream_flag::StreamFlag,
@@ -92,6 +92,10 @@ impl CompletionRequest {
             .is_some_and(StreamOptions::include_usage)
     }
 
+    pub fn echo(&self) -> bool {
+        self.echo.as_ref().is_some_and(|value| value == true)
+    }
+
     pub fn stop_sequences(&self) -> Vec<String> {
         stop_sequences(&self.stop)
     }
@@ -109,7 +113,7 @@ impl CompletionRequest {
             .with_present("top_p", !is_neutral_number(&self.top_p, 1.0))
             .with_present("n", !is_neutral_number(&self.n, 1.0))
             .with_present("logprobs", self.logprobs.is_some())
-            .with_present("echo", !is_neutral_bool(&self.echo, false))
+            .with_present("echo", !self.echo_option_is_supported())
             .with_present("stop", !is_supported_stop_sequences(&self.stop))
             .with_present(
                 "presence_penalty",
@@ -134,6 +138,15 @@ impl CompletionRequest {
         }
         fields
     }
+
+    fn echo_option_is_supported(&self) -> bool {
+        match &self.echo {
+            None => true,
+            Some(Value::Bool(false)) => true,
+            Some(Value::Bool(true)) => !self.stream(),
+            Some(_) => false,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -153,6 +166,15 @@ impl CompletionResponse {
     }
 
     pub fn from_generations(model: String, generated: Vec<GeneratedText>) -> Self {
+        Self::from_prompt_generations(model, &[], generated, false)
+    }
+
+    pub fn from_prompt_generations(
+        model: String,
+        prompts: &[String],
+        generated: Vec<GeneratedText>,
+        echo: bool,
+    ) -> Self {
         let created = unix_timestamp();
         Self {
             id: response_id("cmpl", created),
@@ -163,7 +185,10 @@ impl CompletionResponse {
             choices: generated
                 .iter()
                 .enumerate()
-                .map(|(index, generated)| CompletionChoice::new(index, generated))
+                .map(|(index, generated)| {
+                    let prompt = echo.then(|| prompts.get(index).map(String::as_str).unwrap_or(""));
+                    CompletionChoice::new(index, prompt, generated)
+                })
                 .collect(),
             usage: Usage::from_generations(&generated),
         }
@@ -179,9 +204,13 @@ struct CompletionChoice {
 }
 
 impl CompletionChoice {
-    fn new(index: usize, generated: &GeneratedText) -> Self {
+    fn new(index: usize, prompt: Option<&str>, generated: &GeneratedText) -> Self {
+        let text = match prompt {
+            Some(prompt) => format!("{prompt}{}", generated.text()),
+            None => generated.text().to_owned(),
+        };
         Self {
-            text: generated.text().to_owned(),
+            text,
             index,
             logprobs: None,
             finish_reason: finish_reason(generated.finish_reason()),

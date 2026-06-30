@@ -153,9 +153,11 @@ async fn completions(
         permit,
     )
     .await?;
-    Ok(Json(CompletionResponse::from_generations(
+    Ok(Json(CompletionResponse::from_prompt_generations(
         state.model_id().to_owned(),
+        request.prompts(),
         generated,
+        request.echo(),
     ))
     .into_response())
 }

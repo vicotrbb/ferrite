@@ -33,6 +33,14 @@ async fn completions_endpoint_accepts_disabled_echo() -> Result<(), Box<dyn std:
 }
 
 #[tokio::test]
+async fn completions_endpoint_echoes_prompt_when_requested(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let body = accepted_completion_option_response(r#""echo":true"#).await?;
+    assert_eq!(body["choices"][0]["text"], "hellowinner");
+    Ok(())
+}
+
+#[tokio::test]
 async fn completions_endpoint_accepts_single_best_of_candidate(
 ) -> Result<(), Box<dyn std::error::Error>> {
     assert_completion_option_is_accepted(r#""best_of":1"#).await
