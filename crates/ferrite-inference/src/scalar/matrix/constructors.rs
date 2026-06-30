@@ -1,5 +1,6 @@
 use super::{Matrix, MatrixData};
 use crate::scalar::{
+    q4_k::validate_q4_k_finite_scales,
     q5_0::validate_q5_0_finite_scales,
     q8_0::validate_q8_0_finite_scales,
     quantized::{
@@ -108,6 +109,7 @@ impl Matrix {
                 data.len()
             )));
         }
+        validate_q4_k_finite_scales(&data)?;
 
         Ok(Self {
             rows,

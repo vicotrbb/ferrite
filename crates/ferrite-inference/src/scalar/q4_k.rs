@@ -123,6 +123,19 @@ pub(super) fn q4_k_storage_bytes(value_count: usize) -> Result<usize, InferenceE
         .ok_or_else(|| InferenceError::new("Q4_K byte length overflow"))
 }
 
+pub(super) fn validate_q4_k_finite_scales(bytes: &[u8]) -> Result<(), InferenceError> {
+    for block in bytes.chunks_exact(Q4_K_BLOCK_BYTES) {
+        let d = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
+        let dmin = f16_bits_to_f32(u16::from_le_bytes([block[2], block[3]]));
+        if !d.is_finite() || !dmin.is_finite() {
+            return Err(InferenceError::new(
+                "Q4_K matrix scale values must be finite",
+            ));
+        }
+    }
+    Ok(())
+}
+
 pub(super) fn decode_q4_k_values(
     bytes: &[u8],
     value_count: usize,

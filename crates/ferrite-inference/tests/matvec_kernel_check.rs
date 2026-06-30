@@ -134,6 +134,27 @@ fn q4_k_matvec_check_uses_decoded_scalar_reference() -> Result<(), Box<dyn Error
 }
 
 #[test]
+fn q4_k_matrix_rejects_non_finite_scale_values() -> Result<(), Box<dyn Error>> {
+    for scale_bits in [0x7c00, 0xfc00, 0x7e00] {
+        let error = match Matrix::from_q4_k_row_major_bytes(
+            1,
+            256,
+            q4_k_block_with_scale_bits(scale_bits, 0, 1),
+        ) {
+            Ok(_) => {
+                return Err(io::Error::other("non-finite Q4_K matrix scale should fail").into());
+            }
+            Err(error) => error,
+        };
+
+        assert!(error
+            .to_string()
+            .contains("Q4_K matrix scale values must be finite"));
+    }
+    Ok(())
+}
+
+#[test]
 fn q4_k_matvec_accepts_q8_k_execution_options() -> Result<(), Box<dyn Error>> {
     let matrix = Matrix::from_q4_k_row_major_bytes(1, 256, q4_k_block_with_value(1))?;
     let vector: Vec<f32> = (1..=256).map(|value| value as f32).collect();
@@ -241,10 +262,14 @@ fn q5_0_block_with_scale_bits(scale_bits: u16, value: i32) -> Vec<u8> {
 }
 
 fn q4_k_block_with_value(value: u8) -> Vec<u8> {
+    q4_k_block_with_scale_bits(0x3c00, 0, value)
+}
+
+fn q4_k_block_with_scale_bits(scale_bits: u16, min_bits: u16, value: u8) -> Vec<u8> {
     let quantized = value & 0x0f;
     let mut block = Vec::new();
-    block.extend_from_slice(&0x3c00u16.to_le_bytes());
-    block.extend_from_slice(&0u16.to_le_bytes());
+    block.extend_from_slice(&scale_bits.to_le_bytes());
+    block.extend_from_slice(&min_bits.to_le_bytes());
     block.extend_from_slice(&[1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1]);
     block.extend_from_slice(&[quantized | (quantized << 4); 128]);
     block
