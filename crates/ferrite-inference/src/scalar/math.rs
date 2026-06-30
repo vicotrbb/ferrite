@@ -5,6 +5,12 @@ pub fn rms_norm(input: &[f32], weight: &[f32], epsilon: f32) -> Result<Vec<f32>,
         return Err(InferenceError::new("rms_norm input must not be empty"));
     }
     ensure_len("rms_norm weight", weight, input.len())?;
+    if input.iter().any(|value| !value.is_finite()) {
+        return Err(InferenceError::new("rms_norm input must be finite"));
+    }
+    if weight.iter().any(|value| !value.is_finite()) {
+        return Err(InferenceError::new("rms_norm weight must be finite"));
+    }
     if !epsilon.is_finite() || epsilon < 0.0 {
         return Err(InferenceError::new(
             "rms_norm epsilon must be finite and non-negative",
@@ -121,6 +127,32 @@ mod tests {
             };
 
             assert!(error.to_string().contains("softmax input must be finite"));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn rms_norm_rejects_non_finite_values() -> Result<(), InferenceError> {
+        for value in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            let error = match rms_norm(&[1.0, value], &[1.0, 1.0], 0.0) {
+                Ok(_) => return Err(InferenceError::new("non-finite rms_norm input should fail")),
+                Err(error) => error,
+            };
+
+            assert!(error.to_string().contains("rms_norm input must be finite"));
+        }
+
+        for value in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            let error = match rms_norm(&[1.0, 2.0], &[1.0, value], 0.0) {
+                Ok(_) => {
+                    return Err(InferenceError::new(
+                        "non-finite rms_norm weight should fail",
+                    ))
+                }
+                Err(error) => error,
+            };
+
+            assert!(error.to_string().contains("rms_norm weight must be finite"));
         }
         Ok(())
     }
