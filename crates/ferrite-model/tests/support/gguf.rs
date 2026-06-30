@@ -149,6 +149,13 @@ pub(crate) fn minimal_llama_gguf_with_value_length(value_length: u32) -> Vec<u8>
     })
 }
 
+pub(crate) fn minimal_llama_gguf_with_rope_dimension_count(rope_dimension_count: u32) -> Vec<u8> {
+    minimal_llama_gguf_with_options(LlamaGgufOptions {
+        rope_dimension_count,
+        ..LlamaGgufOptions::default()
+    })
+}
+
 pub(crate) fn minimal_qwen2_gguf() -> Vec<u8> {
     let mut bytes = Vec::new();
     bytes.extend_from_slice(b"GGUF");
@@ -200,6 +207,7 @@ struct LlamaGgufOptions {
     attention_head_count_kv: u32,
     key_length: u32,
     value_length: u32,
+    rope_dimension_count: u32,
 }
 
 impl Default for LlamaGgufOptions {
@@ -214,6 +222,7 @@ impl Default for LlamaGgufOptions {
             attention_head_count_kv: 1,
             key_length: 4,
             value_length: 4,
+            rope_dimension_count: 4,
         }
     }
 }
@@ -261,7 +270,11 @@ fn minimal_llama_gguf_with_options(options: LlamaGgufOptions) -> Vec<u8> {
         "llama.attention.layer_norm_rms_epsilon",
         0.00001,
     );
-    push_kv_u32(&mut bytes, "llama.rope.dimension_count", 4);
+    push_kv_u32(
+        &mut bytes,
+        "llama.rope.dimension_count",
+        options.rope_dimension_count,
+    );
     push_kv_f32(&mut bytes, "llama.rope.freq_base", 10000.0);
     push_kv_string_array(&mut bytes, "tokenizer.ggml.tokens", &["<unk>", "hello"]);
 

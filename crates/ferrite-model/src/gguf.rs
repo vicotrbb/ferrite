@@ -76,7 +76,7 @@ impl GgufFile {
             .optional_nonzero_count(&format!("{prefix}.attention.value_length"))?
             .unwrap_or(default_head_dimension);
         let rope_dimension_count =
-            match self.optional_count(&format!("{prefix}.rope.dimension_count"))? {
+            match self.optional_nonzero_count(&format!("{prefix}.rope.dimension_count"))? {
                 Some(value) => value,
                 None if architecture == ModelArchitecture::Qwen2 => key_length,
                 None => {
