@@ -23,6 +23,28 @@ async fn completion_endpoint_rejects_multiple_choice_request(
 }
 
 #[tokio::test]
+async fn completion_endpoint_rejects_multiple_best_of_candidates(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let body = post_completion_json(
+        r#"{
+            "model":"fixture-model",
+            "prompt":"hello",
+            "best_of":2
+        }"#,
+    )
+    .await?;
+
+    assert_eq!(body.status, StatusCode::BAD_REQUEST);
+    assert_eq!(body.json["error"]["type"], "invalid_request_error");
+    assert_eq!(body.json["error"]["param"], "best_of");
+    assert!(body.json["error"]["message"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("best_of"));
+    Ok(())
+}
+
+#[tokio::test]
 async fn completion_endpoint_rejects_logprobs_request() -> Result<(), Box<dyn std::error::Error>> {
     let body = post_completion_json(
         r#"{

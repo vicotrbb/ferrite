@@ -119,7 +119,7 @@ impl CompletionRequest {
                 "frequency_penalty",
                 !is_neutral_number(&self.frequency_penalty, 0.0),
             )
-            .with_present("best_of", self.best_of.is_some())
+            .with_present("best_of", !is_neutral_number(&self.best_of, 1.0))
             .with_present("logit_bias", !is_neutral_logit_bias(&self.logit_bias))
             .with_present("user", !is_user_identifier(&self.user))
             .with_present("seed", !is_seed(&self.seed))
