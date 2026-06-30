@@ -245,6 +245,28 @@ fn rejects_non_positive_rope_freq_base() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+fn rejects_non_finite_rope_freq_base() -> Result<(), Box<dyn Error>> {
+    for rope_freq_base in [f32::NAN, f32::INFINITY] {
+        let bytes = minimal_llama_gguf_with_rope_freq_base(rope_freq_base);
+        let file = parse_gguf(&bytes)?;
+
+        let error = match file.llama_config() {
+            Ok(_) => {
+                return Err(
+                    io::Error::other("non-finite rope frequency base should be rejected").into(),
+                );
+            }
+            Err(error) => error,
+        };
+
+        assert!(error
+            .to_string()
+            .contains("llama.rope.freq_base must be finite"));
+    }
+    Ok(())
+}
+
+#[test]
 fn rejects_zero_attention_head_count_in_model_config() -> Result<(), Box<dyn Error>> {
     let bytes = minimal_llama_gguf_with_attention_head_count(0);
     let file = parse_gguf(&bytes)?;

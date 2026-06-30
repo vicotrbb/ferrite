@@ -341,6 +341,12 @@ fn validate_rope_dimension_layout(
 
 fn validate_rope_freq_base(prefix: &str, rope_freq_base: Option<f32>) -> Result<(), GgufError> {
     if let Some(value) = rope_freq_base {
+        if !value.is_finite() {
+            return Err(GgufError::new(format!(
+                "{prefix}.rope.freq_base must be finite"
+            )));
+        }
+
         if value <= 0.0 {
             return Err(GgufError::new(format!(
                 "{prefix}.rope.freq_base {value} must be positive"
