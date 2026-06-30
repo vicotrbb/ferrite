@@ -1,5 +1,6 @@
 pub mod config;
 pub mod limits;
+pub mod long_chat_gate;
 pub mod openai;
 pub mod runtime;
 pub mod state;
