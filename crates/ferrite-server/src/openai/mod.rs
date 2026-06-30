@@ -61,7 +61,13 @@ mod stop_filter;
 #[cfg(test)]
 mod stop_sequences_tests;
 #[cfg(test)]
-mod stream_options_tests;
+mod stream_obfuscation_options_tests;
+#[cfg(test)]
+mod stream_options_test_support;
+#[cfg(test)]
+mod stream_options_validation_tests;
+#[cfg(test)]
+mod stream_usage_options_tests;
 #[cfg(test)]
 mod test_support;
 #[cfg(test)]
