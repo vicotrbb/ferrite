@@ -102,11 +102,25 @@ fn q8_0_values_from_le_bytes(name: &str, slice: &[u8]) -> Result<Vec<f32>, Infer
     let mut values = Vec::with_capacity(slice.len() / Q8_0_BLOCK_BYTES * Q8_0_BLOCK_VALUES);
     for block in slice.chunks_exact(Q8_0_BLOCK_BYTES) {
         let scale = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
+        validate_quantized_scale_finite(name, "Q8_0", scale)?;
         for quantized in &block[2..] {
             values.push(scale * f32::from(*quantized as i8));
         }
     }
     Ok(values)
+}
+
+fn validate_quantized_scale_finite(
+    name: &str,
+    format: &str,
+    scale: f32,
+) -> Result<(), InferenceError> {
+    if !scale.is_finite() {
+        return Err(InferenceError::new(format!(
+            "tensor {name} {format} scale values must be finite"
+        )));
+    }
+    Ok(())
 }
 
 fn q5_0_values_from_le_bytes(name: &str, slice: &[u8]) -> Result<Vec<f32>, InferenceError> {
@@ -123,6 +137,7 @@ fn q5_0_values_from_le_bytes(name: &str, slice: &[u8]) -> Result<Vec<f32>, Infer
     let mut values = Vec::with_capacity(slice.len() / Q5_0_BLOCK_BYTES * Q5_0_BLOCK_VALUES);
     for block in slice.chunks_exact(Q5_0_BLOCK_BYTES) {
         let scale = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
+        validate_quantized_scale_finite(name, "Q5_0", scale)?;
         let high_bits = u32::from_le_bytes([block[2], block[3], block[4], block[5]]);
         let quants = &block[6..];
 
@@ -156,6 +171,8 @@ fn q4_k_values_from_le_bytes(name: &str, slice: &[u8]) -> Result<Vec<f32>, Infer
     for block in slice.chunks_exact(Q4_K_BLOCK_BYTES) {
         let d = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
         let dmin = f16_bits_to_f32(u16::from_le_bytes([block[2], block[3]]));
+        validate_quantized_scale_finite(name, "Q4K", d)?;
+        validate_quantized_scale_finite(name, "Q4K", dmin)?;
         let scales = &block[4..16];
         let quants = &block[16..];
         let mut scale_index = 0usize;
@@ -191,6 +208,10 @@ fn q6_k_values_from_le_bytes(name: &str, slice: &[u8]) -> Result<Vec<f32>, Infer
         )));
     }
 
+    for block in slice.chunks_exact(Q6_K_BLOCK_BYTES) {
+        let scale = f16_bits_to_f32(u16::from_le_bytes([block[208], block[209]]));
+        validate_quantized_scale_finite(name, "Q6K", scale)?;
+    }
     let value_count = slice.len() / Q6_K_BLOCK_BYTES * Q6_K_BLOCK_VALUES;
     decode_q6_k_values(slice, value_count)
 }
@@ -238,95 +259,4 @@ fn f16_bits_to_f32(bits: u16) -> f32 {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{
-        bf16_values_from_le_bytes, f16_bits_to_f32, f16_values_from_le_bytes,
-        f32_values_from_le_bytes, q5_0_values_from_le_bytes, q6_k_values_from_le_bytes,
-    };
-
-    #[test]
-    fn dense_tensor_decoders_reject_non_finite_values() -> Result<(), super::InferenceError> {
-        let f32_cases = [
-            f32::NAN.to_le_bytes(),
-            f32::INFINITY.to_le_bytes(),
-            f32::NEG_INFINITY.to_le_bytes(),
-        ];
-        for bytes in f32_cases {
-            let error = match f32_values_from_le_bytes("dense", &bytes) {
-                Ok(_) => {
-                    return Err(super::InferenceError::new(
-                        "non-finite F32 tensor value should fail",
-                    ));
-                }
-                Err(error) => error,
-            };
-            assert!(error
-                .to_string()
-                .contains("tensor dense value 0 must be finite"));
-        }
-
-        for bits in [0x7e00u16, 0x7c00, 0xfc00] {
-            let error = match f16_values_from_le_bytes("dense", &bits.to_le_bytes()) {
-                Ok(_) => {
-                    return Err(super::InferenceError::new(
-                        "non-finite F16 tensor value should fail",
-                    ));
-                }
-                Err(error) => error,
-            };
-            assert!(error
-                .to_string()
-                .contains("tensor dense value 0 must be finite"));
-        }
-
-        for bits in [0x7fc0u16, 0x7f80, 0xff80] {
-            let error = match bf16_values_from_le_bytes("dense", &bits.to_le_bytes()) {
-                Ok(_) => {
-                    return Err(super::InferenceError::new(
-                        "non-finite BF16 tensor value should fail",
-                    ));
-                }
-                Err(error) => error,
-            };
-            assert!(error
-                .to_string()
-                .contains("tensor dense value 0 must be finite"));
-        }
-
-        Ok(())
-    }
-
-    #[test]
-    fn q5_0_decoder_reconstructs_signed_block_values() -> Result<(), super::InferenceError> {
-        let mut block = Vec::new();
-        block.extend_from_slice(&0x3c00u16.to_le_bytes());
-        block.extend_from_slice(&0xffff_0000u32.to_le_bytes());
-        for index in 0..16u8 {
-            block.push(index | (index << 4));
-        }
-
-        let values = q5_0_values_from_le_bytes("q5", &block)?;
-
-        let expected = (-16..16).map(|value| value as f32).collect::<Vec<_>>();
-        assert_eq!(f16_bits_to_f32(0x3c00), 1.0);
-        assert_eq!(values, expected);
-        Ok(())
-    }
-
-    #[test]
-    fn q6_k_decoder_reconstructs_signed_block_values() -> Result<(), super::InferenceError> {
-        let mut block = vec![0u8; 128 + 64];
-        block[32] = 0xff;
-        block[128] = 0xe4;
-        block.extend(vec![1u8; 16]);
-        block.extend_from_slice(&0x3c00u16.to_le_bytes());
-
-        let values = q6_k_values_from_le_bytes("q6", &block)?;
-
-        assert_eq!(values[0], -32.0);
-        assert_eq!(values[32], -1.0);
-        assert_eq!(values[64], 0.0);
-        assert_eq!(values[96], 31.0);
-        Ok(())
-    }
-}
+mod tests;
