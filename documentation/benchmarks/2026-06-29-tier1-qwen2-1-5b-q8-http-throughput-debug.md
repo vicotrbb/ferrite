@@ -70,3 +70,40 @@ The measured request rates are low because this was a debug test-profile run.
 A future throughput gate should use an explicit release-build benchmark
 protocol with host details, request counts, warmup behavior, prompt set,
 generated-token counts, client concurrency, and memory sampling.
+
+## Current-Tree Rerun
+
+After the OpenAI request authentication-order hardening and fresh real-model
+client reruns, the combined ignored throughput harness was rerun against commit
+`529382c`.
+
+Host:
+
+- OS: macOS Darwin 23.5.0 arm64
+- CPU: Apple M1 Pro
+- Logical CPUs: 8
+- Memory: 17,179,869,184 bytes
+
+Command:
+
+```sh
+cargo test -p ferrite-server --test openai_real_tier1_qwen_1_5b_throughput -- --ignored --nocapture
+```
+
+Observed result:
+
+```text
+running 2 tests
+qwen_1_5b_q8_sequential_http_completion_requests=3 elapsed_ms=97051 requests_per_second=0.030911
+test live_http_server_measures_qwen_1_5b_q8_sequential_completion_request_rate ... ok
+qwen_1_5b_q8_queued_http_completion_requests=3 elapsed_ms=98359 requests_per_second=0.030500
+test live_http_server_measures_qwen_1_5b_q8_queued_completion_request_rate ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 103.88s
+```
+
+This current-tree rerun keeps the same interpretation as the original note: it
+proves the debug-profile measurement harness still executes and validates the
+real Qwen2.5-1.5B Q8_0 OpenAI-compatible completion responses. It is not a
+release throughput pass and should not be used as evidence that the Tier 1
+HTTP throughput gate is complete.
