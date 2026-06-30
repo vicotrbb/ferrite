@@ -15,9 +15,11 @@ Covered routes:
 
 This complements the fixture-server raw HTTP and `async-openai` catalog proof.
 It includes repeatable ignored raw HTTP and `async-openai` integration tests
-against a real loaded Tier 1 model. It does not prove dynamic multi-model
-catalogs, provider metadata parity, all OpenAI model-management semantics, or
-catalog behavior under long-running load.
+against a real loaded Tier 1 model. It also covers provider-style model IDs
+containing `/` through percent-encoded raw HTTP paths and standard-client
+literal slash paths. It does not prove dynamic multi-model catalogs, provider
+metadata parity, all OpenAI model-management semantics, or catalog behavior
+under long-running load.
 
 ## Environment
 
@@ -65,10 +67,11 @@ cargo test -p ferrite-server --test openai_client_real_tier1_catalog -- --ignore
 Result:
 
 ```text
-running 1 test
+running 2 tests
+test async_openai_client_retrieves_real_tier1_provider_style_model_id ... ok
 test async_openai_client_lists_and_retrieves_real_tier1_model ... ok
 
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.90s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.71s
 ```
 
 Repeatable ignored raw HTTP test:
@@ -80,10 +83,11 @@ cargo test -p ferrite-server --test openai_real_tier1_catalog -- --ignored --noc
 Result:
 
 ```text
-running 1 test
+running 2 tests
 test live_http_server_lists_and_retrieves_real_tier1_model ... ok
+test live_http_server_retrieves_real_tier1_provider_style_model_id ... ok
 
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.99s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.65s
 ```
 
 Repeatable ignored raw HTTP provider-style id test:
@@ -145,9 +149,11 @@ OpenAI-shaped model objects. The route is now covered by a one-off raw HTTP
 real-model probe, a repeatable raw HTTP real-model integration test, and a
 repeatable `async-openai` real-model integration test. A separate raw HTTP
 real-model check verifies retrieval when the loaded model id contains a
-provider-style slash and the request path percent-encodes it. This strengthens
-the local base-URL service path for users wiring OpenAI-compatible clients to a
-Ferrite server.
+provider-style slash and the request path percent-encodes it. The
+`async-openai` real-model catalog test also verifies provider-style IDs when
+the client sends literal slash path segments. This strengthens the local
+base-URL service path for users wiring OpenAI-compatible clients to a Ferrite
+server.
 
 This remains a single-model, local aarch64 proof. It does not prove dynamic
 multi-model serving, catalog pagination, provider metadata parity, x86_64

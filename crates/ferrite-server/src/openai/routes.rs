@@ -35,7 +35,7 @@ pub fn router(state: ServerState) -> Router {
             get(super::catalog::models).options(super::cors::openai_preflight),
         )
         .route(
-            "/v1/models/:model",
+            "/v1/models/*model",
             get(super::catalog::model).options(super::cors::openai_preflight),
         )
         .route(
