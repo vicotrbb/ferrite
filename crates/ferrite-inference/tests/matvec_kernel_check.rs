@@ -44,6 +44,28 @@ fn q8_matvec_check_uses_decoded_scalar_reference() -> Result<(), Box<dyn Error>>
 }
 
 #[test]
+fn q8_matvec_rejects_non_finite_vector_values() -> Result<(), Box<dyn Error>> {
+    let matrix = Matrix::from_q8_0_row_major_bytes(1, 32, q8_row(1, 32))?;
+
+    for value in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+        let mut vector = vec![1.0; 32];
+        vector[0] = value;
+
+        let error = match matrix.mul_vec(&vector) {
+            Ok(_) => {
+                return Err(io::Error::other("non-finite Q8_0 vector value should fail").into());
+            }
+            Err(error) => error,
+        };
+
+        assert!(error
+            .to_string()
+            .contains("matrix vector values must be finite"));
+    }
+    Ok(())
+}
+
+#[test]
 fn q5_matvec_check_uses_decoded_scalar_reference() -> Result<(), Box<dyn Error>> {
     let mut bytes = Vec::new();
     bytes.extend(q5_0_block_with_value(1));

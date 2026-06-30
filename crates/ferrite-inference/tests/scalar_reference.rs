@@ -88,7 +88,7 @@ fn matrix_vector_multiply_rejects_non_finite_vector_values() -> Result<(), Box<d
 
         assert!(error
             .to_string()
-            .contains("F32 matvec vector values must be finite"));
+            .contains("matrix vector values must be finite"));
     }
     Ok(())
 }

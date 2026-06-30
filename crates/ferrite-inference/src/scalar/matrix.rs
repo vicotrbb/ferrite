@@ -119,6 +119,7 @@ impl Matrix {
                 vector.len()
             )));
         }
+        ensure_vector_values_finite(vector)?;
 
         if let MatrixData::Q4K(data) = &self.data {
             return Ok(
@@ -164,6 +165,7 @@ impl Matrix {
                 vector.len()
             )));
         }
+        ensure_vector_values_finite(vector)?;
         if self.rows == 0 {
             return Err(InferenceError::new("argmax input must not be empty"));
         }
@@ -201,6 +203,7 @@ impl Matrix {
                 vector.len()
             )));
         }
+        ensure_vector_values_finite(vector)?;
 
         let mut output = Vec::with_capacity(self.rows);
         for row_index in 0..self.rows {
@@ -209,4 +212,11 @@ impl Matrix {
         }
         Ok(output)
     }
+}
+
+fn ensure_vector_values_finite(vector: &[f32]) -> Result<(), InferenceError> {
+    if vector.iter().any(|value| !value.is_finite()) {
+        return Err(InferenceError::new("matrix vector values must be finite"));
+    }
+    Ok(())
 }
