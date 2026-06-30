@@ -19,7 +19,7 @@ impl StreamOptions {
     }
 
     pub fn include_obfuscation(&self) -> bool {
-        self.include_obfuscation.unwrap_or(false)
+        self.include_obfuscation.unwrap_or(true)
     }
 
     pub fn unsupported_request_fields(&self) -> Vec<String> {
@@ -97,7 +97,7 @@ mod tests {
         let options: StreamOptions = serde_json::from_str(r#"{"include_usage":true}"#)?;
 
         assert!(options.include_usage());
-        assert!(!options.include_obfuscation());
+        assert!(options.include_obfuscation());
         assert!(options.unsupported_request_fields().is_empty());
         Ok(())
     }
