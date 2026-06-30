@@ -81,44 +81,65 @@ pub(crate) fn minimal_llama_gguf() -> Vec<u8> {
 }
 
 pub(crate) fn minimal_llama_gguf_with_context_length(context_length: u64) -> Vec<u8> {
-    minimal_llama_gguf_with_options(0, context_length, 8, 2, 16, 2, 1)
+    minimal_llama_gguf_with_options(LlamaGgufOptions {
+        context_length,
+        ..LlamaGgufOptions::default()
+    })
 }
 
 pub(crate) fn minimal_llama_gguf_with_embedding_length(embedding_length: u64) -> Vec<u8> {
-    minimal_llama_gguf_with_options(0, 2048, embedding_length, 2, 16, 2, 1)
+    minimal_llama_gguf_with_options(LlamaGgufOptions {
+        embedding_length,
+        ..LlamaGgufOptions::default()
+    })
 }
 
 pub(crate) fn minimal_llama_gguf_with_block_count(block_count: u64) -> Vec<u8> {
-    minimal_llama_gguf_with_options(0, 2048, 8, block_count, 16, 2, 1)
+    minimal_llama_gguf_with_options(LlamaGgufOptions {
+        block_count,
+        ..LlamaGgufOptions::default()
+    })
 }
 
 pub(crate) fn minimal_llama_gguf_with_feed_forward_length(feed_forward_length: u64) -> Vec<u8> {
-    minimal_llama_gguf_with_options(0, 2048, 8, 2, feed_forward_length, 2, 1)
+    minimal_llama_gguf_with_options(LlamaGgufOptions {
+        feed_forward_length,
+        ..LlamaGgufOptions::default()
+    })
 }
 
 pub(crate) fn minimal_llama_gguf_with_attention_head_count(attention_head_count: u64) -> Vec<u8> {
-    minimal_llama_gguf_with_options(0, 2048, 8, 2, 16, attention_head_count, 1)
+    minimal_llama_gguf_with_options(LlamaGgufOptions {
+        attention_head_count,
+        ..LlamaGgufOptions::default()
+    })
 }
 
 pub(crate) fn minimal_llama_gguf_with_attention_head_count_kv(
     attention_head_count_kv: u32,
 ) -> Vec<u8> {
-    minimal_llama_gguf_with_options(0, 2048, 8, 2, 16, 2, attention_head_count_kv)
+    minimal_llama_gguf_with_options(LlamaGgufOptions {
+        attention_head_count_kv,
+        ..LlamaGgufOptions::default()
+    })
 }
 
 pub(crate) fn minimal_llama_gguf_with_attention_heads(
     attention_head_count: u64,
     attention_head_count_kv: u32,
 ) -> Vec<u8> {
-    minimal_llama_gguf_with_options(
-        0,
-        2048,
-        8,
-        2,
-        16,
+    minimal_llama_gguf_with_options(LlamaGgufOptions {
         attention_head_count,
         attention_head_count_kv,
-    )
+        ..LlamaGgufOptions::default()
+    })
+}
+
+pub(crate) fn minimal_llama_gguf_with_key_length(key_length: u32) -> Vec<u8> {
+    minimal_llama_gguf_with_options(LlamaGgufOptions {
+        key_length,
+        ..LlamaGgufOptions::default()
+    })
 }
 
 pub(crate) fn minimal_qwen2_gguf() -> Vec<u8> {
@@ -156,10 +177,13 @@ pub(crate) fn minimal_qwen2_gguf() -> Vec<u8> {
 }
 
 pub(crate) fn minimal_llama_gguf_with_tensor_offset(tensor_offset: u64) -> Vec<u8> {
-    minimal_llama_gguf_with_options(tensor_offset, 2048, 8, 2, 16, 2, 1)
+    minimal_llama_gguf_with_options(LlamaGgufOptions {
+        tensor_offset,
+        ..LlamaGgufOptions::default()
+    })
 }
 
-fn minimal_llama_gguf_with_options(
+struct LlamaGgufOptions {
     tensor_offset: u64,
     context_length: u64,
     embedding_length: u64,
@@ -167,7 +191,27 @@ fn minimal_llama_gguf_with_options(
     feed_forward_length: u64,
     attention_head_count: u64,
     attention_head_count_kv: u32,
-) -> Vec<u8> {
+    key_length: u32,
+    value_length: u32,
+}
+
+impl Default for LlamaGgufOptions {
+    fn default() -> Self {
+        Self {
+            tensor_offset: 0,
+            context_length: 2048,
+            embedding_length: 8,
+            block_count: 2,
+            feed_forward_length: 16,
+            attention_head_count: 2,
+            attention_head_count_kv: 1,
+            key_length: 4,
+            value_length: 4,
+        }
+    }
+}
+
+fn minimal_llama_gguf_with_options(options: LlamaGgufOptions) -> Vec<u8> {
     let mut bytes = Vec::new();
     bytes.extend_from_slice(b"GGUF");
     push_u32(&mut bytes, 3);
@@ -177,22 +221,34 @@ fn minimal_llama_gguf_with_options(
     push_kv_string(&mut bytes, "general.architecture", "llama");
     push_kv_u32(&mut bytes, "general.quantization_version", 2);
     push_kv_u32(&mut bytes, "general.alignment", 64);
-    push_kv_u64(&mut bytes, "llama.context_length", context_length);
-    push_kv_u64(&mut bytes, "llama.embedding_length", embedding_length);
-    push_kv_u64(&mut bytes, "llama.block_count", block_count);
-    push_kv_u64(&mut bytes, "llama.feed_forward_length", feed_forward_length);
+    push_kv_u64(&mut bytes, "llama.context_length", options.context_length);
+    push_kv_u64(
+        &mut bytes,
+        "llama.embedding_length",
+        options.embedding_length,
+    );
+    push_kv_u64(&mut bytes, "llama.block_count", options.block_count);
+    push_kv_u64(
+        &mut bytes,
+        "llama.feed_forward_length",
+        options.feed_forward_length,
+    );
     push_kv_u64(
         &mut bytes,
         "llama.attention.head_count",
-        attention_head_count,
+        options.attention_head_count,
     );
     push_kv_u32(
         &mut bytes,
         "llama.attention.head_count_kv",
-        attention_head_count_kv,
+        options.attention_head_count_kv,
     );
-    push_kv_u32(&mut bytes, "llama.attention.key_length", 4);
-    push_kv_u32(&mut bytes, "llama.attention.value_length", 4);
+    push_kv_u32(&mut bytes, "llama.attention.key_length", options.key_length);
+    push_kv_u32(
+        &mut bytes,
+        "llama.attention.value_length",
+        options.value_length,
+    );
     push_kv_f32(
         &mut bytes,
         "llama.attention.layer_norm_rms_epsilon",
@@ -207,7 +263,7 @@ fn minimal_llama_gguf_with_options(
         "token_embd.weight",
         &[8, 2],
         GgmlType::F32,
-        tensor_offset,
+        options.tensor_offset,
     );
     align_len(&mut bytes, 64);
 

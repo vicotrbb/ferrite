@@ -70,7 +70,7 @@ impl GgufFile {
             self.required_nonzero_count(&format!("{prefix}.attention.head_count"))?;
         let default_head_dimension = embedding_length / attention_head_count;
         let key_length = self
-            .optional_count(&format!("{prefix}.attention.key_length"))?
+            .optional_nonzero_count(&format!("{prefix}.attention.key_length"))?
             .unwrap_or(default_head_dimension);
         let value_length = self
             .optional_count(&format!("{prefix}.attention.value_length"))?
