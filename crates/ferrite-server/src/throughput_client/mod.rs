@@ -1,6 +1,7 @@
 mod config;
 mod http;
 mod rss;
+mod streaming_finish;
 mod streaming_metrics;
 mod streaming_usage;
 
@@ -9,6 +10,7 @@ mod tests;
 
 pub use config::{OpenAiEndpoint, ThroughputClientConfig};
 pub use rss::RssSummary;
+pub use streaming_finish::StreamingFinishSummary;
 pub use streaming_metrics::StreamingTimingSummary;
 pub use streaming_usage::StreamingUsageSummary;
 
@@ -17,10 +19,11 @@ use std::{
     time::{Duration, Instant},
 };
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct ThroughputResult {
     pub completed_requests: usize,
     pub elapsed: Duration,
+    pub streaming_finish: Option<StreamingFinishSummary>,
     pub streaming_timing: Option<StreamingTimingSummary>,
     pub streaming_usage: Option<StreamingUsageSummary>,
     pub rss: Option<RssSummary>,
@@ -55,6 +58,7 @@ pub async fn run_completion_benchmark(
     Ok(ThroughputResult {
         completed_requests: run.completed_requests,
         elapsed: started.elapsed(),
+        streaming_finish: run.streaming_finish,
         streaming_timing: run.streaming_timing,
         streaming_usage: run.streaming_usage,
         rss,
@@ -63,6 +67,7 @@ pub async fn run_completion_benchmark(
 
 struct RequestRun {
     completed_requests: usize,
+    streaming_finish: Option<StreamingFinishSummary>,
     streaming_timing: Option<StreamingTimingSummary>,
     streaming_usage: Option<StreamingUsageSummary>,
 }
@@ -74,6 +79,7 @@ async fn run_requests(
     stream: bool,
 ) -> Result<RequestRun, Box<dyn Error>> {
     let mut completed_requests = 0;
+    let mut streaming_finish = None;
     let mut streaming_timing = None;
     let mut streaming_usage = None;
 
@@ -107,6 +113,9 @@ async fn run_requests(
             if stream && streaming_timing.is_none() {
                 streaming_timing = response.streaming_timing();
             }
+            if stream && streaming_finish.is_none() {
+                streaming_finish = response.streaming_finish();
+            }
             if stream && streaming_usage.is_none() {
                 streaming_usage = response.streaming_usage();
             }
@@ -116,6 +125,7 @@ async fn run_requests(
 
     Ok(RequestRun {
         completed_requests,
+        streaming_finish,
         streaming_timing,
         streaming_usage,
     })
@@ -141,6 +151,9 @@ pub fn format_result(config: &ThroughputClientConfig, result: ThroughputResult) 
             summary.p95_token_latency().as_millis(),
             summary.max_token_latency().as_millis(),
         ));
+    }
+    if let Some(finish) = &result.streaming_finish {
+        output.push_str(&format!("\nstreaming_finish_reason={}", finish.reason()));
     }
     if let Some(usage) = result.streaming_usage {
         output.push_str(&format!(

@@ -89,6 +89,7 @@ fn formats_chat_completion_result_metric_name() -> Result<(), Box<dyn std::error
     let result = ThroughputResult {
         completed_requests: 2,
         elapsed: std::time::Duration::from_millis(400),
+        streaming_finish: None,
         streaming_timing: None,
         streaming_usage: None,
         rss: None,
@@ -275,6 +276,7 @@ fn formats_streaming_chat_completion_result_metric_name() -> Result<(), Box<dyn 
     let result = ThroughputResult {
         completed_requests: 2,
         elapsed: std::time::Duration::from_millis(400),
+        streaming_finish: None,
         streaming_timing: None,
         streaming_usage: None,
         rss: None,
@@ -298,6 +300,7 @@ fn formats_streaming_timing_summary() -> Result<(), Box<dyn std::error::Error>> 
     let result = ThroughputResult {
         completed_requests: 1,
         elapsed: Duration::from_millis(400),
+        streaming_finish: None,
         streaming_timing: StreamingTimingSummary::from_event_offsets(&[
             Duration::from_millis(100),
             Duration::from_millis(140),
@@ -326,6 +329,7 @@ fn formats_streaming_usage_summary() -> Result<(), Box<dyn std::error::Error>> {
     let result = ThroughputResult {
         completed_requests: 1,
         elapsed: Duration::from_millis(400),
+        streaming_finish: None,
         streaming_timing: None,
         streaming_usage: Some(StreamingUsageSummary::new(8, 32, 40)),
         rss: None,
@@ -334,6 +338,30 @@ fn formats_streaming_usage_summary() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(
         format_result(&config, result),
         "openai_http_streaming_chat_completion_requests=1\nelapsed_ms=400\nrequests_per_second=2.500000\nstreaming_usage_prompt_tokens=8\nstreaming_usage_completion_tokens=32\nstreaming_usage_total_tokens=40"
+    );
+    Ok(())
+}
+
+#[test]
+fn formats_streaming_finish_summary() -> Result<(), Box<dyn std::error::Error>> {
+    let config = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--endpoint"),
+        OsString::from("chat-completions"),
+        OsString::from("--stream"),
+    ])?;
+    let result = ThroughputResult {
+        completed_requests: 1,
+        elapsed: Duration::from_millis(400),
+        streaming_finish: Some(StreamingFinishSummary::new("length")),
+        streaming_timing: None,
+        streaming_usage: None,
+        rss: None,
+    };
+
+    assert_eq!(
+        format_result(&config, result),
+        "openai_http_streaming_chat_completion_requests=1\nelapsed_ms=400\nrequests_per_second=2.500000\nstreaming_finish_reason=length"
     );
     Ok(())
 }
@@ -348,6 +376,7 @@ fn formats_rss_sampling_summary() -> Result<(), Box<dyn std::error::Error>> {
     let result = ThroughputResult {
         completed_requests: 1,
         elapsed: Duration::from_millis(400),
+        streaming_finish: None,
         streaming_timing: None,
         streaming_usage: None,
         rss: Some(RssSummary::new(1000, 2000, 1500)),
@@ -363,6 +392,21 @@ fn formats_rss_sampling_summary() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn parses_ps_rss_kib_output_as_bytes() -> Result<(), Box<dyn std::error::Error>> {
     assert_eq!(RssSummary::parse_ps_rss_bytes("  2048\n")?, 2_097_152);
+    Ok(())
+}
+
+#[test]
+fn extracts_streaming_finish_reason_from_sse_body() -> Result<(), Box<dyn std::error::Error>> {
+    let body = concat!(
+        "data: {\"choices\":[{\"delta\":{\"content\":\"A\"},\"finish_reason\":null}]}\n\n",
+        "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"length\"}]}\n\n",
+        "data: [DONE]\n\n",
+    );
+
+    let finish =
+        StreamingFinishSummary::from_sse_body(body).ok_or("expected streaming finish reason")?;
+
+    assert_eq!(finish.reason(), "length");
     Ok(())
 }
 
@@ -384,7 +428,7 @@ fn extracts_streaming_usage_from_sse_body() -> Result<(), Box<dyn std::error::Er
 
 #[test]
 fn validates_streaming_response_done_event() -> Result<(), Box<dyn std::error::Error>> {
-    let response = "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\n\r\ndata: {\"choices\":[{\"text\":\"hi\"}]}\n\ndata: [DONE]\n\n";
+    let response = "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\n\r\ndata: {\"choices\":[{\"text\":\"hi\",\"finish_reason\":\"length\"}]}\n\ndata: [DONE]\n\n";
 
     http::validate_openai_response(OpenAiEndpoint::Completions, true, false, response)?;
     Ok(())
@@ -430,9 +474,24 @@ fn rejects_streaming_response_without_json_data_chunk() -> Result<(), Box<dyn st
 }
 
 #[test]
+fn rejects_streaming_response_without_finish_reason() -> Result<(), Box<dyn std::error::Error>> {
+    let response = "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\n\r\ndata: {\"choices\":[{\"text\":\"hi\"}]}\n\ndata: [DONE]\n\n";
+
+    let error = validate_stream_error(response, false)?;
+
+    assert!(
+        error
+            .to_string()
+            .contains("missing streaming finish_reason"),
+        "{error}"
+    );
+    Ok(())
+}
+
+#[test]
 fn rejects_streaming_usage_response_without_usage_chunk() -> Result<(), Box<dyn std::error::Error>>
 {
-    let response = "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\n\r\ndata: {\"choices\":[{\"text\":\"hi\"}],\"usage\":null}\n\ndata: [DONE]\n\n";
+    let response = "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\n\r\ndata: {\"choices\":[{\"text\":\"hi\",\"finish_reason\":\"length\"}],\"usage\":null}\n\ndata: [DONE]\n\n";
 
     let error = validate_stream_error(response, true)?;
 

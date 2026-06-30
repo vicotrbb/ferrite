@@ -1,4 +1,6 @@
-use super::{OpenAiEndpoint, StreamingTimingSummary, StreamingUsageSummary};
+use super::{
+    OpenAiEndpoint, StreamingFinishSummary, StreamingTimingSummary, StreamingUsageSummary,
+};
 use std::{
     error::Error,
     net::SocketAddr,
@@ -12,6 +14,7 @@ use tokio::{
 #[derive(Clone, Debug)]
 pub struct OpenAiHttpResponse {
     raw: String,
+    streaming_finish: Option<StreamingFinishSummary>,
     streaming_timing: Option<StreamingTimingSummary>,
     streaming_usage: Option<StreamingUsageSummary>,
 }
@@ -19,6 +22,10 @@ pub struct OpenAiHttpResponse {
 impl OpenAiHttpResponse {
     pub fn raw(&self) -> &str {
         &self.raw
+    }
+
+    pub fn streaming_finish(&self) -> Option<StreamingFinishSummary> {
+        self.streaming_finish.clone()
     }
 
     pub fn streaming_timing(&self) -> Option<StreamingTimingSummary> {
@@ -54,8 +61,12 @@ Connection: close\r\n\
     let streaming_usage = raw
         .split_once("\r\n\r\n")
         .and_then(|(_, body)| StreamingUsageSummary::from_sse_body(body));
+    let streaming_finish = raw
+        .split_once("\r\n\r\n")
+        .and_then(|(_, body)| StreamingFinishSummary::from_sse_body(body));
     Ok(OpenAiHttpResponse {
         raw,
+        streaming_finish,
         streaming_timing,
         streaming_usage,
     })
@@ -130,6 +141,9 @@ fn validate_streaming_response(
         .any(|data| serde_json::from_str::<serde_json::Value>(data).is_ok());
     if !has_json_event {
         return Err("missing streaming JSON data event".into());
+    }
+    if StreamingFinishSummary::from_sse_body(body).is_none() {
+        return Err("missing streaming finish_reason".into());
     }
     if expect_stream_usage && StreamingUsageSummary::from_sse_body(body).is_none() {
         return Err("missing streaming usage chunk".into());
