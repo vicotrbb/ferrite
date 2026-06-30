@@ -104,6 +104,22 @@ async fn chat_endpoint_rejects_enabled_reasoning_effort() -> Result<(), Box<dyn 
 }
 
 #[tokio::test]
+async fn chat_endpoint_accepts_null_reasoning_effort() -> Result<(), Box<dyn std::error::Error>> {
+    let body = post_chat_json(
+        r#"{
+            "model":"fixture-model",
+            "messages":[{"role":"user","content":"hello"}],
+            "reasoning_effort":null
+        }"#,
+    )
+    .await?;
+
+    assert_eq!(body.status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(body.json["error"]["type"], "server_error");
+    Ok(())
+}
+
+#[tokio::test]
 async fn chat_endpoint_rejects_multiple_choice_request() -> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat_json(
         r#"{

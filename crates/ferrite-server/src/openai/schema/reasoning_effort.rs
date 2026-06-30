@@ -3,6 +3,7 @@ use serde_json::Value;
 pub(super) fn is_no_reasoning_effort(value: &Option<Value>) -> bool {
     match value {
         None => true,
+        Some(Value::Null) => true,
         Some(Value::String(effort)) => effort == "none",
         Some(_) => false,
     }
@@ -21,6 +22,11 @@ mod tests {
     #[test]
     fn none_reasoning_effort_is_neutral() {
         assert!(is_no_reasoning_effort(&Some(json!("none"))));
+    }
+
+    #[test]
+    fn null_reasoning_effort_is_neutral() {
+        assert!(is_no_reasoning_effort(&Some(Value::Null)));
     }
 
     #[test]
