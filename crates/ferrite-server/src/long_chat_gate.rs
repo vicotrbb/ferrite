@@ -2,6 +2,7 @@ use std::{error::Error, ffi::OsString, fmt};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LongChatGateConfig {
+    models: Vec<String>,
     token_lengths: Vec<usize>,
     turns: usize,
 }
@@ -17,6 +18,10 @@ impl LongChatGateConfig {
                 .to_str()
                 .ok_or_else(|| LongChatGateError::new("arguments must be valid UTF-8"))?;
             match flag {
+                "--models" => {
+                    config.models =
+                        parse_non_empty_list(next_value(&mut iter, "--models")?, "--models")?;
+                }
                 "--token-lengths" => {
                     config.token_lengths =
                         parse_token_lengths(next_value(&mut iter, "--token-lengths")?)?;
@@ -41,19 +46,25 @@ impl LongChatGateConfig {
         &self.token_lengths
     }
 
+    pub fn models(&self) -> &[String] {
+        &self.models
+    }
+
     pub fn turns(&self) -> usize {
         self.turns
     }
 
     pub fn planned_scenarios(&self) -> usize {
-        self.token_lengths.len() * self.turns
+        self.models.len() * self.token_lengths.len() * self.turns
     }
 
-    pub fn scenarios(&self) -> Vec<LongChatScenario> {
+    pub fn scenarios(&self) -> Vec<LongChatScenario<'_>> {
         let mut scenarios = Vec::with_capacity(self.planned_scenarios());
-        for turn in 1..=self.turns {
-            for token_length in &self.token_lengths {
-                scenarios.push(LongChatScenario::new(turn, *token_length));
+        for model in &self.models {
+            for turn in 1..=self.turns {
+                for token_length in &self.token_lengths {
+                    scenarios.push(LongChatScenario::new(model, turn, *token_length));
+                }
             }
         }
         scenarios
@@ -63,6 +74,12 @@ impl LongChatGateConfig {
 impl Default for LongChatGateConfig {
     fn default() -> Self {
         Self {
+            models: vec![
+                "Qwen2.5-0.5B-Instruct-Q4_K_M".to_owned(),
+                "Qwen2.5-1.5B-Instruct-Q8_0".to_owned(),
+                "Qwen2.5-1.5B-Instruct-Q6_K".to_owned(),
+                "SmolLM2-1.7B-Instruct-Q4_K_M".to_owned(),
+            ],
             token_lengths: vec![256, 512, 1024],
             turns: 4,
         }
@@ -91,14 +108,23 @@ impl fmt::Display for LongChatGateError {
 impl Error for LongChatGateError {}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct LongChatScenario {
+pub struct LongChatScenario<'a> {
+    model: &'a str,
     turn: usize,
     token_length: usize,
 }
 
-impl LongChatScenario {
-    fn new(turn: usize, token_length: usize) -> Self {
-        Self { turn, token_length }
+impl<'a> LongChatScenario<'a> {
+    fn new(model: &'a str, turn: usize, token_length: usize) -> Self {
+        Self {
+            model,
+            turn,
+            token_length,
+        }
+    }
+
+    pub fn model(&self) -> &str {
+        self.model
     }
 
     pub fn turn(&self) -> usize {
@@ -119,11 +145,18 @@ fn next_value(
 }
 
 fn parse_token_lengths(value: OsString) -> Result<Vec<usize>, LongChatGateError> {
+    parse_non_empty_list(value, "--token-lengths")?
+        .into_iter()
+        .map(|part| parse_positive_usize(&part, "--token-lengths"))
+        .collect()
+}
+
+fn parse_non_empty_list(value: OsString, flag: &str) -> Result<Vec<String>, LongChatGateError> {
     let value = os_string_to_string(value)?;
     if value.trim().is_empty() {
-        return Err(LongChatGateError::new(
-            "--token-lengths must contain at least one length",
-        ));
+        return Err(LongChatGateError::new(format!(
+            "{flag} must contain at least one value"
+        )));
     }
 
     value
@@ -131,11 +164,11 @@ fn parse_token_lengths(value: OsString) -> Result<Vec<usize>, LongChatGateError>
         .map(|part| {
             let part = part.trim();
             if part.is_empty() {
-                return Err(LongChatGateError::new(
-                    "--token-lengths must not contain empty entries",
-                ));
+                return Err(LongChatGateError::new(format!(
+                    "{flag} must not contain empty entries"
+                )));
             }
-            parse_positive_usize(part, "--token-lengths")
+            Ok(part.to_owned())
         })
         .collect()
 }
@@ -167,10 +200,11 @@ fn os_string_to_string(value: OsString) -> Result<String, LongChatGateError> {
 }
 
 fn usage() -> &'static str {
-    "usage: ferrite-openai-long-chat-gate [--token-lengths 256,512,1024] [--turns 4]"
+    "usage: ferrite-openai-long-chat-gate [--models MODEL[,MODEL...]] [--token-lengths 256,512,1024] [--turns 4]"
 }
 
 pub fn format_plan(config: &LongChatGateConfig) -> String {
+    let models = config.models().join(",");
     let token_lengths = config
         .token_lengths()
         .iter()
@@ -178,7 +212,7 @@ pub fn format_plan(config: &LongChatGateConfig) -> String {
         .collect::<Vec<_>>()
         .join(",");
     format!(
-        "long_chat_token_lengths={token_lengths}\nlong_chat_turns={}\nlong_chat_planned_scenarios={}",
+        "long_chat_models={models}\nlong_chat_token_lengths={token_lengths}\nlong_chat_turns={}\nlong_chat_planned_scenarios={}",
         config.turns(),
         config.planned_scenarios()
     )
@@ -190,7 +224,8 @@ pub fn format_scenarios(config: &LongChatGateConfig) -> String {
         .iter()
         .map(|scenario| {
             format!(
-                "long_chat_scenario=turn:{},max_tokens:{}",
+                "long_chat_scenario=model:{},turn:{},max_tokens:{}",
+                scenario.model(),
                 scenario.turn(),
                 scenario.token_length()
             )
