@@ -129,6 +129,7 @@ pub(crate) fn minimal_llama_gguf_with_attention_heads(
     attention_head_count_kv: u32,
 ) -> Vec<u8> {
     minimal_llama_gguf_with_options(LlamaGgufOptions {
+        embedding_length: attention_head_count * 4,
         attention_head_count,
         attention_head_count_kv,
         ..LlamaGgufOptions::default()

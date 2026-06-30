@@ -68,6 +68,7 @@ impl GgufFile {
             self.required_nonzero_count(&format!("{prefix}.embedding_length"))?;
         let attention_head_count =
             self.required_nonzero_count(&format!("{prefix}.attention.head_count"))?;
+        validate_embedding_head_layout(prefix, embedding_length, attention_head_count)?;
         let default_head_dimension = embedding_length / attention_head_count;
         let key_length = self
             .optional_nonzero_count(&format!("{prefix}.attention.key_length"))?
@@ -286,6 +287,20 @@ fn read_alignment(metadata: &BTreeMap<String, MetadataValue>) -> Result<u64, Ggu
     }
 
     Ok(alignment)
+}
+
+fn validate_embedding_head_layout(
+    prefix: &str,
+    embedding_length: u64,
+    attention_head_count: u64,
+) -> Result<(), GgufError> {
+    if !embedding_length.is_multiple_of(attention_head_count) {
+        return Err(GgufError::new(format!(
+            "{prefix}.embedding_length {embedding_length} must be divisible by {prefix}.attention.head_count {attention_head_count}"
+        )));
+    }
+
+    Ok(())
 }
 
 fn validate_attention_head_layout(

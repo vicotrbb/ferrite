@@ -221,6 +221,27 @@ fn rejects_zero_attention_head_count_in_model_config() -> Result<(), Box<dyn Err
 }
 
 #[test]
+fn rejects_embedding_length_that_does_not_divide_attention_heads() -> Result<(), Box<dyn Error>> {
+    let bytes = minimal_llama_gguf_with_attention_head_count(3);
+    let file = parse_gguf(&bytes)?;
+
+    let error = match file.llama_config() {
+        Ok(_) => {
+            return Err(io::Error::other(
+                "embedding length that does not divide attention heads should be rejected",
+            )
+            .into());
+        }
+        Err(error) => error,
+    };
+
+    assert!(error
+        .to_string()
+        .contains("llama.embedding_length 8 must be divisible by llama.attention.head_count 3"));
+    Ok(())
+}
+
+#[test]
 fn rejects_zero_attention_kv_head_count_in_model_config() -> Result<(), Box<dyn Error>> {
     let bytes = minimal_llama_gguf_with_attention_head_count_kv(0);
     let file = parse_gguf(&bytes)?;
