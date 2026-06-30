@@ -22,6 +22,9 @@ impl Matrix {
                 data.len()
             )));
         }
+        if data.iter().any(|value| !value.is_finite()) {
+            return Err(InferenceError::new("matrix data values must be finite"));
+        }
 
         Ok(Self {
             rows,
