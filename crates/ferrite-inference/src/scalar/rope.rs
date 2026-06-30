@@ -42,6 +42,9 @@ pub(super) fn apply_rope_with_layout(
             "rope dimension count {rope_dimension_count} must be even"
         )));
     }
+    if !rope_freq_base.is_finite() {
+        return Err(InferenceError::new("rope frequency base must be finite"));
+    }
     if rope_freq_base <= 0.0 {
         return Err(InferenceError::new(format!(
             "rope frequency base {rope_freq_base} must be positive"

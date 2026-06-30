@@ -98,6 +98,25 @@ fn rope_rotates_even_odd_pairs_by_position_and_frequency() -> Result<(), Box<dyn
 }
 
 #[test]
+fn apply_rope_rejects_non_finite_frequency_base() -> Result<(), Box<dyn Error>> {
+    for rope_freq_base in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+        let error = match apply_rope(&[1.0, 0.0, 0.0, 1.0], 1, 4, rope_freq_base) {
+            Ok(_) => {
+                return Err(
+                    io::Error::other("non-finite rope frequency base should be rejected").into(),
+                );
+            }
+            Err(error) => error,
+        };
+
+        assert!(error
+            .to_string()
+            .contains("rope frequency base must be finite"));
+    }
+    Ok(())
+}
+
+#[test]
 fn scalar_config_rejects_non_finite_rope_freq_base() -> Result<(), Box<dyn Error>> {
     for rope_freq_base in [f32::NAN, f32::INFINITY] {
         let error = match model_with_rope_freq_base(rope_freq_base) {
