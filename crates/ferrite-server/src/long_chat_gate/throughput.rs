@@ -12,7 +12,7 @@ impl LongChatGateConfig {
     }
 
     pub fn throughput_args(&self, scenario: &LongChatScenario<'_>) -> Vec<OsString> {
-        [
+        let mut args: Vec<OsString> = [
             "ferrite-openai-throughput",
             "--addr",
             self.addr(),
@@ -39,6 +39,18 @@ impl LongChatGateConfig {
         ]
         .into_iter()
         .map(OsString::from)
-        .collect()
+        .collect();
+
+        if let Some(stop) = self.stop() {
+            args.extend([OsString::from("--stop"), OsString::from(stop)]);
+        }
+        if let Some(rss_pid) = self.rss_pid() {
+            args.extend([
+                OsString::from("--rss-pid"),
+                OsString::from(rss_pid.to_string()),
+            ]);
+        }
+
+        args
     }
 }

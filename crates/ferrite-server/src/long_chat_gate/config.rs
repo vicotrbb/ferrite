@@ -10,6 +10,8 @@ pub struct LongChatGateConfig {
     prompt: String,
     assistant_context: String,
     follow_up: String,
+    stop: Option<String>,
+    rss_pid: Option<u32>,
     token_lengths: Vec<usize>,
     turns: usize,
 }
@@ -55,6 +57,18 @@ impl LongChatGateConfig {
                         next_value(&mut iter, "--follow-up")?,
                         "--follow-up",
                     )?;
+                }
+                "--stop" => {
+                    config.stop = Some(parse_non_empty_string(
+                        next_value(&mut iter, "--stop")?,
+                        "--stop",
+                    )?);
+                }
+                "--rss-pid" => {
+                    config.rss_pid = Some(parse_positive_u32(
+                        next_value(&mut iter, "--rss-pid")?,
+                        "--rss-pid",
+                    )?);
                 }
                 "--token-lengths" => {
                     config.token_lengths =
@@ -108,6 +122,14 @@ impl LongChatGateConfig {
         &self.follow_up
     }
 
+    pub fn stop(&self) -> Option<&str> {
+        self.stop.as_deref()
+    }
+
+    pub fn rss_pid(&self) -> Option<u32> {
+        self.rss_pid
+    }
+
     pub fn turns(&self) -> usize {
         self.turns
     }
@@ -144,6 +166,8 @@ impl Default for LongChatGateConfig {
             prompt: "Write a concise paragraph about CPU inference.".to_owned(),
             assistant_context: "CPU inference prioritizes memory locality, predictable scheduling, and efficient token streaming.".to_owned(),
             follow_up: "Continue with the operational risks for a long streaming chat.".to_owned(),
+            stop: None,
+            rss_pid: None,
             token_lengths: vec![256, 512, 1024],
             turns: 4,
         }
@@ -184,6 +208,18 @@ fn parse_token_lengths(value: OsString) -> Result<Vec<usize>, LongChatGateError>
         .into_iter()
         .map(|part| parse_positive_usize(&part, "--token-lengths"))
         .collect()
+}
+
+fn parse_positive_u32(value: OsString, flag: &str) -> Result<u32, LongChatGateError> {
+    let parsed: u32 = os_string_to_string(value)?
+        .parse()
+        .map_err(|error| LongChatGateError::new(format!("invalid {flag}: {error}")))?;
+    if parsed == 0 {
+        return Err(LongChatGateError::new(format!(
+            "{flag} must be greater than 0"
+        )));
+    }
+    Ok(parsed)
 }
 
 fn parse_non_empty_list(value: OsString, flag: &str) -> Result<Vec<String>, LongChatGateError> {
@@ -240,5 +276,5 @@ fn os_string_to_string(value: OsString) -> Result<String, LongChatGateError> {
 }
 
 fn usage() -> &'static str {
-    "usage: ferrite-openai-long-chat-gate [--execute] [--addr 127.0.0.1:8080] [--api-key local-secret] [--models MODEL[,MODEL...]] [--prompt TEXT] [--assistant-context TEXT] [--follow-up TEXT] [--token-lengths 256,512,1024] [--turns 4]"
+    "usage: ferrite-openai-long-chat-gate [--execute] [--addr 127.0.0.1:8080] [--api-key local-secret] [--models MODEL[,MODEL...]] [--prompt TEXT] [--assistant-context TEXT] [--follow-up TEXT] [--stop TEXT] [--rss-pid PID] [--token-lengths 256,512,1024] [--turns 4]"
 }

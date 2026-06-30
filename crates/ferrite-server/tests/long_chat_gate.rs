@@ -52,6 +52,10 @@ fn parses_custom_long_chat_token_lengths_turns_and_models() -> Result<(), Box<dy
         OsString::from("first answer"),
         OsString::from("--follow-up"),
         OsString::from("second turn"),
+        OsString::from("--stop"),
+        OsString::from("<STOP>"),
+        OsString::from("--rss-pid"),
+        OsString::from("4242"),
     ])?;
 
     assert_eq!(config.token_lengths(), &[128, 256]);
@@ -64,6 +68,8 @@ fn parses_custom_long_chat_token_lengths_turns_and_models() -> Result<(), Box<dy
     assert_eq!(config.prompt(), "first turn");
     assert_eq!(config.assistant_context(), "first answer");
     assert_eq!(config.follow_up(), "second turn");
+    assert_eq!(config.stop(), Some("<STOP>"));
+    assert_eq!(config.rss_pid(), Some(4242));
     Ok(())
 }
 
@@ -224,6 +230,10 @@ fn builds_streaming_chat_throughput_args_for_scenario() -> Result<(), Box<dyn st
         OsString::from("first answer"),
         OsString::from("--follow-up"),
         OsString::from("second turn"),
+        OsString::from("--stop"),
+        OsString::from("<STOP>"),
+        OsString::from("--rss-pid"),
+        OsString::from("4242"),
     ])?;
     let scenario = config
         .scenarios()
@@ -240,12 +250,30 @@ fn builds_streaming_chat_throughput_args_for_scenario() -> Result<(), Box<dyn st
     assert_eq!(throughput.prompt(), "first turn");
     assert_eq!(throughput.assistant_context(), Some("first answer"));
     assert_eq!(throughput.follow_up(), Some("second turn"));
+    assert_eq!(throughput.stop(), Some("<STOP>"));
     assert_eq!(throughput.max_tokens(), 256);
     assert_eq!(throughput.requests(), 1);
     assert_eq!(throughput.concurrency(), 1);
+    assert_eq!(throughput.rss_pid(), Some(4242));
     assert_eq!(throughput.api_key(), "secret");
     assert!(throughput.stream());
     assert!(throughput.stream_usage());
+    Ok(())
+}
+
+#[test]
+fn rejects_invalid_long_chat_rss_pid() -> Result<(), Box<dyn std::error::Error>> {
+    let result = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--rss-pid"),
+        OsString::from("0"),
+    ]);
+    let error = match result {
+        Ok(config) => return Err(format!("expected error, got config: {config:?}").into()),
+        Err(error) => error,
+    };
+
+    assert!(error.to_string().contains("--rss-pid"), "{error}");
     Ok(())
 }
 
