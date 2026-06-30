@@ -14,10 +14,10 @@ Covered routes:
 - `GET /v1/models/{model}`
 
 This complements the fixture-server raw HTTP and `async-openai` catalog proof.
-It includes a repeatable ignored `async-openai` integration test against a real
-loaded Tier 1 model. It does not prove dynamic multi-model catalogs, provider
-metadata parity, all OpenAI model-management semantics, or catalog behavior
-under long-running load.
+It includes repeatable ignored raw HTTP and `async-openai` integration tests
+against a real loaded Tier 1 model. It does not prove dynamic multi-model
+catalogs, provider metadata parity, all OpenAI model-management semantics, or
+catalog behavior under long-running load.
 
 ## Environment
 
@@ -71,6 +71,21 @@ test async_openai_client_lists_and_retrieves_real_tier1_model ... ok
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.90s
 ```
 
+Repeatable ignored raw HTTP test:
+
+```sh
+cargo test -p ferrite-server --test openai_real_tier1_catalog -- --ignored --nocapture
+```
+
+Result:
+
+```text
+running 1 test
+test live_http_server_lists_and_retrieves_real_tier1_model ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.99s
+```
+
 The probe used Python `urllib` with `Authorization: Bearer local-secret`.
 
 Result:
@@ -111,10 +126,11 @@ After the probe, `lsof -nP -iTCP:18104 -sTCP:LISTEN` returned no listener.
 
 Ferrite's OpenAI-compatible catalog route exposes a loaded real Qwen2.5-0.5B
 Q4_K_M model through `GET /v1/models` and `GET /v1/models/{model}` with
-OpenAI-shaped model objects. The route is now covered by both a one-off raw
-HTTP real-model probe and a repeatable `async-openai` real-model integration
-test. This strengthens the local base-URL service path for users wiring
-OpenAI-compatible clients to a Ferrite server.
+OpenAI-shaped model objects. The route is now covered by a one-off raw HTTP
+real-model probe, a repeatable raw HTTP real-model integration test, and a
+repeatable `async-openai` real-model integration test. This strengthens the
+local base-URL service path for users wiring OpenAI-compatible clients to a
+Ferrite server.
 
 This remains a single-model, local aarch64 proof. It does not prove dynamic
 multi-model serving, catalog pagination, provider metadata parity, x86_64
