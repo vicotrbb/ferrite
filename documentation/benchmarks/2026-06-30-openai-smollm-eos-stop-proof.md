@@ -126,7 +126,14 @@ before the requested token budgets:
 - legacy completions: 3 completion tokens for `max_tokens: 6`;
 - streaming chat completions: 9 completion tokens for `max_tokens: 16`.
 
-The EOS token is still emitted as visible `<|im_end|>` content today. That
-matches the current runtime behavior already documented by the CLI EOS proof,
-but future API polish may choose to suppress tokenizer control text at the HTTP
-boundary.
+## Follow-Up
+
+The raw run above captured the behavior before the OpenAI server suppressed
+visible EOS control text. The follow-up slice documented in
+`documentation/dev-notes/2026-06-30-openai-eos-control-text-suppression.md`
+adds fixture regression coverage so tokenizer EOS still counts toward
+`completion_tokens` and still produces `finish_reason: "stop"`, but no longer
+appears as assistant-visible completion text.
+
+A fresh real SmolLM2 probe should be recorded before claiming this polished EOS
+presentation across real Tier 1 artifacts.
