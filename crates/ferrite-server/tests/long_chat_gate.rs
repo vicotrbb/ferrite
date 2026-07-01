@@ -30,6 +30,10 @@ fn defaults_to_required_long_chat_token_lengths_and_turns() -> Result<(), Box<dy
         ]
     );
     assert_eq!(config.planned_scenarios(), 48);
+    assert_eq!(
+        config.disconnect_reconnect_timeout(),
+        Duration::from_secs(30)
+    );
     Ok(())
 }
 
@@ -63,6 +67,8 @@ fn parses_custom_long_chat_token_lengths_turns_and_models() -> Result<(), Box<dy
         OsString::from("--disconnect-probe"),
         OsString::from("--expect-finish-reason"),
         OsString::from("stop"),
+        OsString::from("--disconnect-reconnect-timeout-ms"),
+        OsString::from("45000"),
     ])?;
 
     assert_eq!(config.token_lengths(), &[128, 256]);
@@ -80,6 +86,10 @@ fn parses_custom_long_chat_token_lengths_turns_and_models() -> Result<(), Box<dy
     assert!(config.error_probe());
     assert!(config.disconnect_probe());
     assert_eq!(config.expected_finish_reason(), Some("stop"));
+    assert_eq!(
+        config.disconnect_reconnect_timeout(),
+        Duration::from_secs(45)
+    );
     Ok(())
 }
 

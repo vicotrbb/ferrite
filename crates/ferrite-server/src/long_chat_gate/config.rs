@@ -1,5 +1,7 @@
 use super::LongChatScenario;
-use std::{error::Error, ffi::OsString, fmt};
+use std::{error::Error, ffi::OsString, fmt, time::Duration};
+
+const DEFAULT_DISCONNECT_RECONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LongChatGateConfig {
@@ -14,6 +16,7 @@ pub struct LongChatGateConfig {
     follow_up: String,
     stop: Option<String>,
     expected_finish_reason: Option<String>,
+    disconnect_reconnect_timeout: Duration,
     rss_pid: Option<u32>,
     token_lengths: Vec<usize>,
     turns: usize,
@@ -78,6 +81,13 @@ impl LongChatGateConfig {
                         next_value(&mut iter, "--expect-finish-reason")?,
                         "--expect-finish-reason",
                     )?);
+                }
+                "--disconnect-reconnect-timeout-ms" => {
+                    config.disconnect_reconnect_timeout =
+                        Duration::from_millis(parse_positive_u64(
+                            next_value(&mut iter, "--disconnect-reconnect-timeout-ms")?,
+                            "--disconnect-reconnect-timeout-ms",
+                        )?);
                 }
                 "--rss-pid" => {
                     config.rss_pid = Some(parse_positive_u32(
@@ -153,6 +163,10 @@ impl LongChatGateConfig {
         self.expected_finish_reason.as_deref()
     }
 
+    pub fn disconnect_reconnect_timeout(&self) -> Duration {
+        self.disconnect_reconnect_timeout
+    }
+
     pub fn rss_pid(&self) -> Option<u32> {
         self.rss_pid
     }
@@ -197,6 +211,7 @@ impl Default for LongChatGateConfig {
             follow_up: "Continue with the operational risks for a long streaming chat.".to_owned(),
             stop: None,
             expected_finish_reason: None,
+            disconnect_reconnect_timeout: DEFAULT_DISCONNECT_RECONNECT_TIMEOUT,
             rss_pid: None,
             token_lengths: vec![256, 512, 1024],
             turns: 4,
@@ -241,7 +256,14 @@ fn parse_token_lengths(value: OsString) -> Result<Vec<usize>, LongChatGateError>
 }
 
 fn parse_positive_u32(value: OsString, flag: &str) -> Result<u32, LongChatGateError> {
-    let parsed: u32 = os_string_to_string(value)?
+    let parsed: u32 = parse_positive_u64(value, flag)?
+        .try_into()
+        .map_err(|error| LongChatGateError::new(format!("invalid {flag}: {error}")))?;
+    Ok(parsed)
+}
+
+fn parse_positive_u64(value: OsString, flag: &str) -> Result<u64, LongChatGateError> {
+    let parsed: u64 = os_string_to_string(value)?
         .parse()
         .map_err(|error| LongChatGateError::new(format!("invalid {flag}: {error}")))?;
     if parsed == 0 {
@@ -306,5 +328,5 @@ fn os_string_to_string(value: OsString) -> Result<String, LongChatGateError> {
 }
 
 fn usage() -> &'static str {
-    "usage: ferrite-openai-long-chat-gate [--execute] [--error-probe] [--disconnect-probe] [--addr 127.0.0.1:8080] [--api-key local-secret] [--models MODEL[,MODEL...]] [--prompt TEXT] [--assistant-context TEXT] [--follow-up TEXT] [--stop TEXT] [--expect-finish-reason REASON] [--rss-pid PID] [--token-lengths 256,512,1024] [--turns 4]"
+    "usage: ferrite-openai-long-chat-gate [--execute] [--error-probe] [--disconnect-probe] [--addr 127.0.0.1:8080] [--api-key local-secret] [--models MODEL[,MODEL...]] [--prompt TEXT] [--assistant-context TEXT] [--follow-up TEXT] [--stop TEXT] [--expect-finish-reason REASON] [--disconnect-reconnect-timeout-ms 30000] [--rss-pid PID] [--token-lengths 256,512,1024] [--turns 4]"
 }

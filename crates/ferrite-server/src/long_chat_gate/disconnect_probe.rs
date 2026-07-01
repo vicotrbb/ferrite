@@ -3,7 +3,7 @@ use std::{error::Error, net::SocketAddr, time::Duration};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
-    time::sleep,
+    time::{sleep, Instant},
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -42,7 +42,13 @@ impl LongChatGateConfig {
         }
 
         let reconnect_body = self.disconnect_probe_body(1)?;
-        reconnect_until_completed(addr, self.api_key(), &reconnect_body).await?;
+        reconnect_until_completed(
+            addr,
+            self.api_key(),
+            &reconnect_body,
+            self.disconnect_reconnect_timeout(),
+        )
+        .await?;
         Ok(LongChatDisconnectProbeResult::new(true, true))
     }
 
@@ -110,9 +116,10 @@ async fn reconnect_until_completed(
     addr: SocketAddr,
     api_key: &str,
     body: &str,
+    timeout: Duration,
 ) -> Result<(), Box<dyn Error>> {
-    let mut last_status = None;
-    for _ in 0..20 {
+    let deadline = Instant::now() + timeout;
+    loop {
         let response = send_chat_stream_probe(addr, api_key, body).await?;
         let status = http_status(&response)?;
         if status == 200 {
@@ -121,17 +128,14 @@ async fn reconnect_until_completed(
         if !is_retryable_reconnect_status(status) {
             return Err(format!("expected reconnect probe status 200, got {status}").into());
         }
-        last_status = Some(status);
+        if Instant::now() >= deadline {
+            return Err(format!(
+                "reconnect probe did not complete after retryable status {status}"
+            )
+            .into());
+        }
         sleep(Duration::from_millis(250)).await;
     }
-
-    Err(format!(
-        "reconnect probe did not complete after retryable status {}",
-        last_status
-            .map(|status| status.to_string())
-            .unwrap_or_else(|| "unknown".to_owned())
-    )
-    .into())
 }
 
 async fn write_chat_stream_request(
