@@ -134,16 +134,16 @@ full-length operational prompt shape from the earlier SmolLM2 full matrix.
 The long-chat gate is still not a release-complete readiness claim: broader
 EOS-specific evidence across the required model set, x86_64 behavior, longer
 steady-state behavior, and memory-focused reruns remain unproven.
-The x86_64 long-chat proof has started with bounded `staging` pod runs for
-Qwen2.5-0.5B Q4_K_M at the 256-token and 512-token combined reconnect/error
+The x86_64 long-chat proof has bounded `staging` pod runs for Qwen2.5-0.5B
+Q4_K_M at the 256-token, 512-token, and 1024-token combined reconnect/error
 budgets. Those runs prove the same request-error recovery,
 disconnect/reconnect recovery, finish reason, usage accounting, per-token
-latency summaries, and RSS sampling shape on one amd64 AVX2 pod. The
-512-token run also encountered transient staging control-plane and node
-readiness flaps, while the in-pod Ferrite gate still reached
-`long_chat_summary_run_complete=true`; it should not be treated as a clean
-control-plane-stability sample. The 1024-token x86_64 Qwen2.5-0.5B Q4_K_M run
-and the rest of the x86_64 model matrix remain unproven.
+latency summaries, and RSS sampling shape on one amd64 AVX2 pod. The 512-token
+and 1024-token runs also encountered transient staging control-plane and node
+readiness flaps, while the in-pod Ferrite gates still reached
+`long_chat_summary_run_complete=true`; they should not be treated as clean
+control-plane-stability samples. The rest of the x86_64 model matrix remains
+unproven.
 The Qwen2.5-1.5B Q8_0 OpenAI-compatible HTTP path now also has a debug
 test-profile throughput harness check for three sequential one-token legacy
 completion requests and three queued one-token legacy completion requests. This
