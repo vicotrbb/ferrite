@@ -60,9 +60,15 @@ impl InferenceEngine {
         let mut token_texts = Vec::with_capacity(max_tokens);
         let mut token_text_buffer = TokenTextBuffer::new();
         let mut finish_reason = GenerationFinishReason::Length;
+        let mut stopped_on_eos = false;
 
         for _ in 0..max_tokens {
             generated_token_ids.push(token_id);
+            if Some(token_id) == self.tokenizer.eos_token_id() {
+                finish_reason = GenerationFinishReason::Stop;
+                stopped_on_eos = true;
+                break;
+            }
             let control = token_text_buffer.emit_ready_text(
                 &generated_token_ids,
                 |ids| self.decode_token_text(ids),
@@ -76,19 +82,23 @@ impl InferenceEngine {
                 finish_reason = GenerationFinishReason::Stop;
                 break;
             }
-            if Some(token_id) == self.tokenizer.eos_token_id() {
-                finish_reason = GenerationFinishReason::Stop;
-                break;
-            }
             token_id = session.accept_token_id(token_id).map_err(|error| {
                 RuntimeError::new(format!("failed to generate next token: {error}"))
             })?;
         }
 
-        let text = self
-            .tokenizer
-            .decode(&generated_token_ids)
-            .map_err(|error| RuntimeError::new(format!("failed to decode completion: {error}")))?;
+        let visible_token_ids = if stopped_on_eos {
+            &generated_token_ids[..generated_token_ids.len().saturating_sub(1)]
+        } else {
+            &generated_token_ids
+        };
+        let text = if visible_token_ids.is_empty() {
+            String::new()
+        } else {
+            self.tokenizer.decode(visible_token_ids).map_err(|error| {
+                RuntimeError::new(format!("failed to decode completion: {error}"))
+            })?
+        };
         Ok(GeneratedText::with_finish_reason(
             text,
             prompt_token_ids.len(),

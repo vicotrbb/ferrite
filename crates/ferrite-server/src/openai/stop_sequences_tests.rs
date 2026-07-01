@@ -2,6 +2,7 @@ use super::{
     routes::router,
     test_support::{
         remove_fixture_model, to_json, to_text, write_chat_fixture_model, write_fixture_model,
+        write_fixture_model_with_eos_token_id,
     },
 };
 use crate::{runtime::InferenceEngine, state::ServerState};
@@ -140,8 +141,70 @@ async fn chat_stream_endpoint_flushes_chunks_when_stop_sequence_does_not_match(
     Ok(())
 }
 
+#[tokio::test]
+async fn completions_endpoint_suppresses_visible_eos_text() -> Result<(), Box<dyn std::error::Error>>
+{
+    let body = post_completion_with_eos_token_id(
+        r#"{"model":"fixture-model","prompt":"hello","max_tokens":3}"#,
+        2,
+    )
+    .await?;
+
+    assert_eq!(body["choices"][0]["text"], "");
+    assert_eq!(body["choices"][0]["finish_reason"], "stop");
+    assert_eq!(body["usage"]["completion_tokens"], 1);
+    Ok(())
+}
+
+#[tokio::test]
+async fn completions_stream_endpoint_suppresses_visible_eos_text(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let body = post_completion_stream_with_eos_token_id(
+        r#"{"model":"fixture-model","prompt":"hello","max_tokens":3,"stream":true,"stream_options":{"include_usage":true}}"#,
+        2,
+    )
+    .await?;
+
+    let events = sse_json_events(&body)?;
+    assert_eq!(
+        completion_text_chunks(&events),
+        Vec::<&str>::new(),
+        "{body}"
+    );
+    assert!(
+        events
+            .iter()
+            .any(|event| event["choices"][0]["finish_reason"] == "stop"),
+        "{body}"
+    );
+    assert!(body.contains("\"completion_tokens\":1"), "{body}");
+    assert!(body.contains("data: [DONE]"), "{body}");
+    Ok(())
+}
+
 async fn post_completion(payload: &str) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
     let model_path = write_fixture_model()?;
+    let engine = InferenceEngine::load(&model_path)?;
+    let app = router(ServerState::with_engine("fixture-model".to_owned(), engine));
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/completions")
+        .header("content-type", "application/json")
+        .body(Body::from(payload.to_owned()))?;
+    let response = app.oneshot(request).await?;
+    remove_fixture_model(&model_path)?;
+
+    let status = response.status();
+    let body = to_json(response.into_body()).await?;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    Ok(body)
+}
+
+async fn post_completion_with_eos_token_id(
+    payload: &str,
+    eos_token_id: u64,
+) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+    let model_path = write_fixture_model_with_eos_token_id(eos_token_id)?;
     let engine = InferenceEngine::load(&model_path)?;
     let app = router(ServerState::with_engine("fixture-model".to_owned(), engine));
     let request = Request::builder()
@@ -178,6 +241,27 @@ async fn post_chat(payload: &str) -> Result<serde_json::Value, Box<dyn std::erro
 
 async fn post_completion_stream(payload: &str) -> Result<String, Box<dyn std::error::Error>> {
     post_stream(payload, "/v1/completions", write_fixture_model).await
+}
+
+async fn post_completion_stream_with_eos_token_id(
+    payload: &str,
+    eos_token_id: u64,
+) -> Result<String, Box<dyn std::error::Error>> {
+    let model_path = write_fixture_model_with_eos_token_id(eos_token_id)?;
+    let engine = InferenceEngine::load(&model_path)?;
+    let app = router(ServerState::with_engine("fixture-model".to_owned(), engine));
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/completions")
+        .header("content-type", "application/json")
+        .body(Body::from(payload.to_owned()))?;
+    let response = app.oneshot(request).await?;
+    remove_fixture_model(&model_path)?;
+
+    let status = response.status();
+    let body = to_text(response.into_body()).await?;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    Ok(body)
 }
 
 async fn post_chat_stream(payload: &str) -> Result<String, Box<dyn std::error::Error>> {
