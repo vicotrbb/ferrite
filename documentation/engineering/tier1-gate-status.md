@@ -112,11 +112,12 @@ HTTP model artifacts now also have integrated stop-summary runs through the
 long-chat harness. Those runs prove stop-finished streaming chat scenarios,
 usage accounting, client-side timing, RSS samples, request-level error
 recovery, disconnect/reconnect behavior, and `long_chat_summary_run_complete`.
-Qwen2.5-0.5B Q4_K_M and Qwen2.5-1.5B Q8_0 also have bounded x86_64 AVX2
-staging runs for the same explicit-stop long-chat shape, proving
-`finish_reason=stop`, one emitted streaming token event, usage accounting,
-timing summaries, RSS samples, request-error recovery, disconnect/reconnect
-recovery, and `long_chat_summary_run_complete=true` on amd64.
+Qwen2.5-0.5B Q4_K_M, Qwen2.5-1.5B Q8_0, and Qwen2.5-1.5B Q6_K also have
+bounded x86_64 AVX2 staging runs for the same explicit-stop long-chat shape,
+proving `finish_reason=stop`, one emitted streaming token event, usage
+accounting, timing summaries, RSS samples, request-error recovery,
+disconnect/reconnect recovery, and `long_chat_summary_run_complete=true` on
+amd64.
 Qwen2.5-0.5B Q4_K_M now also has combined 256-token, 512-token, and
 1024-token full-length long-chat proofs where the error reconnect request,
 disconnect reconnect request, and four repeated streaming chat scenarios all
