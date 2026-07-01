@@ -136,17 +136,20 @@ EOS-specific evidence across the required model set, x86_64 behavior, longer
 steady-state behavior, and memory-focused reruns remain unproven.
 The x86_64 long-chat proof has bounded `staging` pod runs for Qwen2.5-0.5B
 Q4_K_M, Qwen2.5-1.5B Q8_0, and Qwen2.5-1.5B Q6_K at the 256-token, 512-token,
-and 1024-token combined reconnect/error budgets. Those runs prove the same
-request-error recovery, disconnect/reconnect recovery, finish reason, usage
-accounting, per-token latency summaries, and RSS sampling shape on amd64 AVX2
-pods. The 512-token, 1024-token, Qwen2.5-1.5B Q8_0, and Qwen2.5-1.5B Q6_K runs
-also encountered transient staging control-plane and node readiness or
-exec-stream flaps, while the in-pod Ferrite gates still reached
-`long_chat_summary_run_complete=true`; they should not be treated as clean
-control-plane-stability samples. The Qwen2.5-1.5B Q8_0 512-token run also ran
-close to the current 6Gi pod memory limit, so the 1024-token run used an 8Gi
-limit and is not proof that the 1024-token path fits 6Gi. The rest of the
-x86_64 model matrix remains unproven.
+and 1024-token combined reconnect/error budgets. SmolLM2-1.7B Q4_K_M now also
+has the same x86_64 combined reconnect/error proof shape at the 256-token
+budget when using the known full-length operational prompt shape. Those runs
+prove the same request-error recovery, disconnect/reconnect recovery, finish
+reason, usage accounting, per-token latency summaries, and RSS sampling shape
+on amd64 AVX2 pods. The 512-token, 1024-token, Qwen2.5-1.5B Q8_0,
+Qwen2.5-1.5B Q6_K, and SmolLM2-1.7B Q4_K_M 256-token runs also encountered
+transient staging control-plane and node readiness or exec-stream flaps, while
+the in-pod Ferrite gates still reached `long_chat_summary_run_complete=true`;
+they should not be treated as clean control-plane-stability samples. The
+Qwen2.5-1.5B Q8_0 512-token run also ran close to the current 6Gi pod memory
+limit, so the 1024-token run used an 8Gi limit and is not proof that the
+1024-token path fits 6Gi. The SmolLM2-1.7B Q4_K_M 512-token and 1024-token
+x86_64 budgets remain unproven.
 The Qwen2.5-1.5B Q8_0 OpenAI-compatible HTTP path now also has a debug
 test-profile throughput harness check for three sequential one-token legacy
 completion requests and three queued one-token legacy completion requests. This
