@@ -34,6 +34,13 @@ impl LongChatScenarioResult {
     pub fn throughput(&self) -> &ThroughputResult {
         &self.throughput
     }
+
+    pub fn hit_token_limit(&self) -> Option<bool> {
+        let finish = self.throughput.streaming_finish.as_ref()?;
+        let usage = self.throughput.streaming_usage?;
+
+        Some(finish.reason() == "length" && usage.completion_tokens() == self.token_length as u64)
+    }
 }
 
 pub fn format_scenario_result(result: &LongChatScenarioResult) -> String {
@@ -58,6 +65,11 @@ pub fn format_scenario_result(result: &LongChatScenarioResult) -> String {
             usage.prompt_tokens(),
             usage.completion_tokens(),
             usage.total_tokens()
+        ));
+    }
+    if let Some(hit_token_limit) = result.hit_token_limit() {
+        output.push_str(&format!(
+            "\nlong_chat_result_hit_token_limit={hit_token_limit}"
         ));
     }
     if let Some(timing) = throughput.streaming_timing {

@@ -61,7 +61,12 @@ The gate must record:
 - completion-token count for every turn;
 - total-token count for every turn;
 - whether cache growth is bounded and monotonic as expected;
-- whether any turn hits the configured hard token limit.
+- whether any turn hits the configured completion-token limit.
+
+The current harness reports completion-token limit status with
+`long_chat_result_hit_token_limit`, plus summary fields
+`long_chat_summary_all_token_limit_status_present` and
+`long_chat_summary_any_token_limit_hit`.
 
 ## Memory Sampling
 
@@ -139,6 +144,7 @@ with:
 - prompt and multi-turn transcript shape;
 - RSS samples;
 - latency summary;
+- token-limit status;
 - stop/EOS result;
 - reconnect/error result;
 - raw pass/fail conclusion and remaining unproven scope.
