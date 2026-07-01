@@ -34,6 +34,8 @@ pub fn format_run_summary(
     let disconnect_probe_required = config.disconnect_probe();
     let disconnect_probe_completed = disconnect_probe
         .is_some_and(|probe| probe.aborted_after_generated_event() && probe.reconnect_completed());
+    let disconnect_probe_reconnect_started_new_generation =
+        disconnect_probe.is_some_and(|probe| probe.reconnect_started_new_generation());
     let run_complete = completed_scenarios == planned_scenarios
         && all_finish_reasons_present
         && all_usage_accounting_valid
@@ -41,7 +43,8 @@ pub fn format_run_summary(
         && all_timing_present
         && (!rss_required || all_rss_present)
         && (!error_probe_required || error_probe_completed)
-        && (!disconnect_probe_required || disconnect_probe_completed);
+        && (!disconnect_probe_required
+            || (disconnect_probe_completed && disconnect_probe_reconnect_started_new_generation));
 
     format!(
         "long_chat_summary_planned_scenarios={planned_scenarios}\n\
@@ -57,6 +60,7 @@ long_chat_summary_error_probe_required={error_probe_required}\n\
 long_chat_summary_error_probe_completed={error_probe_completed}\n\
 long_chat_summary_disconnect_probe_required={disconnect_probe_required}\n\
 long_chat_summary_disconnect_probe_completed={disconnect_probe_completed}\n\
+long_chat_summary_disconnect_probe_reconnect_started_new_generation={disconnect_probe_reconnect_started_new_generation}\n\
 long_chat_summary_run_complete={run_complete}"
     )
 }

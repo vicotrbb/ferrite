@@ -436,7 +436,7 @@ fn formats_long_chat_disconnect_probe_result() {
 
     assert_eq!(
         format_disconnect_probe_result(&result),
-        "long_chat_disconnect_probe_aborted_after_generated_event=true\nlong_chat_disconnect_probe_reconnect_completed=true\nlong_chat_disconnect_probe_max_tokens=256"
+        "long_chat_disconnect_probe_aborted_after_generated_event=true\nlong_chat_disconnect_probe_reconnect_completed=true\nlong_chat_disconnect_probe_reconnect_generated_event=true\nlong_chat_disconnect_probe_reconnect_started_new_generation=true\nlong_chat_disconnect_probe_max_tokens=256"
     );
 }
 
@@ -489,7 +489,7 @@ fn formats_integrated_long_chat_run_summary() -> Result<(), Box<dyn std::error::
             Some(&error_probe),
             Some(&disconnect_probe)
         ),
-        "long_chat_summary_planned_scenarios=4\nlong_chat_summary_completed_scenarios=4\nlong_chat_summary_all_finish_reasons_present=true\nlong_chat_summary_all_usage_accounting_valid=true\nlong_chat_summary_all_token_limit_status_present=true\nlong_chat_summary_any_token_limit_hit=true\nlong_chat_summary_all_timing_present=true\nlong_chat_summary_rss_required=true\nlong_chat_summary_all_rss_present=true\nlong_chat_summary_error_probe_required=true\nlong_chat_summary_error_probe_completed=true\nlong_chat_summary_disconnect_probe_required=true\nlong_chat_summary_disconnect_probe_completed=true\nlong_chat_summary_run_complete=true"
+        "long_chat_summary_planned_scenarios=4\nlong_chat_summary_completed_scenarios=4\nlong_chat_summary_all_finish_reasons_present=true\nlong_chat_summary_all_usage_accounting_valid=true\nlong_chat_summary_all_token_limit_status_present=true\nlong_chat_summary_any_token_limit_hit=true\nlong_chat_summary_all_timing_present=true\nlong_chat_summary_rss_required=true\nlong_chat_summary_all_rss_present=true\nlong_chat_summary_error_probe_required=true\nlong_chat_summary_error_probe_completed=true\nlong_chat_summary_disconnect_probe_required=true\nlong_chat_summary_disconnect_probe_completed=true\nlong_chat_summary_disconnect_probe_reconnect_started_new_generation=true\nlong_chat_summary_run_complete=true"
     );
     Ok(())
 }

@@ -129,6 +129,13 @@ disconnect. The gate must make that explicit with bounded behavior:
 
 This is a correctness and operability gate, not a promise of resumable streams.
 
+The current disconnect harness records this with
+`long_chat_disconnect_probe_reconnect_generated_event`,
+`long_chat_disconnect_probe_reconnect_started_new_generation`, and
+`long_chat_summary_disconnect_probe_reconnect_started_new_generation`. A
+reconnect response must include generated stream content as well as `[DONE]`;
+a done-only SSE response is not accepted as a completed reconnect generation.
+
 ## Required Artifacts
 
 Each completed run must add a benchmark note under `documentation/benchmarks/`

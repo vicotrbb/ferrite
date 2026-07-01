@@ -34,6 +34,14 @@ impl LongChatDisconnectProbeResult {
         self.reconnect_completed
     }
 
+    pub fn reconnect_generated_event(&self) -> bool {
+        self.reconnect_completed
+    }
+
+    pub fn reconnect_started_new_generation(&self) -> bool {
+        self.aborted_after_generated_event && self.reconnect_generated_event()
+    }
+
     pub fn max_tokens(&self) -> usize {
         self.max_tokens
     }
@@ -85,9 +93,11 @@ impl LongChatGateConfig {
 
 pub fn format_disconnect_probe_result(result: &LongChatDisconnectProbeResult) -> String {
     format!(
-        "long_chat_disconnect_probe_aborted_after_generated_event={}\nlong_chat_disconnect_probe_reconnect_completed={}\nlong_chat_disconnect_probe_max_tokens={}",
+        "long_chat_disconnect_probe_aborted_after_generated_event={}\nlong_chat_disconnect_probe_reconnect_completed={}\nlong_chat_disconnect_probe_reconnect_generated_event={}\nlong_chat_disconnect_probe_reconnect_started_new_generation={}\nlong_chat_disconnect_probe_max_tokens={}",
         result.aborted_after_generated_event(),
         result.reconnect_completed(),
+        result.reconnect_generated_event(),
+        result.reconnect_started_new_generation(),
         result.max_tokens()
     )
 }
@@ -192,6 +202,9 @@ fn validate_reconnect_response(response: &str) -> Result<(), Box<dyn Error>> {
     if !body.lines().any(|line| line == "data: [DONE]") {
         return Err("expected reconnect response streaming done event".into());
     }
+    if !has_generated_stream_event(response) {
+        return Err("expected reconnect response generated stream event".into());
+    }
     Ok(())
 }
 
@@ -246,5 +259,20 @@ mod tests {
     #[test]
     fn treats_rate_limited_reconnect_as_retryable() {
         assert!(is_retryable_reconnect_status(429));
+    }
+
+    #[test]
+    fn rejects_reconnect_response_without_generated_event() {
+        let response = "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\n\r\ndata: [DONE]\n";
+
+        let error = validate_reconnect_response(response)
+            .expect_err("done-only reconnect response should be rejected");
+
+        assert!(
+            error
+                .to_string()
+                .contains("expected reconnect response generated stream event"),
+            "{error}"
+        );
     }
 }
