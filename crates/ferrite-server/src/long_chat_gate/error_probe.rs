@@ -9,13 +9,15 @@ use tokio::{
 pub struct LongChatErrorProbeResult {
     unauthorized_status: u16,
     reconnect_completed: bool,
+    max_tokens: usize,
 }
 
 impl LongChatErrorProbeResult {
-    pub fn new(unauthorized_status: u16, reconnect_completed: bool) -> Self {
+    pub fn new(unauthorized_status: u16, reconnect_completed: bool, max_tokens: usize) -> Self {
         Self {
             unauthorized_status,
             reconnect_completed,
+            max_tokens,
         }
     }
 
@@ -25,6 +27,10 @@ impl LongChatErrorProbeResult {
 
     pub fn reconnect_completed(&self) -> bool {
         self.reconnect_completed
+    }
+
+    pub fn max_tokens(&self) -> usize {
+        self.max_tokens
     }
 }
 
@@ -44,7 +50,11 @@ impl LongChatGateConfig {
 
         let reconnect = send_chat_stream_probe(addr, self.api_key(), &body).await?;
         validate_reconnect_response(&reconnect)?;
-        Ok(LongChatErrorProbeResult::new(unauthorized_status, true))
+        Ok(LongChatErrorProbeResult::new(
+            unauthorized_status,
+            true,
+            self.error_probe_max_tokens(),
+        ))
     }
 
     fn error_probe_body(&self) -> Result<String, Box<dyn Error>> {
@@ -56,18 +66,23 @@ impl LongChatGateConfig {
                 {"role": "assistant", "content": self.assistant_context()},
                 {"role": "user", "content": self.follow_up()}
             ],
-            "max_tokens": 1,
+            "max_tokens": self.error_probe_max_tokens(),
             "stream": true
         });
         Ok(body.to_string())
+    }
+
+    fn error_probe_max_tokens(&self) -> usize {
+        self.probe_max_tokens().unwrap_or(1)
     }
 }
 
 pub fn format_error_probe_result(result: &LongChatErrorProbeResult) -> String {
     format!(
-        "long_chat_error_probe_unauthorized_status={}\nlong_chat_error_probe_reconnect_completed={}",
+        "long_chat_error_probe_unauthorized_status={}\nlong_chat_error_probe_reconnect_completed={}\nlong_chat_error_probe_max_tokens={}",
         result.unauthorized_status(),
-        result.reconnect_completed()
+        result.reconnect_completed(),
+        result.max_tokens()
     )
 }
 

@@ -10,13 +10,19 @@ use tokio::{
 pub struct LongChatDisconnectProbeResult {
     aborted_after_generated_event: bool,
     reconnect_completed: bool,
+    max_tokens: usize,
 }
 
 impl LongChatDisconnectProbeResult {
-    pub fn new(aborted_after_generated_event: bool, reconnect_completed: bool) -> Self {
+    pub fn new(
+        aborted_after_generated_event: bool,
+        reconnect_completed: bool,
+        max_tokens: usize,
+    ) -> Self {
         Self {
             aborted_after_generated_event,
             reconnect_completed,
+            max_tokens,
         }
     }
 
@@ -27,6 +33,10 @@ impl LongChatDisconnectProbeResult {
     pub fn reconnect_completed(&self) -> bool {
         self.reconnect_completed
     }
+
+    pub fn max_tokens(&self) -> usize {
+        self.max_tokens
+    }
 }
 
 impl LongChatGateConfig {
@@ -34,14 +44,15 @@ impl LongChatGateConfig {
         &self,
     ) -> Result<LongChatDisconnectProbeResult, Box<dyn Error>> {
         let addr: SocketAddr = self.addr().parse()?;
-        let abort_body = self.disconnect_probe_body(8)?;
+        let max_tokens = self.disconnect_probe_max_tokens();
+        let abort_body = self.disconnect_probe_body(max_tokens)?;
         let aborted_after_generated_event =
             abort_after_generated_event(addr, self.api_key(), &abort_body).await?;
         if !aborted_after_generated_event {
             return Err("disconnect probe did not observe a generated stream event".into());
         }
 
-        let reconnect_body = self.disconnect_probe_body(1)?;
+        let reconnect_body = self.disconnect_probe_body(max_tokens)?;
         reconnect_until_completed(
             addr,
             self.api_key(),
@@ -49,7 +60,7 @@ impl LongChatGateConfig {
             self.disconnect_reconnect_timeout(),
         )
         .await?;
-        Ok(LongChatDisconnectProbeResult::new(true, true))
+        Ok(LongChatDisconnectProbeResult::new(true, true, max_tokens))
     }
 
     fn disconnect_probe_body(&self, max_tokens: usize) -> Result<String, Box<dyn Error>> {
@@ -66,13 +77,18 @@ impl LongChatGateConfig {
         });
         Ok(body.to_string())
     }
+
+    fn disconnect_probe_max_tokens(&self) -> usize {
+        self.probe_max_tokens().unwrap_or(8)
+    }
 }
 
 pub fn format_disconnect_probe_result(result: &LongChatDisconnectProbeResult) -> String {
     format!(
-        "long_chat_disconnect_probe_aborted_after_generated_event={}\nlong_chat_disconnect_probe_reconnect_completed={}",
+        "long_chat_disconnect_probe_aborted_after_generated_event={}\nlong_chat_disconnect_probe_reconnect_completed={}\nlong_chat_disconnect_probe_max_tokens={}",
         result.aborted_after_generated_event(),
-        result.reconnect_completed()
+        result.reconnect_completed(),
+        result.max_tokens()
     )
 }
 

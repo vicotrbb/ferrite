@@ -34,6 +34,7 @@ fn defaults_to_required_long_chat_token_lengths_and_turns() -> Result<(), Box<dy
         config.disconnect_reconnect_timeout(),
         Duration::from_secs(30)
     );
+    assert_eq!(config.probe_max_tokens(), None);
     Ok(())
 }
 
@@ -67,6 +68,8 @@ fn parses_custom_long_chat_token_lengths_turns_and_models() -> Result<(), Box<dy
         OsString::from("--disconnect-probe"),
         OsString::from("--expect-finish-reason"),
         OsString::from("stop"),
+        OsString::from("--probe-max-tokens"),
+        OsString::from("256"),
         OsString::from("--disconnect-reconnect-timeout-ms"),
         OsString::from("45000"),
     ])?;
@@ -86,10 +89,27 @@ fn parses_custom_long_chat_token_lengths_turns_and_models() -> Result<(), Box<dy
     assert!(config.error_probe());
     assert!(config.disconnect_probe());
     assert_eq!(config.expected_finish_reason(), Some("stop"));
+    assert_eq!(config.probe_max_tokens(), Some(256));
     assert_eq!(
         config.disconnect_reconnect_timeout(),
         Duration::from_secs(45)
     );
+    Ok(())
+}
+
+#[test]
+fn rejects_invalid_long_chat_probe_max_tokens() -> Result<(), Box<dyn std::error::Error>> {
+    let result = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--probe-max-tokens"),
+        OsString::from("0"),
+    ]);
+    let error = match result {
+        Ok(config) => return Err(format!("expected error, got config: {config:?}").into()),
+        Err(error) => error,
+    };
+
+    assert!(error.to_string().contains("--probe-max-tokens"), "{error}");
     Ok(())
 }
 
@@ -370,21 +390,21 @@ fn formats_long_chat_scenario_result() -> Result<(), Box<dyn std::error::Error>>
 
 #[test]
 fn formats_long_chat_error_probe_result() {
-    let result = LongChatErrorProbeResult::new(401, true);
+    let result = LongChatErrorProbeResult::new(401, true, 256);
 
     assert_eq!(
         format_error_probe_result(&result),
-        "long_chat_error_probe_unauthorized_status=401\nlong_chat_error_probe_reconnect_completed=true"
+        "long_chat_error_probe_unauthorized_status=401\nlong_chat_error_probe_reconnect_completed=true\nlong_chat_error_probe_max_tokens=256"
     );
 }
 
 #[test]
 fn formats_long_chat_disconnect_probe_result() {
-    let result = LongChatDisconnectProbeResult::new(true, true);
+    let result = LongChatDisconnectProbeResult::new(true, true, 256);
 
     assert_eq!(
         format_disconnect_probe_result(&result),
-        "long_chat_disconnect_probe_aborted_after_generated_event=true\nlong_chat_disconnect_probe_reconnect_completed=true"
+        "long_chat_disconnect_probe_aborted_after_generated_event=true\nlong_chat_disconnect_probe_reconnect_completed=true\nlong_chat_disconnect_probe_max_tokens=256"
     );
 }
 
@@ -427,8 +447,8 @@ fn formats_integrated_long_chat_run_summary() -> Result<(), Box<dyn std::error::
             )
         })
         .collect::<Vec<_>>();
-    let error_probe = LongChatErrorProbeResult::new(401, true);
-    let disconnect_probe = LongChatDisconnectProbeResult::new(true, true);
+    let error_probe = LongChatErrorProbeResult::new(401, true, 8);
+    let disconnect_probe = LongChatDisconnectProbeResult::new(true, true, 8);
 
     assert_eq!(
         format_run_summary(
