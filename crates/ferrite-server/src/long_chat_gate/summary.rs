@@ -21,6 +21,9 @@ pub fn format_run_summary(
     let any_token_limit_hit = results
         .iter()
         .any(|result| result.hit_token_limit().unwrap_or(false));
+    let all_follow_up_turns_use_generated_context = results
+        .iter()
+        .all(|result| result.turn() == 1 || result.assistant_context_source().is_generated());
     let all_timing_present = results
         .iter()
         .all(|result| result.throughput().streaming_timing.is_some());
@@ -40,6 +43,7 @@ pub fn format_run_summary(
         && all_finish_reasons_present
         && all_usage_accounting_valid
         && all_token_limit_status_present
+        && all_follow_up_turns_use_generated_context
         && all_timing_present
         && (!rss_required || all_rss_present)
         && (!error_probe_required || error_probe_completed)
@@ -53,6 +57,7 @@ long_chat_summary_all_finish_reasons_present={all_finish_reasons_present}\n\
 long_chat_summary_all_usage_accounting_valid={all_usage_accounting_valid}\n\
 long_chat_summary_all_token_limit_status_present={all_token_limit_status_present}\n\
 long_chat_summary_any_token_limit_hit={any_token_limit_hit}\n\
+long_chat_summary_all_follow_up_turns_use_generated_context={all_follow_up_turns_use_generated_context}\n\
 long_chat_summary_all_timing_present={all_timing_present}\n\
 long_chat_summary_rss_required={rss_required}\n\
 long_chat_summary_all_rss_present={all_rss_present}\n\

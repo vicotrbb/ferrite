@@ -55,12 +55,18 @@ For each model, run a repeated conversation sequence using one server process:
    and a second user follow-up.
 3. Repeat for at least four user turns.
 
+The current harness carries assistant-visible generated text from each completed
+scenario into the next turn for the same `(model, token_length)` pair. It
+records `long_chat_result_assistant_context_source=seed|generated` and requires
+`long_chat_summary_all_follow_up_turns_use_generated_context=true` for
+`long_chat_summary_run_complete=true`.
+
 The gate must record:
 
 - prompt-token count for every turn;
 - completion-token count for every turn;
 - total-token count for every turn;
-- whether cache growth is bounded and monotonic as expected;
+- whether generated assistant context is carried into every follow-up turn;
 - whether any turn hits the configured completion-token limit.
 
 The current harness reports completion-token limit status with
@@ -149,6 +155,7 @@ with:
 - client command;
 - token length;
 - prompt and multi-turn transcript shape;
+- assistant-context source for each turn;
 - RSS samples;
 - latency summary;
 - token-limit status;

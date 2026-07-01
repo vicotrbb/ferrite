@@ -6,15 +6,29 @@ pub struct LongChatScenarioResult {
     model: String,
     turn: usize,
     token_length: usize,
+    assistant_context_source: LongChatAssistantContextSource,
     throughput: ThroughputResult,
 }
 
 impl LongChatScenarioResult {
     pub fn new(scenario: &LongChatScenario<'_>, throughput: ThroughputResult) -> Self {
+        Self::new_with_assistant_context_source(
+            scenario,
+            throughput,
+            LongChatAssistantContextSource::Seed,
+        )
+    }
+
+    pub fn new_with_assistant_context_source(
+        scenario: &LongChatScenario<'_>,
+        throughput: ThroughputResult,
+        assistant_context_source: LongChatAssistantContextSource,
+    ) -> Self {
         Self {
             model: scenario.model().to_owned(),
             turn: scenario.turn(),
             token_length: scenario.token_length(),
+            assistant_context_source,
             throughput,
         }
     }
@@ -31,6 +45,10 @@ impl LongChatScenarioResult {
         self.token_length
     }
 
+    pub fn assistant_context_source(&self) -> LongChatAssistantContextSource {
+        self.assistant_context_source
+    }
+
     pub fn throughput(&self) -> &ThroughputResult {
         &self.throughput
     }
@@ -43,13 +61,33 @@ impl LongChatScenarioResult {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LongChatAssistantContextSource {
+    Seed,
+    Generated,
+}
+
+impl LongChatAssistantContextSource {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Seed => "seed",
+            Self::Generated => "generated",
+        }
+    }
+
+    pub fn is_generated(self) -> bool {
+        self == Self::Generated
+    }
+}
+
 pub fn format_scenario_result(result: &LongChatScenarioResult) -> String {
     let throughput = result.throughput();
     let mut output = format!(
-        "long_chat_result=model:{},turn:{},max_tokens:{}\nlong_chat_result_completed_requests={}\nlong_chat_result_elapsed_ms={}",
+        "long_chat_result=model:{},turn:{},max_tokens:{}\nlong_chat_result_assistant_context_source={}\nlong_chat_result_completed_requests={}\nlong_chat_result_elapsed_ms={}",
         result.model(),
         result.turn(),
         result.token_length(),
+        result.assistant_context_source().as_str(),
         throughput.completed_requests,
         throughput.elapsed.as_millis()
     );
