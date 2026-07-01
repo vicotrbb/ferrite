@@ -794,6 +794,33 @@ fn waits_for_completed_sse_event_before_recording_streaming_timing(
 }
 
 #[test]
+fn derives_streaming_timing_from_terminal_stop_event_without_visible_content(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let base = "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\n\r\n";
+    let stop_event = r#"data: {"choices":[{"delta":{},"finish_reason":"stop"}]}"#;
+    let done_event = "data: [DONE]";
+    let snapshots = [
+        (base.to_owned(), Duration::from_millis(10)),
+        (
+            format!("{base}{stop_event}\n\n{done_event}\n\n"),
+            Duration::from_millis(90),
+        ),
+    ];
+
+    let summary = http::streaming_timing_from_response_snapshots(
+        snapshots
+            .iter()
+            .map(|(response, offset)| (response.as_bytes(), *offset)),
+    )
+    .ok_or("expected streaming timing summary")?;
+
+    assert_eq!(summary.token_events(), 1);
+    assert_eq!(summary.time_to_first_token(), Duration::from_millis(90));
+    assert_eq!(summary.total_elapsed(), Duration::from_millis(90));
+    Ok(())
+}
+
+#[test]
 fn summarizes_streaming_token_arrival_latencies() -> Result<(), Box<dyn std::error::Error>> {
     let summary = StreamingTimingSummary::from_event_offsets(&[
         Duration::from_millis(100),

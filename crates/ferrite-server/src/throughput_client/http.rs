@@ -226,7 +226,7 @@ impl StreamingEventTracker {
         let Ok(body) = std::str::from_utf8(&response[body_start..]) else {
             return;
         };
-        let token_events = count_streaming_token_events(body);
+        let token_events = count_streaming_timing_events(body);
         while self.seen_token_events < token_events {
             self.event_offsets.push(offset);
             self.seen_token_events += 1;
@@ -238,7 +238,7 @@ impl StreamingEventTracker {
     }
 }
 
-fn count_streaming_token_events(body: &str) -> usize {
+fn count_streaming_timing_events(body: &str) -> usize {
     let mut token_events = 0;
     let mut event_data: Vec<&str> = Vec::new();
 
@@ -246,7 +246,7 @@ fn count_streaming_token_events(body: &str) -> usize {
         if line.is_empty() {
             if event_data
                 .iter()
-                .any(|data| streaming_event_has_generated_text(data))
+                .any(|data| streaming_event_has_timing_signal(data))
             {
                 token_events += 1;
             }
@@ -264,14 +264,16 @@ fn count_streaming_token_events(body: &str) -> usize {
     token_events
 }
 
-fn streaming_event_has_generated_text(data: &str) -> bool {
+fn streaming_event_has_timing_signal(data: &str) -> bool {
     let Ok(event) = serde_json::from_str::<serde_json::Value>(data) else {
         return false;
     };
     let Some(choices) = event.get("choices").and_then(serde_json::Value::as_array) else {
         return false;
     };
-    choices.iter().any(choice_has_generated_text)
+    choices
+        .iter()
+        .any(|choice| choice_has_generated_text(choice) || choice_has_finish_reason(choice))
 }
 
 fn choice_has_generated_text(choice: &serde_json::Value) -> bool {
@@ -284,6 +286,13 @@ fn choice_has_generated_text(choice: &serde_json::Value) -> bool {
             .and_then(|delta| delta.get("content"))
             .and_then(serde_json::Value::as_str)
             .is_some_and(|content| !content.is_empty())
+}
+
+fn choice_has_finish_reason(choice: &serde_json::Value) -> bool {
+    choice
+        .get("finish_reason")
+        .and_then(serde_json::Value::as_str)
+        .is_some()
 }
 
 fn find_header_end(response: &[u8]) -> Option<usize> {
