@@ -135,5 +135,82 @@ adds fixture regression coverage so tokenizer EOS still counts toward
 `completion_tokens` and still produces `finish_reason: "stop"`, but no longer
 appears as assistant-visible completion text.
 
-A fresh real SmolLM2 probe should be recorded before claiming this polished EOS
-presentation across real Tier 1 artifacts.
+## Refreshed Suppression Rerun
+
+A refreshed real SmolLM2 probe was run after the EOS control-text suppression
+fix.
+
+Environment:
+
+- Date: 2026-06-30
+- Commit before rerun: `f06b4a7`
+- Host: local macOS development machine
+- Server port: `127.0.0.1:18105`
+- Server PID: `14111`
+- Model: `SmolLM2-1.7B-Instruct-Q4_K_M`
+- Model path: `target/models/SmolLM2-1.7B-Instruct-Q4_K_M.gguf`
+- API key: `local-secret`
+- Raw log: `target/proof/smollm-openai-eos-suppressed-probe.log`
+
+Server command:
+
+```sh
+target/release/ferrite-server \
+  --bind 127.0.0.1:18105 \
+  --model target/models/SmolLM2-1.7B-Instruct-Q4_K_M.gguf \
+  --model-id SmolLM2-1.7B-Instruct-Q4_K_M \
+  --api-key local-secret \
+  --default-max-tokens 16 \
+  --hard-max-tokens 64
+```
+
+Health check response:
+
+```json
+{"status":"ok","ready":true,"model":"SmolLM2-1.7B-Instruct-Q4_K_M"}
+```
+
+The refreshed probe used the same prompt and endpoint mix as the original run.
+It returned no visible `<|im_end|>` content in the raw log:
+
+```sh
+rg -n '<\|im_end\|>' target/proof/smollm-openai-eos-suppressed-probe.log
+```
+
+The command returned no matches.
+
+Streaming legacy completions returned HTTP `200` with `text/event-stream` and
+emitted only assistant-visible text before the terminal stop chunk:
+
+```text
+data: ... "text":" Paris" ... "finish_reason":null
+data: ... "text":"." ... "finish_reason":null
+data: ... "text":"" ... "finish_reason":"stop"
+data: ... "usage":{"prompt_tokens":5,"completion_tokens":3,"total_tokens":8,...}
+data: [DONE]
+```
+
+The non-streaming legacy completion returned visible text without the EOS
+control token while preserving EOS accounting:
+
+```json
+{"choices":[{"text":" Paris.","finish_reason":"stop"}],"usage":{"prompt_tokens":5,"completion_tokens":3,"total_tokens":8}}
+```
+
+Streaming chat completions returned HTTP `200` with `text/event-stream`, no
+visible EOS control token, a terminal stop chunk, usage, and `[DONE]`:
+
+```text
+data: ... "delta":{"content":" Paris"} ... "finish_reason":null
+data: ... "delta":{"content":"."} ... "finish_reason":null
+data: ... "delta":{} ... "finish_reason":"stop"
+data: ... "usage":{"prompt_tokens":12,"completion_tokens":9,"total_tokens":21,...}
+data: [DONE]
+```
+
+After stopping the server, `lsof -nP -iTCP:18105 -sTCP:LISTEN` returned no
+listener.
+
+This proves the polished EOS presentation for the local SmolLM2
+OpenAI-compatible legacy completion and streaming chat paths. It does not prove
+EOS presentation across Qwen models, x86_64, or longer steady-state serving.
