@@ -137,20 +137,22 @@ latency summaries, and RSS samples.
 SmolLM2-1.7B Q4_K_M now has the same combined reconnect/error proof shape for
 the 256-token, 512-token, and 1024-token budgets when using the known
 full-length operational prompt shape from the earlier SmolLM2 full matrix.
-The long-chat gate is still not a release-complete readiness claim. The next
-proof milestone remains a dedicated long-chat gate closure that treats 256,
-512, and 1024-token streaming responses, repeated multi-turn conversations, RSS
-sampling before and after requests, latency per token, stop/EOS behavior, and
-client reconnect/error behavior as one explicit contract. SmolLM2 now has
-x86_64 EOS-specific evidence for one known prompt, but broader Qwen EOS
-behavior, full-matrix EOS behavior across the required model set, longer
-steady-state behavior, and memory-focused reruns remain unproven.
 After the generated-context harness update, Qwen2.5-0.5B Q4_K_M now has one
 fresh local 256-token long-chat rerun proving that turn 1 uses the seed
 assistant context while turns 2-4 use generated assistant context from prior
 completed streaming responses. That same run records token-limit status, fresh
 disconnect reconnect generation, usage accounting, timing, RSS samples, and
 `long_chat_summary_run_complete=true`.
+The long-chat gate is still not a release-complete readiness claim. The next
+proof milestone is a dedicated long-chat gate closure that treats 256, 512, and
+1024-token streaming responses, repeated multi-turn conversations with generated
+assistant context, RSS sampling before and after requests, latency per token,
+stop/EOS behavior, and client reconnect/error behavior as one explicit contract.
+SmolLM2 now has x86_64 EOS-specific evidence for one known prompt, but broader
+Qwen EOS behavior, full-matrix EOS behavior across the required model set,
+512/1024-token generated-context reruns, larger-artifact generated-context
+reruns, longer steady-state behavior, and memory-focused reruns remain
+unproven.
 The x86_64 long-chat proof has bounded `staging` pod runs for Qwen2.5-0.5B
 Q4_K_M, Qwen2.5-1.5B Q8_0, and Qwen2.5-1.5B Q6_K at the 256-token, 512-token,
 and 1024-token combined reconnect/error budgets. SmolLM2-1.7B Q4_K_M now also

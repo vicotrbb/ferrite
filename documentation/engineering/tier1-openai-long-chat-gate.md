@@ -1,14 +1,15 @@
 # Tier 1 OpenAI Long-Chat Gate
 
-Date: 2026-06-30
+Date: 2026-07-01
 
 ## Purpose
 
 This gate defines the next OpenAI-compatible proof milestone for Ferrite's Tier
-1 local server path. Existing evidence covers one-token and 32-token streaming
-chat shapes. The next milestone must prove longer streaming chat behavior under
-bounded memory and latency observation before any broader Tier 1 HTTP readiness
-claim.
+1 local server path. Existing evidence covers short streaming chat shapes and
+partial long-chat runs. The next milestone is a dedicated long-chat closure pass
+that proves 256, 512, and 1024-token streaming responses, repeated multi-turn
+conversations, RSS sampling before and after requests, latency per token,
+stop/EOS behavior, and client reconnect/error behavior as one explicit contract.
 
 ## Scope
 
@@ -24,6 +25,29 @@ Required local Tier 1 model set:
 The first implementation slice may start with Qwen2.5-0.5B Q4_K_M and then
 expand through the larger Tier 1 artifacts. The gate is not closed until every
 required model above has recorded evidence.
+
+## Next Proof Milestone
+
+The next proof milestone is not another isolated smoke run. It is a dedicated
+long-chat gate closure with one reportable matrix:
+
+- all required Tier 1 HTTP model artifacts;
+- 256, 512, and 1024 completion-token streaming responses;
+- at least four repeated turns per model and token length;
+- generated assistant context carried from each completed turn into the next
+  follow-up turn;
+- RSS samples before and after each measured streaming request, plus idle
+  post-run samples;
+- latency per generated token, including time to first token, elapsed stream
+  time, tokens per second, and min/p50/p95/max inter-token latency;
+- terminal `finish_reason` and usage accounting for length, explicit stop, and
+  tokenizer EOS cases;
+- client disconnect, reconnect, and request-error probes that demonstrate
+  bounded behavior and fresh generation after reconnect.
+
+Any run that covers only one model, one token length, no generated follow-up
+context, or only one of stop/EOS/reconnect/error behavior remains partial
+evidence.
 
 ## Required Scenarios
 
