@@ -136,16 +136,18 @@ EOS-specific evidence across the required model set, x86_64 behavior, longer
 steady-state behavior, and memory-focused reruns remain unproven.
 The x86_64 long-chat proof has bounded `staging` pod runs for Qwen2.5-0.5B
 Q4_K_M and Qwen2.5-1.5B Q8_0 at the 256-token, 512-token, and 1024-token
-combined reconnect/error budgets. Those runs prove the same request-error
+combined reconnect/error budgets, plus Qwen2.5-1.5B Q6_K at the 256-token
+combined reconnect/error budget. Those runs prove the same request-error
 recovery, disconnect/reconnect recovery, finish reason, usage accounting,
 per-token latency summaries, and RSS sampling shape on amd64 AVX2 pods. The
-512-token, 1024-token, and Qwen2.5-1.5B Q8_0 runs also encountered transient
-staging control-plane and node readiness flaps, while the in-pod Ferrite gates
-still reached `long_chat_summary_run_complete=true`; they should not be
-treated as clean control-plane-stability samples. The Qwen2.5-1.5B Q8_0
-512-token run also ran close to the current 6Gi pod memory limit, so the
-1024-token run used an 8Gi limit and is not proof that the 1024-token path fits
-6Gi. The rest of the x86_64 model matrix remains unproven.
+512-token, 1024-token, Qwen2.5-1.5B Q8_0, and Qwen2.5-1.5B Q6_K runs also
+encountered transient staging control-plane and node readiness or exec-stream
+flaps, while the in-pod Ferrite gates still reached
+`long_chat_summary_run_complete=true`; they should not be treated as clean
+control-plane-stability samples. The Qwen2.5-1.5B Q8_0 512-token run also ran
+close to the current 6Gi pod memory limit, so the 1024-token run used an 8Gi
+limit and is not proof that the 1024-token path fits 6Gi. The rest of the
+x86_64 model matrix remains unproven.
 The Qwen2.5-1.5B Q8_0 OpenAI-compatible HTTP path now also has a debug
 test-profile throughput harness check for three sequential one-token legacy
 completion requests and three queued one-token legacy completion requests. This
