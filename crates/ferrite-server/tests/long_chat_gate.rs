@@ -375,6 +375,7 @@ fn formats_long_chat_scenario_result() -> Result<(), Box<dyn std::error::Error>>
             Duration::from_millis(140),
             Duration::from_millis(170),
         ]),
+        streaming_text: None,
         streaming_usage: Some(StreamingUsageSummary::new(16, 256, 272)),
         rss: Some(RssSummary::new(1000, 2000, 1500)),
     };
@@ -410,6 +411,7 @@ fn formats_long_chat_stop_result_as_not_hitting_token_limit(
         elapsed: Duration::from_millis(400),
         streaming_finish: Some(StreamingFinishSummary::new("stop")),
         streaming_timing: None,
+        streaming_text: None,
         streaming_usage: Some(StreamingUsageSummary::new(16, 3, 19)),
         rss: None,
     };
@@ -469,6 +471,7 @@ fn formats_integrated_long_chat_run_summary() -> Result<(), Box<dyn std::error::
                         Duration::from_millis(100),
                         Duration::from_millis(140),
                     ]),
+                    streaming_text: None,
                     streaming_usage: Some(StreamingUsageSummary::new(
                         16,
                         scenario.token_length() as u64,
@@ -514,6 +517,7 @@ fn runs_long_chat_gate_with_injected_executor() -> Result<(), Box<dyn std::error
             elapsed: Duration::from_millis(10 * throughput.max_tokens() as u64),
             streaming_finish: Some(StreamingFinishSummary::new("length")),
             streaming_timing: None,
+            streaming_text: None,
             streaming_usage: Some(StreamingUsageSummary::new(
                 8,
                 throughput.max_tokens() as u64,
@@ -570,6 +574,7 @@ fn observes_long_chat_results_as_each_scenario_finishes() -> Result<(), Box<dyn 
                 elapsed: Duration::from_millis(10 * throughput.max_tokens() as u64),
                 streaming_finish: Some(StreamingFinishSummary::new("length")),
                 streaming_timing: None,
+                streaming_text: None,
                 streaming_usage: Some(StreamingUsageSummary::new(
                     8,
                     throughput.max_tokens() as u64,
@@ -621,6 +626,7 @@ fn rejects_unexpected_long_chat_finish_reason() -> Result<(), Box<dyn std::error
             elapsed: Duration::from_millis(10),
             streaming_finish: Some(StreamingFinishSummary::new("length")),
             streaming_timing: None,
+            streaming_text: None,
             streaming_usage: Some(StreamingUsageSummary::new(
                 8,
                 throughput.max_tokens() as u64,
@@ -666,6 +672,7 @@ fn rejects_missing_long_chat_finish_reason_when_expected() -> Result<(), Box<dyn
             elapsed: Duration::from_millis(10),
             streaming_finish: None,
             streaming_timing: None,
+            streaming_text: None,
             streaming_usage: None,
             rss: None,
         })

@@ -3,6 +3,7 @@ mod http;
 mod rss;
 mod streaming_finish;
 mod streaming_metrics;
+mod streaming_text;
 mod streaming_usage;
 
 #[cfg(test)]
@@ -12,6 +13,7 @@ pub use config::{OpenAiEndpoint, ThroughputClientConfig};
 pub use rss::RssSummary;
 pub use streaming_finish::StreamingFinishSummary;
 pub use streaming_metrics::StreamingTimingSummary;
+pub use streaming_text::StreamingTextSummary;
 pub use streaming_usage::StreamingUsageSummary;
 
 use std::{
@@ -25,6 +27,7 @@ pub struct ThroughputResult {
     pub elapsed: Duration,
     pub streaming_finish: Option<StreamingFinishSummary>,
     pub streaming_timing: Option<StreamingTimingSummary>,
+    pub streaming_text: Option<StreamingTextSummary>,
     pub streaming_usage: Option<StreamingUsageSummary>,
     pub rss: Option<RssSummary>,
 }
@@ -60,6 +63,7 @@ pub async fn run_completion_benchmark(
         elapsed: started.elapsed(),
         streaming_finish: run.streaming_finish,
         streaming_timing: run.streaming_timing,
+        streaming_text: run.streaming_text,
         streaming_usage: run.streaming_usage,
         rss,
     })
@@ -69,6 +73,7 @@ struct RequestRun {
     completed_requests: usize,
     streaming_finish: Option<StreamingFinishSummary>,
     streaming_timing: Option<StreamingTimingSummary>,
+    streaming_text: Option<StreamingTextSummary>,
     streaming_usage: Option<StreamingUsageSummary>,
 }
 
@@ -81,6 +86,7 @@ async fn run_requests(
     let mut completed_requests = 0;
     let mut streaming_finish = None;
     let mut streaming_timing = None;
+    let mut streaming_text = None;
     let mut streaming_usage = None;
 
     while completed_requests < config.requests() {
@@ -111,6 +117,7 @@ async fn run_requests(
                 response.raw(),
             )?;
             let response_finish = response.streaming_finish();
+            let response_text = response.streaming_text();
             let response_usage = response.streaming_usage();
             validate_streaming_token_count(config, response_finish.as_ref(), response_usage)?;
             if stream && streaming_timing.is_none() {
@@ -118,6 +125,9 @@ async fn run_requests(
             }
             if stream && streaming_finish.is_none() {
                 streaming_finish = response_finish;
+            }
+            if stream && streaming_text.is_none() {
+                streaming_text = response_text;
             }
             if stream && streaming_usage.is_none() {
                 streaming_usage = response_usage;
@@ -130,6 +140,7 @@ async fn run_requests(
         completed_requests,
         streaming_finish,
         streaming_timing,
+        streaming_text,
         streaming_usage,
     })
 }
@@ -157,6 +168,9 @@ pub fn format_result(config: &ThroughputClientConfig, result: ThroughputResult) 
     }
     if let Some(finish) = &result.streaming_finish {
         output.push_str(&format!("\nstreaming_finish_reason={}", finish.reason()));
+    }
+    if let Some(text) = &result.streaming_text {
+        output.push_str(&format!("\nstreaming_text_bytes={}", text.byte_len()));
     }
     if let Some(usage) = result.streaming_usage {
         output.push_str(&format!(

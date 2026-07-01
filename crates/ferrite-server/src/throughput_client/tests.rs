@@ -165,6 +165,7 @@ fn formats_chat_completion_result_metric_name() -> Result<(), Box<dyn std::error
         elapsed: std::time::Duration::from_millis(400),
         streaming_finish: None,
         streaming_timing: None,
+        streaming_text: None,
         streaming_usage: None,
         rss: None,
     };
@@ -418,6 +419,7 @@ fn formats_streaming_chat_completion_result_metric_name() -> Result<(), Box<dyn 
         elapsed: std::time::Duration::from_millis(400),
         streaming_finish: None,
         streaming_timing: None,
+        streaming_text: None,
         streaming_usage: None,
         rss: None,
     };
@@ -446,6 +448,7 @@ fn formats_streaming_timing_summary() -> Result<(), Box<dyn std::error::Error>> 
             Duration::from_millis(140),
             Duration::from_millis(170),
         ]),
+        streaming_text: None,
         streaming_usage: None,
         rss: None,
     };
@@ -471,6 +474,7 @@ fn formats_streaming_usage_summary() -> Result<(), Box<dyn std::error::Error>> {
         elapsed: Duration::from_millis(400),
         streaming_finish: None,
         streaming_timing: None,
+        streaming_text: None,
         streaming_usage: Some(StreamingUsageSummary::new(8, 32, 40)),
         rss: None,
     };
@@ -495,6 +499,7 @@ fn formats_streaming_finish_summary() -> Result<(), Box<dyn std::error::Error>> 
         elapsed: Duration::from_millis(400),
         streaming_finish: Some(StreamingFinishSummary::new("length")),
         streaming_timing: None,
+        streaming_text: None,
         streaming_usage: None,
         rss: None,
     };
@@ -518,6 +523,7 @@ fn formats_rss_sampling_summary() -> Result<(), Box<dyn std::error::Error>> {
         elapsed: Duration::from_millis(400),
         streaming_finish: None,
         streaming_timing: None,
+        streaming_text: None,
         streaming_usage: None,
         rss: Some(RssSummary::new(1000, 2000, 1500)),
     };
@@ -563,6 +569,33 @@ fn extracts_streaming_usage_from_sse_body() -> Result<(), Box<dyn std::error::Er
     assert_eq!(usage.prompt_tokens(), 8);
     assert_eq!(usage.completion_tokens(), 32);
     assert_eq!(usage.total_tokens(), 40);
+    Ok(())
+}
+
+#[test]
+fn extracts_streaming_text_from_chat_and_completion_sse_bodies(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let chat_body = concat!(
+        "data: {\"choices\":[{\"delta\":{\"role\":\"assistant\",\"content\":\"\"}}]}\n\n",
+        "data: {\"choices\":[{\"delta\":{\"content\":\"Hello\"}}]}\n\n",
+        "data: {\"choices\":[{\"delta\":{\"content\":\" world\"}}]}\n\n",
+        "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"length\"}]}\n\n",
+        "data: [DONE]\n\n",
+    );
+    let completion_body = concat!(
+        "data: {\"choices\":[{\"text\":\"Hello\",\"finish_reason\":null}]}\n\n",
+        "data: {\"choices\":[{\"text\":\" world\",\"finish_reason\":null}]}\n\n",
+        "data: {\"choices\":[{\"text\":\"\",\"finish_reason\":\"length\"}]}\n\n",
+        "data: [DONE]\n\n",
+    );
+
+    let chat_text =
+        StreamingTextSummary::from_sse_body(chat_body).ok_or("expected chat streaming text")?;
+    let completion_text = StreamingTextSummary::from_sse_body(completion_body)
+        .ok_or("expected completion streaming text")?;
+
+    assert_eq!(chat_text.text(), "Hello world");
+    assert_eq!(completion_text.text(), "Hello world");
     Ok(())
 }
 
