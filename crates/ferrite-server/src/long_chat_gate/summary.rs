@@ -21,6 +21,13 @@ pub fn format_run_summary(
     let any_token_limit_hit = results
         .iter()
         .any(|result| result.hit_token_limit().unwrap_or(false));
+    let prompt_cache_key_present = config.prompt_cache_key().is_some();
+    let any_cached_prompt_tokens = results.iter().any(has_cached_prompt_tokens);
+    let all_generated_follow_up_turns_cached = prompt_cache_key_present
+        && results
+            .iter()
+            .filter(|result| result.turn() > 1 && result.assistant_context_source().is_generated())
+            .all(has_cached_prompt_tokens);
     let all_follow_up_turns_use_generated_context = results
         .iter()
         .all(|result| result.turn() == 1 || result.assistant_context_source().is_generated());
@@ -57,6 +64,9 @@ long_chat_summary_all_finish_reasons_present={all_finish_reasons_present}\n\
 long_chat_summary_all_usage_accounting_valid={all_usage_accounting_valid}\n\
 long_chat_summary_all_token_limit_status_present={all_token_limit_status_present}\n\
 long_chat_summary_any_token_limit_hit={any_token_limit_hit}\n\
+long_chat_summary_prompt_cache_key_present={prompt_cache_key_present}\n\
+long_chat_summary_any_cached_prompt_tokens={any_cached_prompt_tokens}\n\
+long_chat_summary_all_generated_follow_up_turns_cached={all_generated_follow_up_turns_cached}\n\
 long_chat_summary_all_follow_up_turns_use_generated_context={all_follow_up_turns_use_generated_context}\n\
 long_chat_summary_all_timing_present={all_timing_present}\n\
 long_chat_summary_rss_required={rss_required}\n\
@@ -68,6 +78,13 @@ long_chat_summary_disconnect_probe_completed={disconnect_probe_completed}\n\
 long_chat_summary_disconnect_probe_reconnect_started_new_generation={disconnect_probe_reconnect_started_new_generation}\n\
 long_chat_summary_run_complete={run_complete}"
     )
+}
+
+fn has_cached_prompt_tokens(result: &LongChatScenarioResult) -> bool {
+    result
+        .throughput()
+        .streaming_usage
+        .is_some_and(|usage| usage.cached_prompt_tokens() > 0)
 }
 
 fn usage_accounting_valid(result: &LongChatScenarioResult) -> bool {
