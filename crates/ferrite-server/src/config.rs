@@ -14,6 +14,7 @@ pub struct ServerConfig {
     api_key: Option<String>,
     token_limits: TokenLimits,
     inference_wait_timeout: Duration,
+    experimental_prefix_cache_enabled: bool,
 }
 
 impl ServerConfig {
@@ -64,6 +65,9 @@ impl ServerConfig {
                     config.inference_wait_timeout =
                         Duration::from_millis(parse_millis(value, "--inference-wait-ms")?);
                 }
+                "--experimental-prefix-cache" => {
+                    config.experimental_prefix_cache_enabled = true;
+                }
                 "--help" | "-h" => {
                     return Err(ConfigError::new(usage()));
                 }
@@ -104,6 +108,10 @@ impl ServerConfig {
     pub fn inference_wait_timeout(&self) -> Duration {
         self.inference_wait_timeout
     }
+
+    pub fn experimental_prefix_cache_enabled(&self) -> bool {
+        self.experimental_prefix_cache_enabled
+    }
 }
 
 impl Default for ServerConfig {
@@ -115,6 +123,7 @@ impl Default for ServerConfig {
             api_key: None,
             token_limits: TokenLimits::default(),
             inference_wait_timeout: Duration::ZERO,
+            experimental_prefix_cache_enabled: false,
         }
     }
 }
@@ -167,7 +176,7 @@ fn parse_millis(value: OsString, flag: &str) -> Result<u64, ConfigError> {
 }
 
 fn usage() -> &'static str {
-    "usage: ferrite-server [--bind 127.0.0.1:8080] [--model-id ferrite-local] [--model path/to/model.gguf] [--api-key local-secret] [--default-max-tokens 16] [--hard-max-tokens 256] [--inference-wait-ms 0]"
+    "usage: ferrite-server [--bind 127.0.0.1:8080] [--model-id ferrite-local] [--model path/to/model.gguf] [--api-key local-secret] [--default-max-tokens 16] [--hard-max-tokens 256] [--inference-wait-ms 0] [--experimental-prefix-cache]"
 }
 
 #[cfg(test)]
@@ -247,6 +256,17 @@ mod tests {
             config.inference_wait_timeout(),
             std::time::Duration::from_millis(250)
         );
+        Ok(())
+    }
+
+    #[test]
+    fn parses_experimental_prefix_cache_flag() -> Result<(), Box<dyn Error>> {
+        let config = ServerConfig::parse([
+            OsString::from("ferrite-server"),
+            OsString::from("--experimental-prefix-cache"),
+        ])?;
+
+        assert!(config.experimental_prefix_cache_enabled());
         Ok(())
     }
 

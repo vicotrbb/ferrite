@@ -14,6 +14,7 @@ pub struct ServerState {
     inference_wait_timeout: Duration,
     api_key: Option<Arc<str>>,
     token_limits: TokenLimits,
+    prefix_cache_enabled: bool,
 }
 
 impl ServerState {
@@ -25,6 +26,7 @@ impl ServerState {
             inference_wait_timeout: Duration::ZERO,
             api_key: None,
             token_limits: TokenLimits::default(),
+            prefix_cache_enabled: false,
         }
     }
 
@@ -36,6 +38,7 @@ impl ServerState {
             inference_wait_timeout: Duration::ZERO,
             api_key: None,
             token_limits: TokenLimits::default(),
+            prefix_cache_enabled: false,
         }
     }
 
@@ -51,6 +54,11 @@ impl ServerState {
 
     pub fn with_inference_wait_timeout(mut self, timeout: Duration) -> Self {
         self.inference_wait_timeout = timeout;
+        self
+    }
+
+    pub fn with_prefix_cache_enabled(mut self, enabled: bool) -> Self {
+        self.prefix_cache_enabled = enabled;
         self
     }
 
@@ -72,6 +80,10 @@ impl ServerState {
 
     pub fn token_limits(&self) -> TokenLimits {
         self.token_limits
+    }
+
+    pub fn prefix_cache_enabled(&self) -> bool {
+        self.prefix_cache_enabled
     }
 
     pub fn try_acquire_inference_permit(&self) -> Option<OwnedSemaphorePermit> {
@@ -106,5 +118,13 @@ mod tests {
         assert!(state.try_acquire_inference_permit().is_none());
         drop(first);
         assert!(state.try_acquire_inference_permit().is_some());
+    }
+
+    #[test]
+    fn prefix_cache_is_explicitly_enabled() {
+        let state = ServerState::new("test-model".to_owned());
+
+        assert!(!state.prefix_cache_enabled());
+        assert!(state.with_prefix_cache_enabled(true).prefix_cache_enabled());
     }
 }
