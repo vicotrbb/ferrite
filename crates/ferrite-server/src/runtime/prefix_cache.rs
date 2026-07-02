@@ -30,10 +30,13 @@ impl Default for RuntimePrefixCache {
 }
 
 impl RuntimePrefixCache {
-    pub(super) fn get(&mut self, key: &PrefixCacheKey) -> Option<RuntimePrefixCacheValue> {
+    pub(super) fn get_longest_prefix(
+        &mut self,
+        key: &PrefixCacheKey,
+    ) -> Option<RuntimePrefixCacheValue> {
         let used_at_tick = self.advance_tick();
-        self.metadata.record_hit(key, used_at_tick)?;
-        self.values.get(key).cloned()
+        let entry = self.metadata.record_longest_prefix_hit(key, used_at_tick)?;
+        self.values.get(entry.key()).cloned()
     }
 
     pub(super) fn insert(
@@ -89,7 +92,7 @@ impl InferenceEngine {
         self.prefix_cache
             .lock()
             .map_err(|_| RuntimeError::new("runtime prefix cache lock is poisoned"))
-            .map(|mut cache| cache.get(key))
+            .map(|mut cache| cache.get_longest_prefix(key))
     }
 
     pub(super) fn store_prefix_cache_value(

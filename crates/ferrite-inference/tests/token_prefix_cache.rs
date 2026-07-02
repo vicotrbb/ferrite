@@ -202,20 +202,75 @@ fn prefix_cache_store_evicts_until_byte_budget_fits() {
     assert!(store.get(third.key()).is_some());
 }
 
-fn prefix_cache_entry(namespace: &str, bytes: u128, tick: u64) -> PrefixCacheEntry {
-    PrefixCacheEntry::new(
-        PrefixCacheKey::new(
-            PrefixCacheFingerprints::new(
-                "model-a",
-                "tokenizer-a",
-                "template-a",
-                "scalar-default",
-                "chat-default",
-            ),
-            TokenPrefixIdentity::from_tokens([10, 20, tick as usize]),
-        )
-        .with_namespace(namespace),
-        bytes,
-        tick,
+#[test]
+fn prefix_cache_store_finds_longest_compatible_token_prefix() {
+    let mut store = PrefixCacheMetadataStore::new(4, 10_000);
+    let short = prefix_cache_entry_with_tokens("tenant-a", [10, 20], 100, 1);
+    let long = prefix_cache_entry_with_tokens("tenant-a", [10, 20, 30], 100, 2);
+    let different_namespace = prefix_cache_entry_with_tokens("tenant-b", [10, 20, 30, 40], 100, 3);
+    let query = prefix_cache_key_with_tokens("tenant-a", [10, 20, 30, 40, 50]);
+
+    assert!(store.insert(short.clone()).is_empty());
+    assert!(store.insert(long.clone()).is_empty());
+    assert!(store.insert(different_namespace).is_empty());
+
+    assert_eq!(
+        store.record_longest_prefix_hit(&query, 11).map(|entry| (
+            entry.key().clone(),
+            entry.matched_prefix_token_count(),
+            entry.last_used_at_tick()
+        )),
+        Some((long.key().clone(), 3, 11))
+    );
+}
+
+#[test]
+fn prefix_cache_store_rejects_partial_prefix_with_different_fingerprints() {
+    let mut store = PrefixCacheMetadataStore::new(4, 10_000);
+    let cached = prefix_cache_entry_with_tokens("tenant-a", [10, 20, 30], 100, 1);
+    let query = PrefixCacheKey::new(
+        PrefixCacheFingerprints::new(
+            "model-b",
+            "tokenizer-a",
+            "template-a",
+            "scalar-default",
+            "chat-default",
+        ),
+        TokenPrefixIdentity::from_tokens([10, 20, 30, 40]),
     )
+    .with_namespace("tenant-a");
+
+    assert!(store.insert(cached).is_empty());
+
+    assert!(store.record_longest_prefix_hit(&query, 11).is_none());
+}
+
+fn prefix_cache_entry(namespace: &str, bytes: u128, tick: u64) -> PrefixCacheEntry {
+    prefix_cache_entry_with_tokens(namespace, [10, 20, tick as usize], bytes, tick)
+}
+
+fn prefix_cache_entry_with_tokens(
+    namespace: &str,
+    tokens: impl IntoIterator<Item = usize>,
+    bytes: u128,
+    tick: u64,
+) -> PrefixCacheEntry {
+    PrefixCacheEntry::new(prefix_cache_key_with_tokens(namespace, tokens), bytes, tick)
+}
+
+fn prefix_cache_key_with_tokens(
+    namespace: &str,
+    tokens: impl IntoIterator<Item = usize>,
+) -> PrefixCacheKey {
+    PrefixCacheKey::new(
+        PrefixCacheFingerprints::new(
+            "model-a",
+            "tokenizer-a",
+            "template-a",
+            "scalar-default",
+            "chat-default",
+        ),
+        TokenPrefixIdentity::from_tokens(tokens),
+    )
+    .with_namespace(namespace)
 }

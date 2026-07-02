@@ -122,7 +122,20 @@ impl InferenceEngine {
                         RuntimeError::new(format!("failed to restore prompt cache: {error}"))
                     })?;
                 cached_prompt_tokens = cached.snapshot().cached_token_count();
-                cached.next_token().clone()
+                let suffix = &prompt_token_ids[cached_prompt_tokens..];
+                if suffix.is_empty() {
+                    cached.next_token().clone()
+                } else {
+                    let next = session.accept_prompt(suffix).map_err(|error| {
+                        RuntimeError::new(format!("failed to evaluate prompt suffix: {error}"))
+                    })?;
+                    self.store_prefix_cache_value(
+                        prefix_cache_key,
+                        session.cache_snapshot(),
+                        next.clone(),
+                    )?;
+                    next
+                }
             } else {
                 let next = session.accept_prompt(&prompt_token_ids).map_err(|error| {
                     RuntimeError::new(format!("failed to evaluate prompt: {error}"))
@@ -464,6 +477,30 @@ mod tests {
         assert_eq!(first.cached_prompt_tokens(), 0);
         assert_eq!(second.prompt_tokens(), 1);
         assert_eq!(second.cached_prompt_tokens(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn prefix_cache_reuses_longest_prompt_prefix_when_enabled(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let model_path = write_fixture_model()?;
+        let engine = InferenceEngine::load(&model_path)?;
+        remove_fixture_model(&model_path)?;
+        let cache_options =
+            GenerationCacheOptions::from_namespace(Some("tenant-a:thread-1".to_owned()))
+                .with_prefix_cache_enabled(true);
+
+        let cached_prefix =
+            engine.generate_with_cache_options("hello", 1, cache_options.clone())?;
+        let uncached_full_prompt = engine.generate("hellowinner", 1)?;
+        let cached_full_prompt =
+            engine.generate_with_cache_options("hellowinner", 1, cache_options)?;
+
+        assert_eq!(cached_prefix.cached_prompt_tokens(), 0);
+        assert_eq!(uncached_full_prompt.text(), cached_full_prompt.text());
+        assert_eq!(uncached_full_prompt.prompt_tokens(), 2);
+        assert_eq!(cached_full_prompt.prompt_tokens(), 2);
+        assert_eq!(cached_full_prompt.cached_prompt_tokens(), 1);
         Ok(())
     }
 

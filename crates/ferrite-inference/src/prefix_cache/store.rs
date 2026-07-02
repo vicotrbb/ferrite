@@ -47,6 +47,22 @@ impl PrefixCacheMetadataStore {
         Some(entry)
     }
 
+    pub fn record_longest_prefix_hit(
+        &mut self,
+        key: &PrefixCacheKey,
+        used_at_tick: u64,
+    ) -> Option<&PrefixCacheEntry> {
+        let index = self
+            .entries
+            .iter()
+            .enumerate()
+            .filter(|(_, entry)| is_compatible_prefix(entry.key(), key))
+            .max_by_key(|(_, entry)| entry.key().prefix_token_count())
+            .map(|(index, _)| index)?;
+        self.entries[index].record_use(used_at_tick);
+        Some(&self.entries[index])
+    }
+
     pub fn get(&self, key: &PrefixCacheKey) -> Option<&PrefixCacheEntry> {
         self.entries.iter().find(|entry| entry.key() == key)
     }
@@ -87,4 +103,12 @@ impl PrefixCacheMetadataStore {
             .min_by_key(|(_, entry)| (entry.last_used_at_tick(), entry.created_at_tick()))
             .map(|(index, _)| index)
     }
+}
+
+fn is_compatible_prefix(cached: &PrefixCacheKey, requested: &PrefixCacheKey) -> bool {
+    cached.fingerprints() == requested.fingerprints()
+        && cached.namespace() == requested.namespace()
+        && requested
+            .prefix_tokens()
+            .starts_with(cached.prefix_tokens())
 }
