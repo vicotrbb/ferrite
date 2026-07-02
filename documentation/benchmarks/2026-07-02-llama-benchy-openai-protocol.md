@@ -136,7 +136,20 @@ Every executed `llama-benchy` run must be paired with a Markdown result note in
 
 ## Current Status
 
-No `llama-benchy` command in this protocol has been executed against Ferrite
-yet. The next proof slice is a baseline smoke against one available Tier 1
-model, followed by a short result note that either promotes this protocol to a
-repeatable benchmark gate or records why it failed.
+A minimal compatibility smoke has been executed against Ferrite:
+
+- Result note:
+  `documentation/benchmarks/2026-07-02-llama-benchy-qwen-0-5b-compat-smoke.md`
+- Failed pre-change raw result:
+  `documentation/benchmarks/2026-07-02-llama-benchy-qwen-0-5b-compat-smoke.json`
+- Successful post-change raw result:
+  `documentation/benchmarks/2026-07-02-llama-benchy-qwen-0-5b-compat-smoke-after-return-token-ids.json`
+
+That smoke used `--pp 32`, `--tg 16`, one run, concurrency `1`, no warmup, no
+coherence check, and no prompt adaptation. It proves external tool
+compatibility only.
+
+The full protocol has not been executed. The next proof slice is a bounded
+256-token baseline against one available Tier 1 model, followed by a result
+note comparing `llama-benchy` output with the nearest Ferrite long-chat timing
+artifact.

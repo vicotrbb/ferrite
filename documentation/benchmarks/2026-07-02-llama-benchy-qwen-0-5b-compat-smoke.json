@@ -1,0 +1,29 @@
+{
+  "version": "0.3.8",
+  "timestamp": "2026-07-02 18:34:41Z",
+  "latency_mode": "none",
+  "latency_ms": 0.0,
+  "model": "Qwen/Qwen2.5-0.5B-Instruct",
+  "prefix_caching_enabled": false,
+  "max_concurrency": 1,
+  "benchmarks": [
+    {
+      "concurrency": 1,
+      "context_size": 0,
+      "prompt_size": 32,
+      "response_size": 16,
+      "is_context_prefill_phase": false,
+      "pp_throughput": null,
+      "pp_req_throughput": null,
+      "tg_throughput": null,
+      "tg_req_throughput": null,
+      "peak_throughput": null,
+      "peak_req_throughput": null,
+      "ttfr": null,
+      "est_ppt": null,
+      "e2e_ttft": null,
+      "throughput_over_time": null,
+      "requests_throughput_over_time": null
+    }
+  ]
+}
