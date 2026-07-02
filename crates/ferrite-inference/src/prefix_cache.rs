@@ -85,6 +85,51 @@ impl PrefixCacheKey {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PrefixCacheEntry {
+    key: PrefixCacheKey,
+    matched_prefix_token_count: usize,
+    estimated_kv_bytes: u128,
+    created_at_tick: u64,
+    last_used_at_tick: u64,
+}
+
+impl PrefixCacheEntry {
+    pub fn new(key: PrefixCacheKey, estimated_kv_bytes: u128, created_at_tick: u64) -> Self {
+        Self {
+            matched_prefix_token_count: key.prefix_token_count(),
+            key,
+            estimated_kv_bytes,
+            created_at_tick,
+            last_used_at_tick: created_at_tick,
+        }
+    }
+
+    pub fn key(&self) -> &PrefixCacheKey {
+        &self.key
+    }
+
+    pub fn matched_prefix_token_count(&self) -> usize {
+        self.matched_prefix_token_count
+    }
+
+    pub fn estimated_kv_bytes(&self) -> u128 {
+        self.estimated_kv_bytes
+    }
+
+    pub fn created_at_tick(&self) -> u64 {
+        self.created_at_tick
+    }
+
+    pub fn last_used_at_tick(&self) -> u64 {
+        self.last_used_at_tick
+    }
+
+    pub fn record_use(&mut self, used_at_tick: u64) {
+        self.last_used_at_tick = used_at_tick;
+    }
+}
+
 const FNV_OFFSET_BASIS: u64 = 0xcbf29ce484222325;
 const FNV_PRIME: u64 = 0x100000001b3;
 

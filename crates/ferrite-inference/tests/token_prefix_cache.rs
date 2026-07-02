@@ -1,5 +1,5 @@
 use ferrite_inference::prefix_cache::{
-    PrefixCacheFingerprints, PrefixCacheKey, TokenPrefixIdentity,
+    PrefixCacheEntry, PrefixCacheFingerprints, PrefixCacheKey, TokenPrefixIdentity,
 };
 
 #[test]
@@ -124,4 +124,30 @@ fn prefix_cache_key_includes_execution_request_shape_and_namespace() {
         PrefixCacheKey::new(fingerprints, TokenPrefixIdentity::from_tokens([10, 20, 31]))
             .with_namespace("tenant-a:prompt-1")
     );
+}
+
+#[test]
+fn prefix_cache_entry_records_token_count_bytes_and_use_ticks() {
+    let key = PrefixCacheKey::new(
+        PrefixCacheFingerprints::new(
+            "model-a",
+            "tokenizer-a",
+            "template-a",
+            "scalar-default",
+            "chat-default",
+        ),
+        TokenPrefixIdentity::from_tokens([10, 20, 30]),
+    );
+    let mut entry = PrefixCacheEntry::new(key.clone(), 4096, 7);
+
+    assert_eq!(entry.key(), &key);
+    assert_eq!(entry.matched_prefix_token_count(), 3);
+    assert_eq!(entry.estimated_kv_bytes(), 4096);
+    assert_eq!(entry.created_at_tick(), 7);
+    assert_eq!(entry.last_used_at_tick(), 7);
+
+    entry.record_use(11);
+
+    assert_eq!(entry.created_at_tick(), 7);
+    assert_eq!(entry.last_used_at_tick(), 11);
 }
