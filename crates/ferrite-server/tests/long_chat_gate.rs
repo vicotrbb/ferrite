@@ -194,6 +194,26 @@ fn formats_long_chat_gate_plan_summary() -> Result<(), Box<dyn std::error::Error
 }
 
 #[test]
+fn formats_long_chat_gate_plan_with_execute_flag() -> Result<(), Box<dyn std::error::Error>> {
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--execute"),
+        OsString::from("--models"),
+        OsString::from("fixture-model"),
+        OsString::from("--token-lengths"),
+        OsString::from("256"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+    ])?;
+
+    assert_eq!(
+        format_plan(&config),
+        "long_chat_models=fixture-model\nlong_chat_token_lengths=256\nlong_chat_turns=4\nlong_chat_execute=true\nlong_chat_planned_scenarios=4"
+    );
+    Ok(())
+}
+
+#[test]
 fn formats_long_chat_gate_plan_with_prompt_cache_key() -> Result<(), Box<dyn std::error::Error>> {
     let config = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),
