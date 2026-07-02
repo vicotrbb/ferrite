@@ -100,10 +100,10 @@ explicit retained-cache accounting.
 
 ## Next Step
 
-Scale the repeated-session probe to a bounded x86_64 pod and at least one
-larger 1.5B artifact at 512 or 1024 tokens. If retained memory grows or cannot
-be attributed, add explicit KV/cache byte accounting before treating prefix
-reuse and windowing as safe steady-state serving features.
+Scale the repeated-session probe to at least one larger 1.5B artifact at 512 or
+1024 tokens. If retained memory grows or cannot be attributed, add explicit
+KV/cache byte accounting before treating prefix reuse and windowing as safe
+steady-state serving features.
 
 ## x86_64 Attempt Boundary
 
@@ -112,10 +112,36 @@ An x86_64 repeated-session probe was attempted with the established bounded
 pod creation. The dev note is
 `documentation/dev-notes/2026-07-02-staging-api-unreachable-x86-memory-retention.md`.
 
-No x86 memory-retention benchmark ran in that slice. Retry only after:
+No x86 memory-retention benchmark ran in that slice. This boundary is
+historical; a retry should only happen after:
 
 ```sh
 kubectl --context staging get --raw=/readyz
 ```
 
 returns successfully.
+
+## First x86_64 Repeated-Session Probe
+
+After `kubectl --context staging get --raw=/readyz` returned `ok`, the bounded
+x86_64 retry completed on `Qwen2.5-0.5B-Instruct-Q4_K_M`. The benchmark note is
+`documentation/benchmarks/2026-07-02-openai-long-chat-x86-qwen-0-5b-memory-retention-3x128.md`.
+
+The run used one `rust:1.96-bookworm` pod on `homelab-01`, verified `x86_64`
+with `avx` and `avx2`, and served the model through Ferrite's
+OpenAI-compatible HTTP server. Three sequential four-turn 128-token
+generated-context sessions exited `0` and recorded
+`long_chat_summary_run_complete=true`.
+
+Session-level RSS summary:
+
+| Session | First request RSS before | Final idle RSS | Delta |
+| ---: | ---: | ---: | ---: |
+| 1 | 423370752 | 440016896 | +16646144 |
+| 2 | 440016896 | 440147968 | +131072 |
+| 3 | 440147968 | 440147968 | 0 |
+
+The pod cgroup peak for the full build, model load, and proof was
+`1411563520` bytes, and cgroup current after the run was `1032531968` bytes.
+This reduces risk for the small Qwen 0.5B 128-token x86 shape, but it does not
+close the larger-model or 512/1024-token memory-retention questions.

@@ -78,3 +78,9 @@ The connection to the server 192.168.50.132:6443 was refused - did you specify t
 No Ferrite x86_64 pod was created, and no x86 memory-retention benchmark was
 run in this slice. The next x86 memory-retention attempt should retry only
 after `kubectl --context staging get --raw=/readyz` succeeds.
+
+## Retry
+
+Later on 2026-07-02, `kubectl --context staging get --raw=/readyz` returned
+`ok`, and the bounded x86_64 retry completed. The benchmark note is
+`documentation/benchmarks/2026-07-02-openai-long-chat-x86-qwen-0-5b-memory-retention-3x128.md`.
