@@ -207,6 +207,32 @@ Adoption criterion: use it only after the Ferrite long-chat gate passes the
 same token budget, and document both artifacts together so correctness and
 benchmark throughput do not get conflated.
 
+## Shared-Prefix Smoke
+
+After the Ferrite shared-prefix long-chat gates completed on the internal proof
+client, a bounded `llama-benchy` prefix-cache smoke ran against
+`SmolLM2-135M-Instruct-Q4_K_M`. The benchmark note is
+`documentation/benchmarks/2026-07-02-llama-benchy-smollm-135m-shared-prefix-smoke.md`.
+
+The run used:
+
+- `--pp 64`
+- `--tg 16`
+- `--depth 64`
+- `--enable-prefix-caching`
+- `--extra-body prompt_cache_key=ferrite:benchy:smollm135:shared-prefix`
+- `--latency-mode generation`
+
+`llama-benchy` exited `0`, wrote JSON output, and reported the expected
+context-load and inference rows. A companion direct Ferrite probe sent two
+divergent prompts with the same cache key; the second prompt reported
+`cached_tokens=3`, proving a shared-prefix cache hit through Ferrite's own
+OpenAI-compatible usage metadata.
+
+This reinforces the tool split: use Ferrite's internal long-chat gate for
+correctness and protocol proof, and use `llama-benchy` for external benchmark
+trends after correctness is already established.
+
 ## Falsification Experiment
 
 Run a small no-cache baseline first:
