@@ -92,6 +92,39 @@ This supports the theory for the small local measurement slice. It does not
 prove response quality, token-exact windowing, x86_64 behavior, larger
 generated-context budgets, or steady-state memory behavior.
 
+## Token-Window Probe
+
+The long-chat gate now also supports `--generated-context-max-tokens`, which
+keeps only the trailing streaming content chunks from generated assistant text
+before carrying that text into the next turn. This is not tokenizer-level
+retokenization, but it is closer to generated-token retention than the earlier
+character-count window and avoids cutting through arbitrary text boundaries.
+
+A local `Qwen2.5-0.5B-Instruct-Q4_K_M` 128-token probe completed with
+`--generated-context-max-tokens 32`. The benchmark note is
+`documentation/benchmarks/2026-07-02-openai-long-chat-qwen-0-5b-generated-context-token-windowing-128.md`.
+
+Generated-turn averages compared with the prior local probes:
+
+| Metric | Unwindowed | 128-char window | 32-token window |
+| --- | ---: | ---: | ---: |
+| Prompt tokens | 158.00 | 55.67 | 61.67 |
+| TTFT ms | 7116.00 | 2354.33 | 3468.00 |
+| Stream ms | 13741.00 | 8250.67 | 9745.00 |
+| Streaming tok/s | 9.388321 | 15.640928 | 13.262002 |
+
+The token-window run preserved the long-chat gate invariants:
+
+```text
+long_chat_summary_all_follow_up_turns_use_generated_context=true
+long_chat_summary_all_streaming_content_chunks_have_token_ids=true
+long_chat_summary_run_complete=true
+```
+
+The 32-token window was slower than the 128-character window on this prompt,
+but it is a better basis for future sweeps because the retained context is
+bounded by generated stream chunks instead of raw character count.
+
 ## Risks
 
 - Windowing can hide long-range context regressions if the proof prompt is too
@@ -105,7 +138,8 @@ generated-context budgets, or steady-state memory behavior.
 
 ## Next Step
 
-Design a token-aware generated-context windowing experiment next. Keep it
+Run a small window sweep such as 16, 32, 64, and 128 generated chunks, then
+repeat on a larger 1.5B artifact when x86_64 staging is reachable. Keep this
 outside the default public HTTP request path until larger-model and
 conversation-quality probes prove that reduced prompt length does not hide
 important continuity regressions.

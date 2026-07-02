@@ -104,3 +104,18 @@ Scale the repeated-session probe to a bounded x86_64 pod and at least one
 larger 1.5B artifact at 512 or 1024 tokens. If retained memory grows or cannot
 be attributed, add explicit KV/cache byte accounting before treating prefix
 reuse and windowing as safe steady-state serving features.
+
+## x86_64 Attempt Boundary
+
+An x86_64 repeated-session probe was attempted with the established bounded
+`staging` pod shape, but the Kubernetes API server refused connections before
+pod creation. The dev note is
+`documentation/dev-notes/2026-07-02-staging-api-unreachable-x86-memory-retention.md`.
+
+No x86 memory-retention benchmark ran in that slice. Retry only after:
+
+```sh
+kubectl --context staging get --raw=/readyz
+```
+
+returns successfully.
