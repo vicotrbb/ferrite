@@ -62,6 +62,14 @@ The first useful shape is:
 - no optimization claims unless the results agree with Ferrite's own gate or a
   documented explanation accounts for differences.
 
+For a prefix-cache comparison, run Ferrite with `--experimental-prefix-cache`
+and send the cache namespace explicitly. Ferrite's local proof clients now use
+`--prompt-cache-key KEY`; `llama-benchy` can mirror that request field with:
+
+```sh
+--extra-body prompt_cache_key=ferrite:benchy:prefix-smoke
+```
+
 ## Open Questions
 
 - What exact `llama-benchy` CLI options map cleanly to Ferrite's current
@@ -75,4 +83,5 @@ The first useful shape is:
 ## Status
 
 Candidate accepted for a future benchmark-tool smoke. No Ferrite benchmark
-claim currently depends on `llama-benchy`.
+claim currently depends on `llama-benchy`, and no `llama-benchy` run has been
+executed against Ferrite yet.

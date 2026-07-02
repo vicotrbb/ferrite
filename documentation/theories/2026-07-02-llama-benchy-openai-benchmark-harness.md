@@ -2,7 +2,7 @@
 
 Date: 2026-07-02
 
-Status: Hypothesis
+Status: Testing
 
 ## Source Check
 
@@ -24,6 +24,11 @@ Observed on 2026-07-02:
   2026-06-10.
 
 No `llama-benchy` run has been executed against Ferrite yet.
+
+Ferrite's own proof clients now expose `--prompt-cache-key` for
+`chat-completions`, and the long-chat gate passes that through to the
+throughput client. That makes direct comparison with `llama-benchy --extra-body
+prompt_cache_key=...` practical without patching either side.
 
 ## Hypothesis
 
@@ -68,8 +73,7 @@ notes.
 
 ## Falsification Experiment
 
-After the OpenAI-compatible server endpoint is available, run a small smoke
-benchmark similar to:
+Run a small no-cache baseline first:
 
 ```sh
 uvx llama-benchy \
@@ -82,6 +86,25 @@ uvx llama-benchy \
   --latency-mode generation \
   --format json \
   --save-result documentation/benchmarks/YYYY-MM-DD-llama-benchy-smoke.json
+```
+
+Then run an explicit namespace/cache experiment against a Ferrite server started
+with `--experimental-prefix-cache`:
+
+```sh
+uvx llama-benchy \
+  --base-url http://127.0.0.1:8000/v1 \
+  --model ferrite-local \
+  --served-model-name ferrite-local \
+  --pp 256 512 1024 \
+  --tg 256 512 1024 \
+  --depth 256 512 1024 \
+  --enable-prefix-caching \
+  --extra-body prompt_cache_key=ferrite:benchy:prefix-smoke \
+  --concurrency 1 \
+  --latency-mode generation \
+  --format json \
+  --save-result documentation/benchmarks/YYYY-MM-DD-llama-benchy-prefix-smoke.json
 ```
 
 The theory is falsified for near-term use if Ferrite's API semantics require
@@ -104,7 +127,7 @@ long-chat proof notes.
 
 ## Next Step
 
-Keep this as a benchmark-candidate theory until the OpenAI-compatible server
-path is ready. Then run a minimal smoke against Ferrite and document the result
-under `documentation/benchmarks` before adopting it as a standard performance
-gate.
+Run the baseline smoke against one available Tier 1 model, then archive both
+the raw JSON result and a short benchmark note under `documentation/benchmarks`.
+Do not adopt this as a standard gate until the result is compared with
+Ferrite's own long-chat timing output for the same model and token lengths.
