@@ -233,6 +233,20 @@ This reinforces the tool split: use Ferrite's internal long-chat gate for
 correctness and protocol proof, and use `llama-benchy` for external benchmark
 trends after correctness is already established.
 
+## Generated-Context Windowing Fit
+
+The 512-token x86_64 generated-context window probe completed with Ferrite's own
+long-chat gate because that proof needed reconnect/error coverage, RSS sampling,
+generated follow-up turn validation, stop/finish behavior, and streaming token
+ID invariants. The benchmark note is
+`documentation/benchmarks/2026-07-02-openai-long-chat-x86-qwen-1-5b-q8-token-window-probed-512.md`.
+
+`llama-benchy` remains useful for the next comparison layer: once a candidate
+windowing policy is exposed through Ferrite's OpenAI-compatible request path,
+run it as an external throughput and context-depth harness. Do not use it as the
+correctness oracle for windowing, because it does not replace Ferrite's
+long-chat continuity, reconnect/error, stop/EOS, and RSS gates.
+
 ## 128-Token Calibration
 
 A bounded 128-token calibration now compares `llama-benchy` with Ferrite's own
