@@ -26,6 +26,30 @@ fn session_truncates_kv_cache_to_resume_prior_turn() -> Result<(), Box<dyn Error
 }
 
 #[test]
+fn session_restores_cache_snapshot_to_resume_prefix() -> Result<(), Box<dyn Error>> {
+    let model = cache_model()?;
+    let mut prefix_session = model.start_session();
+
+    prefix_session.accept_token(0)?;
+    let snapshot = prefix_session.cache_snapshot();
+    assert_eq!(snapshot.cached_token_count(), 1);
+    assert_eq!(snapshot.kv_cache_bytes(), 16);
+
+    let mut resumed_session = model.start_session();
+    resumed_session.restore_cache_snapshot(&snapshot)?;
+    assert_eq!(resumed_session.cached_token_count(), 1);
+    assert_eq!(resumed_session.kv_cache_bytes(), 16);
+
+    let resumed = resumed_session.accept_token(1)?;
+    let recomputed = model.next_token_for_prompt(&[0, 1])?;
+
+    assert_eq!(resumed, recomputed);
+    assert_eq!(resumed_session.cached_token_count(), 2);
+    assert_eq!(resumed_session.kv_cache_bytes(), 32);
+    Ok(())
+}
+
+#[test]
 fn session_rejects_truncation_beyond_cached_tokens() -> Result<(), Box<dyn Error>> {
     let model = cache_model()?;
     let mut session = model.start_session();

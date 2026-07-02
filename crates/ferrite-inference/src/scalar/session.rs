@@ -7,8 +7,10 @@ use super::{
 
 mod cache;
 mod profiling;
+mod snapshot;
 
 use profiling::{profiled_argmax_mul_vec, profiled_layer_mul_vec, profiled_mul_vec};
+pub use snapshot::ScalarLlamaSessionSnapshot;
 
 #[derive(Debug)]
 pub struct ScalarLlamaSession<'a> {

@@ -59,7 +59,7 @@ pub use output::ScalarLlamaOutputWeights;
 pub use profile::{ProfiledNextToken, ProfiledTokenId, ScalarMatVecComparison, ScalarProfileEvent};
 use rope::apply_rope_with_layout;
 pub use rope::{apply_rope, RopeLayout};
-pub use session::ScalarLlamaSession;
+pub use session::{ScalarLlamaSession, ScalarLlamaSessionSnapshot};
 
 use ferrite_model::gguf::{GgufError, GgufFile};
 use ferrite_model::tokenizer::GgufTokenizer;
