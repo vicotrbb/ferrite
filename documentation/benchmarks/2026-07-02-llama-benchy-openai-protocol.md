@@ -160,6 +160,12 @@ A minimal compatibility smoke has been executed against Ferrite:
   `documentation/benchmarks/2026-07-02-llama-benchy-qwen-0-5b-512-baseline.json`
 - 512-token latency-none raw result:
   `documentation/benchmarks/2026-07-02-llama-benchy-qwen-0-5b-512-baseline-latency-none.json`
+- 1024-token baseline note:
+  `documentation/benchmarks/2026-07-02-llama-benchy-qwen-0-5b-1024-baseline.md`
+- 1024-token generation-latency raw result:
+  `documentation/benchmarks/2026-07-02-llama-benchy-qwen-0-5b-1024-baseline.json`
+- 1024-token latency-none raw result:
+  `documentation/benchmarks/2026-07-02-llama-benchy-qwen-0-5b-1024-baseline-latency-none.json`
 
 That smoke used `--pp 32`, `--tg 16`, one run, concurrency `1`, no warmup, no
 coherence check, and no prompt adaptation. It proves external tool
@@ -171,14 +177,14 @@ Ferrite started returning token IDs on chat content chunks. The command exited
 `0` and did not print the previous `No token_ids in response, using local
 tokenization` fallback line.
 
-Bounded 256-token and 512-token baselines have also been executed against the
-same local Qwen 0.5B model at concurrency `1`. In both cases, the
+Bounded 256-token, 512-token, and 1024-token baselines have also been executed
+against the same local Qwen 0.5B model at concurrency `1`. In all cases, the
 generation-latency run produced decode and first-token fields but no
 prompt-processing throughput. The companion latency-none run produced
-prompt-processing throughput and similar decode throughput. Both token lengths
+prompt-processing throughput and similar decode throughput. All three lengths
 are documented in their result notes above and compared with the nearest
 Ferrite long-chat timing artifacts.
 
-The full protocol has not been executed. The next proof slice is the 1024-token
-baseline against the same model before expanding to concurrency or prefix-cache
-experiments.
+The first single-model length matrix is executed, but the full protocol has not
+been executed. The next proof slice is a small concurrency step against the same
+model before prefix-cache experiments.
