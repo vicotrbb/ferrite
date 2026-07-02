@@ -88,6 +88,58 @@ async fn chat_endpoint_accepts_text_content_parts() -> Result<(), Box<dyn std::e
 }
 
 #[tokio::test]
+async fn chat_endpoint_reports_cached_tokens_when_experimental_prefix_cache_is_enabled(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let model_path = write_chat_fixture_model()?;
+    let engine = InferenceEngine::load(&model_path)?;
+    let app = router(
+        ServerState::with_engine("fixture-model".to_owned(), engine)
+            .with_prefix_cache_enabled(true),
+    );
+    let request_body = r#"{"model":"fixture-model","messages":[{"role":"user","content":"hello"}],"prompt_cache_key":"tenant-a:thread-1","max_completion_tokens":1}"#;
+
+    let first_response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/chat/completions")
+                .header("content-type", "application/json")
+                .body(Body::from(request_body))?,
+        )
+        .await?;
+    let second_response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/chat/completions")
+                .header("content-type", "application/json")
+                .body(Body::from(request_body))?,
+        )
+        .await?;
+    remove_fixture_model(&model_path)?;
+
+    let first_status = first_response.status();
+    let first_body = to_json(first_response.into_body()).await?;
+    assert_eq!(first_status, StatusCode::OK, "{first_body}");
+    assert_eq!(
+        first_body["usage"]["prompt_tokens_details"]["cached_tokens"],
+        0
+    );
+
+    let second_status = second_response.status();
+    let second_body = to_json(second_response.into_body()).await?;
+    assert_eq!(second_status, StatusCode::OK, "{second_body}");
+    assert_eq!(second_body["choices"][0]["message"]["content"], "winner");
+    assert_eq!(second_body["usage"]["prompt_tokens"], 4);
+    assert_eq!(
+        second_body["usage"]["prompt_tokens_details"]["cached_tokens"],
+        4
+    );
+    Ok(())
+}
+
+#[tokio::test]
 async fn chat_endpoint_accepts_assistant_refusal_content_parts(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let model_path = write_chat_fixture_model()?;

@@ -16,6 +16,7 @@ use super::{
         CompletionStreamOptions,
     },
 };
+use crate::runtime::GenerationCacheOptions;
 use crate::state::ServerState;
 use axum::{
     extract::{OriginalUri, State},
@@ -75,7 +76,7 @@ async fn chat_completions(
                 request.stream_include_obfuscation(),
                 request.response_service_tier(),
             ),
-            request.cache_options(),
+            chat_cache_options(&state, &request),
             permit,
         ));
     }
@@ -84,7 +85,7 @@ async fn chat_completions(
         prompt,
         max_tokens,
         request.stop_sequences(),
-        request.cache_options(),
+        chat_cache_options(&state, &request),
         permit,
     )
     .await?;
@@ -94,6 +95,15 @@ async fn chat_completions(
         request.response_service_tier(),
     ))
     .into_response())
+}
+
+fn chat_cache_options(
+    state: &ServerState,
+    request: &ChatCompletionRequest,
+) -> GenerationCacheOptions {
+    request
+        .cache_options()
+        .with_prefix_cache_enabled(state.prefix_cache_enabled())
 }
 
 async fn completions(
