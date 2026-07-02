@@ -1,3 +1,7 @@
+mod store;
+
+pub use store::PrefixCacheMetadataStore;
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct TokenPrefixIdentity {
     tokens: Vec<usize>,

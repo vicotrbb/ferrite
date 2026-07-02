@@ -1,5 +1,6 @@
 use ferrite_inference::prefix_cache::{
-    PrefixCacheEntry, PrefixCacheFingerprints, PrefixCacheKey, TokenPrefixIdentity,
+    PrefixCacheEntry, PrefixCacheFingerprints, PrefixCacheKey, PrefixCacheMetadataStore,
+    TokenPrefixIdentity,
 };
 
 #[test]
@@ -150,4 +151,64 @@ fn prefix_cache_entry_records_token_count_bytes_and_use_ticks() {
 
     assert_eq!(entry.created_at_tick(), 7);
     assert_eq!(entry.last_used_at_tick(), 11);
+}
+
+#[test]
+fn prefix_cache_store_evicts_least_recent_entry_by_count() {
+    let mut store = PrefixCacheMetadataStore::new(2, 10_000);
+    let first = prefix_cache_entry("first", 100, 1);
+    let second = prefix_cache_entry("second", 100, 2);
+    let third = prefix_cache_entry("third", 100, 3);
+
+    assert!(store.is_empty());
+    assert!(store.insert(first.clone()).is_empty());
+    assert!(!store.is_empty());
+    assert!(store.insert(second.clone()).is_empty());
+    assert!(store.record_hit(first.key(), 10).is_some());
+
+    let evicted = store.insert(third.clone());
+
+    assert_eq!(evicted, vec![second.clone()]);
+    assert_eq!(store.len(), 2);
+    assert_eq!(store.estimated_kv_bytes(), 200);
+    assert!(store.get(first.key()).is_some());
+    assert!(store.get(second.key()).is_none());
+    assert!(store.get(third.key()).is_some());
+}
+
+#[test]
+fn prefix_cache_store_evicts_until_byte_budget_fits() {
+    let mut store = PrefixCacheMetadataStore::new(4, 250);
+    let first = prefix_cache_entry("first", 100, 1);
+    let second = prefix_cache_entry("second", 100, 2);
+    let third = prefix_cache_entry("third", 100, 3);
+
+    assert!(store.insert(first.clone()).is_empty());
+    assert!(store.insert(second.clone()).is_empty());
+
+    let evicted = store.insert(third.clone());
+
+    assert_eq!(evicted, vec![first]);
+    assert_eq!(store.len(), 2);
+    assert_eq!(store.estimated_kv_bytes(), 200);
+    assert!(store.get(second.key()).is_some());
+    assert!(store.get(third.key()).is_some());
+}
+
+fn prefix_cache_entry(namespace: &str, bytes: u128, tick: u64) -> PrefixCacheEntry {
+    PrefixCacheEntry::new(
+        PrefixCacheKey::new(
+            PrefixCacheFingerprints::new(
+                "model-a",
+                "tokenizer-a",
+                "template-a",
+                "scalar-default",
+                "chat-default",
+            ),
+            TokenPrefixIdentity::from_tokens([10, 20, tick as usize]),
+        )
+        .with_namespace(namespace),
+        bytes,
+        tick,
+    )
 }
