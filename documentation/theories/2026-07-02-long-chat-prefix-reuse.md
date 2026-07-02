@@ -132,11 +132,39 @@ much faster than seed first-token delay, while post-first-token decode also
 degrades materially. This makes prefix reuse the highest-value first-token
 latency experiment, not a complete throughput fix.
 
+## Exact-Cache Boundary Probe
+
+A small local Qwen2.5-0.5B Q4_K_M generated-context cache gate completed on
+2026-07-02. The benchmark note is
+`documentation/benchmarks/2026-07-02-openai-long-chat-qwen-0-5b-generated-context-cache-gate-32.md`.
+
+The run used `--experimental-prefix-cache`, `--prompt-cache-key`, and
+`--require-cached-follow-ups` with four 32-token streaming turns. Turn 1 used
+seed assistant context. Turns 2-4 used generated assistant context, so the
+long-chat generated-context behavior itself was exercised. However, all
+generated follow-up turns reported `long_chat_result_usage_cached_prompt_tokens=0`.
+The summary recorded:
+
+```text
+long_chat_summary_cached_follow_ups_required=true
+long_chat_summary_generated_follow_up_turns=3
+long_chat_summary_cached_generated_follow_up_turns=0
+long_chat_summary_uncached_generated_follow_up_turns=3
+long_chat_summary_all_generated_follow_up_turns_cached=false
+long_chat_summary_run_complete=false
+```
+
+This is an important boundary result. Ferrite's current experimental prefix
+cache proves exact prompt reuse, but it does not implement partial-prefix reuse
+for generated-context chat prompts. The generated assistant context changes the
+full rendered prompt, so the current full-prompt token identity misses even
+when an explicit cache namespace is present.
+
 ## Next Step
 
-Design a small token-prefix identity layer and bounded per-model KV prefix cache
-as a separate implementation slice. Keep it behind an explicit opt-in or
-internal experiment flag until repeated 256/512/1024-token generated-context
-proofs show lower first-token latency without RSS drift or response-shape
-regression. Track decode slowdown as a separate theory instead of assuming
-prefix reuse will fix it.
+Implement a longest-valid token-prefix match layer on top of the bounded
+per-model KV prefix cache. Keep it behind the existing experimental prefix-cache
+flag until the generated-context cache gate completes with cached follow-ups,
+lower first-token latency, unchanged response shape, and bounded RSS. Track
+decode slowdown as a separate theory instead of assuming prefix reuse will fix
+it.
