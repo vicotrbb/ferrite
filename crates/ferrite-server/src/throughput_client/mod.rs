@@ -4,6 +4,7 @@ mod rss;
 mod streaming_finish;
 mod streaming_metrics;
 mod streaming_text;
+mod streaming_token_ids;
 mod streaming_usage;
 
 #[cfg(test)]
@@ -14,6 +15,7 @@ pub use rss::RssSummary;
 pub use streaming_finish::StreamingFinishSummary;
 pub use streaming_metrics::StreamingTimingSummary;
 pub use streaming_text::StreamingTextSummary;
+pub use streaming_token_ids::StreamingTokenIdsSummary;
 pub use streaming_usage::StreamingUsageSummary;
 
 use std::{
@@ -28,6 +30,7 @@ pub struct ThroughputResult {
     pub streaming_finish: Option<StreamingFinishSummary>,
     pub streaming_timing: Option<StreamingTimingSummary>,
     pub streaming_text: Option<StreamingTextSummary>,
+    pub streaming_token_ids: Option<StreamingTokenIdsSummary>,
     pub streaming_usage: Option<StreamingUsageSummary>,
     pub rss: Option<RssSummary>,
 }
@@ -64,6 +67,7 @@ pub async fn run_completion_benchmark(
         streaming_finish: run.streaming_finish,
         streaming_timing: run.streaming_timing,
         streaming_text: run.streaming_text,
+        streaming_token_ids: run.streaming_token_ids,
         streaming_usage: run.streaming_usage,
         rss,
     })
@@ -74,6 +78,7 @@ struct RequestRun {
     streaming_finish: Option<StreamingFinishSummary>,
     streaming_timing: Option<StreamingTimingSummary>,
     streaming_text: Option<StreamingTextSummary>,
+    streaming_token_ids: Option<StreamingTokenIdsSummary>,
     streaming_usage: Option<StreamingUsageSummary>,
 }
 
@@ -87,6 +92,7 @@ async fn run_requests(
     let mut streaming_finish = None;
     let mut streaming_timing = None;
     let mut streaming_text = None;
+    let mut streaming_token_ids = None;
     let mut streaming_usage = None;
 
     while completed_requests < config.requests() {
@@ -118,6 +124,7 @@ async fn run_requests(
             )?;
             let response_finish = response.streaming_finish();
             let response_text = response.streaming_text();
+            let response_token_ids = response.streaming_token_ids();
             let response_usage = response.streaming_usage();
             validate_streaming_token_count(config, response_finish.as_ref(), response_usage)?;
             if stream && streaming_timing.is_none() {
@@ -128,6 +135,9 @@ async fn run_requests(
             }
             if stream && streaming_text.is_none() {
                 streaming_text = response_text;
+            }
+            if stream && streaming_token_ids.is_none() {
+                streaming_token_ids = response_token_ids;
             }
             if stream && streaming_usage.is_none() {
                 streaming_usage = response_usage;
@@ -141,6 +151,7 @@ async fn run_requests(
         streaming_finish,
         streaming_timing,
         streaming_text,
+        streaming_token_ids,
         streaming_usage,
     })
 }
@@ -179,6 +190,15 @@ pub fn format_result(config: &ThroughputClientConfig, result: ThroughputResult) 
     }
     if let Some(text) = &result.streaming_text {
         output.push_str(&format!("\nstreaming_text_bytes={}", text.byte_len()));
+    }
+    if let Some(token_ids) = result.streaming_token_ids {
+        output.push_str(&format!(
+            "\nstreaming_content_chunks={}\nstreaming_token_id_chunks={}\nstreaming_token_ids={}\nstreaming_all_content_chunks_have_token_ids={}",
+            token_ids.content_chunks(),
+            token_ids.token_id_chunks(),
+            token_ids.token_ids(),
+            token_ids.all_content_chunks_have_token_ids(),
+        ));
     }
     if let Some(usage) = result.streaming_usage {
         output.push_str(&format!(

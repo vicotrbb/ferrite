@@ -128,6 +128,15 @@ pub fn format_scenario_result(result: &LongChatScenarioResult) -> String {
             timing.max_token_latency().as_millis()
         ));
     }
+    if let Some(token_ids) = throughput.streaming_token_ids {
+        output.push_str(&format!(
+            "\nlong_chat_result_streaming_content_chunks={}\nlong_chat_result_streaming_token_id_chunks={}\nlong_chat_result_streaming_token_ids={}\nlong_chat_result_streaming_all_content_chunks_have_token_ids={}",
+            token_ids.content_chunks(),
+            token_ids.token_id_chunks(),
+            token_ids.token_ids(),
+            token_ids.all_content_chunks_have_token_ids()
+        ));
+    }
     if let Some(rss) = throughput.rss {
         output.push_str(&format!(
             "\nlong_chat_result_server_rss_before_bytes={}\nlong_chat_result_server_rss_after_bytes={}\nlong_chat_result_server_rss_idle_bytes={}",

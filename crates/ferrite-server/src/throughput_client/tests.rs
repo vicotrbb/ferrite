@@ -153,6 +153,26 @@ fn builds_openai_compatible_chat_prompt_cache_key_request_body(
 }
 
 #[test]
+fn summarizes_streaming_chat_token_ids_from_sse_body() -> Result<(), Box<dyn std::error::Error>> {
+    let body = concat!(
+        "data: {\"choices\":[{\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\n",
+        "data: {\"choices\":[{\"delta\":{\"content\":\"hel\"},\"token_ids\":[1,2],\"finish_reason\":null}]}\n\n",
+        "data: {\"choices\":[{\"delta\":{\"content\":\"lo\"},\"token_ids\":[3],\"finish_reason\":null}]}\n\n",
+        "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"length\"}]}\n\n",
+        "data: [DONE]\n\n",
+    );
+
+    let summary = StreamingTokenIdsSummary::from_sse_body(body)
+        .ok_or("expected streaming token id summary")?;
+
+    assert_eq!(summary.content_chunks(), 2);
+    assert_eq!(summary.token_id_chunks(), 2);
+    assert_eq!(summary.token_ids(), 3);
+    assert!(summary.all_content_chunks_have_token_ids());
+    Ok(())
+}
+
+#[test]
 fn rejects_prompt_cache_key_for_legacy_completions() {
     let result = ThroughputClientConfig::parse([
         OsString::from("ferrite-openai-throughput"),
@@ -214,6 +234,7 @@ fn formats_chat_completion_result_metric_name() -> Result<(), Box<dyn std::error
         streaming_finish: None,
         streaming_timing: None,
         streaming_text: None,
+        streaming_token_ids: None,
         streaming_usage: None,
         rss: None,
     };
@@ -468,6 +489,7 @@ fn formats_streaming_chat_completion_result_metric_name() -> Result<(), Box<dyn 
         streaming_finish: None,
         streaming_timing: None,
         streaming_text: None,
+        streaming_token_ids: None,
         streaming_usage: None,
         rss: None,
     };
@@ -497,6 +519,7 @@ fn formats_streaming_timing_summary() -> Result<(), Box<dyn std::error::Error>> 
             Duration::from_millis(170),
         ]),
         streaming_text: None,
+        streaming_token_ids: None,
         streaming_usage: None,
         rss: None,
     };
@@ -523,6 +546,7 @@ fn formats_streaming_usage_summary() -> Result<(), Box<dyn std::error::Error>> {
         streaming_finish: None,
         streaming_timing: None,
         streaming_text: None,
+        streaming_token_ids: None,
         streaming_usage: Some(StreamingUsageSummary::new(8, 32, 40).with_cached_prompt_tokens(5)),
         rss: None,
     };
@@ -548,6 +572,7 @@ fn formats_streaming_finish_summary() -> Result<(), Box<dyn std::error::Error>> 
         streaming_finish: Some(StreamingFinishSummary::new("length")),
         streaming_timing: None,
         streaming_text: None,
+        streaming_token_ids: None,
         streaming_usage: None,
         rss: None,
     };
@@ -572,6 +597,7 @@ fn formats_rss_sampling_summary() -> Result<(), Box<dyn std::error::Error>> {
         streaming_finish: None,
         streaming_timing: None,
         streaming_text: None,
+        streaming_token_ids: None,
         streaming_usage: None,
         rss: Some(RssSummary::new(1000, 2000, 1500)),
     };

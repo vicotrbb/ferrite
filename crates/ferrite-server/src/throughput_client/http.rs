@@ -1,6 +1,6 @@
 use super::{
     OpenAiEndpoint, StreamingFinishSummary, StreamingTextSummary, StreamingTimingSummary,
-    StreamingUsageSummary,
+    StreamingTokenIdsSummary, StreamingUsageSummary,
 };
 use std::{
     error::Error,
@@ -18,6 +18,7 @@ pub struct OpenAiHttpResponse {
     streaming_finish: Option<StreamingFinishSummary>,
     streaming_timing: Option<StreamingTimingSummary>,
     streaming_text: Option<StreamingTextSummary>,
+    streaming_token_ids: Option<StreamingTokenIdsSummary>,
     streaming_usage: Option<StreamingUsageSummary>,
 }
 
@@ -36,6 +37,10 @@ impl OpenAiHttpResponse {
 
     pub fn streaming_text(&self) -> Option<StreamingTextSummary> {
         self.streaming_text.clone()
+    }
+
+    pub fn streaming_token_ids(&self) -> Option<StreamingTokenIdsSummary> {
+        self.streaming_token_ids
     }
 
     pub fn streaming_usage(&self) -> Option<StreamingUsageSummary> {
@@ -73,11 +78,15 @@ Connection: close\r\n\
     let streaming_text = raw
         .split_once("\r\n\r\n")
         .and_then(|(_, body)| StreamingTextSummary::from_sse_body(body));
+    let streaming_token_ids = raw
+        .split_once("\r\n\r\n")
+        .and_then(|(_, body)| StreamingTokenIdsSummary::from_sse_body(body));
     Ok(OpenAiHttpResponse {
         raw,
         streaming_finish,
         streaming_timing,
         streaming_text,
+        streaming_token_ids,
         streaming_usage,
     })
 }

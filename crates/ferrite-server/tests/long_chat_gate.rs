@@ -6,7 +6,8 @@ use ferrite_server::long_chat_gate::{
 };
 use ferrite_server::throughput_client::{
     OpenAiEndpoint, RssSummary, StreamingFinishSummary, StreamingTextSummary,
-    StreamingTimingSummary, StreamingUsageSummary, ThroughputClientConfig, ThroughputResult,
+    StreamingTimingSummary, StreamingTokenIdsSummary, StreamingUsageSummary,
+    ThroughputClientConfig, ThroughputResult,
 };
 use std::ffi::OsString;
 use std::time::Duration;
@@ -567,6 +568,7 @@ fn formats_long_chat_scenario_result() -> Result<(), Box<dyn std::error::Error>>
             Duration::from_millis(170),
         ]),
         streaming_text: None,
+        streaming_token_ids: Some(StreamingTokenIdsSummary::new(3, 3, 256)),
         streaming_usage: Some(StreamingUsageSummary::new(16, 256, 272)),
         rss: Some(RssSummary::new(1000, 2000, 1500)),
     };
@@ -579,7 +581,7 @@ fn formats_long_chat_scenario_result() -> Result<(), Box<dyn std::error::Error>>
 
     assert_eq!(
         format_scenario_result(&result),
-        "long_chat_result=model:fixture-model,turn:2,max_tokens:256\nlong_chat_result_assistant_context_source=generated\nlong_chat_result_completed_requests=1\nlong_chat_result_elapsed_ms=400\nlong_chat_result_finish_reason=length\nlong_chat_result_usage_prompt_tokens=16\nlong_chat_result_usage_cached_prompt_tokens=0\nlong_chat_result_usage_completion_tokens=256\nlong_chat_result_usage_total_tokens=272\nlong_chat_result_hit_token_limit=true\nlong_chat_result_streaming_token_events=3\nlong_chat_result_time_to_first_token_ms=100\nlong_chat_result_stream_observed_prefill_elapsed_ms=100\nlong_chat_result_first_token_timestamp_ms=100\nlong_chat_result_stream_observed_decode_elapsed_ms=70\nlong_chat_result_stream_observed_decode_tokens_per_second=28.571429\nlong_chat_result_streaming_total_elapsed_ms=170\nlong_chat_result_streaming_tokens_per_second=17.647059\nlong_chat_result_token_latency_min_ms=30\nlong_chat_result_token_latency_p50_ms=40\nlong_chat_result_token_latency_p95_ms=100\nlong_chat_result_token_latency_max_ms=100\nlong_chat_result_server_rss_before_bytes=1000\nlong_chat_result_server_rss_after_bytes=2000\nlong_chat_result_server_rss_idle_bytes=1500"
+        "long_chat_result=model:fixture-model,turn:2,max_tokens:256\nlong_chat_result_assistant_context_source=generated\nlong_chat_result_completed_requests=1\nlong_chat_result_elapsed_ms=400\nlong_chat_result_finish_reason=length\nlong_chat_result_usage_prompt_tokens=16\nlong_chat_result_usage_cached_prompt_tokens=0\nlong_chat_result_usage_completion_tokens=256\nlong_chat_result_usage_total_tokens=272\nlong_chat_result_hit_token_limit=true\nlong_chat_result_streaming_token_events=3\nlong_chat_result_time_to_first_token_ms=100\nlong_chat_result_stream_observed_prefill_elapsed_ms=100\nlong_chat_result_first_token_timestamp_ms=100\nlong_chat_result_stream_observed_decode_elapsed_ms=70\nlong_chat_result_stream_observed_decode_tokens_per_second=28.571429\nlong_chat_result_streaming_total_elapsed_ms=170\nlong_chat_result_streaming_tokens_per_second=17.647059\nlong_chat_result_token_latency_min_ms=30\nlong_chat_result_token_latency_p50_ms=40\nlong_chat_result_token_latency_p95_ms=100\nlong_chat_result_token_latency_max_ms=100\nlong_chat_result_streaming_content_chunks=3\nlong_chat_result_streaming_token_id_chunks=3\nlong_chat_result_streaming_token_ids=256\nlong_chat_result_streaming_all_content_chunks_have_token_ids=true\nlong_chat_result_server_rss_before_bytes=1000\nlong_chat_result_server_rss_after_bytes=2000\nlong_chat_result_server_rss_idle_bytes=1500"
     );
     Ok(())
 }
@@ -607,6 +609,7 @@ fn formats_long_chat_stop_result_as_not_hitting_token_limit(
         streaming_finish: Some(StreamingFinishSummary::new("stop")),
         streaming_timing: None,
         streaming_text: None,
+        streaming_token_ids: None,
         streaming_usage: Some(StreamingUsageSummary::new(16, 3, 19)),
         rss: None,
     };
@@ -672,6 +675,11 @@ fn formats_integrated_long_chat_run_summary() -> Result<(), Box<dyn std::error::
                         Duration::from_millis(140),
                     ]),
                     streaming_text: None,
+                    streaming_token_ids: Some(StreamingTokenIdsSummary::new(
+                        2,
+                        2,
+                        scenario.token_length(),
+                    )),
                     streaming_usage: Some(StreamingUsageSummary::new(
                         16,
                         scenario.token_length() as u64,
@@ -693,7 +701,7 @@ fn formats_integrated_long_chat_run_summary() -> Result<(), Box<dyn std::error::
             Some(&error_probe),
             Some(&disconnect_probe)
         ),
-        "long_chat_summary_planned_scenarios=4\nlong_chat_summary_completed_scenarios=4\nlong_chat_summary_all_finish_reasons_present=true\nlong_chat_summary_all_usage_accounting_valid=true\nlong_chat_summary_all_token_limit_status_present=true\nlong_chat_summary_any_token_limit_hit=true\nlong_chat_summary_prompt_cache_key_present=false\nlong_chat_summary_cached_follow_ups_required=false\nlong_chat_summary_any_cached_prompt_tokens=false\nlong_chat_summary_generated_follow_up_turns=3\nlong_chat_summary_cached_generated_follow_up_turns=0\nlong_chat_summary_uncached_generated_follow_up_turns=3\nlong_chat_summary_all_generated_follow_up_turns_cached=false\nlong_chat_summary_all_follow_up_turns_use_generated_context=true\nlong_chat_summary_all_timing_present=true\nlong_chat_summary_rss_required=true\nlong_chat_summary_all_rss_present=true\nlong_chat_summary_error_probe_required=true\nlong_chat_summary_error_probe_completed=true\nlong_chat_summary_disconnect_probe_required=true\nlong_chat_summary_disconnect_probe_completed=true\nlong_chat_summary_disconnect_probe_reconnect_started_new_generation=true\nlong_chat_summary_run_complete=true"
+        "long_chat_summary_planned_scenarios=4\nlong_chat_summary_completed_scenarios=4\nlong_chat_summary_all_finish_reasons_present=true\nlong_chat_summary_all_usage_accounting_valid=true\nlong_chat_summary_all_token_limit_status_present=true\nlong_chat_summary_any_token_limit_hit=true\nlong_chat_summary_prompt_cache_key_present=false\nlong_chat_summary_cached_follow_ups_required=false\nlong_chat_summary_any_cached_prompt_tokens=false\nlong_chat_summary_generated_follow_up_turns=3\nlong_chat_summary_cached_generated_follow_up_turns=0\nlong_chat_summary_uncached_generated_follow_up_turns=3\nlong_chat_summary_all_generated_follow_up_turns_cached=false\nlong_chat_summary_all_follow_up_turns_use_generated_context=true\nlong_chat_summary_all_timing_present=true\nlong_chat_summary_streaming_token_ids_required=true\nlong_chat_summary_all_streaming_token_id_summaries_present=true\nlong_chat_summary_all_streaming_content_chunks_have_token_ids=true\nlong_chat_summary_rss_required=true\nlong_chat_summary_all_rss_present=true\nlong_chat_summary_error_probe_required=true\nlong_chat_summary_error_probe_completed=true\nlong_chat_summary_disconnect_probe_required=true\nlong_chat_summary_disconnect_probe_completed=true\nlong_chat_summary_disconnect_probe_reconnect_started_new_generation=true\nlong_chat_summary_run_complete=true"
     );
     Ok(())
 }
@@ -739,6 +747,7 @@ fn formats_cache_observability_in_long_chat_run_summary() -> Result<(), Box<dyn 
                         Duration::from_millis(140),
                     ]),
                     streaming_text: None,
+                    streaming_token_ids: None,
                     streaming_usage: Some(usage),
                     rss: None,
                 },
@@ -788,6 +797,7 @@ fn cache_summary_does_not_treat_missing_generated_follow_ups_as_cached(
                 Duration::from_millis(140),
             ]),
             streaming_text: None,
+            streaming_token_ids: None,
             streaming_usage: Some(StreamingUsageSummary::new(16, 256, 272)),
             rss: None,
         },
@@ -839,6 +849,7 @@ fn required_cached_follow_ups_make_summary_incomplete_without_cache_hits(
                         Duration::from_millis(140),
                     ]),
                     streaming_text: None,
+                    streaming_token_ids: None,
                     streaming_usage: Some(StreamingUsageSummary::new(
                         16,
                         scenario.token_length() as u64,
@@ -883,6 +894,7 @@ fn runs_long_chat_gate_with_injected_executor() -> Result<(), Box<dyn std::error
             streaming_finish: Some(StreamingFinishSummary::new("length")),
             streaming_timing: None,
             streaming_text: None,
+            streaming_token_ids: None,
             streaming_usage: Some(StreamingUsageSummary::new(
                 8,
                 throughput.max_tokens() as u64,
@@ -940,6 +952,7 @@ fn observes_long_chat_results_as_each_scenario_finishes() -> Result<(), Box<dyn 
                 streaming_finish: Some(StreamingFinishSummary::new("length")),
                 streaming_timing: None,
                 streaming_text: None,
+                streaming_token_ids: None,
                 streaming_usage: Some(StreamingUsageSummary::new(
                     8,
                     throughput.max_tokens() as u64,
@@ -1005,6 +1018,7 @@ fn carries_generated_assistant_text_between_turns_per_token_length(
                 "generated-{}-{turn_index_for_length}",
                 throughput.max_tokens()
             ))),
+            streaming_token_ids: None,
             streaming_usage: Some(StreamingUsageSummary::new(
                 8,
                 throughput.max_tokens() as u64,
@@ -1052,6 +1066,7 @@ fn rejects_unexpected_long_chat_finish_reason() -> Result<(), Box<dyn std::error
             streaming_finish: Some(StreamingFinishSummary::new("length")),
             streaming_timing: None,
             streaming_text: None,
+            streaming_token_ids: None,
             streaming_usage: Some(StreamingUsageSummary::new(
                 8,
                 throughput.max_tokens() as u64,
@@ -1098,6 +1113,7 @@ fn rejects_missing_long_chat_finish_reason_when_expected() -> Result<(), Box<dyn
             streaming_finish: None,
             streaming_timing: None,
             streaming_text: None,
+            streaming_token_ids: None,
             streaming_usage: None,
             rss: None,
         })
