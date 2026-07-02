@@ -121,9 +121,16 @@ server. The generation-latency run reported `tg_throughput.mean` of
 `16.579741995461383`. See
 `documentation/benchmarks/2026-07-02-llama-benchy-qwen-0-5b-256-baseline.md`.
 
+The same bounded baseline has also run at 512 tokens. The generation-latency
+run reported `tg_throughput.mean` of `12.495702857387348` and `e2e_ttft.mean`
+of `27288.6513749836`, but `pp_throughput` was null. The companion latency-none
+run reported `pp_throughput.mean` of `570285.7620520669` and
+`tg_throughput.mean` of `12.425758423855232`. See
+`documentation/benchmarks/2026-07-02-llama-benchy-qwen-0-5b-512-baseline.md`.
+
 This moves the theory from pure hypothesis to early compatibility evidence. It
-does not validate the full 512/1024-token protocol, prefix caching, concurrency
-behavior, RSS behavior, reconnect/error behavior, or stop/EOS behavior.
+does not validate the 1024-token protocol, prefix caching, concurrency behavior,
+RSS behavior, reconnect/error behavior, or stop/EOS behavior.
 
 ## Falsification Experiment
 
@@ -181,10 +188,10 @@ long-chat proof notes.
 
 ## Next Step
 
-Run the same bounded `llama-benchy` baseline at 512 tokens against
+Run the same bounded `llama-benchy` baseline at 1024 tokens against
 `Qwen2.5-0.5B-Instruct-Q4_K_M` and compare it with the nearest Ferrite
-long-chat timing output. Only after that should the protocol expand to 1024
-tokens and then concurrency.
+long-chat timing output. Only after that should the protocol expand to
+concurrency and prefix-cache experiments.
 
 Do not adopt this as a standard gate until the result is compared with
 Ferrite's own long-chat timing output for the same model and token lengths.
