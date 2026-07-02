@@ -4,6 +4,27 @@ Date: 2026-07-02
 
 Status: Hypothesis
 
+## Source Check
+
+Source inspected: <https://github.com/eugr/llama-benchy>
+
+Observed on 2026-07-02:
+
+- The project describes itself as a `llama-bench`-style benchmark tool for
+  OpenAI-compatible LLM endpoints.
+- It evaluates `/v1/chat/completions`, with `/v1/models` used for model
+  discovery when possible.
+- It supports configurable prompt-processing tokens, generation tokens,
+  context depths, runs, concurrency, latency measurement modes, exact generation
+  lengths, JSON/CSV/Markdown output, and progress JSONL emission.
+- Its prefix-caching mode performs a two-step context-load plus inference
+  benchmark, which is relevant once Ferrite has real prefix reuse instead of
+  key construction only.
+- The latest GitHub release shown during this check was `v0.3.8`, published on
+  2026-06-10.
+
+No `llama-benchy` run has been executed against Ferrite yet.
+
 ## Hypothesis
 
 `llama-benchy` can become a useful external benchmark harness for Ferrite once
