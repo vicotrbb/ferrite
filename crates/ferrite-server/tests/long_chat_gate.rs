@@ -602,7 +602,7 @@ fn formats_integrated_long_chat_run_summary() -> Result<(), Box<dyn std::error::
             Some(&error_probe),
             Some(&disconnect_probe)
         ),
-        "long_chat_summary_planned_scenarios=4\nlong_chat_summary_completed_scenarios=4\nlong_chat_summary_all_finish_reasons_present=true\nlong_chat_summary_all_usage_accounting_valid=true\nlong_chat_summary_all_token_limit_status_present=true\nlong_chat_summary_any_token_limit_hit=true\nlong_chat_summary_prompt_cache_key_present=false\nlong_chat_summary_cached_follow_ups_required=false\nlong_chat_summary_any_cached_prompt_tokens=false\nlong_chat_summary_generated_follow_up_turns=3\nlong_chat_summary_cached_generated_follow_up_turns=0\nlong_chat_summary_all_generated_follow_up_turns_cached=false\nlong_chat_summary_all_follow_up_turns_use_generated_context=true\nlong_chat_summary_all_timing_present=true\nlong_chat_summary_rss_required=true\nlong_chat_summary_all_rss_present=true\nlong_chat_summary_error_probe_required=true\nlong_chat_summary_error_probe_completed=true\nlong_chat_summary_disconnect_probe_required=true\nlong_chat_summary_disconnect_probe_completed=true\nlong_chat_summary_disconnect_probe_reconnect_started_new_generation=true\nlong_chat_summary_run_complete=true"
+        "long_chat_summary_planned_scenarios=4\nlong_chat_summary_completed_scenarios=4\nlong_chat_summary_all_finish_reasons_present=true\nlong_chat_summary_all_usage_accounting_valid=true\nlong_chat_summary_all_token_limit_status_present=true\nlong_chat_summary_any_token_limit_hit=true\nlong_chat_summary_prompt_cache_key_present=false\nlong_chat_summary_cached_follow_ups_required=false\nlong_chat_summary_any_cached_prompt_tokens=false\nlong_chat_summary_generated_follow_up_turns=3\nlong_chat_summary_cached_generated_follow_up_turns=0\nlong_chat_summary_uncached_generated_follow_up_turns=3\nlong_chat_summary_all_generated_follow_up_turns_cached=false\nlong_chat_summary_all_follow_up_turns_use_generated_context=true\nlong_chat_summary_all_timing_present=true\nlong_chat_summary_rss_required=true\nlong_chat_summary_all_rss_present=true\nlong_chat_summary_error_probe_required=true\nlong_chat_summary_error_probe_completed=true\nlong_chat_summary_disconnect_probe_required=true\nlong_chat_summary_disconnect_probe_completed=true\nlong_chat_summary_disconnect_probe_reconnect_started_new_generation=true\nlong_chat_summary_run_complete=true"
     );
     Ok(())
 }
@@ -662,6 +662,7 @@ fn formats_cache_observability_in_long_chat_run_summary() -> Result<(), Box<dyn 
     assert!(summary.contains("long_chat_summary_any_cached_prompt_tokens=true"));
     assert!(summary.contains("long_chat_summary_generated_follow_up_turns=3"));
     assert!(summary.contains("long_chat_summary_cached_generated_follow_up_turns=3"));
+    assert!(summary.contains("long_chat_summary_uncached_generated_follow_up_turns=0"));
     assert!(summary.contains("long_chat_summary_all_generated_follow_up_turns_cached=true"));
     Ok(())
 }
@@ -707,6 +708,7 @@ fn cache_summary_does_not_treat_missing_generated_follow_ups_as_cached(
     assert!(summary.contains("long_chat_summary_prompt_cache_key_present=true"));
     assert!(summary.contains("long_chat_summary_generated_follow_up_turns=0"));
     assert!(summary.contains("long_chat_summary_cached_generated_follow_up_turns=0"));
+    assert!(summary.contains("long_chat_summary_uncached_generated_follow_up_turns=0"));
     assert!(summary.contains("long_chat_summary_all_generated_follow_up_turns_cached=false"));
     Ok(())
 }
@@ -761,6 +763,9 @@ fn required_cached_follow_ups_make_summary_incomplete_without_cache_hits(
     let summary = format_run_summary(&config, &results, None, None);
 
     assert!(summary.contains("long_chat_summary_cached_follow_ups_required=true"));
+    assert!(summary.contains("long_chat_summary_generated_follow_up_turns=3"));
+    assert!(summary.contains("long_chat_summary_cached_generated_follow_up_turns=0"));
+    assert!(summary.contains("long_chat_summary_uncached_generated_follow_up_turns=3"));
     assert!(summary.contains("long_chat_summary_all_generated_follow_up_turns_cached=false"));
     assert!(summary.contains("long_chat_summary_run_complete=false"));
     Ok(())

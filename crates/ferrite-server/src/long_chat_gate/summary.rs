@@ -31,6 +31,8 @@ pub fn format_run_summary(
         .iter()
         .filter(|result| is_generated_follow_up_turn(result) && has_cached_prompt_tokens(result))
         .count();
+    let uncached_generated_follow_up_turns =
+        generated_follow_up_turns - cached_generated_follow_up_turns;
     let all_generated_follow_up_turns_cached = prompt_cache_key_present
         && generated_follow_up_turns > 0
         && generated_follow_up_turns == cached_generated_follow_up_turns;
@@ -77,6 +79,7 @@ long_chat_summary_cached_follow_ups_required={cached_follow_ups_required}\n\
 long_chat_summary_any_cached_prompt_tokens={any_cached_prompt_tokens}\n\
 long_chat_summary_generated_follow_up_turns={generated_follow_up_turns}\n\
 long_chat_summary_cached_generated_follow_up_turns={cached_generated_follow_up_turns}\n\
+long_chat_summary_uncached_generated_follow_up_turns={uncached_generated_follow_up_turns}\n\
 long_chat_summary_all_generated_follow_up_turns_cached={all_generated_follow_up_turns_cached}\n\
 long_chat_summary_all_follow_up_turns_use_generated_context={all_follow_up_turns_use_generated_context}\n\
 long_chat_summary_all_timing_present={all_timing_present}\n\
