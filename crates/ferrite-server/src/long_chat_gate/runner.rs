@@ -17,6 +17,7 @@ impl LongChatGateConfig {
         let mut assistant_contexts = LongChatAssistantContexts::new(
             self.assistant_context(),
             self.generated_context_max_chars(),
+            self.generated_context_max_tokens(),
         );
         let mut results = Vec::with_capacity(scenarios.len());
 
@@ -57,6 +58,7 @@ impl LongChatGateConfig {
         let mut assistant_contexts = LongChatAssistantContexts::new(
             self.assistant_context(),
             self.generated_context_max_chars(),
+            self.generated_context_max_tokens(),
         );
         let mut results = Vec::with_capacity(scenarios.len());
 
@@ -102,6 +104,7 @@ impl LongChatGateConfig {
 struct LongChatAssistantContexts {
     seed: String,
     generated_context_max_chars: Option<usize>,
+    generated_context_max_tokens: Option<usize>,
     generated_by_scenario: HashMap<(String, usize), String>,
 }
 
@@ -111,10 +114,15 @@ struct LongChatAssistantContext {
 }
 
 impl LongChatAssistantContexts {
-    fn new(seed: &str, generated_context_max_chars: Option<usize>) -> Self {
+    fn new(
+        seed: &str,
+        generated_context_max_chars: Option<usize>,
+        generated_context_max_tokens: Option<usize>,
+    ) -> Self {
         Self {
             seed: seed.to_owned(),
             generated_context_max_chars,
+            generated_context_max_tokens,
             generated_by_scenario: HashMap::new(),
         }
     }
@@ -140,9 +148,13 @@ impl LongChatAssistantContexts {
         let Some(text) = &result.streaming_text else {
             return;
         };
-        let text = match self.generated_context_max_chars {
-            Some(max_chars) => trailing_chars(text.text(), max_chars),
-            None => text.text().to_owned(),
+        let text = match (
+            self.generated_context_max_tokens,
+            self.generated_context_max_chars,
+        ) {
+            (Some(max_tokens), _) => trailing_chunks(text.chunks(), max_tokens),
+            (None, Some(max_chars)) => trailing_chars(text.text(), max_chars),
+            (None, None) => text.text().to_owned(),
         };
         self.generated_by_scenario
             .insert((scenario.model().to_owned(), scenario.token_length()), text);
@@ -155,4 +167,9 @@ fn trailing_chars(text: &str, max_chars: usize) -> String {
         return text.to_owned();
     }
     text.chars().skip(char_count - max_chars).collect()
+}
+
+fn trailing_chunks(chunks: &[String], max_chunks: usize) -> String {
+    let start = chunks.len().saturating_sub(max_chunks);
+    chunks[start..].concat()
 }

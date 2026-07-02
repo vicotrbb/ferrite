@@ -1,28 +1,45 @@
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct StreamingTextSummary {
     text: String,
+    chunks: Vec<String>,
 }
 
 impl StreamingTextSummary {
     pub fn new(text: impl Into<String>) -> Self {
-        Self { text: text.into() }
+        let text = text.into();
+        Self {
+            chunks: vec![text.clone()],
+            text,
+        }
+    }
+
+    pub fn from_chunks(chunks: impl IntoIterator<Item = impl Into<String>>) -> Self {
+        let chunks = chunks.into_iter().map(Into::into).collect::<Vec<_>>();
+        Self {
+            text: chunks.concat(),
+            chunks,
+        }
     }
 
     pub fn from_sse_body(body: &str) -> Option<Self> {
-        let text = body
+        let chunks = body
             .lines()
             .filter_map(|line| line.strip_prefix("data: "))
             .map(str::trim)
             .filter(|data| *data != "[DONE]")
             .filter_map(|data| serde_json::from_str::<serde_json::Value>(data).ok())
             .flat_map(text_from_event)
-            .collect::<String>();
+            .collect::<Vec<_>>();
 
-        (!text.is_empty()).then(|| Self::new(text))
+        (!chunks.is_empty()).then(|| Self::from_chunks(chunks))
     }
 
     pub fn text(&self) -> &str {
         &self.text
+    }
+
+    pub fn chunks(&self) -> &[String] {
+        &self.chunks
     }
 
     pub fn byte_len(&self) -> usize {

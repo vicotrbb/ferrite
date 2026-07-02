@@ -1100,6 +1100,89 @@ fn can_window_generated_assistant_context_before_follow_up_turns(
 }
 
 #[test]
+fn can_window_generated_assistant_context_by_streaming_chunks(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--models"),
+        OsString::from("fixture-model"),
+        OsString::from("--token-lengths"),
+        OsString::from("256"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+        OsString::from("--assistant-context"),
+        OsString::from("seed answer"),
+        OsString::from("--generated-context-max-tokens"),
+        OsString::from("2"),
+    ])?;
+    let mut observed_contexts = Vec::new();
+    let generated = [
+        vec!["one", " two", " three"],
+        vec!["four", " five", " six"],
+        vec!["seven", " eight", " nine"],
+        vec!["ten"],
+    ];
+    let mut calls = 0usize;
+
+    let results = config.run_with_executor(|throughput| {
+        observed_contexts.push(throughput.assistant_context().map(str::to_owned));
+        let chunks = generated[calls].clone();
+        calls += 1;
+        Ok(ThroughputResult {
+            completed_requests: throughput.requests(),
+            elapsed: Duration::from_millis(10),
+            streaming_finish: Some(StreamingFinishSummary::new("length")),
+            streaming_timing: None,
+            streaming_text: Some(StreamingTextSummary::from_chunks(chunks)),
+            streaming_token_ids: None,
+            streaming_usage: Some(StreamingUsageSummary::new(
+                8,
+                throughput.max_tokens() as u64,
+                throughput.max_tokens() as u64 + 8,
+            )),
+            rss: None,
+        })
+    })?;
+
+    assert_eq!(results.len(), 4);
+    assert_eq!(
+        observed_contexts,
+        [
+            Some("seed answer".to_owned()),
+            Some(" two three".to_owned()),
+            Some(" five six".to_owned()),
+            Some(" eight nine".to_owned()),
+        ]
+    );
+    assert!(format_plan(&config).contains("long_chat_generated_context_max_tokens=2"));
+    Ok(())
+}
+
+#[test]
+fn rejects_combined_generated_context_char_and_token_windows(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let result = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--generated-context-max-chars"),
+        OsString::from("128"),
+        OsString::from("--generated-context-max-tokens"),
+        OsString::from("32"),
+    ]);
+    let error = match result {
+        Ok(config) => return Err(format!("expected error, got config: {config:?}").into()),
+        Err(error) => error,
+    };
+
+    assert!(
+        error
+            .to_string()
+            .contains("cannot be combined with --generated-context-max-tokens"),
+        "{error}"
+    );
+    Ok(())
+}
+
+#[test]
 fn rejects_unexpected_long_chat_finish_reason() -> Result<(), Box<dyn std::error::Error>> {
     let config = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),

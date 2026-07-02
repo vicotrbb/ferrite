@@ -20,6 +20,7 @@ pub struct LongChatGateConfig {
     expected_finish_reason: Option<String>,
     probe_max_tokens: Option<usize>,
     generated_context_max_chars: Option<usize>,
+    generated_context_max_tokens: Option<usize>,
     disconnect_reconnect_timeout: Duration,
     rss_pid: Option<u32>,
     token_lengths: Vec<usize>,
@@ -110,6 +111,15 @@ impl LongChatGateConfig {
                         "--generated-context-max-chars",
                     )?);
                 }
+                "--generated-context-max-tokens" => {
+                    config.generated_context_max_tokens = Some(parse_positive_usize(
+                        &os_string_to_string(next_value(
+                            &mut iter,
+                            "--generated-context-max-tokens",
+                        )?)?,
+                        "--generated-context-max-tokens",
+                    )?);
+                }
                 "--disconnect-reconnect-timeout-ms" => {
                     config.disconnect_reconnect_timeout =
                         Duration::from_millis(parse_positive_u64(
@@ -143,6 +153,13 @@ impl LongChatGateConfig {
         if config.require_cached_follow_ups && config.prompt_cache_key.is_none() {
             return Err(LongChatGateError::new(
                 "--require-cached-follow-ups requires --prompt-cache-key",
+            ));
+        }
+        if config.generated_context_max_chars.is_some()
+            && config.generated_context_max_tokens.is_some()
+        {
+            return Err(LongChatGateError::new(
+                "--generated-context-max-chars cannot be combined with --generated-context-max-tokens",
             ));
         }
 
@@ -213,6 +230,10 @@ impl LongChatGateConfig {
         self.generated_context_max_chars
     }
 
+    pub fn generated_context_max_tokens(&self) -> Option<usize> {
+        self.generated_context_max_tokens
+    }
+
     pub fn disconnect_reconnect_timeout(&self) -> Duration {
         self.disconnect_reconnect_timeout
     }
@@ -265,6 +286,7 @@ impl Default for LongChatGateConfig {
             expected_finish_reason: None,
             probe_max_tokens: None,
             generated_context_max_chars: None,
+            generated_context_max_tokens: None,
             disconnect_reconnect_timeout: DEFAULT_DISCONNECT_RECONNECT_TIMEOUT,
             rss_pid: None,
             token_lengths: vec![256, 512, 1024],
@@ -382,5 +404,5 @@ fn os_string_to_string(value: OsString) -> Result<String, LongChatGateError> {
 }
 
 fn usage() -> &'static str {
-    "usage: ferrite-openai-long-chat-gate [--execute] [--error-probe] [--disconnect-probe] [--require-cached-follow-ups] [--addr 127.0.0.1:8080] [--api-key local-secret] [--models MODEL[,MODEL...]] [--prompt TEXT] [--assistant-context TEXT] [--follow-up TEXT] [--prompt-cache-key KEY] [--stop TEXT] [--expect-finish-reason REASON] [--probe-max-tokens TOKENS] [--generated-context-max-chars CHARS] [--disconnect-reconnect-timeout-ms 30000] [--rss-pid PID] [--token-lengths 256,512,1024] [--turns 4]"
+    "usage: ferrite-openai-long-chat-gate [--execute] [--error-probe] [--disconnect-probe] [--require-cached-follow-ups] [--addr 127.0.0.1:8080] [--api-key local-secret] [--models MODEL[,MODEL...]] [--prompt TEXT] [--assistant-context TEXT] [--follow-up TEXT] [--prompt-cache-key KEY] [--stop TEXT] [--expect-finish-reason REASON] [--probe-max-tokens TOKENS] [--generated-context-max-chars CHARS] [--generated-context-max-tokens TOKENS] [--disconnect-reconnect-timeout-ms 30000] [--rss-pid PID] [--token-lengths 256,512,1024] [--turns 4]"
 }

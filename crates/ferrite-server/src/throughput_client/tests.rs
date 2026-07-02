@@ -173,6 +173,24 @@ fn summarizes_streaming_chat_token_ids_from_sse_body() -> Result<(), Box<dyn std
 }
 
 #[test]
+fn retains_streaming_text_chunks_from_sse_body() -> Result<(), Box<dyn std::error::Error>> {
+    let body = concat!(
+        "data: {\"choices\":[{\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\n",
+        "data: {\"choices\":[{\"delta\":{\"content\":\"hel\"},\"token_ids\":[1],\"finish_reason\":null}]}\n\n",
+        "data: {\"choices\":[{\"delta\":{\"content\":\"lo\"},\"token_ids\":[2],\"finish_reason\":null}]}\n\n",
+        "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"length\"}]}\n\n",
+        "data: [DONE]\n\n",
+    );
+
+    let summary =
+        StreamingTextSummary::from_sse_body(body).ok_or("expected streaming text summary")?;
+
+    assert_eq!(summary.text(), "hello");
+    assert_eq!(summary.chunks(), &["hel".to_owned(), "lo".to_owned()]);
+    Ok(())
+}
+
+#[test]
 fn rejects_prompt_cache_key_for_legacy_completions() {
     let result = ThroughputClientConfig::parse([
         OsString::from("ferrite-openai-throughput"),
