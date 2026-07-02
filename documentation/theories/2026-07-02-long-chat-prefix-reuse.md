@@ -116,11 +116,27 @@ prefill was about 146094 ms, roughly 14.6x the seed prefill. Generated-context
 decode averaged about 170028 ms at about 3.01 decode token events/sec, about 20
 percent slower than the seed decode event rate.
 
+A 1024-token rerun completed the initial timing-theory set on 2026-07-02. The
+benchmark note is
+`documentation/benchmarks/2026-07-02-openai-long-chat-x86-qwen-1-5b-q8-prefill-decode-theory-1024.md`.
+
+The 1024-token seed turn used 43 prompt tokens and reported 10160 ms
+stream-observed prefill. Generated-context turns used 1054-1080 prompt tokens
+and reported 314029-325320 ms stream-observed prefill. Average
+generated-context prefill was about 318932 ms, roughly 31.4x the seed prefill.
+Generated-context decode averaged about 464706 ms at about 2.20 decode token
+events/sec, about 32 percent slower than the seed decode event rate.
+
+Across 256, 512, and 1024 tokens, generated-context first-token delay scales
+much faster than seed first-token delay, while post-first-token decode also
+degrades materially. This makes prefix reuse the highest-value first-token
+latency experiment, not a complete throughput fix.
+
 ## Next Step
 
-Complete the 1024-token timing rerun before designing the bounded KV prefix
-cache. If the 1024 run follows the same shape, design a small token-prefix
-identity layer and bounded per-model KV prefix cache as a separate
-implementation slice. Keep it behind an explicit opt-in or internal experiment
-flag until repeated 256/512/1024-token generated-context proofs show lower
-first-token latency without RSS drift or response-shape regression.
+Design a small token-prefix identity layer and bounded per-model KV prefix cache
+as a separate implementation slice. Keep it behind an explicit opt-in or
+internal experiment flag until repeated 256/512/1024-token generated-context
+proofs show lower first-token latency without RSS drift or response-shape
+regression. Track decode slowdown as a separate theory instead of assuming
+prefix reuse will fix it.
