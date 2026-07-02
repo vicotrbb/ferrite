@@ -144,10 +144,20 @@ A minimal compatibility smoke has been executed against Ferrite:
   `documentation/benchmarks/2026-07-02-llama-benchy-qwen-0-5b-compat-smoke.json`
 - Successful post-change raw result:
   `documentation/benchmarks/2026-07-02-llama-benchy-qwen-0-5b-compat-smoke-after-return-token-ids.json`
+- Token-id streaming smoke note:
+  `documentation/benchmarks/2026-07-02-llama-benchy-qwen-0-5b-token-ids-smoke.md`
+- Token-id streaming raw result:
+  `documentation/benchmarks/2026-07-02-llama-benchy-qwen-0-5b-token-ids-smoke.json`
 
 That smoke used `--pp 32`, `--tg 16`, one run, concurrency `1`, no warmup, no
 coherence check, and no prompt adaptation. It proves external tool
 compatibility only.
+
+A follow-up no-stop streaming smoke used `--pp 16`, `--tg 8`, one run,
+concurrency `1`, no warmup, no coherence check, and no prompt adaptation after
+Ferrite started returning token IDs on chat content chunks. The command exited
+`0` and did not print the previous `No token_ids in response, using local
+tokenization` fallback line.
 
 The full protocol has not been executed. The next proof slice is a bounded
 256-token baseline against one available Tier 1 model, followed by a result

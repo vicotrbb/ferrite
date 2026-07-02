@@ -92,6 +92,20 @@ estimated prompt-processing time, and end-to-end first-token fields. During the
 run, `llama-benchy` reported that Ferrite did not return token IDs and used
 local tokenization instead.
 
+After Ferrite added chat stream `token_ids` on no-stop content chunks, a second
+minimal smoke completed with:
+
+- `--pp 16`
+- `--tg 8`
+- `--runs 1`
+- `--concurrency 1`
+- `--latency-mode none`
+
+The command exited `0`, wrote
+`documentation/benchmarks/2026-07-02-llama-benchy-qwen-0-5b-token-ids-smoke.json`,
+and did not print the previous local-tokenization fallback line. See
+`documentation/benchmarks/2026-07-02-llama-benchy-qwen-0-5b-token-ids-smoke.md`.
+
 This moves the theory from pure hypothesis to early compatibility evidence. It
 does not validate the full 256/512/1024-token protocol, prefix caching,
 concurrency behavior, RSS behavior, reconnect/error behavior, or stop/EOS
