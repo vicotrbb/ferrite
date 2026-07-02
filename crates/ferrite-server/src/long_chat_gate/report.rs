@@ -8,9 +8,14 @@ pub fn format_plan(config: &LongChatGateConfig) -> String {
         .map(usize::to_string)
         .collect::<Vec<_>>()
         .join(",");
+    let prompt_cache_key = config
+        .prompt_cache_key()
+        .map(|key| format!("\nlong_chat_prompt_cache_key={key}"))
+        .unwrap_or_default();
     format!(
-        "long_chat_models={models}\nlong_chat_token_lengths={token_lengths}\nlong_chat_turns={}\nlong_chat_planned_scenarios={}",
+        "long_chat_models={models}\nlong_chat_token_lengths={token_lengths}\nlong_chat_turns={}{}\nlong_chat_planned_scenarios={}",
         config.turns(),
+        prompt_cache_key,
         config.planned_scenarios()
     )
 }
