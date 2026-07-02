@@ -170,6 +170,43 @@ evidence. It does not validate generated-context long-chat cache reuse,
 high-concurrency serving, reconnect/error behavior under load, or stop/EOS
 behavior under load.
 
+## Shared-Prefix Follow-Up
+
+The upstream `llama-benchy` repository still presents the tool as a
+`llama-bench`-style benchmark for OpenAI-compatible endpoints, with prompt
+processing, token generation, context-depth, latency, output-format, and
+concurrency controls. That matches the next Ferrite benchmarking need.
+
+After Ferrite's shared-prefix cache gate completed on the internal long-chat
+proof client, `llama-benchy` should be used as an external comparison harness,
+not as the primary correctness gate. The internal gate directly validates
+generated-context turn sequencing, `cached_prompt_tokens`, RSS sampling,
+streaming token IDs, unauthorized reconnect, and disconnect/reconnect behavior.
+`llama-benchy` is better suited for repeated throughput and latency sweeps once
+the correctness gate is green.
+
+Next external benchmark candidate:
+
+```sh
+uvx llama-benchy \
+  --base-url http://127.0.0.1:18080/v1 \
+  --model smollm2-135m-q4_k_m \
+  --served-model-name smollm2-135m-q4_k_m \
+  --pp 256 512 1024 \
+  --tg 256 512 1024 \
+  --depth 256 512 1024 \
+  --enable-prefix-caching \
+  --extra-body prompt_cache_key=ferrite:benchy:shared-prefix \
+  --concurrency 1 \
+  --latency-mode generation \
+  --format json \
+  --save-result documentation/benchmarks/YYYY-MM-DD-llama-benchy-shared-prefix.json
+```
+
+Adoption criterion: use it only after the Ferrite long-chat gate passes the
+same token budget, and document both artifacts together so correctness and
+benchmark throughput do not get conflated.
+
 ## Falsification Experiment
 
 Run a small no-cache baseline first:

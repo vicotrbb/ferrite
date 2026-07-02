@@ -160,11 +160,50 @@ for generated-context chat prompts. The generated assistant context changes the
 full rendered prompt, so the current full-prompt token identity misses even
 when an explicit cache namespace is present.
 
+## Shared-Prefix Cache Proof
+
+After adding token-level longest-prefix reuse and shared-prefix snapshot
+truncation, the same strict gate shape completed on a small real model. The
+benchmark note is
+`documentation/benchmarks/2026-07-02-openai-long-chat-smollm-135m-shared-prefix-cache-gate-32.md`.
+
+The run used `SmolLM2-135M-Instruct-Q4_K_M`, `--experimental-prefix-cache`,
+`--prompt-cache-key long-chat:prefix`, `--require-cached-follow-ups`,
+unauthorized reconnect probing, disconnect/reconnect probing, RSS sampling, and
+four 32-token streaming turns.
+
+Results:
+
+| Turn | Context | Prompt tokens | Cached prompt tokens | TTFT ms |
+| ---: | --- | ---: | ---: | ---: |
+| 1 | seed | 48 | 0 | 1416 |
+| 2 | generated | 65 | 14 | 1537 |
+| 3 | generated | 65 | 65 | 24 |
+| 4 | generated | 65 | 65 | 24 |
+
+The summary recorded:
+
+```text
+long_chat_summary_cached_generated_follow_up_turns=3
+long_chat_summary_uncached_generated_follow_up_turns=0
+long_chat_summary_all_generated_follow_up_turns_cached=true
+long_chat_summary_run_complete=true
+```
+
+This supports the theory that token-level prefix reuse is a valid first-token
+latency optimization for generated-context long-chat. It also shows why exact
+full-prompt caching was insufficient: turn 2 only shared an earlier token
+prefix, while turns 3 and 4 could reuse the full previous generated-context
+prompt.
+
+The proof is still small. It does not replace the 256/512/1024-token gate,
+larger-model coverage, stop/EOS coverage, x86_64 coverage, or longer
+steady-state memory checks.
+
 ## Next Step
 
-Implement a longest-valid token-prefix match layer on top of the bounded
-per-model KV prefix cache. Keep it behind the existing experimental prefix-cache
-flag until the generated-context cache gate completes with cached follow-ups,
-lower first-token latency, unchanged response shape, and bounded RSS. Track
-decode slowdown as a separate theory instead of assuming prefix reuse will fix
-it.
+Scale the shared-prefix cache proof to the dedicated long-chat gate: 256, 512,
+and 1024-token streaming responses, repeated generated-context conversations,
+RSS before/after/idle sampling, latency per token, stop/EOS behavior, and
+client reconnect/error behavior. Track decode slowdown as a separate theory
+instead of assuming prefix reuse will fix it.
