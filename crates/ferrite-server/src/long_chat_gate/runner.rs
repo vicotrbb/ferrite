@@ -29,6 +29,11 @@ impl LongChatGateConfig {
             )?;
             let throughput = run_completion_benchmark(&throughput_config).await?;
             self.validate_finish_reason(&throughput)?;
+            self.validate_required_generated_response_substrings(
+                scenario,
+                assistant_context.source,
+                &throughput,
+            )?;
             assistant_contexts.record_result(scenario, &throughput);
             let result = LongChatScenarioResult::new_with_assistant_context_source(
                 scenario,
@@ -70,6 +75,11 @@ impl LongChatGateConfig {
             )?;
             let throughput = executor(&throughput_config)?;
             self.validate_finish_reason(&throughput)?;
+            self.validate_required_generated_response_substrings(
+                scenario,
+                assistant_context.source,
+                &throughput,
+            )?;
             assistant_contexts.record_result(scenario, &throughput);
             let result = LongChatScenarioResult::new_with_assistant_context_source(
                 scenario,
@@ -96,6 +106,34 @@ impl LongChatGateConfig {
         };
         if actual != expected {
             return Err(format!("expected finish_reason {expected}, got {actual}").into());
+        }
+        Ok(())
+    }
+
+    fn validate_required_generated_response_substrings(
+        &self,
+        scenario: &super::LongChatScenario<'_>,
+        assistant_context_source: LongChatAssistantContextSource,
+        throughput: &ThroughputResult,
+    ) -> Result<(), Box<dyn Error>> {
+        if !assistant_context_source.is_generated()
+            || self.required_generated_response_substrings().is_empty()
+        {
+            return Ok(());
+        }
+        let text = throughput
+            .streaming_text
+            .as_ref()
+            .map(|text| text.text())
+            .unwrap_or_default();
+        for required in self.required_generated_response_substrings() {
+            if !text.contains(required) {
+                return Err(format!(
+                    "turn {} generated response missing required substring {required}",
+                    scenario.turn()
+                )
+                .into());
+            }
         }
         Ok(())
     }

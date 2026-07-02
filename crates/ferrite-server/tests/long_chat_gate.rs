@@ -76,6 +76,8 @@ fn parses_custom_long_chat_token_lengths_turns_and_models() -> Result<(), Box<dy
         OsString::from("stop"),
         OsString::from("--probe-max-tokens"),
         OsString::from("256"),
+        OsString::from("--require-generated-response-contains"),
+        OsString::from("continuity-marker"),
         OsString::from("--disconnect-reconnect-timeout-ms"),
         OsString::from("45000"),
     ])?;
@@ -98,6 +100,10 @@ fn parses_custom_long_chat_token_lengths_turns_and_models() -> Result<(), Box<dy
     assert!(config.require_cached_follow_ups());
     assert_eq!(config.expected_finish_reason(), Some("stop"));
     assert_eq!(config.probe_max_tokens(), Some(256));
+    assert_eq!(
+        config.required_generated_response_substrings(),
+        &["continuity-marker"]
+    );
     assert_eq!(
         config.disconnect_reconnect_timeout(),
         Duration::from_secs(45)
@@ -325,6 +331,30 @@ fn formats_long_chat_gate_plan_with_probe_metadata() -> Result<(), Box<dyn std::
     assert_eq!(
         format_plan(&config),
         "long_chat_models=fixture-model\nlong_chat_token_lengths=256\nlong_chat_turns=4\nlong_chat_addr=127.0.0.1:8080\nlong_chat_rss_pid=4242\nlong_chat_error_probe_required=true\nlong_chat_disconnect_probe_required=true\nlong_chat_probe_max_tokens=256\nlong_chat_disconnect_reconnect_timeout_ms=1500\nlong_chat_planned_scenarios=4"
+    );
+    Ok(())
+}
+
+#[test]
+fn formats_long_chat_gate_plan_with_generated_response_requirements(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--models"),
+        OsString::from("fixture-model"),
+        OsString::from("--token-lengths"),
+        OsString::from("256"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+        OsString::from("--require-generated-response-contains"),
+        OsString::from("continuity-marker"),
+        OsString::from("--require-generated-response-contains"),
+        OsString::from("anchor-token"),
+    ])?;
+
+    assert_eq!(
+        format_plan(&config),
+        "long_chat_models=fixture-model\nlong_chat_token_lengths=256\nlong_chat_turns=4\nlong_chat_required_generated_response_substrings=continuity-marker,anchor-token\nlong_chat_addr=127.0.0.1:8080\nlong_chat_planned_scenarios=4"
     );
     Ok(())
 }
@@ -1041,6 +1071,105 @@ fn carries_generated_assistant_text_between_turns_per_token_length(
             (256, Some("generated-256-3".to_owned())),
             (512, Some("generated-512-3".to_owned())),
         ]
+    );
+    Ok(())
+}
+
+#[test]
+fn validates_required_substrings_in_generated_follow_up_responses(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--models"),
+        OsString::from("fixture-model"),
+        OsString::from("--token-lengths"),
+        OsString::from("256"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+        OsString::from("--require-generated-response-contains"),
+        OsString::from("continuity-marker"),
+    ])?;
+    let mut calls = 0usize;
+
+    let results = config.run_with_executor(|throughput| {
+        calls += 1;
+        let text = if calls == 1 {
+            "seed response"
+        } else {
+            "generated response with continuity-marker"
+        };
+        Ok(ThroughputResult {
+            completed_requests: throughput.requests(),
+            elapsed: Duration::from_millis(10),
+            streaming_finish: Some(StreamingFinishSummary::new("length")),
+            streaming_timing: None,
+            streaming_text: Some(StreamingTextSummary::new(text)),
+            streaming_token_ids: None,
+            streaming_usage: Some(StreamingUsageSummary::new(
+                8,
+                throughput.max_tokens() as u64,
+                throughput.max_tokens() as u64 + 8,
+            )),
+            rss: None,
+        })
+    })?;
+
+    assert_eq!(results.len(), 4);
+    assert_eq!(calls, 4);
+    Ok(())
+}
+
+#[test]
+fn rejects_missing_required_substring_in_generated_follow_up_response(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--models"),
+        OsString::from("fixture-model"),
+        OsString::from("--token-lengths"),
+        OsString::from("256"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+        OsString::from("--require-generated-response-contains"),
+        OsString::from("continuity-marker"),
+    ])?;
+    let mut calls = 0usize;
+
+    let result = config.run_with_executor(|throughput| {
+        calls += 1;
+        let text = if calls == 1 {
+            "seed response"
+        } else {
+            "generated response without the marker"
+        };
+        Ok(ThroughputResult {
+            completed_requests: throughput.requests(),
+            elapsed: Duration::from_millis(10),
+            streaming_finish: Some(StreamingFinishSummary::new("length")),
+            streaming_timing: None,
+            streaming_text: Some(StreamingTextSummary::new(text)),
+            streaming_token_ids: None,
+            streaming_usage: Some(StreamingUsageSummary::new(
+                8,
+                throughput.max_tokens() as u64,
+                throughput.max_tokens() as u64 + 8,
+            )),
+            rss: None,
+        })
+    });
+    let error = match result {
+        Ok(results) => {
+            return Err(format!("expected response substring mismatch, got {results:?}").into())
+        }
+        Err(error) => error,
+    };
+
+    assert_eq!(calls, 2);
+    assert!(
+        error
+            .to_string()
+            .contains("turn 2 generated response missing required substring continuity-marker"),
+        "{error}"
     );
     Ok(())
 }
