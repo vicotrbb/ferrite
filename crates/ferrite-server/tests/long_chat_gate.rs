@@ -188,7 +188,7 @@ fn formats_long_chat_gate_plan_summary() -> Result<(), Box<dyn std::error::Error
 
     assert_eq!(
         format_plan(&config),
-        "long_chat_models=fixture-model\nlong_chat_token_lengths=256,512,1024\nlong_chat_turns=4\nlong_chat_planned_scenarios=12"
+        "long_chat_models=fixture-model\nlong_chat_token_lengths=256,512,1024\nlong_chat_turns=4\nlong_chat_addr=127.0.0.1:8080\nlong_chat_planned_scenarios=12"
     );
     Ok(())
 }
@@ -208,7 +208,28 @@ fn formats_long_chat_gate_plan_with_execute_flag() -> Result<(), Box<dyn std::er
 
     assert_eq!(
         format_plan(&config),
-        "long_chat_models=fixture-model\nlong_chat_token_lengths=256\nlong_chat_turns=4\nlong_chat_execute=true\nlong_chat_planned_scenarios=4"
+        "long_chat_models=fixture-model\nlong_chat_token_lengths=256\nlong_chat_turns=4\nlong_chat_addr=127.0.0.1:8080\nlong_chat_execute=true\nlong_chat_planned_scenarios=4"
+    );
+    Ok(())
+}
+
+#[test]
+fn formats_long_chat_gate_plan_with_server_address() -> Result<(), Box<dyn std::error::Error>> {
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--addr"),
+        OsString::from("127.0.0.1:18080"),
+        OsString::from("--models"),
+        OsString::from("fixture-model"),
+        OsString::from("--token-lengths"),
+        OsString::from("256"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+    ])?;
+
+    assert_eq!(
+        format_plan(&config),
+        "long_chat_models=fixture-model\nlong_chat_token_lengths=256\nlong_chat_turns=4\nlong_chat_addr=127.0.0.1:18080\nlong_chat_planned_scenarios=4"
     );
     Ok(())
 }
@@ -229,7 +250,7 @@ fn formats_long_chat_gate_plan_with_prompt_cache_key() -> Result<(), Box<dyn std
 
     assert_eq!(
         format_plan(&config),
-        "long_chat_models=fixture-model\nlong_chat_token_lengths=256\nlong_chat_turns=4\nlong_chat_prompt_cache_key=long-chat:prefix\nlong_chat_planned_scenarios=4"
+        "long_chat_models=fixture-model\nlong_chat_token_lengths=256\nlong_chat_turns=4\nlong_chat_prompt_cache_key=long-chat:prefix\nlong_chat_addr=127.0.0.1:8080\nlong_chat_planned_scenarios=4"
     );
     Ok(())
 }
@@ -252,7 +273,7 @@ fn formats_long_chat_gate_plan_with_required_cached_follow_ups(
 
     assert_eq!(
         format_plan(&config),
-        "long_chat_models=fixture-model\nlong_chat_token_lengths=256\nlong_chat_turns=4\nlong_chat_prompt_cache_key=long-chat:prefix\nlong_chat_require_cached_follow_ups=true\nlong_chat_planned_scenarios=4"
+        "long_chat_models=fixture-model\nlong_chat_token_lengths=256\nlong_chat_turns=4\nlong_chat_prompt_cache_key=long-chat:prefix\nlong_chat_addr=127.0.0.1:8080\nlong_chat_require_cached_follow_ups=true\nlong_chat_planned_scenarios=4"
     );
     Ok(())
 }
@@ -275,7 +296,7 @@ fn formats_long_chat_gate_plan_with_stop_expectation() -> Result<(), Box<dyn std
 
     assert_eq!(
         format_plan(&config),
-        "long_chat_models=fixture-model\nlong_chat_token_lengths=256\nlong_chat_turns=4\nlong_chat_stop_configured=true\nlong_chat_expected_finish_reason=stop\nlong_chat_planned_scenarios=4"
+        "long_chat_models=fixture-model\nlong_chat_token_lengths=256\nlong_chat_turns=4\nlong_chat_addr=127.0.0.1:8080\nlong_chat_stop_configured=true\nlong_chat_expected_finish_reason=stop\nlong_chat_planned_scenarios=4"
     );
     Ok(())
 }
@@ -302,7 +323,7 @@ fn formats_long_chat_gate_plan_with_probe_metadata() -> Result<(), Box<dyn std::
 
     assert_eq!(
         format_plan(&config),
-        "long_chat_models=fixture-model\nlong_chat_token_lengths=256\nlong_chat_turns=4\nlong_chat_rss_pid=4242\nlong_chat_error_probe_required=true\nlong_chat_disconnect_probe_required=true\nlong_chat_probe_max_tokens=256\nlong_chat_disconnect_reconnect_timeout_ms=1500\nlong_chat_planned_scenarios=4"
+        "long_chat_models=fixture-model\nlong_chat_token_lengths=256\nlong_chat_turns=4\nlong_chat_addr=127.0.0.1:8080\nlong_chat_rss_pid=4242\nlong_chat_error_probe_required=true\nlong_chat_disconnect_probe_required=true\nlong_chat_probe_max_tokens=256\nlong_chat_disconnect_reconnect_timeout_ms=1500\nlong_chat_planned_scenarios=4"
     );
     Ok(())
 }
@@ -371,7 +392,7 @@ fn formats_long_chat_gate_report_with_plan_and_scenarios() -> Result<(), Box<dyn
 
     assert_eq!(
         format_report(&config),
-        "long_chat_models=fixture-model\nlong_chat_token_lengths=256,512\nlong_chat_turns=4\nlong_chat_planned_scenarios=8\nlong_chat_scenario=model:fixture-model,turn:1,max_tokens:256\nlong_chat_scenario=model:fixture-model,turn:1,max_tokens:512\nlong_chat_scenario=model:fixture-model,turn:2,max_tokens:256\nlong_chat_scenario=model:fixture-model,turn:2,max_tokens:512\nlong_chat_scenario=model:fixture-model,turn:3,max_tokens:256\nlong_chat_scenario=model:fixture-model,turn:3,max_tokens:512\nlong_chat_scenario=model:fixture-model,turn:4,max_tokens:256\nlong_chat_scenario=model:fixture-model,turn:4,max_tokens:512"
+        "long_chat_models=fixture-model\nlong_chat_token_lengths=256,512\nlong_chat_turns=4\nlong_chat_addr=127.0.0.1:8080\nlong_chat_planned_scenarios=8\nlong_chat_scenario=model:fixture-model,turn:1,max_tokens:256\nlong_chat_scenario=model:fixture-model,turn:1,max_tokens:512\nlong_chat_scenario=model:fixture-model,turn:2,max_tokens:256\nlong_chat_scenario=model:fixture-model,turn:2,max_tokens:512\nlong_chat_scenario=model:fixture-model,turn:3,max_tokens:256\nlong_chat_scenario=model:fixture-model,turn:3,max_tokens:512\nlong_chat_scenario=model:fixture-model,turn:4,max_tokens:256\nlong_chat_scenario=model:fixture-model,turn:4,max_tokens:512"
     );
     Ok(())
 }

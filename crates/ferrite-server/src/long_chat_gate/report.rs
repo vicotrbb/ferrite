@@ -12,6 +12,7 @@ pub fn format_plan(config: &LongChatGateConfig) -> String {
         .prompt_cache_key()
         .map(|key| format!("\nlong_chat_prompt_cache_key={key}"))
         .unwrap_or_default();
+    let addr = format!("\nlong_chat_addr={}", config.addr());
     let execute = if config.execute() {
         "\nlong_chat_execute=true"
     } else {
@@ -58,9 +59,10 @@ pub fn format_plan(config: &LongChatGateConfig) -> String {
         String::new()
     };
     format!(
-        "long_chat_models={models}\nlong_chat_token_lengths={token_lengths}\nlong_chat_turns={}{}{}{}{}{}{}{}{}{}{}\nlong_chat_planned_scenarios={}",
+        "long_chat_models={models}\nlong_chat_token_lengths={token_lengths}\nlong_chat_turns={}{}{}{}{}{}{}{}{}{}{}{}\nlong_chat_planned_scenarios={}",
         config.turns(),
         prompt_cache_key,
+        addr,
         execute,
         require_cached_follow_ups,
         stop_configured,
