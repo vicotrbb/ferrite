@@ -35,8 +35,21 @@ impl RuntimePrefixCache {
         key: &PrefixCacheKey,
     ) -> Option<RuntimePrefixCacheValue> {
         let used_at_tick = self.advance_tick();
-        let entry = self.metadata.record_longest_prefix_hit(key, used_at_tick)?;
-        self.values.get(entry.key()).cloned()
+        if let Some(entry) = self.metadata.record_longest_prefix_hit(key, used_at_tick) {
+            return self.values.get(entry.key()).cloned();
+        }
+        let hit = self
+            .metadata
+            .record_longest_shared_prefix_hit(key, used_at_tick)?;
+        let value = self.values.get(hit.entry().key())?;
+        let snapshot = value
+            .snapshot
+            .truncate_to_cached_token_count(hit.shared_prefix_token_count())
+            .ok()?;
+        Some(RuntimePrefixCacheValue {
+            snapshot,
+            next_token: None,
+        })
     }
 
     pub(super) fn insert(
@@ -56,7 +69,7 @@ impl RuntimePrefixCache {
                 key,
                 RuntimePrefixCacheValue {
                     snapshot,
-                    next_token,
+                    next_token: Some(next_token),
                 },
             );
         }
@@ -71,7 +84,7 @@ impl RuntimePrefixCache {
 #[derive(Clone, Debug, PartialEq)]
 pub(super) struct RuntimePrefixCacheValue {
     snapshot: ScalarLlamaSessionSnapshot,
-    next_token: NextToken,
+    next_token: Option<NextToken>,
 }
 
 impl RuntimePrefixCacheValue {
@@ -79,8 +92,8 @@ impl RuntimePrefixCacheValue {
         &self.snapshot
     }
 
-    pub(super) fn next_token(&self) -> &NextToken {
-        &self.next_token
+    pub(super) fn next_token(&self) -> Option<&NextToken> {
+        self.next_token.as_ref()
     }
 }
 

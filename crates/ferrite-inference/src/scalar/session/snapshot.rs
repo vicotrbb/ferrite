@@ -13,9 +13,36 @@ impl ScalarLlamaSessionSnapshot {
         self.cached_token_count
     }
 
+    pub fn truncate_to_cached_token_count(
+        &self,
+        token_count: usize,
+    ) -> Result<Self, InferenceError> {
+        if token_count > self.cached_token_count {
+            return Err(InferenceError::new(format!(
+                "cannot truncate cache snapshot with {} cached tokens to {token_count} tokens",
+                self.cached_token_count
+            )));
+        }
+        if token_count == self.cached_token_count {
+            return Ok(self.clone());
+        }
+        Ok(Self {
+            layer_keys: truncate_layers(&self.layer_keys, token_count),
+            layer_values: truncate_layers(&self.layer_values, token_count),
+            cached_token_count: token_count,
+        })
+    }
+
     pub fn kv_cache_bytes(&self) -> u128 {
         memory::kv_cache_bytes(&self.layer_keys, &self.layer_values)
     }
+}
+
+fn truncate_layers(layers: &[Vec<Vec<f32>>], token_count: usize) -> Vec<Vec<Vec<f32>>> {
+    layers
+        .iter()
+        .map(|layer| layer.iter().take(token_count).cloned().collect())
+        .collect()
 }
 
 impl<'a> ScalarLlamaSession<'a> {

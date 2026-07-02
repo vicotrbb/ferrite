@@ -1,5 +1,21 @@
 use super::{PrefixCacheEntry, PrefixCacheKey};
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PrefixCacheSharedPrefixHit<'a> {
+    entry: &'a PrefixCacheEntry,
+    shared_prefix_token_count: usize,
+}
+
+impl<'a> PrefixCacheSharedPrefixHit<'a> {
+    pub fn entry(&self) -> &'a PrefixCacheEntry {
+        self.entry
+    }
+
+    pub fn shared_prefix_token_count(&self) -> usize {
+        self.shared_prefix_token_count
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PrefixCacheMetadataStore {
     max_entries: usize,
@@ -63,6 +79,27 @@ impl PrefixCacheMetadataStore {
         Some(&self.entries[index])
     }
 
+    pub fn record_longest_shared_prefix_hit(
+        &mut self,
+        key: &PrefixCacheKey,
+        used_at_tick: u64,
+    ) -> Option<PrefixCacheSharedPrefixHit<'_>> {
+        let (index, shared_prefix_token_count) = self
+            .entries
+            .iter()
+            .enumerate()
+            .filter_map(|(index, entry)| {
+                let shared_prefix_token_count = shared_prefix_token_count(entry.key(), key);
+                (shared_prefix_token_count > 0).then_some((index, shared_prefix_token_count))
+            })
+            .max_by_key(|(_, shared_prefix_token_count)| *shared_prefix_token_count)?;
+        self.entries[index].record_use(used_at_tick);
+        Some(PrefixCacheSharedPrefixHit {
+            entry: &self.entries[index],
+            shared_prefix_token_count,
+        })
+    }
+
     pub fn get(&self, key: &PrefixCacheKey) -> Option<&PrefixCacheEntry> {
         self.entries.iter().find(|entry| entry.key() == key)
     }
@@ -111,4 +148,18 @@ fn is_compatible_prefix(cached: &PrefixCacheKey, requested: &PrefixCacheKey) -> 
         && requested
             .prefix_tokens()
             .starts_with(cached.prefix_tokens())
+}
+
+fn shared_prefix_token_count(cached: &PrefixCacheKey, requested: &PrefixCacheKey) -> usize {
+    if cached.fingerprints() != requested.fingerprints()
+        || cached.namespace() != requested.namespace()
+    {
+        return 0;
+    }
+    cached
+        .prefix_tokens()
+        .iter()
+        .zip(requested.prefix_tokens())
+        .take_while(|(cached, requested)| cached == requested)
+        .count()
 }

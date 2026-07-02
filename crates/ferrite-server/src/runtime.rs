@@ -124,7 +124,9 @@ impl InferenceEngine {
                 cached_prompt_tokens = cached.snapshot().cached_token_count();
                 let suffix = &prompt_token_ids[cached_prompt_tokens..];
                 if suffix.is_empty() {
-                    cached.next_token().clone()
+                    cached.next_token().cloned().ok_or_else(|| {
+                        RuntimeError::new("prefix cache hit is missing exact next token")
+                    })?
                 } else {
                     let next = session.accept_prompt(suffix).map_err(|error| {
                         RuntimeError::new(format!("failed to evaluate prompt suffix: {error}"))
@@ -501,6 +503,32 @@ mod tests {
         assert_eq!(uncached_full_prompt.prompt_tokens(), 2);
         assert_eq!(cached_full_prompt.prompt_tokens(), 2);
         assert_eq!(cached_full_prompt.cached_prompt_tokens(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn prefix_cache_reuses_shared_prompt_prefix_when_prompts_diverge(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let model_path = write_fixture_model()?;
+        let engine = InferenceEngine::load(&model_path)?;
+        remove_fixture_model(&model_path)?;
+        let cache_options =
+            GenerationCacheOptions::from_namespace(Some("tenant-a:thread-1".to_owned()))
+                .with_prefix_cache_enabled(true);
+
+        let divergent_cached_prompt =
+            engine.generate_with_cache_options("hellowinner", 1, cache_options.clone())?;
+        let uncached_requested_prompt = engine.generate("hellohello", 1)?;
+        let cached_requested_prompt =
+            engine.generate_with_cache_options("hellohello", 1, cache_options)?;
+
+        assert_eq!(divergent_cached_prompt.cached_prompt_tokens(), 0);
+        assert_eq!(
+            uncached_requested_prompt.text(),
+            cached_requested_prompt.text()
+        );
+        assert_eq!(cached_requested_prompt.prompt_tokens(), 2);
+        assert_eq!(cached_requested_prompt.cached_prompt_tokens(), 1);
         Ok(())
     }
 
