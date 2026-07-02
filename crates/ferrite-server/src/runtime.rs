@@ -149,6 +149,7 @@ impl TokenTextBuffer {
 pub struct GeneratedText {
     text: String,
     prompt_tokens: usize,
+    cached_prompt_tokens: usize,
     completion_tokens: usize,
     token_texts: Vec<String>,
     finish_reason: GenerationFinishReason,
@@ -180,6 +181,7 @@ impl GeneratedText {
         Self {
             text,
             prompt_tokens,
+            cached_prompt_tokens: 0,
             completion_tokens,
             token_texts,
             finish_reason,
@@ -192,6 +194,24 @@ impl GeneratedText {
 
     pub fn prompt_tokens(&self) -> usize {
         self.prompt_tokens
+    }
+
+    pub fn cached_prompt_tokens(&self) -> usize {
+        self.cached_prompt_tokens
+    }
+
+    pub fn with_cached_prompt_tokens(
+        mut self,
+        cached_prompt_tokens: usize,
+    ) -> Result<Self, RuntimeError> {
+        if cached_prompt_tokens > self.prompt_tokens {
+            return Err(RuntimeError::new(format!(
+                "cached prompt tokens {cached_prompt_tokens} exceed prompt tokens {}",
+                self.prompt_tokens
+            )));
+        }
+        self.cached_prompt_tokens = cached_prompt_tokens;
+        Ok(self)
     }
 
     pub fn completion_tokens(&self) -> usize {
@@ -252,6 +272,27 @@ mod tests {
         assert_eq!(generated.text(), "winner");
         assert_eq!(generated.token_texts(), pieces);
         Ok(())
+    }
+
+    #[test]
+    fn generated_text_records_cached_prompt_tokens() -> Result<(), Box<dyn std::error::Error>> {
+        let generated = GeneratedText::new("winner".to_owned(), 4, 1, vec!["winner".to_owned()])
+            .with_cached_prompt_tokens(3)?;
+
+        assert_eq!(generated.prompt_tokens(), 4);
+        assert_eq!(generated.cached_prompt_tokens(), 3);
+        Ok(())
+    }
+
+    #[test]
+    fn generated_text_rejects_cached_prompt_tokens_above_prompt_tokens() {
+        let error = GeneratedText::new("winner".to_owned(), 2, 1, vec!["winner".to_owned()])
+            .with_cached_prompt_tokens(3)
+            .expect_err("cached prompt tokens above prompt token count should fail");
+
+        assert!(error
+            .to_string()
+            .contains("cached prompt tokens 3 exceed prompt tokens 2"));
     }
 
     #[test]
