@@ -23,13 +23,17 @@ pub fn format_run_summary(
         .any(|result| result.hit_token_limit().unwrap_or(false));
     let prompt_cache_key_present = config.prompt_cache_key().is_some();
     let any_cached_prompt_tokens = results.iter().any(has_cached_prompt_tokens);
-    let generated_follow_up_turns_present = results.iter().any(is_generated_follow_up_turn);
+    let generated_follow_up_turns = results
+        .iter()
+        .filter(|result| is_generated_follow_up_turn(result))
+        .count();
+    let cached_generated_follow_up_turns = results
+        .iter()
+        .filter(|result| is_generated_follow_up_turn(result) && has_cached_prompt_tokens(result))
+        .count();
     let all_generated_follow_up_turns_cached = prompt_cache_key_present
-        && generated_follow_up_turns_present
-        && results
-            .iter()
-            .filter(|result| is_generated_follow_up_turn(result))
-            .all(has_cached_prompt_tokens);
+        && generated_follow_up_turns > 0
+        && generated_follow_up_turns == cached_generated_follow_up_turns;
     let cached_follow_ups_required = config.require_cached_follow_ups();
     let all_follow_up_turns_use_generated_context = results
         .iter()
@@ -71,6 +75,8 @@ long_chat_summary_any_token_limit_hit={any_token_limit_hit}\n\
 long_chat_summary_prompt_cache_key_present={prompt_cache_key_present}\n\
 long_chat_summary_cached_follow_ups_required={cached_follow_ups_required}\n\
 long_chat_summary_any_cached_prompt_tokens={any_cached_prompt_tokens}\n\
+long_chat_summary_generated_follow_up_turns={generated_follow_up_turns}\n\
+long_chat_summary_cached_generated_follow_up_turns={cached_generated_follow_up_turns}\n\
 long_chat_summary_all_generated_follow_up_turns_cached={all_generated_follow_up_turns_cached}\n\
 long_chat_summary_all_follow_up_turns_use_generated_context={all_follow_up_turns_use_generated_context}\n\
 long_chat_summary_all_timing_present={all_timing_present}\n\
