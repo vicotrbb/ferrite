@@ -152,6 +152,28 @@ are not limited to the local Qwen 0.5B probe. The result still does not prove
 conversation quality or default serving semantics, and this first larger run
 did not include reconnect/error probes.
 
+## x86_64 Window Sweep
+
+A follow-up x86_64 sweep completed the missing 32, 128, and 256 generated-token
+windows on `Qwen2.5-1.5B-Instruct-Q8_0` at the 256-token budget. Combined with
+the prior 64-token result, the benchmark note is
+`documentation/benchmarks/2026-07-02-openai-long-chat-x86-qwen-1-5b-q8-token-window-sweep-256.md`.
+
+Generated-turn averages:
+
+| Window | Prompt tokens | TTFT/prefill ms | Decode ms | Decode tok/s | Stream tok/s |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 32 | 61.67 | 14409.33 | 64438.00 | 3.972792 | 3.259518 |
+| 64 | 92.33 | 21762.67 | 65377.33 | 3.915744 | 2.949269 |
+| 128 | 155.00 | 37240.67 | 67969.00 | 3.766421 | 2.442740 |
+| 256 | 284.00 | 70926.33 | 72488.67 | 3.532402 | 1.792190 |
+| Unwindowed baseline | 285.33 | 70209.33 | 71463.33 | 3.582265 | 1.814102 |
+
+The 32-token window was fastest on this prompt, and the 256-token window was
+effectively equivalent to the full generated-context baseline. This identifies
+32 and 64 generated chunks as the next candidates for correctness, reconnect,
+and conversation-continuity validation.
+
 ## Risks
 
 - Windowing can hide long-range context regressions if the proof prompt is too
@@ -165,10 +187,8 @@ did not include reconnect/error probes.
 
 ## Next Step
 
-Run a small x86_64 window sweep around the promising larger-artifact result:
-32, 64, 128, and 256 generated chunks on `Qwen2.5-1.5B-Instruct-Q8_0` at the
-256-token budget. Then repeat the selected window size with reconnect/error
-probes and at least one 512-token budget before designing any default public
-HTTP request policy. Keep this outside the default serving path until
-conversation-quality probes prove that reduced prompt length does not hide
-important continuity regressions.
+Repeat the 32-token and 64-token windows with reconnect/error probes and at
+least one 512-token budget before designing any default public HTTP request
+policy. Keep this outside the default serving path until conversation-quality
+probes prove that reduced prompt length does not hide important continuity
+regressions.
