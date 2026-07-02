@@ -475,13 +475,13 @@ fn formats_streaming_usage_summary() -> Result<(), Box<dyn std::error::Error>> {
         streaming_finish: None,
         streaming_timing: None,
         streaming_text: None,
-        streaming_usage: Some(StreamingUsageSummary::new(8, 32, 40)),
+        streaming_usage: Some(StreamingUsageSummary::new(8, 32, 40).with_cached_prompt_tokens(5)),
         rss: None,
     };
 
     assert_eq!(
         format_result(&config, result),
-        "openai_http_streaming_chat_completion_requests=1\nelapsed_ms=400\nrequests_per_second=2.500000\nstreaming_usage_prompt_tokens=8\nstreaming_usage_completion_tokens=32\nstreaming_usage_total_tokens=40"
+        "openai_http_streaming_chat_completion_requests=1\nelapsed_ms=400\nrequests_per_second=2.500000\nstreaming_usage_prompt_tokens=8\nstreaming_usage_cached_prompt_tokens=5\nstreaming_usage_completion_tokens=32\nstreaming_usage_total_tokens=40"
     );
     Ok(())
 }
@@ -560,13 +560,14 @@ fn extracts_streaming_finish_reason_from_sse_body() -> Result<(), Box<dyn std::e
 fn extracts_streaming_usage_from_sse_body() -> Result<(), Box<dyn std::error::Error>> {
     let body = concat!(
         "data: {\"choices\":[{\"delta\":{\"content\":\"A\"}}],\"usage\":null}\n\n",
-        "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":8,\"completion_tokens\":32,\"total_tokens\":40}}\n\n",
+        "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":8,\"prompt_tokens_details\":{\"cached_tokens\":5,\"audio_tokens\":0},\"completion_tokens\":32,\"total_tokens\":40}}\n\n",
         "data: [DONE]\n\n",
     );
 
     let usage = StreamingUsageSummary::from_sse_body(body).ok_or("expected streaming usage")?;
 
     assert_eq!(usage.prompt_tokens(), 8);
+    assert_eq!(usage.cached_prompt_tokens(), 5);
     assert_eq!(usage.completion_tokens(), 32);
     assert_eq!(usage.total_tokens(), 40);
     Ok(())

@@ -174,8 +174,9 @@ pub fn format_result(config: &ThroughputClientConfig, result: ThroughputResult) 
     }
     if let Some(usage) = result.streaming_usage {
         output.push_str(&format!(
-            "\nstreaming_usage_prompt_tokens={}\nstreaming_usage_completion_tokens={}\nstreaming_usage_total_tokens={}",
+            "\nstreaming_usage_prompt_tokens={}\nstreaming_usage_cached_prompt_tokens={}\nstreaming_usage_completion_tokens={}\nstreaming_usage_total_tokens={}",
             usage.prompt_tokens(),
+            usage.cached_prompt_tokens(),
             usage.completion_tokens(),
             usage.total_tokens(),
         ));

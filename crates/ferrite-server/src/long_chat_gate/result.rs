@@ -99,8 +99,9 @@ pub fn format_scenario_result(result: &LongChatScenarioResult) -> String {
     }
     if let Some(usage) = throughput.streaming_usage {
         output.push_str(&format!(
-            "\nlong_chat_result_usage_prompt_tokens={}\nlong_chat_result_usage_completion_tokens={}\nlong_chat_result_usage_total_tokens={}",
+            "\nlong_chat_result_usage_prompt_tokens={}\nlong_chat_result_usage_cached_prompt_tokens={}\nlong_chat_result_usage_completion_tokens={}\nlong_chat_result_usage_total_tokens={}",
             usage.prompt_tokens(),
+            usage.cached_prompt_tokens(),
             usage.completion_tokens(),
             usage.total_tokens()
         ));
