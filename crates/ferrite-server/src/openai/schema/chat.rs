@@ -150,6 +150,15 @@ impl ChatCompletionRequest {
         stop_sequences(&self.stop)
     }
 
+    pub fn cache_options(&self) -> crate::runtime::GenerationCacheOptions {
+        crate::runtime::GenerationCacheOptions::from_namespace(
+            self.prompt_cache_key
+                .as_ref()
+                .and_then(Value::as_str)
+                .map(str::to_owned),
+        )
+    }
+
     pub fn unsupported_fields(&self) -> Vec<String> {
         let mut fields = UnsupportedFields::new()
             .with_present("tools", !is_empty_tools(&self.tools))
@@ -232,5 +241,43 @@ impl ChatCompletionRequest {
                 .flat_map(ChatMessage::unsupported_fields),
         );
         fields
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn chat_request_maps_prompt_cache_key_to_generation_cache_namespace(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let request: ChatCompletionRequest = serde_json::from_str(
+            r#"{
+                "model":"fixture-model",
+                "messages":[{"role":"user","content":"hello"}],
+                "prompt_cache_key":"tenant-a:thread-1"
+            }"#,
+        )?;
+
+        assert_eq!(
+            request.cache_options().namespace(),
+            Some("tenant-a:thread-1")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn chat_request_omits_cache_namespace_for_null_prompt_cache_key(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let request: ChatCompletionRequest = serde_json::from_str(
+            r#"{
+                "model":"fixture-model",
+                "messages":[{"role":"user","content":"hello"}],
+                "prompt_cache_key":null
+            }"#,
+        )?;
+
+        assert_eq!(request.cache_options().namespace(), None);
+        Ok(())
     }
 }

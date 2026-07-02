@@ -4,7 +4,7 @@ use super::{
     stop_filter::StopSequenceFilter,
     streaming,
 };
-use crate::runtime::GenerationControl;
+use crate::runtime::{GenerationCacheOptions, GenerationControl};
 use axum::response::Response;
 use std::sync::{Arc, Mutex};
 use tokio::sync::OwnedSemaphorePermit;
@@ -103,6 +103,7 @@ pub(super) fn chat_stream_response(
     prompt: String,
     max_tokens: usize,
     options: ChatStreamOptions,
+    cache_options: GenerationCacheOptions,
     permit: OwnedSemaphorePermit,
 ) -> Response {
     let include_usage = options.include_usage;
@@ -118,7 +119,8 @@ pub(super) fn chat_stream_response(
             max_tokens,
             options.stop_sequences,
             vec![context.role()],
-        ),
+        )
+        .with_cache_options(cache_options),
         move |piece| token_context.token(piece.to_owned()),
         move |generated| {
             let mut chunks = vec![context.finish(generated.finish_reason())];
@@ -136,6 +138,7 @@ struct StreamGenerationInput<T> {
     prompt: String,
     max_tokens: usize,
     stop_sequences: Vec<String>,
+    cache_options: GenerationCacheOptions,
     initial_chunks: Vec<T>,
 }
 
@@ -152,8 +155,14 @@ impl<T> StreamGenerationInput<T> {
             prompt,
             max_tokens,
             stop_sequences,
+            cache_options: GenerationCacheOptions::default(),
             initial_chunks,
         }
+    }
+
+    fn with_cache_options(mut self, cache_options: GenerationCacheOptions) -> Self {
+        self.cache_options = cache_options;
+        self
     }
 }
 
@@ -179,20 +188,25 @@ where
                 .lock()
                 .map_err(|_| OpenAiHttpError::internal("inference engine lock is poisoned"))?;
             let generated = engine
-                .generate_with_token_callback(&input.prompt, input.max_tokens, |piece| {
-                    for visible_piece in stop_filter.push(piece) {
-                        sender
-                            .send_json_blocking(&token_chunk(&visible_piece))
-                            .map_err(|error| {
-                                crate::runtime::RuntimeError::new(error.to_string())
-                            })?;
-                    }
-                    if stop_filter.stopped() {
-                        Ok(GenerationControl::Stop)
-                    } else {
-                        Ok(GenerationControl::Continue)
-                    }
-                })
+                .generate_with_token_callback_and_cache_options(
+                    &input.prompt,
+                    input.max_tokens,
+                    input.cache_options,
+                    |piece| {
+                        for visible_piece in stop_filter.push(piece) {
+                            sender
+                                .send_json_blocking(&token_chunk(&visible_piece))
+                                .map_err(|error| {
+                                    crate::runtime::RuntimeError::new(error.to_string())
+                                })?;
+                        }
+                        if stop_filter.stopped() {
+                            Ok(GenerationControl::Stop)
+                        } else {
+                            Ok(GenerationControl::Continue)
+                        }
+                    },
+                )
                 .map_err(|error| OpenAiHttpError::internal(error.to_string()))?;
             for visible_piece in stop_filter.finish() {
                 sender.send_json_blocking(&token_chunk(&visible_piece))?;

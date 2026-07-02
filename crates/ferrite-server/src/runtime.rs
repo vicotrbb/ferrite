@@ -1,3 +1,7 @@
+mod cache_options;
+
+pub use cache_options::GenerationCacheOptions;
+
 use ferrite_inference::scalar::ScalarLlamaModel;
 use ferrite_model::{gguf::parse_gguf, tokenizer::GgufTokenizer};
 use std::{error::Error, fmt, fs, path::Path};
@@ -37,12 +41,42 @@ impl InferenceEngine {
         self.generate_with_token_callback(prompt, max_tokens, |_| Ok(GenerationControl::Continue))
     }
 
+    pub fn generate_with_cache_options(
+        &self,
+        prompt: &str,
+        max_tokens: usize,
+        cache_options: GenerationCacheOptions,
+    ) -> Result<GeneratedText, RuntimeError> {
+        self.generate_with_token_callback_and_cache_options(
+            prompt,
+            max_tokens,
+            cache_options,
+            |_| Ok(GenerationControl::Continue),
+        )
+    }
+
     pub fn generate_with_token_callback(
         &self,
         prompt: &str,
         max_tokens: usize,
         mut on_token: impl FnMut(&str) -> Result<GenerationControl, RuntimeError>,
     ) -> Result<GeneratedText, RuntimeError> {
+        self.generate_with_token_callback_and_cache_options(
+            prompt,
+            max_tokens,
+            GenerationCacheOptions::default(),
+            &mut on_token,
+        )
+    }
+
+    pub fn generate_with_token_callback_and_cache_options(
+        &self,
+        prompt: &str,
+        max_tokens: usize,
+        cache_options: GenerationCacheOptions,
+        mut on_token: impl FnMut(&str) -> Result<GenerationControl, RuntimeError>,
+    ) -> Result<GeneratedText, RuntimeError> {
+        let _cache_options = cache_options;
         let prompt_token_ids = self
             .tokenizer
             .encode(prompt)

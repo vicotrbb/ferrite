@@ -75,6 +75,7 @@ async fn chat_completions(
                 request.stream_include_obfuscation(),
                 request.response_service_tier(),
             ),
+            request.cache_options(),
             permit,
         ));
     }
@@ -83,6 +84,7 @@ async fn chat_completions(
         prompt,
         max_tokens,
         request.stop_sequences(),
+        request.cache_options(),
         permit,
     )
     .await?;
@@ -156,6 +158,7 @@ async fn completions(
         request.prompts().to_vec(),
         max_tokens,
         request.stop_sequences(),
+        crate::runtime::GenerationCacheOptions::default(),
         permit,
     )
     .await?;

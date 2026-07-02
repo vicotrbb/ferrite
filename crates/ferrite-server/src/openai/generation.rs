@@ -2,7 +2,7 @@ use super::{
     error::OpenAiHttpError,
     stop_filter::{apply_stop_sequences, StopSequenceFilter},
 };
-use crate::runtime::GenerationControl;
+use crate::runtime::{GenerationCacheOptions, GenerationControl};
 use std::sync::{Arc, Mutex};
 use tokio::sync::OwnedSemaphorePermit;
 
@@ -11,10 +11,18 @@ pub(super) async fn generate_text(
     prompt: String,
     max_tokens: usize,
     stop_sequences: Vec<String>,
+    cache_options: GenerationCacheOptions,
     permit: OwnedSemaphorePermit,
 ) -> Result<crate::runtime::GeneratedText, OpenAiHttpError> {
-    let mut generated =
-        generate_texts(engine, vec![prompt], max_tokens, stop_sequences, permit).await?;
+    let mut generated = generate_texts(
+        engine,
+        vec![prompt],
+        max_tokens,
+        stop_sequences,
+        cache_options,
+        permit,
+    )
+    .await?;
     generated
         .pop()
         .ok_or_else(|| OpenAiHttpError::internal("inference did not return a completion"))
@@ -25,6 +33,7 @@ pub(super) async fn generate_texts(
     prompts: Vec<String>,
     max_tokens: usize,
     stop_sequences: Vec<String>,
+    cache_options: GenerationCacheOptions,
     permit: OwnedSemaphorePermit,
 ) -> Result<Vec<crate::runtime::GeneratedText>, OpenAiHttpError> {
     let Some(engine) = engine else {
@@ -42,15 +51,21 @@ pub(super) async fn generate_texts(
             .iter()
             .map(|prompt| {
                 let mut stop_filter = StopSequenceFilter::new(stop_sequences.clone());
+                let cache_options = cache_options.clone();
                 engine
-                    .generate_with_token_callback(prompt, max_tokens, |piece| {
-                        let _ = stop_filter.push(piece);
-                        if stop_filter.stopped() {
-                            Ok(GenerationControl::Stop)
-                        } else {
-                            Ok(GenerationControl::Continue)
-                        }
-                    })
+                    .generate_with_token_callback_and_cache_options(
+                        prompt,
+                        max_tokens,
+                        cache_options,
+                        |piece| {
+                            let _ = stop_filter.push(piece);
+                            if stop_filter.stopped() {
+                                Ok(GenerationControl::Stop)
+                            } else {
+                                Ok(GenerationControl::Continue)
+                            }
+                        },
+                    )
                     .map(|generated| apply_stop_sequences(generated, &stop_sequences))
                     .map_err(|error| OpenAiHttpError::internal(error.to_string()))
             })
