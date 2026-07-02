@@ -252,9 +252,41 @@ shared-prefix cache on a small real model. It does not prove tokenizer EOS
 termination, larger Tier 1 stop behavior after the cache change, or x86_64 stop
 behavior.
 
+## Cached EOS Gate
+
+A tokenizer-EOS-specific cached generated-context gate completed on
+`SmolLM2-1.7B-Instruct-Q4_K_M`. The benchmark note is
+`documentation/benchmarks/2026-07-02-openai-long-chat-smollm-1-7b-shared-prefix-cache-eos-gate.md`.
+
+The passing run used no explicit OpenAI `stop` parameter. It used
+`--expect-finish-reason stop`, `--prompt-cache-key
+long-chat:eos-answer-only-16`, `--require-cached-follow-ups`, RSS sampling,
+unauthorized reconnect probing, and disconnect/reconnect probing. All four
+turns returned natural `finish_reason=stop`, all generated follow-up turns
+reported cached prompt tokens, and the summary recorded:
+
+```text
+long_chat_summary_any_token_limit_hit=false
+long_chat_summary_cached_generated_follow_up_turns=3
+long_chat_summary_uncached_generated_follow_up_turns=0
+long_chat_summary_all_generated_follow_up_turns_cached=true
+long_chat_summary_streaming_token_ids_required=true
+long_chat_summary_all_streaming_content_chunks_have_token_ids=true
+long_chat_summary_run_complete=true
+```
+
+The diagnostic boundary is equally important: a naive repeated
+`The capital of France is` completion prompt still cached generated follow-up
+turns, but turns 2-4 reached the 64-token limit instead of tokenizer EOS. This
+shows shared-prefix reuse and EOS behavior are separate properties. Cached EOS
+proofs must use a prompt contract that naturally terminates under the chat
+template being tested.
+
 ## Next Step
 
-Scale from the small-model full matrix to the required Tier 1 models, add a
-tokenizer-EOS-specific cached generated-context variant, and run a bounded
-`llama-benchy` shared-prefix comparison. Track decode slowdown as a separate
-theory instead of assuming prefix reuse will fix it.
+Scale cached generated-context coverage from the small-model full matrix and
+single SmolLM2 cached-EOS slice to the required Tier 1 models and x86_64. Keep
+`llama-benchy` as a comparison harness for benchmark-shape experiments, but use
+Ferrite's long-chat gate for OpenAI-compatible semantics such as token IDs,
+RSS, reconnect/error behavior, explicit stop, and tokenizer EOS. Track decode
+slowdown as a separate theory instead of assuming prefix reuse will fix it.
