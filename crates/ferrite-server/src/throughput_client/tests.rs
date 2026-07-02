@@ -128,6 +128,44 @@ fn builds_openai_compatible_chat_stop_request_body() -> Result<(), Box<dyn std::
 }
 
 #[test]
+fn builds_openai_compatible_chat_prompt_cache_key_request_body(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let config = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--endpoint"),
+        OsString::from("chat-completions"),
+        OsString::from("--model"),
+        OsString::from("fixture-model"),
+        OsString::from("--prompt"),
+        OsString::from("measure this"),
+        OsString::from("--max-tokens"),
+        OsString::from("2"),
+        OsString::from("--prompt-cache-key"),
+        OsString::from("benchy:smoke"),
+    ])?;
+
+    assert_eq!(config.prompt_cache_key(), Some("benchy:smoke"));
+    assert_eq!(
+        request_body(&config),
+        r#"{"model":"fixture-model","messages":[{"role":"user","content":"measure this"}],"max_tokens":2,"prompt_cache_key":"benchy:smoke"}"#
+    );
+    Ok(())
+}
+
+#[test]
+fn rejects_prompt_cache_key_for_legacy_completions() {
+    let result = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--endpoint"),
+        OsString::from("completions"),
+        OsString::from("--prompt-cache-key"),
+        OsString::from("benchy:smoke"),
+    ]);
+
+    assert!(result.is_err());
+}
+
+#[test]
 fn builds_openai_compatible_second_turn_chat_request_body() -> Result<(), Box<dyn std::error::Error>>
 {
     let config = ThroughputClientConfig::parse([

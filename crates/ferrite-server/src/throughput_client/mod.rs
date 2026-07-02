@@ -241,10 +241,11 @@ fn completion_request_body(config: &ThroughputClientConfig) -> String {
 
 fn chat_completion_request_body(config: &ThroughputClientConfig) -> String {
     let stop = stop_field(config);
+    let prompt_cache_key = prompt_cache_key_field(config);
     let stream = stream_field(config);
     let stream_options = stream_options_field(config);
     format!(
-        r#"{{"model":{},"messages":{},"max_tokens":{}{stop}{stream}{stream_options}}}"#,
+        r#"{{"model":{},"messages":{},"max_tokens":{}{stop}{prompt_cache_key}{stream}{stream_options}}}"#,
         serde_json::Value::String(config.model().to_owned()),
         chat_messages(config),
         config.max_tokens()
@@ -278,6 +279,18 @@ fn stop_field(config: &ThroughputClientConfig) -> String {
     config
         .stop()
         .map(|stop| format!(r#","stop":{}"#, serde_json::Value::String(stop.to_owned())))
+        .unwrap_or_default()
+}
+
+fn prompt_cache_key_field(config: &ThroughputClientConfig) -> String {
+    config
+        .prompt_cache_key()
+        .map(|key| {
+            format!(
+                r#","prompt_cache_key":{}"#,
+                serde_json::Value::String(key.to_owned())
+            )
+        })
         .unwrap_or_default()
 }
 

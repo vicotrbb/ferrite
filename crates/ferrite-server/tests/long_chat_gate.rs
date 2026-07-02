@@ -303,6 +303,34 @@ fn builds_streaming_chat_throughput_args_for_scenario() -> Result<(), Box<dyn st
 }
 
 #[test]
+fn passes_prompt_cache_key_to_long_chat_throughput_config() -> Result<(), Box<dyn std::error::Error>>
+{
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--models"),
+        OsString::from("fixture-model"),
+        OsString::from("--token-lengths"),
+        OsString::from("256"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+        OsString::from("--prompt-cache-key"),
+        OsString::from("long-chat:prefix"),
+    ])?;
+    let scenario = config
+        .scenarios()
+        .into_iter()
+        .next()
+        .ok_or("expected scenario")?;
+
+    let args = config.throughput_args(&scenario);
+    let throughput = ThroughputClientConfig::parse(args)?;
+
+    assert_eq!(config.prompt_cache_key(), Some("long-chat:prefix"));
+    assert_eq!(throughput.prompt_cache_key(), Some("long-chat:prefix"));
+    Ok(())
+}
+
+#[test]
 fn rejects_invalid_long_chat_rss_pid() -> Result<(), Box<dyn std::error::Error>> {
     let result = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),
