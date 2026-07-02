@@ -36,6 +36,18 @@ impl StreamingTimingSummary {
         self.time_to_first_token
     }
 
+    pub fn stream_observed_prefill_elapsed(&self) -> Duration {
+        self.time_to_first_token
+    }
+
+    pub fn first_token_timestamp(&self) -> Duration {
+        self.time_to_first_token
+    }
+
+    pub fn stream_observed_decode_elapsed(&self) -> Duration {
+        self.total_elapsed.saturating_sub(self.time_to_first_token)
+    }
+
     pub fn total_elapsed(&self) -> Duration {
         self.total_elapsed
     }
@@ -58,6 +70,16 @@ impl StreamingTimingSummary {
 
     pub fn tokens_per_second(&self) -> f64 {
         self.token_events as f64 / self.total_elapsed.as_secs_f64()
+    }
+
+    pub fn stream_observed_decode_tokens_per_second(&self) -> f64 {
+        let decode_elapsed = self.stream_observed_decode_elapsed();
+        let decode_token_events = self.token_events.saturating_sub(1);
+        if decode_token_events == 0 || decode_elapsed.is_zero() {
+            return 0.0;
+        }
+
+        decode_token_events as f64 / decode_elapsed.as_secs_f64()
     }
 }
 

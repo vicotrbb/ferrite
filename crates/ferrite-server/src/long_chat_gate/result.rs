@@ -112,9 +112,13 @@ pub fn format_scenario_result(result: &LongChatScenarioResult) -> String {
     }
     if let Some(timing) = throughput.streaming_timing {
         output.push_str(&format!(
-            "\nlong_chat_result_streaming_token_events={}\nlong_chat_result_time_to_first_token_ms={}\nlong_chat_result_streaming_total_elapsed_ms={}\nlong_chat_result_streaming_tokens_per_second={:.6}\nlong_chat_result_token_latency_min_ms={}\nlong_chat_result_token_latency_p50_ms={}\nlong_chat_result_token_latency_p95_ms={}\nlong_chat_result_token_latency_max_ms={}",
+            "\nlong_chat_result_streaming_token_events={}\nlong_chat_result_time_to_first_token_ms={}\nlong_chat_result_stream_observed_prefill_elapsed_ms={}\nlong_chat_result_first_token_timestamp_ms={}\nlong_chat_result_stream_observed_decode_elapsed_ms={}\nlong_chat_result_stream_observed_decode_tokens_per_second={:.6}\nlong_chat_result_streaming_total_elapsed_ms={}\nlong_chat_result_streaming_tokens_per_second={:.6}\nlong_chat_result_token_latency_min_ms={}\nlong_chat_result_token_latency_p50_ms={}\nlong_chat_result_token_latency_p95_ms={}\nlong_chat_result_token_latency_max_ms={}",
             timing.token_events(),
             timing.time_to_first_token().as_millis(),
+            timing.stream_observed_prefill_elapsed().as_millis(),
+            timing.first_token_timestamp().as_millis(),
+            timing.stream_observed_decode_elapsed().as_millis(),
+            timing.stream_observed_decode_tokens_per_second(),
             timing.total_elapsed().as_millis(),
             timing.tokens_per_second(),
             timing.min_token_latency().as_millis(),

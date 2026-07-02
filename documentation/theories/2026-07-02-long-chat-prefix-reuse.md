@@ -2,7 +2,7 @@
 
 Date: 2026-07-02
 
-Status: Hypothesis
+Status: Testing
 
 ## Hypothesis
 
@@ -76,10 +76,22 @@ complex session invalidation risk.
 - Keeping K/V states across requests may hurt memory-fit goals unless eviction
   is strict and observable.
 
+## Instrumentation Progress
+
+The long-chat gate now emits stream-observed timing split fields:
+
+- `long_chat_result_stream_observed_prefill_elapsed_ms`
+- `long_chat_result_first_token_timestamp_ms`
+- `long_chat_result_stream_observed_decode_elapsed_ms`
+- `long_chat_result_stream_observed_decode_tokens_per_second`
+
+These are derived from client-observed SSE token event offsets. They are useful
+for comparing first-token delay against post-first-token decode pace, but they
+do not expose internal engine prefill timing directly.
+
 ## Next Step
 
-Create a measurement-only benchmark note for the current Q8_0 x86_64
-generated-context logs. Then add a focused prefill/decode timing probe before
-any cache implementation. If the timing split confirms prefix reprocessing as
+Rerun the Q8_0 x86_64 generated-context long-chat gate and record the new timing
+fields in a benchmark note. If the timing split confirms prefix reprocessing as
 the dominant cost, design a small token-prefix identity layer and a bounded
 per-model KV prefix cache as a separate implementation slice.

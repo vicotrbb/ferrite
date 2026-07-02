@@ -822,6 +822,13 @@ fn waits_for_completed_sse_event_before_recording_streaming_timing(
 
     assert_eq!(summary.token_events(), 1);
     assert_eq!(summary.time_to_first_token(), Duration::from_millis(80));
+    assert_eq!(
+        summary.stream_observed_prefill_elapsed(),
+        Duration::from_millis(80)
+    );
+    assert_eq!(summary.first_token_timestamp(), Duration::from_millis(80));
+    assert_eq!(summary.stream_observed_decode_elapsed(), Duration::ZERO);
+    assert_eq!(summary.stream_observed_decode_tokens_per_second(), 0.0);
     assert_eq!(summary.total_elapsed(), Duration::from_millis(80));
     Ok(())
 }
@@ -865,11 +872,21 @@ fn summarizes_streaming_token_arrival_latencies() -> Result<(), Box<dyn std::err
 
     assert_eq!(summary.token_events(), 4);
     assert_eq!(summary.time_to_first_token(), Duration::from_millis(100));
+    assert_eq!(
+        summary.stream_observed_prefill_elapsed(),
+        Duration::from_millis(100)
+    );
+    assert_eq!(summary.first_token_timestamp(), Duration::from_millis(100));
+    assert_eq!(
+        summary.stream_observed_decode_elapsed(),
+        Duration::from_millis(160)
+    );
     assert_eq!(summary.total_elapsed(), Duration::from_millis(260));
     assert_eq!(summary.min_token_latency(), Duration::from_millis(30));
     assert_eq!(summary.p50_token_latency(), Duration::from_millis(40));
     assert_eq!(summary.p95_token_latency(), Duration::from_millis(100));
     assert_eq!(summary.max_token_latency(), Duration::from_millis(100));
     assert!((summary.tokens_per_second() - 15.384615).abs() < 0.000001);
+    assert!((summary.stream_observed_decode_tokens_per_second() - 18.75).abs() < 0.000001);
     Ok(())
 }
