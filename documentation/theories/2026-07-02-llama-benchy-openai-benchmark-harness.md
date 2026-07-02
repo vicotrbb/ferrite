@@ -144,9 +144,20 @@ three concurrency levels and showed queued single-permit behavior: total
 stayed around `13.6`. See
 `documentation/benchmarks/2026-07-02-llama-benchy-qwen-0-5b-concurrency.md`.
 
+A bounded prefix-cache smoke has also run with `--pp 128`, `--tg 32`,
+`--depth 128`, `--enable-prefix-caching`, and an explicit
+`prompt_cache_key`. `llama-benchy` completed its context-load and inference
+rows without tool-specific patches. The context-load row reported
+`tg_throughput.mean` of `21.219811746997483`, and the inference row reported
+`tg_throughput.mean` of `18.137211810417345`. A direct Ferrite probe against
+the same server configuration then sent two identical requests with the same
+cache key; the second response reported `cached_tokens=17` and dropped from
+`1065.8981669985224` ms to `386.81875000474975` ms. See
+`documentation/benchmarks/2026-07-02-llama-benchy-qwen-0-5b-prefix-smoke.md`.
+
 This moves the theory from pure hypothesis to early compatibility evidence. It
-does not validate prefix caching, high-concurrency serving, reconnect/error
-behavior under load, or stop/EOS behavior under load.
+does not validate the full prefix-cache matrix, high-concurrency serving,
+reconnect/error behavior under load, or stop/EOS behavior under load.
 
 ## Falsification Experiment
 
@@ -204,9 +215,10 @@ long-chat proof notes.
 
 ## Next Step
 
-Run a `llama-benchy` prefix-cache experiment against
-`Qwen2.5-0.5B-Instruct-Q4_K_M` and compare it with Ferrite's own prompt-cache
-usage metadata and long-chat timing evidence.
+Run the full `llama-benchy` 256/512/1024 prefix-cache matrix against
+`Qwen2.5-0.5B-Instruct-Q4_K_M`, with a companion Ferrite-side cached-token
+metadata probe because `llama-benchy` saved JSON does not currently expose
+`usage.prompt_tokens_details.cached_tokens`.
 
 Do not adopt this as a standard gate until the result is compared with
 Ferrite's own long-chat timing output for the same model and token lengths.

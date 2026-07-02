@@ -1,0 +1,25 @@
+{
+  "server": "http://127.0.0.1:18080/v1",
+  "model": "Qwen2.5-0.5B-Instruct-Q4_K_M",
+  "prompt_cache_key": "ferrite:direct:prefix-smoke-rerun",
+  "requests": [
+    {
+      "request_index": 1,
+      "elapsed_ms": 1065.8981669985224,
+      "prompt_tokens": 17,
+      "completion_tokens": 8,
+      "cached_tokens": 0,
+      "finish_reason": "length",
+      "content": "1. Prefix cache validation is a critical"
+    },
+    {
+      "request_index": 2,
+      "elapsed_ms": 386.81875000474975,
+      "prompt_tokens": 17,
+      "completion_tokens": 8,
+      "cached_tokens": 17,
+      "finish_reason": "length",
+      "content": "1. Prefix cache validation is a critical"
+    }
+  ]
+}
