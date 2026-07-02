@@ -147,7 +147,15 @@ async fn run_requests(
 
 pub fn format_result(config: &ThroughputClientConfig, result: ThroughputResult) -> String {
     let mut output = format!(
-        "{}={}\nelapsed_ms={}\nrequests_per_second={:.6}",
+        "openai_http_addr={}\nopenai_http_endpoint={}\nopenai_http_model={}\nopenai_http_max_tokens={}\nopenai_http_configured_requests={}\nopenai_http_concurrency={}\nopenai_http_stream={}\nopenai_http_stream_usage={}\n{}={}\nelapsed_ms={}\nrequests_per_second={:.6}",
+        config.addr(),
+        config.endpoint().path(),
+        config.model(),
+        config.max_tokens(),
+        config.requests(),
+        config.concurrency(),
+        config.stream(),
+        config.stream_usage(),
         config.endpoint().metric_name(config.stream()),
         result.completed_requests,
         result.elapsed.as_millis(),

@@ -195,8 +195,18 @@ fn builds_openai_compatible_second_turn_chat_request_body() -> Result<(), Box<dy
 fn formats_chat_completion_result_metric_name() -> Result<(), Box<dyn std::error::Error>> {
     let config = ThroughputClientConfig::parse([
         OsString::from("ferrite-openai-throughput"),
+        OsString::from("--addr"),
+        OsString::from("127.0.0.1:18080"),
         OsString::from("--endpoint"),
         OsString::from("chat-completions"),
+        OsString::from("--model"),
+        OsString::from("fixture-model"),
+        OsString::from("--max-tokens"),
+        OsString::from("16"),
+        OsString::from("--requests"),
+        OsString::from("2"),
+        OsString::from("--concurrency"),
+        OsString::from("2"),
     ])?;
     let result = ThroughputResult {
         completed_requests: 2,
@@ -210,7 +220,7 @@ fn formats_chat_completion_result_metric_name() -> Result<(), Box<dyn std::error
 
     assert_eq!(
         format_result(&config, result),
-        "openai_http_chat_completion_requests=2\nelapsed_ms=400\nrequests_per_second=5.000000"
+        "openai_http_addr=127.0.0.1:18080\nopenai_http_endpoint=/v1/chat/completions\nopenai_http_model=fixture-model\nopenai_http_max_tokens=16\nopenai_http_configured_requests=2\nopenai_http_concurrency=2\nopenai_http_stream=false\nopenai_http_stream_usage=false\nopenai_http_chat_completion_requests=2\nelapsed_ms=400\nrequests_per_second=5.000000"
     );
     Ok(())
 }
@@ -464,7 +474,7 @@ fn formats_streaming_chat_completion_result_metric_name() -> Result<(), Box<dyn 
 
     assert_eq!(
         format_result(&config, result),
-        "openai_http_streaming_chat_completion_requests=2\nelapsed_ms=400\nrequests_per_second=5.000000"
+        "openai_http_addr=127.0.0.1:8080\nopenai_http_endpoint=/v1/chat/completions\nopenai_http_model=ferrite-local\nopenai_http_max_tokens=1\nopenai_http_configured_requests=3\nopenai_http_concurrency=1\nopenai_http_stream=true\nopenai_http_stream_usage=false\nopenai_http_streaming_chat_completion_requests=2\nelapsed_ms=400\nrequests_per_second=5.000000"
     );
     Ok(())
 }
@@ -493,7 +503,7 @@ fn formats_streaming_timing_summary() -> Result<(), Box<dyn std::error::Error>> 
 
     assert_eq!(
         format_result(&config, result),
-        "openai_http_streaming_chat_completion_requests=1\nelapsed_ms=400\nrequests_per_second=2.500000\nstreaming_token_events=3\nstreaming_time_to_first_token_ms=100\nstreaming_total_elapsed_ms=170\nstreaming_tokens_per_second=17.647059\nstreaming_token_latency_min_ms=30\nstreaming_token_latency_p50_ms=40\nstreaming_token_latency_p95_ms=100\nstreaming_token_latency_max_ms=100"
+        "openai_http_addr=127.0.0.1:8080\nopenai_http_endpoint=/v1/chat/completions\nopenai_http_model=ferrite-local\nopenai_http_max_tokens=1\nopenai_http_configured_requests=3\nopenai_http_concurrency=1\nopenai_http_stream=true\nopenai_http_stream_usage=false\nopenai_http_streaming_chat_completion_requests=1\nelapsed_ms=400\nrequests_per_second=2.500000\nstreaming_token_events=3\nstreaming_time_to_first_token_ms=100\nstreaming_total_elapsed_ms=170\nstreaming_tokens_per_second=17.647059\nstreaming_token_latency_min_ms=30\nstreaming_token_latency_p50_ms=40\nstreaming_token_latency_p95_ms=100\nstreaming_token_latency_max_ms=100"
     );
     Ok(())
 }
@@ -519,7 +529,7 @@ fn formats_streaming_usage_summary() -> Result<(), Box<dyn std::error::Error>> {
 
     assert_eq!(
         format_result(&config, result),
-        "openai_http_streaming_chat_completion_requests=1\nelapsed_ms=400\nrequests_per_second=2.500000\nstreaming_usage_prompt_tokens=8\nstreaming_usage_cached_prompt_tokens=5\nstreaming_usage_completion_tokens=32\nstreaming_usage_total_tokens=40"
+        "openai_http_addr=127.0.0.1:8080\nopenai_http_endpoint=/v1/chat/completions\nopenai_http_model=ferrite-local\nopenai_http_max_tokens=1\nopenai_http_configured_requests=3\nopenai_http_concurrency=1\nopenai_http_stream=true\nopenai_http_stream_usage=true\nopenai_http_streaming_chat_completion_requests=1\nelapsed_ms=400\nrequests_per_second=2.500000\nstreaming_usage_prompt_tokens=8\nstreaming_usage_cached_prompt_tokens=5\nstreaming_usage_completion_tokens=32\nstreaming_usage_total_tokens=40"
     );
     Ok(())
 }
@@ -544,7 +554,7 @@ fn formats_streaming_finish_summary() -> Result<(), Box<dyn std::error::Error>> 
 
     assert_eq!(
         format_result(&config, result),
-        "openai_http_streaming_chat_completion_requests=1\nelapsed_ms=400\nrequests_per_second=2.500000\nstreaming_finish_reason=length"
+        "openai_http_addr=127.0.0.1:8080\nopenai_http_endpoint=/v1/chat/completions\nopenai_http_model=ferrite-local\nopenai_http_max_tokens=1\nopenai_http_configured_requests=3\nopenai_http_concurrency=1\nopenai_http_stream=true\nopenai_http_stream_usage=false\nopenai_http_streaming_chat_completion_requests=1\nelapsed_ms=400\nrequests_per_second=2.500000\nstreaming_finish_reason=length"
     );
     Ok(())
 }
@@ -568,7 +578,7 @@ fn formats_rss_sampling_summary() -> Result<(), Box<dyn std::error::Error>> {
 
     assert_eq!(
         format_result(&config, result),
-        "openai_http_completion_requests=1\nelapsed_ms=400\nrequests_per_second=2.500000\nserver_rss_before_bytes=1000\nserver_rss_after_bytes=2000\nserver_rss_idle_bytes=1500"
+        "openai_http_addr=127.0.0.1:8080\nopenai_http_endpoint=/v1/completions\nopenai_http_model=ferrite-local\nopenai_http_max_tokens=1\nopenai_http_configured_requests=3\nopenai_http_concurrency=1\nopenai_http_stream=false\nopenai_http_stream_usage=false\nopenai_http_completion_requests=1\nelapsed_ms=400\nrequests_per_second=2.500000\nserver_rss_before_bytes=1000\nserver_rss_after_bytes=2000\nserver_rss_idle_bytes=1500"
     );
     Ok(())
 }
