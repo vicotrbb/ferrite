@@ -233,6 +233,23 @@ This reinforces the tool split: use Ferrite's internal long-chat gate for
 correctness and protocol proof, and use `llama-benchy` for external benchmark
 trends after correctness is already established.
 
+## 128-Token Calibration
+
+A bounded 128-token calibration now compares `llama-benchy` with Ferrite's own
+OpenAI throughput client on the same local Qwen 0.5B server. The benchmark note
+is
+`documentation/benchmarks/2026-07-02-llama-benchy-qwen-0-5b-128-calibration.md`.
+
+The Ferrite throughput client reported `20.673809` streamed tokens/sec for a
+single 128-token chat-completions request. `llama-benchy` reported
+`20.101652` generated tokens/sec in generation-latency mode and `20.176806`
+generated tokens/sec in latency-none mode for `--pp 128 --tg 128`.
+
+This supports using `llama-benchy` for external decode-throughput trend checks.
+It also reinforces that first-token timings need careful interpretation:
+Ferrite's direct comparator used a short 15-token prompt, while `llama-benchy`
+forced a 128-token prompt.
+
 ## Falsification Experiment
 
 Run a small no-cache baseline first:
