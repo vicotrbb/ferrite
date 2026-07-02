@@ -2,7 +2,7 @@
 
 Date: 2026-07-02
 
-Status: Hypothesis
+Status: Testing
 
 ## Hypothesis
 
@@ -60,6 +60,34 @@ meaningful retained growth, cgroup current returns to the same idle baseline,
 and existing memory accounting already predicts observed growth closely enough
 to set a safe 6Gi operating policy.
 
+## First Local Repeated-Session Probe
+
+A small local repeated-session probe completed on
+`Qwen2.5-0.5B-Instruct-Q4_K_M`. The benchmark note is
+`documentation/benchmarks/2026-07-02-openai-long-chat-qwen-0-5b-memory-retention-3x128.md`.
+
+The run used one server process and three identical 128-token generated-context
+long-chat sessions. Every session completed four streaming chat turns with
+generated assistant context on turns 2-4, RSS sampling, token-id summaries, and
+`long_chat_summary_run_complete=true`.
+
+Session-level RSS summary:
+
+| Session | First request RSS before | Final idle RSS | Delta |
+| ---: | ---: | ---: | ---: |
+| 1 | 61472768 | 427032576 | +365559808 |
+| 2 | 426508288 | 425689088 | -819200 |
+| 3 | 425639936 | 429015040 | +3375104 |
+
+The first session includes server/model warmup in the first request RSS
+transition. Sessions 2 and 3 are the useful warm-retention signal: final idle
+RSS stayed between `425689088` and `429015040` bytes.
+
+This small run does not prove leak freedom, but it reduces risk for the local
+Qwen 0.5B 128-token shape. The broader theory remains open for larger models,
+512/1024-token contexts, x86_64 cgroup measurements, multi-client overlap, and
+explicit retained-cache accounting.
+
 ## Risks
 
 - RSS and cgroup current include allocator behavior, page cache, and runtime
@@ -72,7 +100,7 @@ to set a safe 6Gi operating policy.
 
 ## Next Step
 
-Add a memory-focused benchmark note from existing long-chat proof data, then
-run a repeated-session probe in a bounded pod. If retained memory grows or
-cannot be attributed, add explicit KV/cache byte accounting before any prefix
-reuse implementation.
+Scale the repeated-session probe to a bounded x86_64 pod and at least one
+larger 1.5B artifact at 512 or 1024 tokens. If retained memory grows or cannot
+be attributed, add explicit KV/cache byte accounting before treating prefix
+reuse and windowing as safe steady-state serving features.
