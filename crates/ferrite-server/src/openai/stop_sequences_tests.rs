@@ -114,6 +114,7 @@ async fn chat_stream_endpoint_applies_string_stop_sequence(
         !body.contains("\"delta\":{\"content\":\"winner\"}"),
         "{body}"
     );
+    assert!(!body.contains("\"token_ids\""), "{body}");
     assert!(body.contains("\"finish_reason\":\"stop\""), "{body}");
     assert!(body.contains("data: [DONE]"), "{body}");
     Ok(())

@@ -85,7 +85,7 @@ pub(super) fn completion_stream_response(
             options.stop_sequences,
             initial_chunks,
         ),
-        move |piece| token_context.token(piece.to_owned()),
+        move |piece, _token_ids| token_context.token(piece.to_owned()),
         move |generated| {
             let mut chunks = vec![context.finish(generated.finish_reason())];
             if include_usage {
@@ -112,6 +112,7 @@ pub(super) fn chat_stream_response(
         .with_obfuscation_field(options.include_obfuscation)
         .with_service_tier(options.service_tier);
     let token_context = context.clone();
+    let include_token_ids = options.stop_sequences.is_empty();
     stream_generated_text(
         StreamGenerationInput::new(
             engine,
@@ -121,7 +122,13 @@ pub(super) fn chat_stream_response(
             vec![context.role()],
         )
         .with_cache_options(cache_options),
-        move |piece| token_context.token(piece.to_owned()),
+        move |piece, token_ids| {
+            if include_token_ids {
+                token_context.token_with_ids(piece.to_owned(), token_ids.unwrap_or(&[]))
+            } else {
+                token_context.token(piece.to_owned())
+            }
+        },
         move |generated| {
             let mut chunks = vec![context.finish(generated.finish_reason())];
             if include_usage {
@@ -168,7 +175,7 @@ impl<T> StreamGenerationInput<T> {
 
 fn stream_generated_text<T>(
     input: StreamGenerationInput<T>,
-    mut token_chunk: impl FnMut(&str) -> T + Send + 'static,
+    mut token_chunk: impl FnMut(&str, Option<&[usize]>) -> T + Send + 'static,
     final_chunks: impl FnOnce(&crate::runtime::GeneratedText) -> Vec<T> + Send + 'static,
     permit: OwnedSemaphorePermit,
 ) -> Response
@@ -182,34 +189,44 @@ where
             for chunk in input.initial_chunks {
                 sender.send_json_blocking(&chunk)?;
             }
+            let include_token_ids = input.stop_sequences.is_empty();
             let mut stop_filter = StopSequenceFilter::new(input.stop_sequences);
             let engine = input
                 .engine
                 .lock()
                 .map_err(|_| OpenAiHttpError::internal("inference engine lock is poisoned"))?;
             let generated = engine
-                .generate_with_token_callback_and_cache_options(
+                .generate_with_token_event_callback_and_cache_options(
                     &input.prompt,
                     input.max_tokens,
                     input.cache_options,
-                    |piece| {
-                        for visible_piece in stop_filter.push(piece) {
+                    |piece, token_ids| {
+                        if include_token_ids {
                             sender
-                                .send_json_blocking(&token_chunk(&visible_piece))
+                                .send_json_blocking(&token_chunk(piece, Some(token_ids)))
                                 .map_err(|error| {
                                     crate::runtime::RuntimeError::new(error.to_string())
                                 })?;
-                        }
-                        if stop_filter.stopped() {
-                            Ok(GenerationControl::Stop)
                         } else {
-                            Ok(GenerationControl::Continue)
+                            for visible_piece in stop_filter.push(piece) {
+                                sender
+                                    .send_json_blocking(&token_chunk(&visible_piece, None))
+                                    .map_err(|error| {
+                                        crate::runtime::RuntimeError::new(error.to_string())
+                                    })?;
+                            }
+                            if stop_filter.stopped() {
+                                return Ok(GenerationControl::Stop);
+                            }
                         }
+                        Ok(GenerationControl::Continue)
                     },
                 )
                 .map_err(|error| OpenAiHttpError::internal(error.to_string()))?;
-            for visible_piece in stop_filter.finish() {
-                sender.send_json_blocking(&token_chunk(&visible_piece))?;
+            if !include_token_ids {
+                for visible_piece in stop_filter.finish() {
+                    sender.send_json_blocking(&token_chunk(&visible_piece, None))?;
+                }
             }
             for chunk in final_chunks(&generated) {
                 sender.send_json_blocking(&chunk)?;

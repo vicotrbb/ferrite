@@ -85,6 +85,7 @@ async fn chat_endpoint_streams_openai_sse_chunks() -> Result<(), Box<dyn std::er
     assert!(body.contains("data: {\"id\":\"chatcmpl-ferrite-"));
     assert!(body.contains("\"object\":\"chat.completion.chunk\""));
     assert!(body.contains("\"delta\":{\"content\":\"winner\"}"));
+    assert!(body.contains("\"token_ids\":["));
     assert!(body.contains("data: [DONE]"));
     Ok(())
 }

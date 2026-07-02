@@ -88,6 +88,21 @@ impl InferenceEngine {
         cache_options: GenerationCacheOptions,
         mut on_token: impl FnMut(&str) -> Result<GenerationControl, RuntimeError>,
     ) -> Result<GeneratedText, RuntimeError> {
+        self.generate_with_token_event_callback_and_cache_options(
+            prompt,
+            max_tokens,
+            cache_options,
+            |token_text, _token_ids| on_token(token_text),
+        )
+    }
+
+    pub fn generate_with_token_event_callback_and_cache_options(
+        &self,
+        prompt: &str,
+        max_tokens: usize,
+        cache_options: GenerationCacheOptions,
+        mut on_token: impl FnMut(&str, &[usize]) -> Result<GenerationControl, RuntimeError>,
+    ) -> Result<GeneratedText, RuntimeError> {
         let prompt_token_ids = self
             .tokenizer
             .encode(prompt)
@@ -126,6 +141,7 @@ impl InferenceEngine {
         };
         let mut token_id = next.token_id;
         let mut generated_token_ids = Vec::with_capacity(max_tokens);
+        let mut token_id_chunks = Vec::with_capacity(max_tokens);
         let mut token_texts = Vec::with_capacity(max_tokens);
         let mut token_text_buffer = TokenTextBuffer::new();
         let mut finish_reason = GenerationFinishReason::Length;
@@ -141,9 +157,10 @@ impl InferenceEngine {
             let control = token_text_buffer.emit_ready_text(
                 &generated_token_ids,
                 |ids| self.decode_token_text(ids),
-                |token_text| {
-                    let control = on_token(token_text)?;
+                |token_text, token_ids| {
+                    let control = on_token(token_text, token_ids)?;
                     token_texts.push(token_text.to_owned());
+                    token_id_chunks.push(token_ids.to_vec());
                     Ok(control)
                 },
             )?;
@@ -175,6 +192,7 @@ impl InferenceEngine {
             token_texts,
             finish_reason,
         )
+        .with_token_id_chunks(token_id_chunks)?
         .with_cached_prompt_tokens(cached_prompt_tokens)
     }
 
@@ -199,7 +217,7 @@ impl TokenTextBuffer {
         &mut self,
         generated_token_ids: &[usize],
         decode: impl FnOnce(&[usize]) -> Result<Option<String>, RuntimeError>,
-        mut on_text: impl FnMut(&str) -> Result<GenerationControl, RuntimeError>,
+        mut on_text: impl FnMut(&str, &[usize]) -> Result<GenerationControl, RuntimeError>,
     ) -> Result<GenerationControl, RuntimeError> {
         if self.emitted_token_count >= generated_token_ids.len() {
             return Ok(GenerationControl::Continue);
@@ -211,7 +229,7 @@ impl TokenTextBuffer {
         };
 
         self.emitted_token_count = generated_token_ids.len();
-        on_text(&text)
+        on_text(&text, pending_token_ids)
     }
 }
 
@@ -222,6 +240,7 @@ pub struct GeneratedText {
     cached_prompt_tokens: usize,
     completion_tokens: usize,
     token_texts: Vec<String>,
+    token_id_chunks: Vec<Vec<usize>>,
     finish_reason: GenerationFinishReason,
 }
 
@@ -254,6 +273,7 @@ impl GeneratedText {
             cached_prompt_tokens: 0,
             completion_tokens,
             token_texts,
+            token_id_chunks: Vec::new(),
             finish_reason,
         }
     }
@@ -290,6 +310,32 @@ impl GeneratedText {
 
     pub fn token_texts(&self) -> &[String] {
         &self.token_texts
+    }
+
+    pub fn token_id_chunks(&self) -> &[Vec<usize>] {
+        &self.token_id_chunks
+    }
+
+    pub fn with_token_id_chunks(
+        mut self,
+        token_id_chunks: Vec<Vec<usize>>,
+    ) -> Result<Self, RuntimeError> {
+        if token_id_chunks.len() != self.token_texts.len() {
+            return Err(RuntimeError::new(format!(
+                "token id chunk count {} does not match token text count {}",
+                token_id_chunks.len(),
+                self.token_texts.len()
+            )));
+        }
+        let token_id_count = token_id_chunks.iter().map(Vec::len).sum::<usize>();
+        if token_id_count > self.completion_tokens {
+            return Err(RuntimeError::new(format!(
+                "token id count {token_id_count} exceeds completion tokens {}",
+                self.completion_tokens
+            )));
+        }
+        self.token_id_chunks = token_id_chunks;
+        Ok(self)
     }
 
     pub fn finish_reason(&self) -> GenerationFinishReason {
@@ -341,6 +387,14 @@ mod tests {
         assert_eq!(pieces, ["winner"]);
         assert_eq!(generated.text(), "winner");
         assert_eq!(generated.token_texts(), pieces);
+        assert_eq!(
+            generated.token_id_chunks().len(),
+            generated.token_texts().len()
+        );
+        assert!(generated
+            .token_id_chunks()
+            .iter()
+            .all(|chunk| !chunk.is_empty()));
         Ok(())
     }
 
@@ -419,25 +473,35 @@ mod tests {
         let mut buffer = TokenTextBuffer::new();
         let mut generated_token_ids = vec![13];
         let mut pieces = Vec::new();
+        let mut token_id_chunks = Vec::new();
 
-        let control =
-            buffer.emit_ready_text(&generated_token_ids, decode_partial_bpe, |piece| {
+        let control = buffer.emit_ready_text(
+            &generated_token_ids,
+            decode_partial_bpe,
+            |piece, token_ids| {
                 pieces.push(piece.to_owned());
+                token_id_chunks.push(token_ids.to_vec());
                 Ok(GenerationControl::Continue)
-            })?;
+            },
+        )?;
 
         assert_eq!(control, GenerationControl::Continue);
         assert!(pieces.is_empty());
 
         generated_token_ids.push(14);
-        let control =
-            buffer.emit_ready_text(&generated_token_ids, decode_partial_bpe, |piece| {
+        let control = buffer.emit_ready_text(
+            &generated_token_ids,
+            decode_partial_bpe,
+            |piece, token_ids| {
                 pieces.push(piece.to_owned());
+                token_id_chunks.push(token_ids.to_vec());
                 Ok(GenerationControl::Continue)
-            })?;
+            },
+        )?;
 
         assert_eq!(control, GenerationControl::Continue);
         assert_eq!(pieces, ["é"]);
+        assert_eq!(token_id_chunks, [vec![13, 14]]);
         Ok(())
     }
 

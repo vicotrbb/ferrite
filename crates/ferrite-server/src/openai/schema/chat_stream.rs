@@ -61,6 +61,22 @@ impl ChatCompletionStreamContext {
     }
 
     pub fn token(&self, content: String) -> ChatCompletionStreamChunk {
+        self.token_chunk(content, None)
+    }
+
+    pub fn token_with_ids(
+        &self,
+        content: String,
+        token_ids: &[usize],
+    ) -> ChatCompletionStreamChunk {
+        self.token_chunk(content, Some(token_ids.to_vec()))
+    }
+
+    fn token_chunk(
+        &self,
+        content: String,
+        token_ids: Option<Vec<usize>>,
+    ) -> ChatCompletionStreamChunk {
         ChatCompletionStreamChunk {
             id: self.id.clone(),
             object: "chat.completion.chunk",
@@ -68,7 +84,7 @@ impl ChatCompletionStreamContext {
             model: self.model.clone(),
             system_fingerprint: None,
             service_tier: self.service_tier,
-            choices: vec![ChatCompletionStreamChoice::content(content)],
+            choices: vec![ChatCompletionStreamChoice::content(content, token_ids)],
             obfuscation: self.obfuscation(),
             usage: self.null_usage(),
         }
@@ -129,8 +145,13 @@ impl ChatCompletionStreamChunk {
     pub fn from_generation(model: String, generated: &GeneratedText) -> Vec<Self> {
         let context = ChatCompletionStreamContext::new(model);
         let mut chunks = vec![context.role()];
-        for text in generated.token_texts() {
-            chunks.push(context.token(text.clone()));
+        for (index, text) in generated.token_texts().iter().enumerate() {
+            let token_ids = generated.token_id_chunks().get(index);
+            if let Some(token_ids) = token_ids.filter(|ids| !ids.is_empty()) {
+                chunks.push(context.token_with_ids(text.clone(), token_ids));
+            } else {
+                chunks.push(context.token(text.clone()));
+            }
         }
         chunks.push(context.finish(generated.finish_reason()));
         chunks
@@ -143,6 +164,8 @@ struct ChatCompletionStreamChoice {
     delta: ChatCompletionStreamDelta,
     logprobs: Option<Value>,
     finish_reason: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    token_ids: Option<Vec<usize>>,
 }
 
 impl ChatCompletionStreamChoice {
@@ -152,15 +175,17 @@ impl ChatCompletionStreamChoice {
             delta: ChatCompletionStreamDelta::role(),
             logprobs: None,
             finish_reason: None,
+            token_ids: None,
         }
     }
 
-    fn content(content: String) -> Self {
+    fn content(content: String, token_ids: Option<Vec<usize>>) -> Self {
         Self {
             index: 0,
             delta: ChatCompletionStreamDelta::content(content),
             logprobs: None,
             finish_reason: None,
+            token_ids,
         }
     }
 
@@ -170,6 +195,7 @@ impl ChatCompletionStreamChoice {
             delta: ChatCompletionStreamDelta::empty(),
             logprobs: None,
             finish_reason: Some(finish_reason(reason)),
+            token_ids: None,
         }
     }
 }
@@ -260,6 +286,20 @@ mod tests {
         let chunk = serde_json::to_value(context.token("hello".to_owned()))?;
 
         assert!(chunk.get("obfuscation").is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn chat_stream_content_chunk_can_include_token_ids() -> Result<(), Box<dyn std::error::Error>> {
+        let context = ChatCompletionStreamContext::new("fixture-model".to_owned())
+            .with_obfuscation_field(false);
+        let chunk = serde_json::to_value(context.token_with_ids("hello".to_owned(), &[42, 43]))?;
+
+        assert_eq!(chunk["choices"][0]["delta"]["content"], "hello");
+        assert_eq!(
+            chunk["choices"][0]["token_ids"],
+            serde_json::json!([42, 43])
+        );
         Ok(())
     }
 }
