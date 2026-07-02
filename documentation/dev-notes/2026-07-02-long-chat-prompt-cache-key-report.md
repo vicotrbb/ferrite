@@ -63,6 +63,18 @@ Results:
 - formatting check: passed.
 - whitespace check: passed.
 
+CLI plan smoke:
+
+```sh
+CARGO_TARGET_DIR=target/codex-long-chat-cache-report cargo run -p ferrite-server --bin ferrite-openai-long-chat-gate -- --models fixture-model --token-lengths 256 --turns 4 --prompt-cache-key long-chat:prefix
+```
+
+The command exited `0` and printed:
+
+```text
+long_chat_prompt_cache_key=long-chat:prefix
+```
+
 ## Results
 
 Long-chat proof output now records the configured prompt-cache namespace before
