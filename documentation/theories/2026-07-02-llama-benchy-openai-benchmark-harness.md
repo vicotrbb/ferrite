@@ -127,7 +127,10 @@ long-chat proof notes.
 
 ## Next Step
 
-Run the baseline smoke against one available Tier 1 model, then archive both
-the raw JSON result and a short benchmark note under `documentation/benchmarks`.
+Run the baseline smoke from
+`documentation/benchmarks/2026-07-02-llama-benchy-openai-protocol.md` against
+one available Tier 1 model, then archive both the raw JSON result and a short
+benchmark result note under `documentation/benchmarks`.
+
 Do not adopt this as a standard gate until the result is compared with
 Ferrite's own long-chat timing output for the same model and token lengths.
