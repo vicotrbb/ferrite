@@ -227,9 +227,34 @@ shared-prefix reuse: cached prompt-token counts vary with how much generated
 assistant content is actually shared between the previous cached prompt and the
 current request.
 
+## Cached Stop Gate
+
+A stop-focused cached generated-context gate also completed on
+`SmolLM2-135M-Instruct-Q4_K_M`. The benchmark note is
+`documentation/benchmarks/2026-07-02-openai-long-chat-smollm-135m-shared-prefix-cache-stop-gate.md`.
+
+The run used `--stop 'user'`, `--expect-finish-reason stop`,
+`--prompt-cache-key long-chat:stop-prefix`, `--require-cached-follow-ups`, RSS
+sampling, unauthorized reconnect probing, and disconnect/reconnect probing.
+
+The summary recorded:
+
+```text
+long_chat_summary_generated_follow_up_turns=3
+long_chat_summary_cached_generated_follow_up_turns=3
+long_chat_summary_uncached_generated_follow_up_turns=0
+long_chat_summary_all_generated_follow_up_turns_cached=true
+long_chat_summary_run_complete=true
+```
+
+This proves explicit OpenAI stop-sequence behavior can coexist with the
+shared-prefix cache on a small real model. It does not prove tokenizer EOS
+termination, larger Tier 1 stop behavior after the cache change, or x86_64 stop
+behavior.
+
 ## Next Step
 
 Scale from the small-model full matrix to the required Tier 1 models, add a
-stop/EOS-specific cached generated-context variant, and run a bounded
+tokenizer-EOS-specific cached generated-context variant, and run a bounded
 `llama-benchy` shared-prefix comparison. Track decode slowdown as a separate
 theory instead of assuming prefix reuse will fix it.
