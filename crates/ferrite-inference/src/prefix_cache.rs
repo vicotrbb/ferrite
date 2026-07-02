@@ -29,26 +29,55 @@ impl TokenPrefixIdentity {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct PrefixCacheKey {
+pub struct PrefixCacheFingerprints {
     model_fingerprint: String,
     tokenizer_fingerprint: String,
     template_fingerprint: String,
-    prefix: TokenPrefixIdentity,
+    execution_fingerprint: String,
+    request_shape_fingerprint: String,
 }
 
-impl PrefixCacheKey {
+impl PrefixCacheFingerprints {
     pub fn new(
         model_fingerprint: impl Into<String>,
         tokenizer_fingerprint: impl Into<String>,
         template_fingerprint: impl Into<String>,
-        prefix: TokenPrefixIdentity,
+        execution_fingerprint: impl Into<String>,
+        request_shape_fingerprint: impl Into<String>,
     ) -> Self {
         Self {
             model_fingerprint: model_fingerprint.into(),
             tokenizer_fingerprint: tokenizer_fingerprint.into(),
             template_fingerprint: template_fingerprint.into(),
+            execution_fingerprint: execution_fingerprint.into(),
+            request_shape_fingerprint: request_shape_fingerprint.into(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct PrefixCacheKey {
+    fingerprints: PrefixCacheFingerprints,
+    namespace: Option<String>,
+    prefix: TokenPrefixIdentity,
+}
+
+impl PrefixCacheKey {
+    pub fn new(fingerprints: PrefixCacheFingerprints, prefix: TokenPrefixIdentity) -> Self {
+        Self {
+            fingerprints,
+            namespace: None,
             prefix,
         }
+    }
+
+    pub fn with_namespace(mut self, namespace: impl Into<String>) -> Self {
+        self.namespace = Some(namespace.into());
+        self
+    }
+
+    pub fn namespace(&self) -> Option<&str> {
+        self.namespace.as_deref()
     }
 
     pub fn prefix_token_count(&self) -> usize {
