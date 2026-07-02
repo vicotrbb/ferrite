@@ -166,6 +166,12 @@ A minimal compatibility smoke has been executed against Ferrite:
   `documentation/benchmarks/2026-07-02-llama-benchy-qwen-0-5b-1024-baseline.json`
 - 1024-token latency-none raw result:
   `documentation/benchmarks/2026-07-02-llama-benchy-qwen-0-5b-1024-baseline-latency-none.json`
+- Concurrency step note:
+  `documentation/benchmarks/2026-07-02-llama-benchy-qwen-0-5b-concurrency.md`
+- Zero-wait concurrency raw result:
+  `documentation/benchmarks/2026-07-02-llama-benchy-qwen-0-5b-concurrency.json`
+- Queued concurrency raw result:
+  `documentation/benchmarks/2026-07-02-llama-benchy-qwen-0-5b-concurrency-queued.json`
 
 That smoke used `--pp 32`, `--tg 16`, one run, concurrency `1`, no warmup, no
 coherence check, and no prompt adaptation. It proves external tool
@@ -185,6 +191,9 @@ prompt-processing throughput and similar decode throughput. All three lengths
 are documented in their result notes above and compared with the nearest
 Ferrite long-chat timing artifacts.
 
-The first single-model length matrix is executed, but the full protocol has not
-been executed. The next proof slice is a small concurrency step against the same
-model before prefix-cache experiments.
+The first single-model length matrix and a small concurrency step are executed,
+but the full protocol has not been executed. The concurrency step showed the
+default zero-wait policy returning HTTP 429 under excess concurrency and the
+`--inference-wait-ms 300000` policy completing at concurrency 1, 2, and 4 with
+queued single-permit behavior. The next proof slice is a prefix-cache
+experiment.

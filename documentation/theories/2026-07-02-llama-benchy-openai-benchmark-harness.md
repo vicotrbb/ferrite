@@ -135,9 +135,18 @@ run reported `pp_throughput.mean` of `1128453.4269715385` and
 `tg_throughput.mean` of `8.053815994759002`. See
 `documentation/benchmarks/2026-07-02-llama-benchy-qwen-0-5b-1024-baseline.md`.
 
+A small concurrency step has also run with `--pp 512`, `--tg 256`, and
+`--concurrency 1 2 4`. The default zero-wait server returned HTTP 429 under
+excess concurrency. With `--inference-wait-ms 300000`, the run completed at all
+three concurrency levels and showed queued single-permit behavior: total
+`tg_throughput.mean` dropped from `13.520923091874657` at concurrency 1 to
+`6.460806574464915` at concurrency 4, while per-request `tg_req_throughput.mean`
+stayed around `13.6`. See
+`documentation/benchmarks/2026-07-02-llama-benchy-qwen-0-5b-concurrency.md`.
+
 This moves the theory from pure hypothesis to early compatibility evidence. It
-does not validate prefix caching, concurrency behavior, RSS behavior,
-reconnect/error behavior, or stop/EOS behavior.
+does not validate prefix caching, high-concurrency serving, reconnect/error
+behavior under load, or stop/EOS behavior under load.
 
 ## Falsification Experiment
 
@@ -195,10 +204,9 @@ long-chat proof notes.
 
 ## Next Step
 
-Run a small `llama-benchy` concurrency step against
-`Qwen2.5-0.5B-Instruct-Q4_K_M` and compare it with Ferrite's own queue and
-long-chat evidence. Only after that should the protocol expand to prefix-cache
-experiments.
+Run a `llama-benchy` prefix-cache experiment against
+`Qwen2.5-0.5B-Instruct-Q4_K_M` and compare it with Ferrite's own prompt-cache
+usage metadata and long-chat timing evidence.
 
 Do not adopt this as a standard gate until the result is compared with
 Ferrite's own long-chat timing output for the same model and token lengths.
