@@ -89,7 +89,7 @@ These are derived from client-observed SSE token event offsets. They are useful
 for comparing first-token delay against post-first-token decode pace, but they
 do not expose internal engine prefill timing directly.
 
-## 256-Token Theory Probe
+## Timing Theory Probes
 
 The first live x86_64 Qwen2.5-1.5B Q8_0 generated-context rerun with the timing
 split completed on 2026-07-02. The benchmark note is
@@ -106,10 +106,21 @@ This supports prefix reuse as a worthwhile next design slice. It does not prove
 that prefix reuse alone will recover all throughput, because decode pace also
 degraded on generated-context turns.
 
+A 512-token rerun also completed on 2026-07-02. The benchmark note is
+`documentation/benchmarks/2026-07-02-openai-long-chat-x86-qwen-1-5b-q8-prefill-decode-theory-512.md`.
+
+The 512-token seed turn used 43 prompt tokens and reported 10003 ms
+stream-observed prefill. Generated-context turns used 533-553 prompt tokens and
+reported 143512-150282 ms stream-observed prefill. Average generated-context
+prefill was about 146094 ms, roughly 14.6x the seed prefill. Generated-context
+decode averaged about 170028 ms at about 3.01 decode token events/sec, about 20
+percent slower than the seed decode event rate.
+
 ## Next Step
 
-Design a small token-prefix identity layer and bounded per-model KV prefix cache
-as a separate implementation slice. Keep it behind an explicit opt-in or
-internal experiment flag until repeated 256/512/1024-token generated-context
-proofs show lower first-token latency without RSS drift or response-shape
-regression.
+Complete the 1024-token timing rerun before designing the bounded KV prefix
+cache. If the 1024 run follows the same shape, design a small token-prefix
+identity layer and bounded per-model KV prefix cache as a separate
+implementation slice. Keep it behind an explicit opt-in or internal experiment
+flag until repeated 256/512/1024-token generated-context proofs show lower
+first-token latency without RSS drift or response-shape regression.
