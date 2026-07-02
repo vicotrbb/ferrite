@@ -20,6 +20,12 @@ pub(super) fn is_neutral_bool(value: &Option<Value>, expected: bool) -> bool {
         .is_none_or(|value| value.as_bool() == Some(expected))
 }
 
+pub(super) fn is_optional_bool(value: &Option<Value>) -> bool {
+    value
+        .as_ref()
+        .is_none_or(|value| value.is_null() || value.as_bool().is_some())
+}
+
 fn number_equals(value: &Value, expected: f64) -> bool {
     value.as_f64().is_some_and(|actual| actual == expected)
 }
@@ -68,5 +74,19 @@ mod tests {
     fn non_matching_or_non_bool_value_is_not_neutral() {
         assert!(!is_neutral_bool(&Some(json!(true)), false));
         assert!(!is_neutral_bool(&Some(json!("false")), false));
+    }
+
+    #[test]
+    fn optional_bool_accepts_missing_null_and_boolean_values() {
+        assert!(is_optional_bool(&None));
+        assert!(is_optional_bool(&Some(Value::Null)));
+        assert!(is_optional_bool(&Some(json!(false))));
+        assert!(is_optional_bool(&Some(json!(true))));
+    }
+
+    #[test]
+    fn optional_bool_rejects_non_boolean_values() {
+        assert!(!is_optional_bool(&Some(json!("true"))));
+        assert!(!is_optional_bool(&Some(json!(1))));
     }
 }

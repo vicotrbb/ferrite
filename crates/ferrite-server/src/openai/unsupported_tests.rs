@@ -179,6 +179,26 @@ async fn chat_endpoint_rejects_malformed_stream_flag() -> Result<(), Box<dyn std
 }
 
 #[tokio::test]
+async fn chat_endpoint_rejects_malformed_return_token_ids() -> Result<(), Box<dyn std::error::Error>>
+{
+    let body = post_chat_json(
+        r#"{
+            "model":"fixture-model",
+            "messages":[{"role":"user","content":"hello"}],
+            "return_token_ids":"true"
+        }"#,
+    )
+    .await?;
+
+    assert_eq!(body.status, StatusCode::BAD_REQUEST);
+    assert_eq!(body.json["error"]["type"], "invalid_request_error");
+    let message = body.json["error"]["message"].as_str().unwrap_or_default();
+    assert!(message.contains("return_token_ids"), "{message}");
+    assert!(!message.contains("malformed JSON"), "{message}");
+    Ok(())
+}
+
+#[tokio::test]
 async fn chat_endpoint_rejects_unknown_fields() -> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat_json(
         r#"{

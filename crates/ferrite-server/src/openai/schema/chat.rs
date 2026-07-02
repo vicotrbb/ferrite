@@ -6,7 +6,7 @@ use super::{
     metadata::is_valid_metadata,
     modalities::is_text_only_modalities,
     model_id::deserialize_model_id,
-    neutral_options::{is_neutral_bool, is_neutral_number, is_neutral_number_in},
+    neutral_options::{is_neutral_bool, is_neutral_number, is_neutral_number_in, is_optional_bool},
     prompt_cache_key::is_prompt_cache_key,
     reasoning_effort::is_no_reasoning_effort,
     response_format::is_neutral_response_format,
@@ -97,6 +97,8 @@ pub struct ChatCompletionRequest {
     reasoning_effort: Option<Value>,
     #[serde(default)]
     service_tier: Option<Value>,
+    #[serde(default)]
+    return_token_ids: Option<Value>,
     #[serde(default, flatten)]
     extra_fields: BTreeMap<String, Value>,
 }
@@ -226,6 +228,10 @@ impl ChatCompletionRequest {
                 !is_no_reasoning_effort(&self.reasoning_effort),
             )
             .with_present("service_tier", !is_local_service_tier(&self.service_tier))
+            .with_present(
+                "return_token_ids",
+                !is_optional_bool(&self.return_token_ids),
+            )
             .with_extra_keys(&self.extra_fields)
             .into_vec();
         if let Some(stream_options) = &self.stream_options {

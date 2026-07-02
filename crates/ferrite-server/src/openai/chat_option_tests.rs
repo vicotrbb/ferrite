@@ -131,6 +131,12 @@ async fn chat_endpoint_accepts_no_reasoning_effort() -> Result<(), Box<dyn std::
     assert_chat_option_is_accepted(r#""reasoning_effort":"none""#).await
 }
 
+#[tokio::test]
+async fn chat_endpoint_accepts_return_token_ids_extension() -> Result<(), Box<dyn std::error::Error>>
+{
+    assert_chat_option_is_accepted(r#""return_token_ids":true"#).await
+}
+
 async fn assert_chat_option_is_accepted(
     option_json: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
