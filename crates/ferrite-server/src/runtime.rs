@@ -5,8 +5,8 @@ pub use cache_options::GenerationCacheOptions;
 
 use ferrite_inference::scalar::ScalarLlamaModel;
 use ferrite_model::{gguf::parse_gguf, tokenizer::GgufTokenizer};
-use prefix_cache::fnv64_bytes;
-use std::{error::Error, fmt, fs, path::Path};
+use prefix_cache::{fnv64_bytes, RuntimePrefixCache};
+use std::{error::Error, fmt, fs, path::Path, sync::Mutex};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GenerationControl {
@@ -26,6 +26,7 @@ pub struct InferenceEngine {
     tokenizer: GgufTokenizer,
     model_fingerprint: String,
     tokenizer_fingerprint: String,
+    prefix_cache: Mutex<RuntimePrefixCache>,
 }
 
 impl InferenceEngine {
@@ -44,6 +45,7 @@ impl InferenceEngine {
             tokenizer,
             model_fingerprint: format!("gguf-model-fnv64:{content_hash:016x}"),
             tokenizer_fingerprint: format!("gguf-tokenizer-fnv64:{content_hash:016x}"),
+            prefix_cache: Mutex::new(RuntimePrefixCache::default()),
         })
     }
 
@@ -93,12 +95,35 @@ impl InferenceEngine {
         if prompt_token_ids.is_empty() {
             return Err(RuntimeError::new("prompt must contain at least one token"));
         }
-        let _prefix_cache_key = self.prefix_cache_key_for_tokens(&prompt_token_ids, &cache_options);
+        let prefix_cache_key = self.prefix_cache_key_for_tokens(&prompt_token_ids, &cache_options);
 
         let mut session = self.model.start_session();
-        let next = session
-            .accept_prompt(&prompt_token_ids)
-            .map_err(|error| RuntimeError::new(format!("failed to evaluate prompt: {error}")))?;
+        let mut cached_prompt_tokens = 0;
+        let next = if cache_options.prefix_cache_enabled() {
+            if let Some(cached) = self.prefix_cache_hit(&prefix_cache_key)? {
+                session
+                    .restore_cache_snapshot(cached.snapshot())
+                    .map_err(|error| {
+                        RuntimeError::new(format!("failed to restore prompt cache: {error}"))
+                    })?;
+                cached_prompt_tokens = cached.snapshot().cached_token_count();
+                cached.next_token().clone()
+            } else {
+                let next = session.accept_prompt(&prompt_token_ids).map_err(|error| {
+                    RuntimeError::new(format!("failed to evaluate prompt: {error}"))
+                })?;
+                self.store_prefix_cache_value(
+                    prefix_cache_key,
+                    session.cache_snapshot(),
+                    next.clone(),
+                )?;
+                next
+            }
+        } else {
+            session
+                .accept_prompt(&prompt_token_ids)
+                .map_err(|error| RuntimeError::new(format!("failed to evaluate prompt: {error}")))?
+        };
         let mut token_id = next.token_id;
         let mut generated_token_ids = Vec::with_capacity(max_tokens);
         let mut token_texts = Vec::with_capacity(max_tokens);
@@ -143,13 +168,14 @@ impl InferenceEngine {
                 RuntimeError::new(format!("failed to decode completion: {error}"))
             })?
         };
-        Ok(GeneratedText::with_finish_reason(
+        GeneratedText::with_finish_reason(
             text,
             prompt_token_ids.len(),
             generated_token_ids.len(),
             token_texts,
             finish_reason,
-        ))
+        )
+        .with_cached_prompt_tokens(cached_prompt_tokens)
     }
 
     fn decode_token_text(&self, token_ids: &[usize]) -> Result<Option<String>, RuntimeError> {
@@ -362,6 +388,28 @@ mod tests {
         assert_eq!(key.fingerprints().template(), "runtime-rendered-prompt-v1");
         assert_eq!(key.fingerprints().execution(), "scalar-default");
         assert_eq!(key.fingerprints().request_shape(), "text-generation-v1");
+        Ok(())
+    }
+
+    #[test]
+    fn exact_prefix_cache_reuses_prompt_snapshot_when_enabled(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let model_path = write_fixture_model()?;
+        let engine = InferenceEngine::load(&model_path)?;
+        remove_fixture_model(&model_path)?;
+        let cache_options =
+            GenerationCacheOptions::from_namespace(Some("tenant-a:thread-1".to_owned()))
+                .with_prefix_cache_enabled(true);
+
+        let first = engine.generate_with_cache_options("hello", 1, cache_options.clone())?;
+        let second = engine.generate_with_cache_options("hello", 1, cache_options)?;
+
+        assert_eq!(first.text(), "winner");
+        assert_eq!(second.text(), first.text());
+        assert_eq!(first.prompt_tokens(), 1);
+        assert_eq!(first.cached_prompt_tokens(), 0);
+        assert_eq!(second.prompt_tokens(), 1);
+        assert_eq!(second.cached_prompt_tokens(), 1);
         Ok(())
     }
 
