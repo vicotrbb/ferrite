@@ -113,10 +113,17 @@ ID coverage for no-stop streaming chunks. A local Qwen 0.5B smoke reported
 `streaming_all_content_chunks_have_token_ids=true`. See
 `documentation/benchmarks/2026-07-02-openai-throughput-qwen-0-5b-token-id-observability.md`.
 
+A bounded 256-token baseline has now run against the same local Qwen 0.5B
+server. The generation-latency run reported `tg_throughput.mean` of
+`17.108893401529688` and `e2e_ttft.mean` of `11560.583166981814`, but
+`pp_throughput` was null. A companion latency-none run reported
+`pp_throughput.mean` of `294450.6291659168` and `tg_throughput.mean` of
+`16.579741995461383`. See
+`documentation/benchmarks/2026-07-02-llama-benchy-qwen-0-5b-256-baseline.md`.
+
 This moves the theory from pure hypothesis to early compatibility evidence. It
-does not validate the full 256/512/1024-token protocol, prefix caching,
-concurrency behavior, RSS behavior, reconnect/error behavior, or stop/EOS
-behavior.
+does not validate the full 512/1024-token protocol, prefix caching, concurrency
+behavior, RSS behavior, reconnect/error behavior, or stop/EOS behavior.
 
 ## Falsification Experiment
 
@@ -174,10 +181,10 @@ long-chat proof notes.
 
 ## Next Step
 
-Run one bounded 256-token `llama-benchy` baseline against the same
-`Qwen2.5-0.5B-Instruct-Q4_K_M` model and compare it with the nearest Ferrite
-long-chat timing output. Only after that should the protocol expand to the full
-256/512/1024-token matrix.
+Run the same bounded `llama-benchy` baseline at 512 tokens against
+`Qwen2.5-0.5B-Instruct-Q4_K_M` and compare it with the nearest Ferrite
+long-chat timing output. Only after that should the protocol expand to 1024
+tokens and then concurrency.
 
 Do not adopt this as a standard gate until the result is compared with
 Ferrite's own long-chat timing output for the same model and token lengths.

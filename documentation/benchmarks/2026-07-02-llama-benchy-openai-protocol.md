@@ -148,6 +148,12 @@ A minimal compatibility smoke has been executed against Ferrite:
   `documentation/benchmarks/2026-07-02-llama-benchy-qwen-0-5b-token-ids-smoke.md`
 - Token-id streaming raw result:
   `documentation/benchmarks/2026-07-02-llama-benchy-qwen-0-5b-token-ids-smoke.json`
+- 256-token baseline note:
+  `documentation/benchmarks/2026-07-02-llama-benchy-qwen-0-5b-256-baseline.md`
+- 256-token generation-latency raw result:
+  `documentation/benchmarks/2026-07-02-llama-benchy-qwen-0-5b-256-baseline.json`
+- 256-token latency-none raw result:
+  `documentation/benchmarks/2026-07-02-llama-benchy-qwen-0-5b-256-baseline-latency-none.json`
 
 That smoke used `--pp 32`, `--tg 16`, one run, concurrency `1`, no warmup, no
 coherence check, and no prompt adaptation. It proves external tool
@@ -159,7 +165,12 @@ Ferrite started returning token IDs on chat content chunks. The command exited
 `0` and did not print the previous `No token_ids in response, using local
 tokenization` fallback line.
 
-The full protocol has not been executed. The next proof slice is a bounded
-256-token baseline against one available Tier 1 model, followed by a result
-note comparing `llama-benchy` output with the nearest Ferrite long-chat timing
-artifact.
+A bounded 256-token baseline has also been executed against the same local
+Qwen 0.5B model at concurrency `1`. The generation-latency run produced decode
+and first-token fields but no prompt-processing throughput. A companion
+latency-none run produced prompt-processing throughput and similar decode
+throughput. Both runs are documented in the 256-token baseline note above and
+compared with the nearest Ferrite long-chat timing artifact.
+
+The full protocol has not been executed. The next proof slice is the 512-token
+baseline against the same model before expanding to 1024 tokens or concurrency.
