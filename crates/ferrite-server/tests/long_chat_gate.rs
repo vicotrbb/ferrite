@@ -21,6 +21,7 @@ fn defaults_to_required_long_chat_token_lengths_and_turns() -> Result<(), Box<dy
     assert!(!config.execute());
     assert!(!config.error_probe());
     assert!(!config.disconnect_probe());
+    assert!(!config.require_cached_follow_ups());
     assert_eq!(
         config.models(),
         &[
@@ -67,6 +68,7 @@ fn parses_custom_long_chat_token_lengths_turns_and_models() -> Result<(), Box<dy
         OsString::from("4242"),
         OsString::from("--error-probe"),
         OsString::from("--disconnect-probe"),
+        OsString::from("--require-cached-follow-ups"),
         OsString::from("--expect-finish-reason"),
         OsString::from("stop"),
         OsString::from("--probe-max-tokens"),
@@ -89,6 +91,7 @@ fn parses_custom_long_chat_token_lengths_turns_and_models() -> Result<(), Box<dy
     assert_eq!(config.rss_pid(), Some(4242));
     assert!(config.error_probe());
     assert!(config.disconnect_probe());
+    assert!(config.require_cached_follow_ups());
     assert_eq!(config.expected_finish_reason(), Some("stop"));
     assert_eq!(config.probe_max_tokens(), Some(256));
     assert_eq!(
@@ -552,7 +555,7 @@ fn formats_integrated_long_chat_run_summary() -> Result<(), Box<dyn std::error::
             Some(&error_probe),
             Some(&disconnect_probe)
         ),
-        "long_chat_summary_planned_scenarios=4\nlong_chat_summary_completed_scenarios=4\nlong_chat_summary_all_finish_reasons_present=true\nlong_chat_summary_all_usage_accounting_valid=true\nlong_chat_summary_all_token_limit_status_present=true\nlong_chat_summary_any_token_limit_hit=true\nlong_chat_summary_prompt_cache_key_present=false\nlong_chat_summary_any_cached_prompt_tokens=false\nlong_chat_summary_all_generated_follow_up_turns_cached=false\nlong_chat_summary_all_follow_up_turns_use_generated_context=true\nlong_chat_summary_all_timing_present=true\nlong_chat_summary_rss_required=true\nlong_chat_summary_all_rss_present=true\nlong_chat_summary_error_probe_required=true\nlong_chat_summary_error_probe_completed=true\nlong_chat_summary_disconnect_probe_required=true\nlong_chat_summary_disconnect_probe_completed=true\nlong_chat_summary_disconnect_probe_reconnect_started_new_generation=true\nlong_chat_summary_run_complete=true"
+        "long_chat_summary_planned_scenarios=4\nlong_chat_summary_completed_scenarios=4\nlong_chat_summary_all_finish_reasons_present=true\nlong_chat_summary_all_usage_accounting_valid=true\nlong_chat_summary_all_token_limit_status_present=true\nlong_chat_summary_any_token_limit_hit=true\nlong_chat_summary_prompt_cache_key_present=false\nlong_chat_summary_cached_follow_ups_required=false\nlong_chat_summary_any_cached_prompt_tokens=false\nlong_chat_summary_all_generated_follow_up_turns_cached=false\nlong_chat_summary_all_follow_up_turns_use_generated_context=true\nlong_chat_summary_all_timing_present=true\nlong_chat_summary_rss_required=true\nlong_chat_summary_all_rss_present=true\nlong_chat_summary_error_probe_required=true\nlong_chat_summary_error_probe_completed=true\nlong_chat_summary_disconnect_probe_required=true\nlong_chat_summary_disconnect_probe_completed=true\nlong_chat_summary_disconnect_probe_reconnect_started_new_generation=true\nlong_chat_summary_run_complete=true"
     );
     Ok(())
 }
@@ -611,6 +614,61 @@ fn formats_cache_observability_in_long_chat_run_summary() -> Result<(), Box<dyn 
     assert!(summary.contains("long_chat_summary_prompt_cache_key_present=true"));
     assert!(summary.contains("long_chat_summary_any_cached_prompt_tokens=true"));
     assert!(summary.contains("long_chat_summary_all_generated_follow_up_turns_cached=true"));
+    Ok(())
+}
+
+#[test]
+fn required_cached_follow_ups_make_summary_incomplete_without_cache_hits(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--models"),
+        OsString::from("fixture-model"),
+        OsString::from("--token-lengths"),
+        OsString::from("256"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+        OsString::from("--prompt-cache-key"),
+        OsString::from("long-chat:prefix"),
+        OsString::from("--require-cached-follow-ups"),
+    ])?;
+    let results = config
+        .scenarios()
+        .iter()
+        .map(|scenario| {
+            let source = if scenario.turn() == 1 {
+                LongChatAssistantContextSource::Seed
+            } else {
+                LongChatAssistantContextSource::Generated
+            };
+            LongChatScenarioResult::new_with_assistant_context_source(
+                scenario,
+                ThroughputResult {
+                    completed_requests: 1,
+                    elapsed: Duration::from_millis(400),
+                    streaming_finish: Some(StreamingFinishSummary::new("length")),
+                    streaming_timing: StreamingTimingSummary::from_event_offsets(&[
+                        Duration::from_millis(100),
+                        Duration::from_millis(140),
+                    ]),
+                    streaming_text: None,
+                    streaming_usage: Some(StreamingUsageSummary::new(
+                        16,
+                        scenario.token_length() as u64,
+                        scenario.token_length() as u64 + 16,
+                    )),
+                    rss: None,
+                },
+                source,
+            )
+        })
+        .collect::<Vec<_>>();
+
+    let summary = format_run_summary(&config, &results, None, None);
+
+    assert!(summary.contains("long_chat_summary_cached_follow_ups_required=true"));
+    assert!(summary.contains("long_chat_summary_all_generated_follow_up_turns_cached=false"));
+    assert!(summary.contains("long_chat_summary_run_complete=false"));
     Ok(())
 }
 

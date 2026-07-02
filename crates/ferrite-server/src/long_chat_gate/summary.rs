@@ -28,6 +28,7 @@ pub fn format_run_summary(
             .iter()
             .filter(|result| result.turn() > 1 && result.assistant_context_source().is_generated())
             .all(has_cached_prompt_tokens);
+    let cached_follow_ups_required = config.require_cached_follow_ups();
     let all_follow_up_turns_use_generated_context = results
         .iter()
         .all(|result| result.turn() == 1 || result.assistant_context_source().is_generated());
@@ -51,6 +52,7 @@ pub fn format_run_summary(
         && all_usage_accounting_valid
         && all_token_limit_status_present
         && all_follow_up_turns_use_generated_context
+        && (!cached_follow_ups_required || all_generated_follow_up_turns_cached)
         && all_timing_present
         && (!rss_required || all_rss_present)
         && (!error_probe_required || error_probe_completed)
@@ -65,6 +67,7 @@ long_chat_summary_all_usage_accounting_valid={all_usage_accounting_valid}\n\
 long_chat_summary_all_token_limit_status_present={all_token_limit_status_present}\n\
 long_chat_summary_any_token_limit_hit={any_token_limit_hit}\n\
 long_chat_summary_prompt_cache_key_present={prompt_cache_key_present}\n\
+long_chat_summary_cached_follow_ups_required={cached_follow_ups_required}\n\
 long_chat_summary_any_cached_prompt_tokens={any_cached_prompt_tokens}\n\
 long_chat_summary_all_generated_follow_up_turns_cached={all_generated_follow_up_turns_cached}\n\
 long_chat_summary_all_follow_up_turns_use_generated_context={all_follow_up_turns_use_generated_context}\n\
