@@ -641,6 +641,49 @@ fn formats_cache_observability_in_long_chat_run_summary() -> Result<(), Box<dyn 
 }
 
 #[test]
+fn cache_summary_does_not_treat_missing_generated_follow_ups_as_cached(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--models"),
+        OsString::from("fixture-model"),
+        OsString::from("--token-lengths"),
+        OsString::from("256"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+        OsString::from("--prompt-cache-key"),
+        OsString::from("long-chat:prefix"),
+    ])?;
+    let scenario = config
+        .scenarios()
+        .into_iter()
+        .next()
+        .ok_or("expected seed scenario")?;
+    let result = LongChatScenarioResult::new_with_assistant_context_source(
+        &scenario,
+        ThroughputResult {
+            completed_requests: 1,
+            elapsed: Duration::from_millis(400),
+            streaming_finish: Some(StreamingFinishSummary::new("length")),
+            streaming_timing: StreamingTimingSummary::from_event_offsets(&[
+                Duration::from_millis(100),
+                Duration::from_millis(140),
+            ]),
+            streaming_text: None,
+            streaming_usage: Some(StreamingUsageSummary::new(16, 256, 272)),
+            rss: None,
+        },
+        LongChatAssistantContextSource::Seed,
+    );
+
+    let summary = format_run_summary(&config, &[result], None, None);
+
+    assert!(summary.contains("long_chat_summary_prompt_cache_key_present=true"));
+    assert!(summary.contains("long_chat_summary_all_generated_follow_up_turns_cached=false"));
+    Ok(())
+}
+
+#[test]
 fn required_cached_follow_ups_make_summary_incomplete_without_cache_hits(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let config = LongChatGateConfig::parse([

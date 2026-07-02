@@ -23,10 +23,12 @@ pub fn format_run_summary(
         .any(|result| result.hit_token_limit().unwrap_or(false));
     let prompt_cache_key_present = config.prompt_cache_key().is_some();
     let any_cached_prompt_tokens = results.iter().any(has_cached_prompt_tokens);
+    let generated_follow_up_turns_present = results.iter().any(is_generated_follow_up_turn);
     let all_generated_follow_up_turns_cached = prompt_cache_key_present
+        && generated_follow_up_turns_present
         && results
             .iter()
-            .filter(|result| result.turn() > 1 && result.assistant_context_source().is_generated())
+            .filter(|result| is_generated_follow_up_turn(result))
             .all(has_cached_prompt_tokens);
     let cached_follow_ups_required = config.require_cached_follow_ups();
     let all_follow_up_turns_use_generated_context = results
@@ -88,6 +90,10 @@ fn has_cached_prompt_tokens(result: &LongChatScenarioResult) -> bool {
         .throughput()
         .streaming_usage
         .is_some_and(|usage| usage.cached_prompt_tokens() > 0)
+}
+
+fn is_generated_follow_up_turn(result: &LongChatScenarioResult) -> bool {
+    result.turn() > 1 && result.assistant_context_source().is_generated()
 }
 
 fn usage_accounting_valid(result: &LongChatScenarioResult) -> bool {
