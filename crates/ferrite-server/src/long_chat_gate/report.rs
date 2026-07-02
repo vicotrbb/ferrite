@@ -26,13 +26,44 @@ pub fn format_plan(config: &LongChatGateConfig) -> String {
         .expected_finish_reason()
         .map(|reason| format!("\nlong_chat_expected_finish_reason={reason}"))
         .unwrap_or_default();
+    let rss_pid = config
+        .rss_pid()
+        .map(|pid| format!("\nlong_chat_rss_pid={pid}"))
+        .unwrap_or_default();
+    let error_probe_required = if config.error_probe() {
+        "\nlong_chat_error_probe_required=true"
+    } else {
+        ""
+    };
+    let disconnect_probe_required = if config.disconnect_probe() {
+        "\nlong_chat_disconnect_probe_required=true"
+    } else {
+        ""
+    };
+    let probe_max_tokens = config
+        .probe_max_tokens()
+        .map(|tokens| format!("\nlong_chat_probe_max_tokens={tokens}"))
+        .unwrap_or_default();
+    let disconnect_reconnect_timeout = if config.disconnect_probe() {
+        format!(
+            "\nlong_chat_disconnect_reconnect_timeout_ms={}",
+            config.disconnect_reconnect_timeout().as_millis()
+        )
+    } else {
+        String::new()
+    };
     format!(
-        "long_chat_models={models}\nlong_chat_token_lengths={token_lengths}\nlong_chat_turns={}{}{}{}{}\nlong_chat_planned_scenarios={}",
+        "long_chat_models={models}\nlong_chat_token_lengths={token_lengths}\nlong_chat_turns={}{}{}{}{}{}{}{}{}{}\nlong_chat_planned_scenarios={}",
         config.turns(),
         prompt_cache_key,
         require_cached_follow_ups,
         stop_configured,
         expected_finish_reason,
+        rss_pid,
+        error_probe_required,
+        disconnect_probe_required,
+        probe_max_tokens,
+        disconnect_reconnect_timeout,
         config.planned_scenarios()
     )
 }

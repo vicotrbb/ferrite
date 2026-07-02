@@ -261,6 +261,33 @@ fn formats_long_chat_gate_plan_with_stop_expectation() -> Result<(), Box<dyn std
 }
 
 #[test]
+fn formats_long_chat_gate_plan_with_probe_metadata() -> Result<(), Box<dyn std::error::Error>> {
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--models"),
+        OsString::from("fixture-model"),
+        OsString::from("--token-lengths"),
+        OsString::from("256"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+        OsString::from("--rss-pid"),
+        OsString::from("4242"),
+        OsString::from("--error-probe"),
+        OsString::from("--disconnect-probe"),
+        OsString::from("--probe-max-tokens"),
+        OsString::from("256"),
+        OsString::from("--disconnect-reconnect-timeout-ms"),
+        OsString::from("1500"),
+    ])?;
+
+    assert_eq!(
+        format_plan(&config),
+        "long_chat_models=fixture-model\nlong_chat_token_lengths=256\nlong_chat_turns=4\nlong_chat_rss_pid=4242\nlong_chat_error_probe_required=true\nlong_chat_disconnect_probe_required=true\nlong_chat_probe_max_tokens=256\nlong_chat_disconnect_reconnect_timeout_ms=1500\nlong_chat_planned_scenarios=4"
+    );
+    Ok(())
+}
+
+#[test]
 fn expands_ordered_long_chat_gate_scenarios() -> Result<(), Box<dyn std::error::Error>> {
     let config = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),
