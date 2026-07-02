@@ -2,7 +2,7 @@
 
 Date: 2026-07-02
 
-Status: Tested locally, needs design
+Status: Tested locally and on x86_64, needs design
 
 ## Hypothesis
 
@@ -125,6 +125,33 @@ The 32-token window was slower than the 128-character window on this prompt,
 but it is a better basis for future sweeps because the retained context is
 bounded by generated stream chunks instead of raw character count.
 
+## First x86_64 Larger-Artifact Probe
+
+The first larger-artifact x86_64 token-window probe completed on
+`Qwen2.5-1.5B-Instruct-Q8_0` with a 256-token long-chat budget and
+`--generated-context-max-tokens 64`. The benchmark note is
+`documentation/benchmarks/2026-07-02-openai-long-chat-x86-qwen-1-5b-q8-token-windowing-256.md`.
+
+All four turns completed with valid usage accounting, token-limit status,
+generated-context follow-up turns, timing fields, streaming token IDs, RSS
+samples, and `long_chat_summary_run_complete=true`.
+
+Generated-turn averages compared with the existing unwindowed x86 Q8 256-token
+baseline:
+
+| Metric | Unwindowed baseline | 64-token window | Change |
+| --- | ---: | ---: | ---: |
+| Prompt tokens | 285.33 | 92.33 | -67.64% |
+| TTFT/prefill ms | 70209.33 | 21762.67 | -69.01% |
+| Decode ms | 71463.33 | 65377.33 | -8.52% |
+| Decode tok/s | 3.582265 | 3.915744 | +9.31% |
+| Stream tok/s | 1.814102 | 2.949269 | +62.57% |
+
+This materially strengthens the theory: the prompt-size and TTFT improvements
+are not limited to the local Qwen 0.5B probe. The result still does not prove
+conversation quality or default serving semantics, and this first larger run
+did not include reconnect/error probes.
+
 ## Risks
 
 - Windowing can hide long-range context regressions if the proof prompt is too
@@ -138,8 +165,10 @@ bounded by generated stream chunks instead of raw character count.
 
 ## Next Step
 
-Run a small window sweep such as 16, 32, 64, and 128 generated chunks, then
-repeat on a larger 1.5B artifact when x86_64 staging is reachable. Keep this
-outside the default public HTTP request path until larger-model and
+Run a small x86_64 window sweep around the promising larger-artifact result:
+32, 64, 128, and 256 generated chunks on `Qwen2.5-1.5B-Instruct-Q8_0` at the
+256-token budget. Then repeat the selected window size with reconnect/error
+probes and at least one 512-token budget before designing any default public
+HTTP request policy. Keep this outside the default serving path until
 conversation-quality probes prove that reduced prompt length does not hide
 important continuity regressions.
