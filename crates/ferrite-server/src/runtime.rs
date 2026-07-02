@@ -1,9 +1,11 @@
 mod cache_options;
+mod prefix_cache;
 
 pub use cache_options::GenerationCacheOptions;
 
 use ferrite_inference::scalar::ScalarLlamaModel;
 use ferrite_model::{gguf::parse_gguf, tokenizer::GgufTokenizer};
+use prefix_cache::fnv64_bytes;
 use std::{error::Error, fmt, fs, path::Path};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -22,6 +24,8 @@ pub enum GenerationFinishReason {
 pub struct InferenceEngine {
     model: ScalarLlamaModel,
     tokenizer: GgufTokenizer,
+    model_fingerprint: String,
+    tokenizer_fingerprint: String,
 }
 
 impl InferenceEngine {
@@ -34,7 +38,13 @@ impl InferenceEngine {
             .map_err(|error| RuntimeError::new(format!("failed to load tokenizer: {error}")))?;
         let model = ScalarLlamaModel::from_gguf_scalar(&gguf, &bytes)
             .map_err(|error| RuntimeError::new(format!("failed to load scalar model: {error}")))?;
-        Ok(Self { model, tokenizer })
+        let content_hash = fnv64_bytes(&bytes);
+        Ok(Self {
+            model,
+            tokenizer,
+            model_fingerprint: format!("gguf-model-fnv64:{content_hash:016x}"),
+            tokenizer_fingerprint: format!("gguf-tokenizer-fnv64:{content_hash:016x}"),
+        })
     }
 
     pub fn generate(&self, prompt: &str, max_tokens: usize) -> Result<GeneratedText, RuntimeError> {
@@ -76,7 +86,6 @@ impl InferenceEngine {
         cache_options: GenerationCacheOptions,
         mut on_token: impl FnMut(&str) -> Result<GenerationControl, RuntimeError>,
     ) -> Result<GeneratedText, RuntimeError> {
-        let _cache_options = cache_options;
         let prompt_token_ids = self
             .tokenizer
             .encode(prompt)
@@ -84,6 +93,7 @@ impl InferenceEngine {
         if prompt_token_ids.is_empty() {
             return Err(RuntimeError::new("prompt must contain at least one token"));
         }
+        let _prefix_cache_key = self.prefix_cache_key_for_tokens(&prompt_token_ids, &cache_options);
 
         let mut session = self.model.start_session();
         let next = session
@@ -327,6 +337,32 @@ mod tests {
         assert!(error
             .to_string()
             .contains("cached prompt tokens 3 exceed prompt tokens 2"));
+    }
+
+    #[test]
+    fn prefix_cache_key_uses_tokenized_prompt_and_cache_namespace(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let model_path = write_fixture_model()?;
+        let engine = InferenceEngine::load(&model_path)?;
+        remove_fixture_model(&model_path)?;
+
+        let key = engine.prefix_cache_key_for_prompt(
+            "winner",
+            &GenerationCacheOptions::from_namespace(Some("tenant-a:thread-1".to_owned())),
+        )?;
+
+        assert_eq!(key.prefix_tokens(), &[2]);
+        assert_eq!(key.prefix_token_count(), 1);
+        assert_eq!(key.namespace(), Some("tenant-a:thread-1"));
+        assert!(key.fingerprints().model().starts_with("gguf-model-fnv64:"));
+        assert!(key
+            .fingerprints()
+            .tokenizer()
+            .starts_with("gguf-tokenizer-fnv64:"));
+        assert_eq!(key.fingerprints().template(), "runtime-rendered-prompt-v1");
+        assert_eq!(key.fingerprints().execution(), "scalar-default");
+        assert_eq!(key.fingerprints().request_shape(), "text-generation-v1");
+        Ok(())
     }
 
     #[test]
