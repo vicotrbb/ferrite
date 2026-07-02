@@ -68,6 +68,8 @@ fn parses_custom_long_chat_token_lengths_turns_and_models() -> Result<(), Box<dy
         OsString::from("4242"),
         OsString::from("--error-probe"),
         OsString::from("--disconnect-probe"),
+        OsString::from("--prompt-cache-key"),
+        OsString::from("long-chat:prefix"),
         OsString::from("--require-cached-follow-ups"),
         OsString::from("--expect-finish-reason"),
         OsString::from("stop"),
@@ -87,6 +89,7 @@ fn parses_custom_long_chat_token_lengths_turns_and_models() -> Result<(), Box<dy
     assert_eq!(config.prompt(), "first turn");
     assert_eq!(config.assistant_context(), "first answer");
     assert_eq!(config.follow_up(), "second turn");
+    assert_eq!(config.prompt_cache_key(), Some("long-chat:prefix"));
     assert_eq!(config.stop(), Some("<STOP>"));
     assert_eq!(config.rss_pid(), Some(4242));
     assert!(config.error_probe());
@@ -114,6 +117,27 @@ fn rejects_invalid_long_chat_probe_max_tokens() -> Result<(), Box<dyn std::error
     };
 
     assert!(error.to_string().contains("--probe-max-tokens"), "{error}");
+    Ok(())
+}
+
+#[test]
+fn rejects_required_cached_follow_ups_without_prompt_cache_key(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let result = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--require-cached-follow-ups"),
+    ]);
+    let error = match result {
+        Ok(config) => return Err(format!("expected error, got config: {config:?}").into()),
+        Err(error) => error,
+    };
+
+    assert!(
+        error
+            .to_string()
+            .contains("--require-cached-follow-ups requires --prompt-cache-key"),
+        "{error}"
+    );
     Ok(())
 }
 

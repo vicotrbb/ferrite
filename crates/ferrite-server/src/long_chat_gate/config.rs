@@ -130,6 +130,12 @@ impl LongChatGateConfig {
             }
         }
 
+        if config.require_cached_follow_ups && config.prompt_cache_key.is_none() {
+            return Err(LongChatGateError::new(
+                "--require-cached-follow-ups requires --prompt-cache-key",
+            ));
+        }
+
         Ok(config)
     }
 
