@@ -2,7 +2,7 @@
 
 Date: 2026-07-02
 
-Status: Hypothesis
+Status: Tested locally, needs design
 
 ## Hypothesis
 
@@ -61,6 +61,37 @@ The theory is falsified if TTFT and total elapsed time do not improve
 materially, or if response coherence and gate invariants fail at window sizes
 that would be useful for real local chat.
 
+## First Probe
+
+A benchmark-only long-chat gate flag, `--generated-context-max-chars`, now
+allows local generated-context window measurements without changing Ferrite's
+OpenAI-compatible server defaults. The implementation keeps only the trailing
+N Unicode scalar values from generated assistant text before carrying it into
+the next long-chat turn. This is intentionally not a production policy: it is a
+measurement tool to decide whether token-aware windowing is worth designing.
+
+The first local probe completed on `Qwen2.5-0.5B-Instruct-Q4_K_M` with a
+128-token generated-context gate. The benchmark note is
+`documentation/benchmarks/2026-07-02-openai-long-chat-qwen-0-5b-generated-context-windowing-128.md`.
+
+Both the unwindowed baseline and the 128-character windowed run completed four
+streaming chat turns with generated assistant context on turns 2-4, token-limit
+status, usage accounting, streaming token IDs, RSS samples, and
+`long_chat_summary_run_complete=true`.
+
+Generated-turn averages:
+
+| Metric | Baseline | Window 128 chars | Change |
+| --- | ---: | ---: | ---: |
+| Prompt tokens | 158.00 | 55.67 | -64.77% |
+| TTFT ms | 7116.00 | 2354.33 | -66.91% |
+| Stream ms | 13741.00 | 8250.67 | -39.96% |
+| Streaming tok/s | 9.388321 | 15.640928 | +66.60% |
+
+This supports the theory for the small local measurement slice. It does not
+prove response quality, token-exact windowing, x86_64 behavior, larger
+generated-context budgets, or steady-state memory behavior.
+
 ## Risks
 
 - Windowing can hide long-range context regressions if the proof prompt is too
@@ -74,6 +105,7 @@ that would be useful for real local chat.
 
 ## Next Step
 
-Add a benchmark-only generated-context-window probe before changing server
-defaults. Keep the initial implementation outside the public HTTP request path
-until the measurement shows a real latency or memory benefit.
+Design a token-aware generated-context windowing experiment next. Keep it
+outside the default public HTTP request path until larger-model and
+conversation-quality probes prove that reduced prompt length does not hide
+important continuity regressions.
