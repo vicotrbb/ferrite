@@ -12,10 +12,16 @@ pub fn format_plan(config: &LongChatGateConfig) -> String {
         .prompt_cache_key()
         .map(|key| format!("\nlong_chat_prompt_cache_key={key}"))
         .unwrap_or_default();
+    let require_cached_follow_ups = if config.require_cached_follow_ups() {
+        "\nlong_chat_require_cached_follow_ups=true"
+    } else {
+        ""
+    };
     format!(
-        "long_chat_models={models}\nlong_chat_token_lengths={token_lengths}\nlong_chat_turns={}{}\nlong_chat_planned_scenarios={}",
+        "long_chat_models={models}\nlong_chat_token_lengths={token_lengths}\nlong_chat_turns={}{}{}\nlong_chat_planned_scenarios={}",
         config.turns(),
         prompt_cache_key,
+        require_cached_follow_ups,
         config.planned_scenarios()
     )
 }
