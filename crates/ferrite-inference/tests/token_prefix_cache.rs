@@ -32,6 +32,13 @@ fn prefix_cache_key_includes_model_tokenizer_and_template_fingerprints() {
     );
 
     assert_eq!(key.prefix_token_count(), 3);
+    assert_eq!(key.prefix_tokens(), &[10, 20, 30]);
+    assert_eq!(key.prefix_token_hash(), prefix.token_hash());
+    assert_eq!(key.fingerprints().model(), "model-a");
+    assert_eq!(key.fingerprints().tokenizer(), "tokenizer-a");
+    assert_eq!(key.fingerprints().template(), "template-a");
+    assert_eq!(key.fingerprints().execution(), "scalar-default");
+    assert_eq!(key.fingerprints().request_shape(), "chat-default");
     assert_ne!(
         key,
         PrefixCacheKey::new(

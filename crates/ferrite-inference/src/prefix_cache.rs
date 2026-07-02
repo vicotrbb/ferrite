@@ -57,6 +57,26 @@ impl PrefixCacheFingerprints {
             request_shape_fingerprint: request_shape_fingerprint.into(),
         }
     }
+
+    pub fn model(&self) -> &str {
+        &self.model_fingerprint
+    }
+
+    pub fn tokenizer(&self) -> &str {
+        &self.tokenizer_fingerprint
+    }
+
+    pub fn template(&self) -> &str {
+        &self.template_fingerprint
+    }
+
+    pub fn execution(&self) -> &str {
+        &self.execution_fingerprint
+    }
+
+    pub fn request_shape(&self) -> &str {
+        &self.request_shape_fingerprint
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -86,6 +106,18 @@ impl PrefixCacheKey {
 
     pub fn prefix_token_count(&self) -> usize {
         self.prefix.token_count()
+    }
+
+    pub fn prefix_tokens(&self) -> &[usize] {
+        self.prefix.tokens()
+    }
+
+    pub fn prefix_token_hash(&self) -> u64 {
+        self.prefix.token_hash()
+    }
+
+    pub fn fingerprints(&self) -> &PrefixCacheFingerprints {
+        &self.fingerprints
     }
 }
 
