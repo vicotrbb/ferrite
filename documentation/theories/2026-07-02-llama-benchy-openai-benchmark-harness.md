@@ -106,6 +106,13 @@ The command exited `0`, wrote
 and did not print the previous local-tokenization fallback line. See
 `documentation/benchmarks/2026-07-02-llama-benchy-qwen-0-5b-token-ids-smoke.md`.
 
+Ferrite's own OpenAI throughput and long-chat proof clients now summarize token
+ID coverage for no-stop streaming chunks. A local Qwen 0.5B smoke reported
+`streaming_content_chunks=8`, `streaming_token_id_chunks=8`,
+`streaming_token_ids=8`, and
+`streaming_all_content_chunks_have_token_ids=true`. See
+`documentation/benchmarks/2026-07-02-openai-throughput-qwen-0-5b-token-id-observability.md`.
+
 This moves the theory from pure hypothesis to early compatibility evidence. It
 does not validate the full 256/512/1024-token protocol, prefix caching,
 concurrency behavior, RSS behavior, reconnect/error behavior, or stop/EOS
