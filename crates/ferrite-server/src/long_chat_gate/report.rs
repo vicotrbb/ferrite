@@ -17,11 +17,22 @@ pub fn format_plan(config: &LongChatGateConfig) -> String {
     } else {
         ""
     };
+    let stop_configured = if config.stop().is_some() {
+        "\nlong_chat_stop_configured=true"
+    } else {
+        ""
+    };
+    let expected_finish_reason = config
+        .expected_finish_reason()
+        .map(|reason| format!("\nlong_chat_expected_finish_reason={reason}"))
+        .unwrap_or_default();
     format!(
-        "long_chat_models={models}\nlong_chat_token_lengths={token_lengths}\nlong_chat_turns={}{}{}\nlong_chat_planned_scenarios={}",
+        "long_chat_models={models}\nlong_chat_token_lengths={token_lengths}\nlong_chat_turns={}{}{}{}{}\nlong_chat_planned_scenarios={}",
         config.turns(),
         prompt_cache_key,
         require_cached_follow_ups,
+        stop_configured,
+        expected_finish_reason,
         config.planned_scenarios()
     )
 }

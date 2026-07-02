@@ -238,6 +238,29 @@ fn formats_long_chat_gate_plan_with_required_cached_follow_ups(
 }
 
 #[test]
+fn formats_long_chat_gate_plan_with_stop_expectation() -> Result<(), Box<dyn std::error::Error>> {
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--models"),
+        OsString::from("fixture-model"),
+        OsString::from("--token-lengths"),
+        OsString::from("256"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+        OsString::from("--stop"),
+        OsString::from("</s>"),
+        OsString::from("--expect-finish-reason"),
+        OsString::from("stop"),
+    ])?;
+
+    assert_eq!(
+        format_plan(&config),
+        "long_chat_models=fixture-model\nlong_chat_token_lengths=256\nlong_chat_turns=4\nlong_chat_stop_configured=true\nlong_chat_expected_finish_reason=stop\nlong_chat_planned_scenarios=4"
+    );
+    Ok(())
+}
+
+#[test]
 fn expands_ordered_long_chat_gate_scenarios() -> Result<(), Box<dyn std::error::Error>> {
     let config = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),
