@@ -14,7 +14,10 @@ impl LongChatGateConfig {
         mut observer: impl FnMut(&LongChatScenarioResult) -> Result<(), Box<dyn Error>>,
     ) -> Result<Vec<LongChatScenarioResult>, Box<dyn Error>> {
         let scenarios = self.scenarios();
-        let mut assistant_contexts = LongChatAssistantContexts::new(self.assistant_context());
+        let mut assistant_contexts = LongChatAssistantContexts::new(
+            self.assistant_context(),
+            self.generated_context_max_chars(),
+        );
         let mut results = Vec::with_capacity(scenarios.len());
 
         for scenario in &scenarios {
@@ -51,7 +54,10 @@ impl LongChatGateConfig {
         mut observer: impl FnMut(&LongChatScenarioResult) -> Result<(), Box<dyn Error>>,
     ) -> Result<Vec<LongChatScenarioResult>, Box<dyn Error>> {
         let scenarios = self.scenarios();
-        let mut assistant_contexts = LongChatAssistantContexts::new(self.assistant_context());
+        let mut assistant_contexts = LongChatAssistantContexts::new(
+            self.assistant_context(),
+            self.generated_context_max_chars(),
+        );
         let mut results = Vec::with_capacity(scenarios.len());
 
         for scenario in &scenarios {
@@ -95,6 +101,7 @@ impl LongChatGateConfig {
 
 struct LongChatAssistantContexts {
     seed: String,
+    generated_context_max_chars: Option<usize>,
     generated_by_scenario: HashMap<(String, usize), String>,
 }
 
@@ -104,9 +111,10 @@ struct LongChatAssistantContext {
 }
 
 impl LongChatAssistantContexts {
-    fn new(seed: &str) -> Self {
+    fn new(seed: &str, generated_context_max_chars: Option<usize>) -> Self {
         Self {
             seed: seed.to_owned(),
+            generated_context_max_chars,
             generated_by_scenario: HashMap::new(),
         }
     }
@@ -132,9 +140,19 @@ impl LongChatAssistantContexts {
         let Some(text) = &result.streaming_text else {
             return;
         };
-        self.generated_by_scenario.insert(
-            (scenario.model().to_owned(), scenario.token_length()),
-            text.text().to_owned(),
-        );
+        let text = match self.generated_context_max_chars {
+            Some(max_chars) => trailing_chars(text.text(), max_chars),
+            None => text.text().to_owned(),
+        };
+        self.generated_by_scenario
+            .insert((scenario.model().to_owned(), scenario.token_length()), text);
     }
+}
+
+fn trailing_chars(text: &str, max_chars: usize) -> String {
+    let char_count = text.chars().count();
+    if char_count <= max_chars {
+        return text.to_owned();
+    }
+    text.chars().skip(char_count - max_chars).collect()
 }

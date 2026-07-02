@@ -1046,6 +1046,60 @@ fn carries_generated_assistant_text_between_turns_per_token_length(
 }
 
 #[test]
+fn can_window_generated_assistant_context_before_follow_up_turns(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--models"),
+        OsString::from("fixture-model"),
+        OsString::from("--token-lengths"),
+        OsString::from("256"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+        OsString::from("--assistant-context"),
+        OsString::from("seed answer"),
+        OsString::from("--generated-context-max-chars"),
+        OsString::from("4"),
+    ])?;
+    let mut observed_contexts = Vec::new();
+    let generated = ["alpha-beta", "gamma-delta", "epsilon-zeta", "final"];
+    let mut calls = 0usize;
+
+    let results = config.run_with_executor(|throughput| {
+        observed_contexts.push(throughput.assistant_context().map(str::to_owned));
+        let text = generated[calls].to_owned();
+        calls += 1;
+        Ok(ThroughputResult {
+            completed_requests: throughput.requests(),
+            elapsed: Duration::from_millis(10),
+            streaming_finish: Some(StreamingFinishSummary::new("length")),
+            streaming_timing: None,
+            streaming_text: Some(StreamingTextSummary::new(text)),
+            streaming_token_ids: None,
+            streaming_usage: Some(StreamingUsageSummary::new(
+                8,
+                throughput.max_tokens() as u64,
+                throughput.max_tokens() as u64 + 8,
+            )),
+            rss: None,
+        })
+    })?;
+
+    assert_eq!(results.len(), 4);
+    assert_eq!(
+        observed_contexts,
+        [
+            Some("seed answer".to_owned()),
+            Some("beta".to_owned()),
+            Some("elta".to_owned()),
+            Some("zeta".to_owned()),
+        ]
+    );
+    assert!(format_plan(&config).contains("long_chat_generated_context_max_chars=4"));
+    Ok(())
+}
+
+#[test]
 fn rejects_unexpected_long_chat_finish_reason() -> Result<(), Box<dyn std::error::Error>> {
     let config = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),
