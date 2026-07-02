@@ -1,0 +1,81 @@
+{
+  "server": "http://127.0.0.1:18080/v1",
+  "model": "Qwen2.5-0.5B-Instruct-Q4_K_M",
+  "scenarios": [
+    {
+      "scenario": "target-256",
+      "repeated_sentence_count": 24,
+      "prompt_cache_key": "ferrite:direct:prefix-matrix:target-256",
+      "requests": [
+        {
+          "request_index": 1,
+          "elapsed_ms": 17226.462082995567,
+          "prompt_tokens": 342,
+          "completion_tokens": 8,
+          "cached_tokens": 0,
+          "finish_reason": "length",
+          "content": "10000000"
+        },
+        {
+          "request_index": 2,
+          "elapsed_ms": 575.041833013529,
+          "prompt_tokens": 342,
+          "completion_tokens": 8,
+          "cached_tokens": 342,
+          "finish_reason": "length",
+          "content": "10000000"
+        }
+      ]
+    },
+    {
+      "scenario": "target-512",
+      "repeated_sentence_count": 48,
+      "prompt_cache_key": "ferrite:direct:prefix-matrix:target-512",
+      "requests": [
+        {
+          "request_index": 1,
+          "elapsed_ms": 39789.818249992095,
+          "prompt_tokens": 678,
+          "completion_tokens": 8,
+          "cached_tokens": 0,
+          "finish_reason": "length",
+          "content": "1. Check the prompt for repeated exact"
+        },
+        {
+          "request_index": 2,
+          "elapsed_ms": 752.9950000171084,
+          "prompt_tokens": 678,
+          "completion_tokens": 8,
+          "cached_tokens": 678,
+          "finish_reason": "length",
+          "content": "1. Check the prompt for repeated exact"
+        }
+      ]
+    },
+    {
+      "scenario": "target-1024",
+      "repeated_sentence_count": 96,
+      "prompt_cache_key": "ferrite:direct:prefix-matrix:target-1024",
+      "requests": [
+        {
+          "request_index": 1,
+          "elapsed_ms": 103150.62875000876,
+          "prompt_tokens": 1350,
+          "completion_tokens": 8,
+          "cached_tokens": 0,
+          "finish_reason": "length",
+          "content": "1. Check the prefix cache validation checks"
+        },
+        {
+          "request_index": 2,
+          "elapsed_ms": 1117.001792008523,
+          "prompt_tokens": 1350,
+          "completion_tokens": 8,
+          "cached_tokens": 1350,
+          "finish_reason": "length",
+          "content": "1. Check the prefix cache validation checks"
+        }
+      ]
+    }
+  ]
+}

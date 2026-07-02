@@ -178,6 +178,12 @@ A minimal compatibility smoke has been executed against Ferrite:
   `documentation/benchmarks/2026-07-02-llama-benchy-qwen-0-5b-prefix-smoke-rerun.json`
 - Direct Ferrite prefix-cache metadata raw result:
   `documentation/benchmarks/2026-07-02-ferrite-qwen-0-5b-prefix-cache-direct-smoke-rerun.json`
+- Prefix-cache matrix note:
+  `documentation/benchmarks/2026-07-02-llama-benchy-qwen-0-5b-prefix-matrix.md`
+- Prefix-cache matrix raw result:
+  `documentation/benchmarks/2026-07-02-llama-benchy-qwen-0-5b-prefix-matrix.json`
+- Direct Ferrite prefix-cache matrix metadata raw result:
+  `documentation/benchmarks/2026-07-02-ferrite-qwen-0-5b-prefix-cache-direct-matrix.json`
 
 That smoke used `--pp 32`, `--tg 16`, one run, concurrency `1`, no warmup, no
 coherence check, and no prompt adaptation. It proves external tool
@@ -197,13 +203,16 @@ prompt-processing throughput and similar decode throughput. All three lengths
 are documented in their result notes above and compared with the nearest
 Ferrite long-chat timing artifacts.
 
-The first single-model length matrix, a small concurrency step, and a bounded
-prefix-cache smoke are executed, but the full protocol has not been executed.
-The concurrency step showed the default zero-wait policy returning HTTP 429
-under excess concurrency and the `--inference-wait-ms 300000` policy completing
-at concurrency 1, 2, and 4 with queued single-permit behavior. The prefix-cache
-smoke showed that `llama-benchy` can run its context-load plus inference mode
-against Ferrite, while a direct Ferrite probe confirmed repeated exact prompts
-with the same `prompt_cache_key` report non-zero cached prompt tokens. The next
-proof slice is the full 256/512/1024 prefix-cache matrix or a generated-context
-long-chat cache gate.
+The first single-model length matrix, a small concurrency step, a bounded
+prefix-cache smoke, and a 256/512/1024 prefix-cache cross-product matrix are
+executed, but the full protocol has not been executed. The concurrency step
+showed the default zero-wait policy returning HTTP 429 under excess concurrency
+and the `--inference-wait-ms 300000` policy completing at concurrency 1, 2, and
+4 with queued single-permit behavior. The prefix-cache smoke showed that
+`llama-benchy` can run its context-load plus inference mode against Ferrite,
+while direct Ferrite probes confirmed repeated exact prompts with the same
+`prompt_cache_key` report non-zero cached prompt tokens at 17, 342, 678, and
+1350 prompt-token scales. The list-form prefix-cache matrix is a 3x3
+cross-product and is too heavy for a quick default gate. The next proof slice
+is a generated-context long-chat cache gate or a small diagonal wrapper for
+repeatable prefix-cache regression checks.

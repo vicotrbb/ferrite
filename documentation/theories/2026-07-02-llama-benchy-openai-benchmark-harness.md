@@ -155,9 +155,20 @@ cache key; the second response reported `cached_tokens=17` and dropped from
 `1065.8981669985224` ms to `386.81875000474975` ms. See
 `documentation/benchmarks/2026-07-02-llama-benchy-qwen-0-5b-prefix-smoke.md`.
 
-This moves the theory from pure hypothesis to early compatibility evidence. It
-does not validate the full prefix-cache matrix, high-concurrency serving,
-reconnect/error behavior under load, or stop/EOS behavior under load.
+A larger prefix-cache matrix has now run with prompt sizes 256, 512, and 1024,
+context depths 256, 512, and 1024, and a fixed 32 generated tokens. The
+list-form command produced a 3x3 cross-product with context-load and inference
+rows for each combination. The largest inference row, depth 1024 and prompt
+1024, reported `tg_throughput.mean=6.667126615243654` and
+`e2e_ttft.mean=196352.9143340129`. Companion direct Ferrite probes confirmed
+exact-prompt cache hits at larger prompt-token scales: 342, 678, and 1350
+cached prompt tokens on the second request. See
+`documentation/benchmarks/2026-07-02-llama-benchy-qwen-0-5b-prefix-matrix.md`.
+
+This moves the theory from pure hypothesis to working external benchmark
+evidence. It does not validate generated-context long-chat cache reuse,
+high-concurrency serving, reconnect/error behavior under load, or stop/EOS
+behavior under load.
 
 ## Falsification Experiment
 
@@ -215,10 +226,10 @@ long-chat proof notes.
 
 ## Next Step
 
-Run the full `llama-benchy` 256/512/1024 prefix-cache matrix against
-`Qwen2.5-0.5B-Instruct-Q4_K_M`, with a companion Ferrite-side cached-token
-metadata probe because `llama-benchy` saved JSON does not currently expose
-`usage.prompt_tokens_details.cached_tokens`.
+Build a generated-context long-chat cache gate or a small diagonal wrapper for
+repeatable prefix-cache regression checks. Keep the 3x3 `llama-benchy`
+cross-product as an explicit long benchmark because it is too heavy for a quick
+default gate on the local Mac.
 
 Do not adopt this as a standard gate until the result is compared with
 Ferrite's own long-chat timing output for the same model and token lengths.
