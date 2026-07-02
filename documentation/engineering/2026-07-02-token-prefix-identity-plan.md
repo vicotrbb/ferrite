@@ -81,29 +81,33 @@ Add `pub mod prefix_cache;` to `crates/ferrite-inference/src/lib.rs`.
 Create `crates/ferrite-inference/src/prefix_cache.rs` with:
 
 ```rust
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct TokenPrefixIdentity {
-    token_count: usize,
+    tokens: Vec<usize>,
     token_hash: u64,
 }
 
 impl TokenPrefixIdentity {
     pub fn from_tokens(tokens: impl IntoIterator<Item = usize>) -> Self {
-        let mut token_count = 0;
+        let tokens = tokens.into_iter().collect::<Vec<_>>();
         let mut token_hash = FNV_OFFSET_BASIS;
-        for token in tokens {
-            token_count += 1;
-            token_hash = mix_usize(token_hash, token);
+        for token in &tokens {
+            token_hash = mix_usize(token_hash, *token);
         }
-        token_hash = mix_usize(token_hash, token_count);
-        Self {
-            token_count,
-            token_hash,
-        }
+        token_hash = mix_usize(token_hash, tokens.len());
+        Self { tokens, token_hash }
     }
 
     pub fn token_count(&self) -> usize {
-        self.token_count
+        self.tokens.len()
+    }
+
+    pub fn tokens(&self) -> &[usize] {
+        &self.tokens
+    }
+
+    pub fn token_hash(&self) -> u64 {
+        self.token_hash
     }
 }
 
