@@ -200,10 +200,36 @@ The proof is still small. It does not replace the 256/512/1024-token gate,
 larger-model coverage, stop/EOS coverage, x86_64 coverage, or longer
 steady-state memory checks.
 
+## Full-Matrix Shared-Prefix Gate
+
+The same shared-prefix implementation then completed a local full matrix on
+`SmolLM2-135M-Instruct-Q4_K_M`. The benchmark note is
+`documentation/benchmarks/2026-07-02-openai-long-chat-smollm-135m-shared-prefix-cache-full-matrix.md`.
+
+The run covered 256, 512, and 1024 streaming response tokens across four turns,
+with RSS sampling, token-id summaries, unauthorized reconnect probing,
+disconnect/reconnect probing, and `--require-cached-follow-ups`.
+
+The summary recorded:
+
+```text
+long_chat_summary_completed_scenarios=12
+long_chat_summary_generated_follow_up_turns=9
+long_chat_summary_cached_generated_follow_up_turns=9
+long_chat_summary_uncached_generated_follow_up_turns=0
+long_chat_summary_all_generated_follow_up_turns_cached=true
+long_chat_summary_run_complete=true
+```
+
+This moves the theory from a short smoke to a local full-token-matrix proof on
+a small real model. The generated-context rows also show the practical limit of
+shared-prefix reuse: cached prompt-token counts vary with how much generated
+assistant content is actually shared between the previous cached prompt and the
+current request.
+
 ## Next Step
 
-Scale the shared-prefix cache proof to the dedicated long-chat gate: 256, 512,
-and 1024-token streaming responses, repeated generated-context conversations,
-RSS before/after/idle sampling, latency per token, stop/EOS behavior, and
-client reconnect/error behavior. Track decode slowdown as a separate theory
-instead of assuming prefix reuse will fix it.
+Scale from the small-model full matrix to the required Tier 1 models, add a
+stop/EOS-specific cached generated-context variant, and run a bounded
+`llama-benchy` shared-prefix comparison. Track decode slowdown as a separate
+theory instead of assuming prefix reuse will fix it.
