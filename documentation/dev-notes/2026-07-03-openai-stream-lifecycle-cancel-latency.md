@@ -175,3 +175,10 @@ The long-prompt request reported `prompt_tokenized_elapsed_ms=8323`, compared
 with `8581` in the earlier runtime-stage proof. This is only a single local
 sample and does not prove a broad throughput improvement; the full request
 timed out during prompt evaluation after `180 s`.
+
+A dedicated tokenizer-only CLI benchmark was then added and measured in
+`documentation/benchmarks/2026-07-03-local-qwen-0-5b-tokenizer-cli-benchmark.md`.
+The same long prompt reported `tokenization_benchmark_total_ns=8188082917` and
+`tokenization_benchmark_token_count=19428`, with no retained scalar model file
+bytes. This isolates the next optimization target: the BPE encode algorithm
+itself, not OpenAI streaming or generation lifecycle behavior.
