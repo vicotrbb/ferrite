@@ -44,6 +44,9 @@ What is proven:
 - Direct in-process SSE body-drop cancellation releases Ferrite's inference
   permit in the route-level fixture test
   `chat_stream_releases_inference_permit_when_response_body_is_dropped`.
+- Direct TCP disconnect after a generated SSE chat event releases Ferrite's
+  inference permit in the live HTTP fixture test
+  `live_http_server_releases_inference_permit_after_streaming_tcp_disconnect`.
 
 What is not proven:
 
@@ -51,8 +54,6 @@ What is not proven:
 - whether the request would have stopped naturally after a short delay;
 - whether Kubernetes port-forward buffering hid the real client state;
 - whether the observed CPU belonged to the killed request or another request;
-- whether a real TCP client disconnect releases the permit as promptly as an
-  in-process dropped response body;
 - whether cancellation behavior differs before first token versus after first
   streamed token.
 
@@ -76,6 +77,31 @@ that cancellation may be delayed or hidden in real TCP, port-forwarded, or
 pre-first-token paths where the server has not yet attempted to send a chunk or
 where transport buffering delays disconnect observation.
 
+## Direct TCP Evidence
+
+Commit `2c29192` added a live HTTP fixture test for post-token TCP
+disconnects:
+
+```text
+cargo test -p ferrite-server releases_inference_permit -- --nocapture
+```
+
+The test starts a real local TCP listener, sends a streaming
+`/v1/chat/completions` request with `max_completion_tokens=4096`, reads until a
+generated SSE `delta.content` event is observed, drops the socket, and waits
+for the shared inference permit to become available again. It passed on
+2026-07-03.
+
+This further narrows the remaining theory. Normal post-token TCP disconnects
+release the permit in the fixture path. The still-unproven paths are:
+
+- disconnect before the first generated stream event, especially during long
+  prompt prefill;
+- disconnect propagation through Kubernetes port-forward under staging control
+  plane instability;
+- real-model cancellation timing under long CPU-bound Qwen generation, where
+  observing cancellation may depend on when the inference loop next emits text.
+
 ## Minimal Experiment
 
 Use a small, repeatable model/server setup and avoid Kubernetes port-forward for
@@ -94,8 +120,9 @@ the first pass.
 6. Repeat through Kubernetes port-forward only after the direct local or
    in-pod path is understood.
 
-The next experiment should use a real TCP socket, not `tower::ServiceExt`, so
-it can distinguish application-body drop from network disconnect semantics.
+The next experiment should use a real model or a deliberately slow fixture path
+that disconnects before first generated content, so it can distinguish prompt
+prefill cancellation from post-token stream cancellation.
 
 ## Expected Outcomes
 
