@@ -1,8 +1,9 @@
 use ferrite_server::long_chat_gate::{
-    format_disconnect_probe_result, format_error_probe_result, format_plan, format_report,
-    format_run_summary, format_scenario_result, format_scenarios, LongChatAssistantContextSource,
-    LongChatDisconnectProbeResult, LongChatErrorProbeResult, LongChatGateConfig,
-    LongChatProofArtifacts, LongChatScenarioResult, LongChatTextIdentity,
+    format_disconnect_probe_result, format_error_probe_result, format_plan,
+    format_queue_probe_result, format_report, format_run_summary, format_scenario_result,
+    format_scenarios, LongChatAssistantContextSource, LongChatDisconnectProbeResult,
+    LongChatErrorProbeResult, LongChatGateConfig, LongChatProofArtifacts, LongChatQueueProbeResult,
+    LongChatScenarioResult, LongChatTextIdentity,
 };
 use ferrite_server::throughput_client::{
     OpenAiEndpoint, RssSummary, StreamingFinishSummary, StreamingPromptCacheTraceSummary,
@@ -22,6 +23,7 @@ fn defaults_to_required_long_chat_token_lengths_and_turns() -> Result<(), Box<dy
     assert!(!config.execute());
     assert!(!config.error_probe());
     assert!(!config.disconnect_probe());
+    assert!(!config.queue_probe());
     assert!(!config.require_cached_follow_ups());
     assert_eq!(
         config.models(),
@@ -328,6 +330,53 @@ fn formats_long_chat_gate_plan_with_prompt_cache_keys() -> Result<(), Box<dyn st
     assert_eq!(
         format_plan(&config),
         "long_chat_models=fixture-model\nlong_chat_token_lengths=256\nlong_chat_turns=4\nlong_chat_prompt_cache_keys=tenant-a:thread-1,tenant-b:thread-1\nlong_chat_addr=127.0.0.1:8080\nlong_chat_planned_scenarios=8"
+    );
+    Ok(())
+}
+
+#[test]
+fn formats_long_chat_gate_plan_with_queue_probe() -> Result<(), Box<dyn std::error::Error>> {
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--models"),
+        OsString::from("fixture-model"),
+        OsString::from("--token-lengths"),
+        OsString::from("256"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+        OsString::from("--prompt-cache-keys"),
+        OsString::from("tenant-a:thread-1,tenant-b:thread-1"),
+        OsString::from("--queue-probe"),
+        OsString::from("--probe-max-tokens"),
+        OsString::from("64"),
+    ])?;
+
+    assert!(config.queue_probe());
+    assert_eq!(
+        format_plan(&config),
+        "long_chat_models=fixture-model\nlong_chat_token_lengths=256\nlong_chat_turns=4\nlong_chat_prompt_cache_keys=tenant-a:thread-1,tenant-b:thread-1\nlong_chat_addr=127.0.0.1:8080\nlong_chat_queue_probe_required=true\nlong_chat_probe_max_tokens=64\nlong_chat_planned_scenarios=8"
+    );
+    Ok(())
+}
+
+#[test]
+fn rejects_queue_probe_without_two_prompt_cache_keys() -> Result<(), Box<dyn std::error::Error>> {
+    let result = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--queue-probe"),
+        OsString::from("--prompt-cache-key"),
+        OsString::from("tenant-a:thread-1"),
+    ]);
+    let error = match result {
+        Ok(config) => return Err(format!("expected error, got config: {config:?}").into()),
+        Err(error) => error,
+    };
+
+    assert!(
+        error
+            .to_string()
+            .contains("--queue-probe requires at least two --prompt-cache-keys"),
+        "{error}"
     );
     Ok(())
 }
@@ -989,6 +1038,20 @@ fn formats_long_chat_disconnect_probe_result() {
 }
 
 #[test]
+fn formats_long_chat_queue_probe_result() {
+    let result = LongChatQueueProbeResult::new(
+        "tenant-a:thread-1".to_owned(),
+        "tenant-b:thread-1".to_owned(),
+        64,
+    );
+
+    assert_eq!(
+        format_queue_probe_result(&result),
+        "long_chat_queue_probe_holder_prompt_cache_key=tenant-a:thread-1\nlong_chat_queue_probe_contender_prompt_cache_key=tenant-b:thread-1\nlong_chat_queue_probe_holder_started_streaming=true\nlong_chat_queue_probe_holder_completed=true\nlong_chat_queue_probe_contender_status=200\nlong_chat_queue_probe_contender_completed=true\nlong_chat_queue_probe_contender_generated_event=true\nlong_chat_queue_probe_contender_started_after_holder=true\nlong_chat_queue_probe_max_tokens=64"
+    );
+}
+
+#[test]
 fn formats_integrated_long_chat_run_summary() -> Result<(), Box<dyn std::error::Error>> {
     let config = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),
@@ -1056,10 +1119,65 @@ fn formats_integrated_long_chat_run_summary() -> Result<(), Box<dyn std::error::
             &config,
             &results,
             Some(&error_probe),
-            Some(&disconnect_probe)
+            Some(&disconnect_probe),
+            None
         ),
-        "long_chat_summary_planned_scenarios=4\nlong_chat_summary_completed_scenarios=4\nlong_chat_summary_all_finish_reasons_present=true\nlong_chat_summary_all_usage_accounting_valid=true\nlong_chat_summary_all_token_limit_status_present=true\nlong_chat_summary_any_token_limit_hit=true\nlong_chat_summary_prompt_cache_key_present=false\nlong_chat_summary_cached_follow_ups_required=false\nlong_chat_summary_any_cached_prompt_tokens=false\nlong_chat_summary_generated_follow_up_turns=3\nlong_chat_summary_cached_generated_follow_up_turns=0\nlong_chat_summary_uncached_generated_follow_up_turns=3\nlong_chat_summary_all_generated_follow_up_turns_cached=false\nlong_chat_summary_generated_follow_up_context_required=true\nlong_chat_summary_all_follow_up_turns_use_generated_context=true\nlong_chat_summary_generated_context_identity_required=true\nlong_chat_summary_generated_context_identity_links=3\nlong_chat_summary_matching_generated_context_identity_links=3\nlong_chat_summary_all_generated_context_identity_links_present=true\nlong_chat_summary_all_generated_context_identities_match_previous_response=true\nlong_chat_summary_all_timing_present=true\nlong_chat_summary_streaming_token_ids_required=true\nlong_chat_summary_all_streaming_token_id_summaries_present=true\nlong_chat_summary_all_streaming_content_chunks_have_token_ids=true\nlong_chat_summary_rss_required=true\nlong_chat_summary_all_rss_present=true\nlong_chat_summary_error_probe_required=true\nlong_chat_summary_error_probe_completed=true\nlong_chat_summary_error_probe_reconnect_started_new_generation=true\nlong_chat_summary_disconnect_probe_required=true\nlong_chat_summary_disconnect_probe_completed=true\nlong_chat_summary_disconnect_probe_reconnect_started_new_generation=true\nlong_chat_summary_run_complete=true"
+        "long_chat_summary_planned_scenarios=4\nlong_chat_summary_completed_scenarios=4\nlong_chat_summary_all_finish_reasons_present=true\nlong_chat_summary_all_usage_accounting_valid=true\nlong_chat_summary_all_token_limit_status_present=true\nlong_chat_summary_any_token_limit_hit=true\nlong_chat_summary_prompt_cache_key_present=false\nlong_chat_summary_cached_follow_ups_required=false\nlong_chat_summary_any_cached_prompt_tokens=false\nlong_chat_summary_generated_follow_up_turns=3\nlong_chat_summary_cached_generated_follow_up_turns=0\nlong_chat_summary_uncached_generated_follow_up_turns=3\nlong_chat_summary_all_generated_follow_up_turns_cached=false\nlong_chat_summary_generated_follow_up_context_required=true\nlong_chat_summary_all_follow_up_turns_use_generated_context=true\nlong_chat_summary_generated_context_identity_required=true\nlong_chat_summary_generated_context_identity_links=3\nlong_chat_summary_matching_generated_context_identity_links=3\nlong_chat_summary_all_generated_context_identity_links_present=true\nlong_chat_summary_all_generated_context_identities_match_previous_response=true\nlong_chat_summary_all_timing_present=true\nlong_chat_summary_streaming_token_ids_required=true\nlong_chat_summary_all_streaming_token_id_summaries_present=true\nlong_chat_summary_all_streaming_content_chunks_have_token_ids=true\nlong_chat_summary_rss_required=true\nlong_chat_summary_all_rss_present=true\nlong_chat_summary_error_probe_required=true\nlong_chat_summary_error_probe_completed=true\nlong_chat_summary_error_probe_reconnect_started_new_generation=true\nlong_chat_summary_disconnect_probe_required=true\nlong_chat_summary_disconnect_probe_completed=true\nlong_chat_summary_disconnect_probe_reconnect_started_new_generation=true\nlong_chat_summary_queue_probe_required=false\nlong_chat_summary_queue_probe_completed=false\nlong_chat_summary_queue_probe_contender_started_after_holder=false\nlong_chat_summary_run_complete=true"
     );
+    Ok(())
+}
+
+#[test]
+fn queue_probe_participates_in_long_chat_run_summary() -> Result<(), Box<dyn std::error::Error>> {
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--models"),
+        OsString::from("fixture-model"),
+        OsString::from("--token-lengths"),
+        OsString::from("1"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+        OsString::from("--stop"),
+        OsString::from("x"),
+        OsString::from("--prompt-cache-keys"),
+        OsString::from("tenant-a:thread-1,tenant-b:thread-1"),
+        OsString::from("--queue-probe"),
+    ])?;
+    let results = config
+        .scenarios()
+        .iter()
+        .map(|scenario| {
+            LongChatScenarioResult::new_with_assistant_context_source_and_identity(
+                scenario,
+                ThroughputResult {
+                    completed_requests: 1,
+                    elapsed: Duration::from_millis(400),
+                    streaming_finish: Some(StreamingFinishSummary::new("stop")),
+                    streaming_timing: StreamingTimingSummary::from_event_offsets(&[
+                        Duration::from_millis(10),
+                    ]),
+                    streaming_text: None,
+                    streaming_token_ids: None,
+                    streaming_usage: Some(StreamingUsageSummary::new(4, 1, 5)),
+                    rss: None,
+                },
+                LongChatAssistantContextSource::Seed,
+                LongChatTextIdentity::from_text("seed"),
+            )
+        })
+        .collect::<Vec<_>>();
+    let queue_probe = LongChatQueueProbeResult::new(
+        "tenant-a:thread-1".to_owned(),
+        "tenant-b:thread-1".to_owned(),
+        8,
+    );
+
+    let summary = format_run_summary(&config, &results, None, None, Some(&queue_probe));
+
+    assert!(summary.contains("long_chat_summary_queue_probe_required=true"));
+    assert!(summary.contains("long_chat_summary_queue_probe_completed=true"));
+    assert!(summary.contains("long_chat_summary_queue_probe_contender_started_after_holder=true"));
+    assert!(summary.contains("long_chat_summary_run_complete=true"));
     Ok(())
 }
 
@@ -1114,6 +1232,7 @@ fn explicit_stop_summary_can_complete_without_generated_follow_up_context(
         &results,
         Some(&error_probe),
         Some(&disconnect_probe),
+        None,
     );
 
     assert!(summary.contains("long_chat_summary_all_finish_reasons_present=true"));
@@ -1191,7 +1310,7 @@ fn error_probe_without_generated_reconnect_event_makes_summary_incomplete(
         .collect::<Vec<_>>();
     let error_probe = LongChatErrorProbeResult::new(401, true, false, 8);
 
-    let summary = format_run_summary(&config, &results, Some(&error_probe), None);
+    let summary = format_run_summary(&config, &results, Some(&error_probe), None, None);
 
     assert!(summary.contains("long_chat_summary_error_probe_completed=true"));
     assert!(
@@ -1251,7 +1370,7 @@ fn formats_cache_observability_in_long_chat_run_summary() -> Result<(), Box<dyn 
         })
         .collect::<Vec<_>>();
 
-    let summary = format_run_summary(&config, &results, None, None);
+    let summary = format_run_summary(&config, &results, None, None, None);
 
     assert!(summary.contains("long_chat_summary_prompt_cache_key_present=true"));
     assert!(summary.contains("long_chat_summary_any_cached_prompt_tokens=true"));
@@ -1297,7 +1416,7 @@ fn summarizes_generated_context_identity_continuity() -> Result<(), Box<dyn std:
         })
     })?;
 
-    let summary = format_run_summary(&config, &results, None, None);
+    let summary = format_run_summary(&config, &results, None, None, None);
 
     assert!(summary.contains("long_chat_summary_generated_context_identity_required=true"));
     assert!(summary.contains("long_chat_summary_generated_context_identity_links=3"));
@@ -1362,7 +1481,7 @@ fn summary_is_incomplete_when_generated_context_identity_is_missing(
         })
         .collect::<Vec<_>>();
 
-    let summary = format_run_summary(&config, &results, None, None);
+    let summary = format_run_summary(&config, &results, None, None, None);
 
     assert!(summary.contains("long_chat_summary_generated_context_identity_required=true"));
     assert!(summary.contains("long_chat_summary_generated_context_identity_links=0"));
@@ -1460,7 +1579,7 @@ fn cache_summary_does_not_treat_missing_generated_follow_ups_as_cached(
         LongChatAssistantContextSource::Seed,
     );
 
-    let summary = format_run_summary(&config, &[result], None, None);
+    let summary = format_run_summary(&config, &[result], None, None, None);
 
     assert!(summary.contains("long_chat_summary_prompt_cache_key_present=true"));
     assert!(summary.contains("long_chat_summary_generated_follow_up_turns=0"));
@@ -1518,7 +1637,7 @@ fn required_cached_follow_ups_make_summary_incomplete_without_cache_hits(
         })
         .collect::<Vec<_>>();
 
-    let summary = format_run_summary(&config, &results, None, None);
+    let summary = format_run_summary(&config, &results, None, None, None);
 
     assert!(summary.contains("long_chat_summary_cached_follow_ups_required=true"));
     assert!(summary.contains("long_chat_summary_generated_follow_up_turns=3"));

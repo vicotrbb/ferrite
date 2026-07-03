@@ -16,6 +16,7 @@ pub struct LongChatGateConfig {
     execute: bool,
     error_probe: bool,
     disconnect_probe: bool,
+    queue_probe: bool,
     require_cached_follow_ups: bool,
     models: Vec<String>,
     prompt: String,
@@ -67,6 +68,9 @@ impl LongChatGateConfig {
                 }
                 "--disconnect-probe" => {
                     config.disconnect_probe = true;
+                }
+                "--queue-probe" => {
+                    config.queue_probe = true;
                 }
                 "--require-cached-follow-ups" => {
                     config.require_cached_follow_ups = true;
@@ -219,6 +223,11 @@ impl LongChatGateConfig {
                 "--require-cached-follow-ups requires --prompt-cache-key or --prompt-cache-keys",
             ));
         }
+        if config.queue_probe && config.prompt_cache_keys.len() < 2 {
+            return Err(LongChatGateError::new(
+                "--queue-probe requires at least two --prompt-cache-keys",
+            ));
+        }
         if config.generated_context_max_chars.is_some()
             && config.generated_context_max_tokens.is_some()
         {
@@ -248,6 +257,10 @@ impl LongChatGateConfig {
 
     pub fn disconnect_probe(&self) -> bool {
         self.disconnect_probe
+    }
+
+    pub fn queue_probe(&self) -> bool {
+        self.queue_probe
     }
 
     pub fn require_cached_follow_ups(&self) -> bool {
@@ -382,6 +395,7 @@ impl Default for LongChatGateConfig {
             execute: false,
             error_probe: false,
             disconnect_probe: false,
+            queue_probe: false,
             require_cached_follow_ups: false,
             models: vec![
                 "Qwen2.5-0.5B-Instruct-Q4_K_M".to_owned(),
@@ -531,5 +545,5 @@ fn os_string_to_string(value: OsString) -> Result<String, LongChatGateError> {
 }
 
 fn usage() -> &'static str {
-    "usage: ferrite-openai-long-chat-gate [--execute] [--error-probe] [--disconnect-probe] [--require-cached-follow-ups] [--addr 127.0.0.1:8080] [--api-key local-secret] [--models MODEL[,MODEL...]] [--prompt TEXT] [--assistant-context TEXT] [--follow-up TEXT] [--prompt-cache-key KEY] [--prompt-cache-keys KEY[,KEY...]] [--prompt-cache-trace] [--stop TEXT] [--expect-finish-reason REASON] [--probe-max-tokens TOKENS] [--generated-context-max-chars CHARS] [--generated-context-max-tokens TOKENS] [--generated-context-state-capsule TEXT] [--generated-context-state-capsule-placement assistant-context|assistant-context-only|follow-up] [--require-generated-response-contains TEXT] [--disconnect-reconnect-timeout-ms 30000] [--rss-pid PID] [--proof-log PATH] [--proof-exit-code PATH] [--token-lengths 256,512,1024] [--turns 4]"
+    "usage: ferrite-openai-long-chat-gate [--execute] [--error-probe] [--disconnect-probe] [--queue-probe] [--require-cached-follow-ups] [--addr 127.0.0.1:8080] [--api-key local-secret] [--models MODEL[,MODEL...]] [--prompt TEXT] [--assistant-context TEXT] [--follow-up TEXT] [--prompt-cache-key KEY] [--prompt-cache-keys KEY[,KEY...]] [--prompt-cache-trace] [--stop TEXT] [--expect-finish-reason REASON] [--probe-max-tokens TOKENS] [--generated-context-max-chars CHARS] [--generated-context-max-tokens TOKENS] [--generated-context-state-capsule TEXT] [--generated-context-state-capsule-placement assistant-context|assistant-context-only|follow-up] [--require-generated-response-contains TEXT] [--disconnect-reconnect-timeout-ms 30000] [--rss-pid PID] [--proof-log PATH] [--proof-exit-code PATH] [--token-lengths 256,512,1024] [--turns 4]"
 }

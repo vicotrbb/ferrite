@@ -1,7 +1,7 @@
 use ferrite_server::long_chat_gate::{
-    format_disconnect_probe_result, format_error_probe_result, format_report, format_run_summary,
-    format_scenario_result, LongChatDisconnectProbeResult, LongChatErrorProbeResult,
-    LongChatGateConfig, LongChatProofArtifacts,
+    format_disconnect_probe_result, format_error_probe_result, format_queue_probe_result,
+    format_report, format_run_summary, format_scenario_result, LongChatDisconnectProbeResult,
+    LongChatErrorProbeResult, LongChatGateConfig, LongChatProofArtifacts, LongChatQueueProbeResult,
 };
 use std::io::Write;
 
@@ -46,6 +46,7 @@ async fn run(
     emit_line(artifacts, &format_report(config))?;
     let mut error_probe: Option<LongChatErrorProbeResult> = None;
     let mut disconnect_probe: Option<LongChatDisconnectProbeResult> = None;
+    let mut queue_probe: Option<LongChatQueueProbeResult> = None;
     let mut results = Vec::new();
     if config.error_probe() {
         let result = config.run_error_probe().await?;
@@ -56,6 +57,11 @@ async fn run(
         let result = config.run_disconnect_probe().await?;
         emit_line(artifacts, &format_disconnect_probe_result(&result))?;
         disconnect_probe = Some(result);
+    }
+    if config.queue_probe() {
+        let result = config.run_queue_probe().await?;
+        emit_line(artifacts, &format_queue_probe_result(&result))?;
+        queue_probe = Some(result);
     }
     if config.execute() {
         let mut stdout = std::io::stdout();
@@ -69,7 +75,8 @@ async fn run(
             })
             .await?;
     }
-    if config.execute() || config.error_probe() || config.disconnect_probe() {
+    if config.execute() || config.error_probe() || config.disconnect_probe() || config.queue_probe()
+    {
         emit_line(
             artifacts,
             &format_run_summary(
@@ -77,6 +84,7 @@ async fn run(
                 &results,
                 error_probe.as_ref(),
                 disconnect_probe.as_ref(),
+                queue_probe.as_ref(),
             ),
         )?;
     }

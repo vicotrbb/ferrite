@@ -1,6 +1,6 @@
 use super::{
     LongChatDisconnectProbeResult, LongChatErrorProbeResult, LongChatGateConfig,
-    LongChatScenarioResult, LongChatTextIdentity,
+    LongChatQueueProbeResult, LongChatScenarioResult, LongChatTextIdentity,
 };
 use std::collections::HashMap;
 
@@ -9,6 +9,7 @@ pub fn format_run_summary(
     results: &[LongChatScenarioResult],
     error_probe: Option<&LongChatErrorProbeResult>,
     disconnect_probe: Option<&LongChatDisconnectProbeResult>,
+    queue_probe: Option<&LongChatQueueProbeResult>,
 ) -> String {
     let planned_scenarios = config.planned_scenarios();
     let completed_scenarios = results.len();
@@ -67,6 +68,10 @@ pub fn format_run_summary(
         .is_some_and(|probe| probe.aborted_after_generated_event() && probe.reconnect_completed());
     let disconnect_probe_reconnect_started_new_generation =
         disconnect_probe.is_some_and(|probe| probe.reconnect_started_new_generation());
+    let queue_probe_required = config.queue_probe();
+    let queue_probe_completed = queue_probe.is_some_and(LongChatQueueProbeResult::completed);
+    let queue_probe_contender_started_after_holder =
+        queue_probe.is_some_and(LongChatQueueProbeResult::contender_started_after_holder);
     let run_complete = completed_scenarios == planned_scenarios
         && all_finish_reasons_present
         && all_usage_accounting_valid
@@ -83,7 +88,9 @@ pub fn format_run_summary(
         && (!error_probe_required
             || (error_probe_completed && error_probe_reconnect_started_new_generation))
         && (!disconnect_probe_required
-            || (disconnect_probe_completed && disconnect_probe_reconnect_started_new_generation));
+            || (disconnect_probe_completed && disconnect_probe_reconnect_started_new_generation))
+        && (!queue_probe_required
+            || (queue_probe_completed && queue_probe_contender_started_after_holder));
 
     format!(
         "long_chat_summary_planned_scenarios={planned_scenarios}\n\
@@ -118,6 +125,9 @@ long_chat_summary_error_probe_reconnect_started_new_generation={error_probe_reco
 long_chat_summary_disconnect_probe_required={disconnect_probe_required}\n\
 long_chat_summary_disconnect_probe_completed={disconnect_probe_completed}\n\
 long_chat_summary_disconnect_probe_reconnect_started_new_generation={disconnect_probe_reconnect_started_new_generation}\n\
+long_chat_summary_queue_probe_required={queue_probe_required}\n\
+long_chat_summary_queue_probe_completed={queue_probe_completed}\n\
+long_chat_summary_queue_probe_contender_started_after_holder={queue_probe_contender_started_after_holder}\n\
 long_chat_summary_run_complete={run_complete}",
         generated_context_identity.required,
         generated_context_identity.links,

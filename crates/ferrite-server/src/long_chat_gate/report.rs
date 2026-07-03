@@ -98,6 +98,11 @@ pub fn format_plan(config: &LongChatGateConfig) -> String {
     } else {
         ""
     };
+    let queue_probe_required = if config.queue_probe() {
+        "\nlong_chat_queue_probe_required=true"
+    } else {
+        ""
+    };
     let probe_max_tokens = config
         .probe_max_tokens()
         .map(|tokens| format!("\nlong_chat_probe_max_tokens={tokens}"))
@@ -111,7 +116,7 @@ pub fn format_plan(config: &LongChatGateConfig) -> String {
         String::new()
     };
     format!(
-        "long_chat_models={models}\nlong_chat_token_lengths={token_lengths}\nlong_chat_turns={}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}\nlong_chat_planned_scenarios={}",
+        "long_chat_models={models}\nlong_chat_token_lengths={token_lengths}\nlong_chat_turns={}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}\nlong_chat_planned_scenarios={}",
         config.turns(),
         prompt_cache_key,
         prompt_cache_keys,
@@ -130,6 +135,7 @@ pub fn format_plan(config: &LongChatGateConfig) -> String {
         rss_pid,
         error_probe_required,
         disconnect_probe_required,
+        queue_probe_required,
         probe_max_tokens,
         disconnect_reconnect_timeout,
         config.planned_scenarios()
