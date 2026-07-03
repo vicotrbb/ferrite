@@ -128,10 +128,50 @@ This is a useful falsification slice. It suggests that preserving more generated
 assistant prose can compete with the structured capsule. The next theory should
 test capsule placement and authority, not only window size.
 
+## Follow-Up Placement Probe
+
+Commit `211360a` tested the next placement variant on the same Qwen 1.5B Q8
+x86_64 path. The benchmark note is
+`documentation/benchmarks/2026-07-03-openai-long-chat-x86-qwen-1-5b-q8-state-capsule-follow-up-64.md`.
+
+This run kept the 64-token generated-context window and the JSON capsule, but
+placed the capsule in the follow-up user message:
+
+```text
+long_chat_generated_context_state_capsule_placement=follow-up
+long_chat_generated_context_max_tokens=64
+long_chat_required_generated_response_substrings=7291
+```
+
+Result:
+
+| Variant | Window 64 | Read |
+| --- | --- | --- |
+| JSON state capsule in assistant context | failed at turn 2 | capsule competed with retained assistant prose |
+| JSON state capsule in follow-up message | completed 4 turns | user-message placement preserved the anchor |
+
+The follow-up-placement command exited `0` and completed error and
+disconnect/reconnect probes, RSS sampling, four 256-token streaming turns,
+usage accounting, `finish_reason=length`, token-limit checks, and streaming
+token IDs. It also preserved the required `7291` substring through turns 2-4.
+
+The important caveat is that `long_chat_summary_run_complete=false` because the
+64-token generated-context window intentionally truncates previous generated
+responses. That makes full generated-context identity matching fail even when
+the continuity-anchor assertion passes.
+
+This strengthens the authority-placement part of the theory: putting compact
+state in the follow-up user message is more robust than injecting it into the
+assistant-context block next to uncontrolled retained prose. It also costs
+tokens and TTFT. Generated follow-up turns used 162 prompt tokens and averaged
+`38759.67` ms TTFT.
+
 ## Next Steps
 
 1. Test capsule placement in the follow-up user message instead of assistant
-   context.
+   context. Done for the 64-token Qwen 1.5B Q8 256-budget lane; it preserved
+   the anchor but did not satisfy full generated-context identity because the
+   window intentionally truncates prior output.
 2. Test a shorter `state_anchor=7291` capsule against the JSON capsule.
 3. Test a capsule-only generated follow-up mode that omits retained generated
    prose.
