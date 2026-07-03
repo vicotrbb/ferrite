@@ -1,4 +1,5 @@
 pub mod config;
+mod diagnostic_hash;
 pub mod limits;
 pub mod long_chat_gate;
 pub mod openai;

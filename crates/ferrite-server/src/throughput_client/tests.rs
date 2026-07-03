@@ -229,6 +229,16 @@ fn retains_streaming_text_chunks_from_sse_body() -> Result<(), Box<dyn std::erro
 }
 
 #[test]
+fn exposes_deterministic_streaming_text_identity() {
+    let summary = StreamingTextSummary::from_chunks(["hel", "lo"]);
+
+    assert_eq!(summary.byte_len(), 5);
+    assert_eq!(summary.chunk_count(), 2);
+    assert_eq!(summary.text_hash(), 0xa430_d846_80aa_bd0b);
+    assert_eq!(summary.formatted_text_hash(), "fnv64:a430d84680aabd0b");
+}
+
+#[test]
 fn rejects_prompt_cache_key_for_legacy_completions() {
     let result = ThroughputClientConfig::parse([
         OsString::from("ferrite-openai-throughput"),

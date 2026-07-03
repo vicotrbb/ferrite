@@ -1,3 +1,5 @@
+use crate::diagnostic_hash::{fnv64_bytes, format_fnv64};
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct StreamingTextSummary {
     text: String,
@@ -44,6 +46,18 @@ impl StreamingTextSummary {
 
     pub fn byte_len(&self) -> usize {
         self.text.len()
+    }
+
+    pub fn chunk_count(&self) -> usize {
+        self.chunks.len()
+    }
+
+    pub fn text_hash(&self) -> u64 {
+        fnv64_bytes(self.text.as_bytes())
+    }
+
+    pub fn formatted_text_hash(&self) -> String {
+        format_fnv64(self.text_hash())
     }
 }
 

@@ -2,7 +2,7 @@
 
 Date: 2026-07-03
 
-Status: Hypothesis
+Status: Instrumented hypothesis
 
 ## Hypothesis
 
@@ -79,12 +79,14 @@ stable rendered prompt token identity.
 
 ## Next Step
 
-Implement focused long-chat response-context identity observability. Keep it in
-the proof tooling first, not the core runtime. The implementation should be
-small and module-local:
+The first instrumentation slice is implemented in the proof tooling:
 
-- extend `StreamingTextSummary` with deterministic text hash accessors;
-- print generated-response identity from `LongChatScenarioResult`;
-- print next-turn assistant-context identity before request construction if it
-  can be done without large output or text disclosure;
-- validate with fixture tests before running another real-model proof.
+- `StreamingTextSummary` exposes deterministic text identity accessors;
+- `LongChatScenarioResult` prints generated-response identity;
+- the long-chat runner records the exact assistant-context identity used for
+  each request before dispatch;
+- fixture tests validate the formatter and generated-context carry path.
+
+Next, rerun the bounded 1024-token Qwen 0.5B trace with prompt-cache tracing
+enabled and compare generated-response hashes, next-turn assistant-context
+hashes, prompt token hashes, cached prompt tokens, and TTFT.

@@ -2,7 +2,7 @@ use ferrite_server::long_chat_gate::{
     format_disconnect_probe_result, format_error_probe_result, format_plan, format_report,
     format_run_summary, format_scenario_result, format_scenarios, LongChatAssistantContextSource,
     LongChatDisconnectProbeResult, LongChatErrorProbeResult, LongChatGateConfig,
-    LongChatProofArtifacts, LongChatScenarioResult,
+    LongChatProofArtifacts, LongChatScenarioResult, LongChatTextIdentity,
 };
 use ferrite_server::throughput_client::{
     OpenAiEndpoint, RssSummary, StreamingFinishSummary, StreamingPromptCacheTraceSummary,
@@ -796,6 +796,49 @@ fn formats_long_chat_stop_result_as_not_hitting_token_limit(
 }
 
 #[test]
+fn formats_non_disclosing_context_and_response_identity() -> Result<(), Box<dyn std::error::Error>>
+{
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--models"),
+        OsString::from("fixture-model"),
+        OsString::from("--token-lengths"),
+        OsString::from("256"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+    ])?;
+    let scenario = config
+        .scenarios()
+        .into_iter()
+        .next()
+        .ok_or("expected scenario")?;
+    let result = LongChatScenarioResult::new_with_assistant_context_source_and_identity(
+        &scenario,
+        ThroughputResult {
+            completed_requests: 1,
+            elapsed: Duration::from_millis(400),
+            streaming_finish: Some(StreamingFinishSummary::new("length")),
+            streaming_timing: None,
+            streaming_text: Some(StreamingTextSummary::from_chunks(["al", "pha"])),
+            streaming_token_ids: None,
+            streaming_usage: None,
+            rss: None,
+        },
+        LongChatAssistantContextSource::Seed,
+        LongChatTextIdentity::from_text("seed answer"),
+    );
+
+    let formatted = format_scenario_result(&result);
+
+    assert!(formatted.contains("long_chat_result_assistant_context_bytes=11"));
+    assert!(formatted.contains("long_chat_result_assistant_context_hash=fnv64:c4b44c97efd77876"));
+    assert!(formatted.contains("long_chat_result_generated_response_bytes=5"));
+    assert!(formatted.contains("long_chat_result_generated_response_chunks=2"));
+    assert!(formatted.contains("long_chat_result_generated_response_hash=fnv64:8ac625bb85ed202b"));
+    Ok(())
+}
+
+#[test]
 fn formats_long_chat_error_probe_result() {
     let result = LongChatErrorProbeResult::new(401, true, 256);
 
@@ -1265,6 +1308,33 @@ fn carries_generated_assistant_text_between_turns_per_token_length(
             (512, Some("generated-512-2".to_owned())),
             (256, Some("generated-256-3".to_owned())),
             (512, Some("generated-512-3".to_owned())),
+        ]
+    );
+    let observed_identities = results
+        .iter()
+        .map(|result| {
+            let identity = result
+                .assistant_context_identity()
+                .ok_or("expected assistant context identity")?;
+            Ok((
+                result.token_length(),
+                result.turn(),
+                identity.byte_len(),
+                identity.formatted_hash(),
+            ))
+        })
+        .collect::<Result<Vec<_>, Box<dyn std::error::Error>>>()?;
+    assert_eq!(
+        observed_identities,
+        [
+            (256, 1, 11, "fnv64:c4b44c97efd77876".to_owned()),
+            (512, 1, 11, "fnv64:c4b44c97efd77876".to_owned()),
+            (256, 2, 15, "fnv64:89ae2a6c06d3ddfc".to_owned()),
+            (512, 2, 15, "fnv64:94eefc896813f749".to_owned()),
+            (256, 3, 15, "fnv64:89ae2d6c06d3e315".to_owned()),
+            (512, 3, 15, "fnv64:94eef9896813f230".to_owned()),
+            (256, 4, 15, "fnv64:89ae2c6c06d3e162".to_owned()),
+            (512, 4, 15, "fnv64:94eefa896813f3e3".to_owned()),
         ]
     );
     Ok(())

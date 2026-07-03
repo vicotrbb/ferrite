@@ -1,6 +1,7 @@
 use super::{
     state_capsule::{format_state_capsule_context, format_state_capsule_follow_up},
     LongChatAssistantContextSource, LongChatGateConfig, LongChatScenarioResult,
+    LongChatTextIdentity,
 };
 use crate::throughput_client::{
     run_completion_benchmark, ThroughputClientConfig, ThroughputResult,
@@ -42,10 +43,11 @@ impl LongChatGateConfig {
                 &throughput,
             )?;
             assistant_contexts.record_result(scenario, &throughput);
-            let result = LongChatScenarioResult::new_with_assistant_context_source(
+            let result = LongChatScenarioResult::new_with_assistant_context_source_and_identity(
                 scenario,
                 throughput,
                 assistant_context.source,
+                LongChatTextIdentity::from_text(&assistant_context.text),
             );
             observer(&result)?;
             results.push(result);
@@ -92,10 +94,11 @@ impl LongChatGateConfig {
                 &throughput,
             )?;
             assistant_contexts.record_result(scenario, &throughput);
-            let result = LongChatScenarioResult::new_with_assistant_context_source(
+            let result = LongChatScenarioResult::new_with_assistant_context_source_and_identity(
                 scenario,
                 throughput,
                 assistant_context.source,
+                LongChatTextIdentity::from_text(&assistant_context.text),
             );
             observer(&result)?;
             results.push(result);
