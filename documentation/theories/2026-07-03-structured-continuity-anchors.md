@@ -166,13 +166,45 @@ assistant-context block next to uncontrolled retained prose. It also costs
 tokens and TTFT. Generated follow-up turns used 162 prompt tokens and averaged
 `38759.67` ms TTFT.
 
+## Short Follow-Up Capsule Probe
+
+Commit `ed47c8f` tested the next capsule-shape variant on the same Qwen 1.5B
+Q8 x86_64 path. The benchmark note is
+`documentation/benchmarks/2026-07-03-openai-long-chat-x86-qwen-1-5b-q8-short-state-capsule-follow-up-64.md`.
+
+This run kept the follow-up user-message placement, 64-token generated-context
+window, and required anchor, but replaced the JSON capsule with:
+
+```text
+state_anchor=7291
+```
+
+Result:
+
+| Variant | Window 64 | Generated prompt avg | TTFT avg | Read |
+| --- | --- | ---: | ---: | --- |
+| JSON capsule in follow-up message | completed 4 turns | 162.00 | 38759.67 ms | anchor preserved |
+| Short capsule in follow-up message | completed 4 turns | 151.00 | 36127.00 ms | anchor preserved with lower prompt cost |
+
+The shorter capsule reduced generated follow-up prompt cost by 11 tokens on
+average and TTFT by `2632.67` ms while preserving the exact `7291` anchor
+through turns 2-4.
+
+This strengthens the compact-anchor part of the theory. The result is still
+not a full long-chat identity-gate pass: `long_chat_summary_run_complete=false`
+because the 64-token generated-context window intentionally truncates prior
+output, so generated-context identity does not match the previous full
+response.
+
 ## Next Steps
 
 1. Test capsule placement in the follow-up user message instead of assistant
    context. Done for the 64-token Qwen 1.5B Q8 256-budget lane; it preserved
    the anchor but did not satisfy full generated-context identity because the
    window intentionally truncates prior output.
-2. Test a shorter `state_anchor=7291` capsule against the JSON capsule.
+2. Test a shorter `state_anchor=7291` capsule against the JSON capsule. Done
+   for the same 64-token Qwen 1.5B Q8 256-budget lane; it preserved the anchor
+   with lower prompt cost and lower TTFT than the JSON capsule.
 3. Test a capsule-only generated follow-up mode that omits retained generated
    prose.
 4. Add a semantic recall probe that checks a short generated answer for a known
