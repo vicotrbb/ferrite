@@ -111,6 +111,18 @@ An additional bounded local queue-probe slice exists:
 This proves the queue probe path can be required and completed locally, but it
 does not replace queue coverage in the required 256/512/1024 Tier 1 matrix.
 
+An additional bounded local stop slice exists:
+
+- `documentation/benchmarks/2026-07-03-local-qwen-0-5b-stop-probe-64.md`
+- expected finish reason: `stop`
+- required token length: `64`
+- `long_chat_summary_any_token_limit_hit=false`
+- `long_chat_summary_run_complete=true`
+
+This proves explicit stop behavior on a small deterministic local Qwen2.5-0.5B
+slice. It does not prove tokenizer EOS behavior or replace stop/EOS coverage in
+the required Tier 1 matrix.
+
 ## Required Scenarios
 
 For each required model, run three streaming chat lengths:
