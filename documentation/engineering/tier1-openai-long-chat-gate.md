@@ -49,6 +49,28 @@ Any run that covers only one model, one token length, no generated follow-up
 context, or only one of stop/EOS/reconnect/error behavior remains partial
 evidence.
 
+## Current Baseline Before Next Run
+
+The 2026-07-03 active-pair BPE work improves the local Qwen2.5-0.5B
+tokenization stage, but it does not close this long-chat gate by itself.
+
+Current proof baseline:
+
+- tokenizer-only parity was preserved for the deterministic same-size prompt:
+  `tokenization_benchmark_token_count=29527` and
+  `tokenization_benchmark_token_ids_fingerprint=fnv1a64:468c718e7fb1e5a0`;
+- tokenizer-only average encode time improved from `6894344416 ns` to
+  `4062045166 ns` on that local prompt sample;
+- OpenAI server lifecycle `prompt_tokenized_elapsed_ms` improved from `8323`
+  to `4331` on the local same-size prompt-stage proof;
+- the proof was still a cancelled streaming request, not a completed
+  256/512/1024 long-chat run.
+
+The next accepted gate run should therefore report active-pair BPE as the
+current tokenizer baseline and then measure end-to-end streaming behavior with
+the full matrix below. Do not infer long-chat readiness from tokenizer-stage
+improvement alone.
+
 ## Required Scenarios
 
 For each required model, run three streaming chat lengths:
