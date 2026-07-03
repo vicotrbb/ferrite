@@ -239,6 +239,29 @@ fn rejects_too_few_long_chat_turns() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
+fn rejects_follow_ups_that_do_not_match_turn_count() -> Result<(), Box<dyn std::error::Error>> {
+    let result = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+        OsString::from("--follow-ups"),
+        OsString::from("turn one,turn two"),
+    ]);
+    let error = match result {
+        Ok(config) => return Err(format!("expected error, got config: {config:?}").into()),
+        Err(error) => error,
+    };
+
+    assert!(
+        error
+            .to_string()
+            .contains("--follow-ups must contain one entry per turn"),
+        "{error}"
+    );
+    Ok(())
+}
+
+#[test]
 fn rejects_empty_long_chat_token_lengths() -> Result<(), Box<dyn std::error::Error>> {
     let result = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),
@@ -2507,6 +2530,58 @@ fn state_capsule_wrapped_assistant_context_preserves_generated_identity_summary(
         "long_chat_summary_all_generated_context_identities_match_previous_response=true"
     ));
     assert!(summary.contains("long_chat_summary_run_complete=true"));
+    Ok(())
+}
+
+#[test]
+fn uses_configured_follow_up_for_each_turn() -> Result<(), Box<dyn std::error::Error>> {
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--models"),
+        OsString::from("fixture-model"),
+        OsString::from("--token-lengths"),
+        OsString::from("256"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+        OsString::from("--assistant-context"),
+        OsString::from("seed answer"),
+        OsString::from("--follow-ups"),
+        OsString::from("ask stable answer,ask alternate answer,ask third answer,ask fourth answer"),
+    ])?;
+    let mut observed_follow_ups = Vec::new();
+    let generated = ["alpha", "beta", "gamma", "delta"];
+    let mut calls = 0usize;
+
+    let results = config.run_with_executor(|throughput| {
+        observed_follow_ups.push(throughput.follow_up().map(str::to_owned));
+        let text = generated[calls].to_owned();
+        calls += 1;
+        Ok(ThroughputResult {
+            completed_requests: throughput.requests(),
+            elapsed: Duration::from_millis(10),
+            streaming_finish: Some(StreamingFinishSummary::new("length")),
+            streaming_timing: None,
+            streaming_text: Some(StreamingTextSummary::new(text)),
+            streaming_token_ids: None,
+            streaming_usage: Some(StreamingUsageSummary::new(
+                8,
+                throughput.max_tokens() as u64,
+                throughput.max_tokens() as u64 + 8,
+            )),
+            rss: None,
+        })
+    })?;
+
+    assert_eq!(results.len(), 4);
+    assert_eq!(
+        observed_follow_ups,
+        [
+            Some("ask stable answer".to_owned()),
+            Some("ask alternate answer".to_owned()),
+            Some("ask third answer".to_owned()),
+            Some("ask fourth answer".to_owned()),
+        ]
+    );
     Ok(())
 }
 

@@ -31,7 +31,8 @@ impl LongChatGateConfig {
 
         for scenario in &scenarios {
             let assistant_context = assistant_contexts.context_for(scenario);
-            let follow_up = self.follow_up_for_assistant_context(assistant_context.source);
+            let follow_up =
+                self.follow_up_for_assistant_context(assistant_context.source, scenario.turn());
             let throughput_config = self.throughput_config_with_chat_context(
                 scenario,
                 assistant_context.text.as_str(),
@@ -83,7 +84,8 @@ impl LongChatGateConfig {
 
         for scenario in &scenarios {
             let assistant_context = assistant_contexts.context_for(scenario);
-            let follow_up = self.follow_up_for_assistant_context(assistant_context.source);
+            let follow_up =
+                self.follow_up_for_assistant_context(assistant_context.source, scenario.turn());
             let throughput_config = self.throughput_config_with_chat_context(
                 scenario,
                 assistant_context.text.as_str(),
@@ -131,18 +133,20 @@ impl LongChatGateConfig {
     fn follow_up_for_assistant_context(
         &self,
         assistant_context_source: LongChatAssistantContextSource,
+        turn: usize,
     ) -> String {
+        let follow_up = self.follow_up_for_turn(turn);
         let Some(capsule) = self.generated_context_state_capsule() else {
-            return self.follow_up().to_owned();
+            return follow_up.to_owned();
         };
         if assistant_context_source.is_generated()
             && self
                 .generated_context_state_capsule_placement()
                 .decorates_follow_up()
         {
-            return format_state_capsule_follow_up(capsule, self.follow_up());
+            return format_state_capsule_follow_up(capsule, follow_up);
         }
-        self.follow_up().to_owned()
+        follow_up.to_owned()
     }
 
     fn validate_required_generated_response_substrings(

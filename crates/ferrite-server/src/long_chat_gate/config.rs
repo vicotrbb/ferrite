@@ -24,6 +24,7 @@ pub struct LongChatGateConfig {
     prompt: String,
     assistant_context: String,
     follow_up: String,
+    follow_ups: Vec<String>,
     prompt_cache_key: Option<String>,
     prompt_cache_keys: Vec<String>,
     prompt_cache_trace: bool,
@@ -107,6 +108,12 @@ impl LongChatGateConfig {
                     config.follow_up = parse_non_empty_string(
                         next_value(&mut iter, "--follow-up")?,
                         "--follow-up",
+                    )?;
+                }
+                "--follow-ups" => {
+                    config.follow_ups = parse_non_empty_list(
+                        next_value(&mut iter, "--follow-ups")?,
+                        "--follow-ups",
                     )?;
                 }
                 "--prompt-cache-key" => {
@@ -259,6 +266,13 @@ impl LongChatGateConfig {
                 "--generated-context-max-chars cannot be combined with --generated-context-max-tokens",
             ));
         }
+        if !config.follow_ups.is_empty() && config.follow_ups.len() != config.turns {
+            return Err(LongChatGateError::new(format!(
+                "--follow-ups must contain one entry per turn: got {}, expected {}",
+                config.follow_ups.len(),
+                config.turns
+            )));
+        }
 
         Ok(config)
     }
@@ -317,6 +331,20 @@ impl LongChatGateConfig {
 
     pub fn follow_up(&self) -> &str {
         &self.follow_up
+    }
+
+    pub fn follow_ups(&self) -> &[String] {
+        &self.follow_ups
+    }
+
+    pub fn follow_up_for_turn(&self, turn: usize) -> &str {
+        if self.follow_ups.is_empty() {
+            return &self.follow_up;
+        }
+        self.follow_ups
+            .get(turn.saturating_sub(1))
+            .map(String::as_str)
+            .unwrap_or(&self.follow_up)
     }
 
     pub fn prompt_cache_key(&self) -> Option<&str> {
@@ -448,6 +476,7 @@ impl Default for LongChatGateConfig {
             prompt: "Write a concise paragraph about CPU inference.".to_owned(),
             assistant_context: "CPU inference prioritizes memory locality, predictable scheduling, and efficient token streaming.".to_owned(),
             follow_up: "Continue with the operational risks for a long streaming chat.".to_owned(),
+            follow_ups: Vec::new(),
             prompt_cache_key: None,
             prompt_cache_keys: Vec::new(),
             prompt_cache_trace: false,
@@ -589,7 +618,7 @@ fn os_string_to_string(value: OsString) -> Result<String, LongChatGateError> {
 }
 
 fn usage() -> &'static str {
-    "usage: ferrite-openai-long-chat-gate [--execute] [--error-probe] [--disconnect-probe] [--queue-probe] [--require-probes error,disconnect,queue] [--require-cached-follow-ups] [--addr 127.0.0.1:8080] [--api-key local-secret] [--models MODEL[,MODEL...]] [--require-models MODEL[,MODEL...]] [--prompt TEXT] [--assistant-context TEXT] [--follow-up TEXT] [--prompt-cache-key KEY] [--prompt-cache-keys KEY[,KEY...]] [--prompt-cache-trace] [--stop TEXT] [--expect-finish-reason REASON] [--require-finish-sources length,eos,stop_sequence,generation_control] [--probe-max-tokens TOKENS] [--require-token-lengths 256,512,1024] [--generated-context-max-chars CHARS] [--generated-context-max-tokens TOKENS] [--generated-context-state-capsule TEXT] [--generated-context-state-capsule-placement assistant-context|assistant-context-only|follow-up] [--require-generated-response-contains TEXT] [--disconnect-reconnect-timeout-ms 30000] [--rss-pid PID] [--proof-log PATH] [--proof-exit-code PATH] [--token-lengths 256,512,1024] [--turns 4]"
+    "usage: ferrite-openai-long-chat-gate [--execute] [--error-probe] [--disconnect-probe] [--queue-probe] [--require-probes error,disconnect,queue] [--require-cached-follow-ups] [--addr 127.0.0.1:8080] [--api-key local-secret] [--models MODEL[,MODEL...]] [--require-models MODEL[,MODEL...]] [--prompt TEXT] [--assistant-context TEXT] [--follow-up TEXT] [--follow-ups TEXT[,TEXT...]] [--prompt-cache-key KEY] [--prompt-cache-keys KEY[,KEY...]] [--prompt-cache-trace] [--stop TEXT] [--expect-finish-reason REASON] [--require-finish-sources length,eos,stop_sequence,generation_control] [--probe-max-tokens TOKENS] [--require-token-lengths 256,512,1024] [--generated-context-max-chars CHARS] [--generated-context-max-tokens TOKENS] [--generated-context-state-capsule TEXT] [--generated-context-state-capsule-placement assistant-context|assistant-context-only|follow-up] [--require-generated-response-contains TEXT] [--disconnect-reconnect-timeout-ms 30000] [--rss-pid PID] [--proof-log PATH] [--proof-exit-code PATH] [--token-lengths 256,512,1024] [--turns 4]"
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
