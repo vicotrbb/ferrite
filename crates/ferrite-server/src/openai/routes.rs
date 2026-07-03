@@ -160,6 +160,7 @@ async fn completions(
                 request.stream_include_obfuscation(),
             )
             .with_echo_prompt(echo_prompt),
+            completion_cache_options(&state, &request),
             permit,
         ));
     }
@@ -168,7 +169,7 @@ async fn completions(
         request.prompts().to_vec(),
         max_tokens,
         request.stop_sequences(),
-        crate::runtime::GenerationCacheOptions::default(),
+        completion_cache_options(&state, &request),
         permit,
     )
     .await?;
@@ -179,6 +180,15 @@ async fn completions(
         request.echo(),
     ))
     .into_response())
+}
+
+fn completion_cache_options(
+    state: &ServerState,
+    request: &CompletionRequest,
+) -> GenerationCacheOptions {
+    request
+        .cache_options()
+        .with_prefix_cache_enabled(state.prefix_cache_enabled())
 }
 
 async fn method_not_allowed(

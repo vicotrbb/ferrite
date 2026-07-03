@@ -3,6 +3,7 @@ use super::{
     logit_bias::is_neutral_logit_bias,
     model_id::deserialize_model_id,
     neutral_options::{is_neutral_number, is_neutral_number_in},
+    prompt_cache_key::is_prompt_cache_key,
     seed::is_seed,
     stop_sequences::{is_supported_stop_sequences, stop_sequences},
     stream_flag::StreamFlag,
@@ -53,6 +54,8 @@ pub struct CompletionRequest {
     user: Option<Value>,
     #[serde(default)]
     seed: Option<Value>,
+    #[serde(default)]
+    prompt_cache_key: Option<Value>,
     #[serde(default, flatten)]
     extra_fields: BTreeMap<String, Value>,
 }
@@ -102,6 +105,15 @@ impl CompletionRequest {
         stop_sequences(&self.stop)
     }
 
+    pub fn cache_options(&self) -> crate::runtime::GenerationCacheOptions {
+        crate::runtime::GenerationCacheOptions::from_namespace(
+            self.prompt_cache_key
+                .as_ref()
+                .and_then(Value::as_str)
+                .map(str::to_owned),
+        )
+    }
+
     pub fn unsupported_fields(&self) -> Vec<String> {
         let mut fields = UnsupportedFields::new()
             .with_present("prompt", self.prompt.has_unsupported_form())
@@ -129,6 +141,10 @@ impl CompletionRequest {
             .with_present("logit_bias", !is_neutral_logit_bias(&self.logit_bias))
             .with_present("user", !is_user_identifier(&self.user))
             .with_present("seed", !is_seed(&self.seed))
+            .with_present(
+                "prompt_cache_key",
+                !is_prompt_cache_key(&self.prompt_cache_key),
+            )
             .with_extra_keys(&self.extra_fields)
             .into_vec();
         if let Some(stream_options) = &self.stream_options {

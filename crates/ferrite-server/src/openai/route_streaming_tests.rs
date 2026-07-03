@@ -66,6 +66,51 @@ async fn completions_endpoint_streams_echo_prompt_when_requested(
 }
 
 #[tokio::test]
+async fn completions_endpoint_stream_reports_cached_tokens_when_experimental_prefix_cache_is_enabled(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let model_path = write_fixture_model()?;
+    let engine = InferenceEngine::load(&model_path)?;
+    let app = router(
+        ServerState::with_engine("fixture-model".to_owned(), engine)
+            .with_prefix_cache_enabled(true),
+    );
+    let request_body = r#"{"model":"fixture-model","prompt":"hello","prompt_cache_key":"tenant-a:completion-stream-1","max_tokens":1,"stream":true,"stream_options":{"include_usage":true}}"#;
+
+    let first_response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/completions")
+                .header("content-type", "application/json")
+                .body(Body::from(request_body))?,
+        )
+        .await?;
+    let first_status = first_response.status();
+    let first_body = to_text(first_response.into_body()).await?;
+    assert_eq!(first_status, StatusCode::OK, "{first_body}");
+    assert_eq!(stream_usage_cached_tokens(&first_body)?, 0);
+
+    let second_response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v1/completions")
+                .header("content-type", "application/json")
+                .body(Body::from(request_body))?,
+        )
+        .await?;
+    remove_fixture_model(&model_path)?;
+
+    let second_status = second_response.status();
+    let second_body = to_text(second_response.into_body()).await?;
+    assert_eq!(second_status, StatusCode::OK, "{second_body}");
+    assert!(second_body.contains("\"text\":\"winner\""), "{second_body}");
+    assert_eq!(stream_usage_cached_tokens(&second_body)?, 1);
+    Ok(())
+}
+
+#[tokio::test]
 async fn chat_endpoint_streams_openai_sse_chunks() -> Result<(), Box<dyn std::error::Error>> {
     let model_path = write_chat_fixture_model()?;
     let engine = InferenceEngine::load(&model_path)?;
@@ -108,6 +153,7 @@ async fn completion_stream_helper_emits_tokens_from_generation_callback(
         "hello".to_owned(),
         1,
         super::stream_generation::CompletionStreamOptions::new(Vec::new(), false, false),
+        crate::runtime::GenerationCacheOptions::default(),
         permit,
     );
     let body = to_text(response.into_body()).await?;
@@ -152,4 +198,17 @@ async fn chat_stream_releases_inference_permit_when_response_body_is_dropped(
 
     remove_fixture_model(&model_path)?;
     Ok(())
+}
+
+fn stream_usage_cached_tokens(body: &str) -> Result<u64, Box<dyn std::error::Error>> {
+    for line in body.lines().filter_map(|line| line.strip_prefix("data: ")) {
+        if line == "[DONE]" {
+            continue;
+        }
+        let event: serde_json::Value = serde_json::from_str(line)?;
+        if let Some(tokens) = event["usage"]["prompt_tokens_details"]["cached_tokens"].as_u64() {
+            return Ok(tokens);
+        }
+    }
+    Err(format!("missing stream usage cached_tokens: {body}").into())
 }

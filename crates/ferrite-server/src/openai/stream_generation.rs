@@ -69,6 +69,7 @@ pub(super) fn completion_stream_response(
     prompt: String,
     max_tokens: usize,
     options: CompletionStreamOptions,
+    cache_options: GenerationCacheOptions,
     permit: OwnedSemaphorePermit,
 ) -> Response {
     let include_usage = options.include_usage;
@@ -88,7 +89,8 @@ pub(super) fn completion_stream_response(
             max_tokens,
             options.stop_sequences,
             initial_chunks,
-        ),
+        )
+        .with_cache_options(cache_options),
         move |piece, _token_ids| token_context.token(piece.to_owned()),
         move |generated| {
             let mut chunks = vec![context.finish(generated.finish_reason())];
