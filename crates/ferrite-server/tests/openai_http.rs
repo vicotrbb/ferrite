@@ -198,6 +198,53 @@ async fn live_http_server_releases_inference_permit_after_streaming_tcp_disconne
 }
 
 #[tokio::test]
+async fn live_http_server_releases_inference_permit_after_tcp_disconnect_before_generated_content(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let token_limits = TokenLimits::new(16, 4096)?;
+    let server =
+        support::LiveServer::start_configured(|state| state.with_token_limits(token_limits))
+            .await?;
+    let request_body = format!(
+        r#"{{"model":"{}","messages":[{{"role":"user","content":"hello"}}],"max_completion_tokens":4096,"stream":true}}"#,
+        support::MODEL_ID
+    );
+
+    let partial_response = abort_http_stream_after_marker(
+        server.addr(),
+        "POST",
+        "/v1/chat/completions",
+        request_body.as_bytes(),
+        "\"delta\":{\"role\":\"assistant\",\"content\":\"\"}",
+    )
+    .await?;
+    assert!(
+        partial_response.starts_with("HTTP/1.1 200 OK"),
+        "unexpected response: {partial_response}"
+    );
+    assert!(
+        !partial_response.contains("\"delta\":{\"content\":\""),
+        "test must disconnect before generated content: {partial_response}"
+    );
+    assert!(server.state().try_acquire_inference_permit().is_none());
+
+    let deadline = Instant::now() + Duration::from_secs(2);
+    loop {
+        if server.state().try_acquire_inference_permit().is_some() {
+            break;
+        }
+        if Instant::now() >= deadline {
+            return Err(
+                "streaming TCP disconnect kept the inference permit before generated content"
+                    .into(),
+            );
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn live_http_server_streams_openai_style_legacy_completion_chunks(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let server = support::LiveServer::start().await?;
