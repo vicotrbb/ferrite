@@ -58,6 +58,8 @@ pub fn format_run_summary(
     let error_probe_required = config.error_probe();
     let error_probe_completed = error_probe
         .is_some_and(|probe| probe.unauthorized_status() == 401 && probe.reconnect_completed());
+    let error_probe_reconnect_started_new_generation =
+        error_probe.is_some_and(|probe| probe.reconnect_started_new_generation());
     let disconnect_probe_required = config.disconnect_probe();
     let disconnect_probe_completed = disconnect_probe
         .is_some_and(|probe| probe.aborted_after_generated_event() && probe.reconnect_completed());
@@ -76,7 +78,8 @@ pub fn format_run_summary(
             || (all_streaming_token_id_summaries_present
                 && all_streaming_content_chunks_have_token_ids))
         && (!rss_required || all_rss_present)
-        && (!error_probe_required || error_probe_completed)
+        && (!error_probe_required
+            || (error_probe_completed && error_probe_reconnect_started_new_generation))
         && (!disconnect_probe_required
             || (disconnect_probe_completed && disconnect_probe_reconnect_started_new_generation));
 
@@ -108,6 +111,7 @@ long_chat_summary_rss_required={rss_required}\n\
 long_chat_summary_all_rss_present={all_rss_present}\n\
 long_chat_summary_error_probe_required={error_probe_required}\n\
 long_chat_summary_error_probe_completed={error_probe_completed}\n\
+long_chat_summary_error_probe_reconnect_started_new_generation={error_probe_reconnect_started_new_generation}\n\
 long_chat_summary_disconnect_probe_required={disconnect_probe_required}\n\
 long_chat_summary_disconnect_probe_completed={disconnect_probe_completed}\n\
 long_chat_summary_disconnect_probe_reconnect_started_new_generation={disconnect_probe_reconnect_started_new_generation}\n\
