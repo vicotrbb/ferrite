@@ -122,5 +122,22 @@ Turn 3 produced the same generated-response identity as its own assistant
 context. Turn 4 then used that same assistant-context identity, matched the
 previous prompt token hash, reused all prompt tokens, and collapsed TTFT to
 `228` ms. This supports the theory for at least the local Qwen 0.5B
-1024-token lane; x86_64 reruns with the same identity-summary gate remain the
-next stronger validation step.
+1024-token lane.
+
+## x86_64 1024-Token Confirmation
+
+The x86_64 identity-summary rerun on the bounded `staging` pod confirmed the
+same mechanism:
+
+| Turn | Context hash | Response hash | Cached / Prompt | Lookup | TTFT ms |
+| ---: | --- | --- | ---: | --- | ---: |
+| 2 | `fnv64:890bd91fd63ce8b0` | `fnv64:d3b6392e4ebce4da` | 12 / 1054 | `shared_prefix_hit` | 382172 |
+| 3 | `fnv64:d3b6392e4ebce4da` | `fnv64:d3b6392e4ebce4da` | 16 / 1054 | `shared_prefix_hit` | 371694 |
+| 4 | `fnv64:d3b6392e4ebce4da` | `fnv64:d3b6392e4ebce4da` | 1054 / 1054 | `exact_hit` | 266 |
+
+The integrated gate summary reported three generated-context identity links,
+three matching links, and
+`long_chat_summary_all_generated_context_identities_match_previous_response=true`.
+This is the strongest confirmation so far that the millisecond TTFT on turn 4
+comes from exact prompt identity after generated context reaches a fixed point,
+not from a disconnected or synthetic prompt path.
