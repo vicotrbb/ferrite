@@ -143,16 +143,20 @@ needs a deterministic tokenizer-aware fixture or model-specific harness mode.
 An additional bounded local SmolLM2 EOS finish-source slice exists:
 
 - `documentation/benchmarks/2026-07-03-local-smollm-1-7b-eos-finish-source-16.md`
+- `documentation/benchmarks/2026-07-03-local-smollm-1-7b-eos-finish-source-trace-16.md`
 - model: `SmolLM2-1.7B-Instruct-Q4_K_M`
 - required finish source: `eos`
 - required token length: `16`
+- trace-bearing rerun cache lookup sequence:
+  `miss -> shared_prefix_hit -> exact_hit -> exact_hit`
 - error and disconnect probes completed
 - `long_chat_summary_required_finish_sources_present=true`
 - `long_chat_summary_run_complete=true`
 
 This proves one real local tokenizer-EOS finish-source path with generated
-follow-up context and cached follow-up turns. It does not prove EOS behavior
-for Qwen models or replace the required full Tier 1 matrix.
+follow-up context, cached follow-up turns, and prompt-cache trace evidence in
+the newer rerun. It does not prove EOS behavior for Qwen models or replace the
+required full Tier 1 matrix.
 
 Finish-source observability now exists in the long-chat gate:
 
