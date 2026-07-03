@@ -2,7 +2,7 @@
 
 Date: 2026-07-03
 
-Status: Candidate, narrowed by direct-route test
+Status: Candidate, narrowed and partially mitigated by focused cancellation gates
 
 ## Hypothesis
 
@@ -55,6 +55,9 @@ What is proven:
   initial stream chunks and before entering generation. This avoids starting
   generation for the cheap closed-receiver case that is visible at that
   boundary.
+- Ferrite now has a cooperative prompt-prefill cancellation seam. The scalar
+  session checks a cancellation callback before each prompt token, and the
+  OpenAI streaming path maps a closed SSE receiver to prompt cancellation.
 
 What is not proven:
 
@@ -62,8 +65,9 @@ What is not proven:
 - whether the request would have stopped naturally after a short delay;
 - whether Kubernetes port-forward buffering hid the real client state;
 - whether the observed CPU belonged to the killed request or another request;
-- whether cancellation behavior differs before the first SSE event, during
-  long prompt prefill, versus after the server has started streaming.
+- how quickly a real large-model prompt prefill returns to idle after
+  disconnect, because cancellation is cooperative at prompt-token boundaries
+  and does not interrupt a single in-progress token evaluation.
 
 ## Direct Route Evidence
 
@@ -147,9 +151,36 @@ cargo test -p ferrite-server releases_inference_permit -- --nocapture
 
 This is a small defensive improvement, not a full cancellation architecture.
 It can skip generation when the SSE receiver has already closed at the
-pre-generation boundary. It does not interrupt `accept_prompt` once prompt
-prefill has started, because the scalar runtime does not yet have a
-cooperative cancellation callback inside prompt evaluation.
+pre-generation boundary.
+
+## Cooperative Prompt-Prefill Cancellation
+
+Commits `0bbd2ec` and `39b1d74` added the next cancellation seam:
+
+- `ScalarLlamaSession::accept_prompt_with_control` checks a callback before
+  each prompt token is evaluated.
+- `InferenceEngine::generate_with_prompt_callback_and_cache_options` exposes
+  that seam at the server runtime layer.
+- The OpenAI streaming worker maps `StreamSender::is_closed()` to
+  `PromptEvaluationControl::Cancel` during prompt evaluation.
+
+Validation:
+
+```text
+cargo test -p ferrite-inference --test scalar_prompt_cancellation -- --nocapture
+cargo test -p ferrite-server generate_with_prompt_callback_cancels_before_next_prompt_token -- --nocapture
+cargo test -p ferrite-server prompt_control_cancels_when_stream_receiver_is_closed -- --nocapture
+cargo test -p ferrite-server releases_inference_permit -- --nocapture
+cargo fmt -- --check
+git diff --check
+```
+
+This improves the design from "HTTP-layer cancellation only" to cooperative
+runtime cancellation during prompt prefill. It still cannot preempt a single
+matrix-heavy token evaluation mid-token. For real models, the worst-case
+cancellation latency is therefore bounded by the time to finish the current
+prompt token plus the transport delay before the SSE receiver is marked
+closed.
 
 ## Minimal Experiment
 
@@ -169,13 +200,16 @@ the first pass.
 6. Repeat through Kubernetes port-forward only after the direct local or
    in-pod path is understood.
 
-The next experiment should use a real model or a deliberately slow prefill path
-that disconnects before the first SSE event, so it can distinguish prompt
-prefill cancellation from already-started stream cancellation.
+The next experiment should use a real model and a long prompt that disconnects
+after prompt evaluation starts but before generated content is delivered. It
+should measure how many seconds elapse between client disconnect and permit
+release with the cooperative prompt-prefill cancellation seam in place.
 
-If that experiment shows continued CPU after disconnect, the next design
-candidate is cooperative cancellation in the runtime prompt-evaluation loop,
-not more HTTP-layer checks.
+If that experiment still shows unacceptable post-disconnect CPU, the next
+design candidate is lower-level cancellation inside a single token evaluation,
+most likely at layer or matvec boundaries. That is a higher-risk change and
+should not be attempted without real-model evidence that token-boundary
+cancellation is insufficient.
 
 ## Expected Outcomes
 
@@ -200,6 +234,7 @@ does not depend on external inference from `top`:
 - client disconnect detection point;
 - generation cancellation signal observed by the inference worker;
 - tokens generated after disconnect;
+- prompt tokens evaluated after disconnect;
 - per-request elapsed time and final state.
 
 ## Decision Rule
