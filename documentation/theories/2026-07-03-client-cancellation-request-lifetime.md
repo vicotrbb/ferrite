@@ -328,6 +328,21 @@ and use these fields to decide whether the 6.5 second delay is dominated by
 tokenization, a single prompt-token evaluation, a specific transformer layer,
 or work before the runtime cancellation callback.
 
+Real-model follow-up:
+`documentation/benchmarks/2026-07-03-local-qwen-0-5b-prefill-cancel-location.md`.
+The abandoned local Qwen2.5-0.5B Q4_K_M stream reported:
+
+```text
+openai_stream_lifecycle request_id=stream-0 finish_reason=cancelled disconnect_point=prompt_evaluation prompt_tokens_started=1 prompt_cancellation_polls=1 prompt_cancellation_closed_polls=1 generated_chunks=0 generated_token_ids=0 elapsed_ms=8203 disconnect_observed_elapsed_ms=8203 disconnect_to_finish_ms=0 prompt_cancellation_token_index=0 prompt_cancellation_layer_index=none
+```
+
+This rejects the theory that the measured delay is dominated by a single
+transformer layer after the runtime prompt-cancellation callback begins
+polling. The better next theory is that the delay occurs before prompt
+evaluation reaches its first cancellation poll, such as request body handling,
+chat-template formatting, tokenization, prompt allocation, model page faults, or
+other prompt setup work.
+
 ## Minimal Experiment
 
 Use a small, repeatable model/server setup and avoid Kubernetes port-forward for

@@ -121,5 +121,13 @@ closed stream. The next useful lifecycle fields are prompt token index and
 transformer layer index at cancellation.
 
 The prompt-token and layer fields have now been added to the lifecycle log. The
-next real-model proof must rerun the same cancellation scenario before making a
-new performance claim from those fields.
+same cancellation scenario was rerun against local Qwen2.5-0.5B Q4_K_M:
+
+- `documentation/benchmarks/2026-07-03-local-qwen-0-5b-prefill-cancel-location.md`
+- `disconnect_observed_elapsed_ms=8203`
+- `disconnect_to_finish_ms=0`
+- `prompt_cancellation_token_index=0`
+- `prompt_cancellation_layer_index=none`
+
+That proof places the remaining delay before the first prompt-token layer
+evaluation, not inside one transformer layer.
