@@ -251,3 +251,32 @@ a local port-forward to the x86 server. It reported e2e TTFT of
 `87046.129750` ms for context load and `90266.089625` ms for inference. A first
 port-forward attempt failed during the inference phase, so x86 companion runs
 should record port-forward stability as part of the benchmark note.
+
+## Second x86_64 Paired Observation
+
+A bounded x86_64 512-token paired run now exists:
+
+- Ferrite gate note:
+  `documentation/benchmarks/2026-07-03-latency-cache-x86-paired-qwen-0-5b-512.md`
+- `llama-benchy` JSON:
+  `documentation/benchmarks/2026-07-03-llama-benchy-x86-qwen-0-5b-paired-cache-512.json`
+
+The Ferrite gate proved generated-context identity, error probe behavior, and
+disconnect/reconnect behavior on the bounded amd64 `staging` pod. The
+generated-context lane again did not converge to an exact prompt fixed point at
+512 tokens. Follow-up turns stayed in `shared_prefix_hit`, but the reusable
+prefix varied sharply: `12 / 542`, `306 / 542`, then `20 / 542`. TTFT followed
+that prefix-depth shape: turns 2 and 4 stayed near 179 seconds, while turn 3
+dropped to 83 seconds.
+
+The companion `llama-benchy` run completed only after moving the client inside
+the pod. Port-forward attempts were unstable for this long request shape. The
+accepted in-pod benchmark reported e2e TTFT of `173297.980096` ms for context
+load and `192137.629073` ms for inference with `--latency-mode none`. This
+strengthens the protocol decision to keep `llama-benchy` as a companion trend
+tool while Ferrite's gate remains the cache-correctness oracle.
+
+The disconnected port-forward attempt also exposed a new theory candidate:
+client cancellation may not immediately stop in-flight server generation. That
+needs a focused cancellation/reconnect experiment with server-side CPU, RSS,
+and request-lifetime evidence.
