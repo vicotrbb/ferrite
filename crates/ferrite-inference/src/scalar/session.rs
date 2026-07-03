@@ -54,8 +54,48 @@ impl<'a> ScalarLlamaSession<'a> {
         next.ok_or_else(|| InferenceError::new("prompt must contain at least one token"))
     }
 
+    pub fn accept_prompt_with_cancellation(
+        &mut self,
+        tokens: &[usize],
+        mut on_cancellation_poll: impl FnMut() -> Result<PromptEvaluationControl, InferenceError>,
+    ) -> Result<NextToken, InferenceError> {
+        if tokens.is_empty() {
+            return Err(InferenceError::new(
+                "prompt must contain at least one token",
+            ));
+        }
+
+        let mut next = None;
+        for token_id in tokens.iter().copied() {
+            if on_cancellation_poll()? == PromptEvaluationControl::Cancel {
+                return Err(InferenceError::new("prompt evaluation cancelled"));
+            }
+            next =
+                Some(self.accept_token_with_layer_control(token_id, |_| on_cancellation_poll())?);
+        }
+
+        next.ok_or_else(|| InferenceError::new("prompt must contain at least one token"))
+    }
+
     pub fn accept_token(&mut self, token_id: usize) -> Result<NextToken, InferenceError> {
-        let accepted = self.accept_token_inner(token_id, None, None, OutputMode::Logits)?;
+        let accepted = self.accept_token_inner(token_id, None, None, OutputMode::Logits, |_| {
+            Ok(PromptEvaluationControl::Continue)
+        })?;
+        Ok(NextToken {
+            token_id: accepted.token_id,
+            logits: accepted
+                .logits
+                .ok_or_else(|| InferenceError::new("missing logits for next token"))?,
+        })
+    }
+
+    pub fn accept_token_with_layer_control(
+        &mut self,
+        token_id: usize,
+        on_layer: impl FnMut(usize) -> Result<PromptEvaluationControl, InferenceError>,
+    ) -> Result<NextToken, InferenceError> {
+        let accepted =
+            self.accept_token_inner(token_id, None, None, OutputMode::Logits, on_layer)?;
         Ok(NextToken {
             token_id: accepted.token_id,
             logits: accepted
@@ -66,7 +106,9 @@ impl<'a> ScalarLlamaSession<'a> {
 
     pub fn accept_token_id(&mut self, token_id: usize) -> Result<usize, InferenceError> {
         Ok(self
-            .accept_token_inner(token_id, None, None, OutputMode::TokenIdOnly)?
+            .accept_token_inner(token_id, None, None, OutputMode::TokenIdOnly, |_| {
+                Ok(PromptEvaluationControl::Continue)
+            })?
             .token_id)
     }
 
@@ -81,6 +123,7 @@ impl<'a> ScalarLlamaSession<'a> {
             Some(&mut events),
             Some(&mut comparisons),
             OutputMode::TokenIdOnly,
+            |_| Ok(PromptEvaluationControl::Continue),
         )?;
         Ok(ProfiledTokenId {
             token_id: accepted.token_id,
@@ -114,6 +157,7 @@ impl<'a> ScalarLlamaSession<'a> {
             Some(&mut events),
             Some(&mut comparisons),
             OutputMode::Logits,
+            |_| Ok(PromptEvaluationControl::Continue),
         )?;
         let next_token = NextToken {
             token_id: accepted.token_id,
@@ -134,6 +178,7 @@ impl<'a> ScalarLlamaSession<'a> {
         mut profile_events: Option<&mut Vec<ScalarProfileEvent>>,
         mut comparison_events: Option<&mut Vec<ScalarMatVecComparison>>,
         output_mode: OutputMode,
+        mut on_layer: impl FnMut(usize) -> Result<PromptEvaluationControl, InferenceError>,
     ) -> Result<AcceptedToken, InferenceError> {
         if token_id >= self.model.config.vocab_size {
             return Err(InferenceError::new(format!(
@@ -146,6 +191,9 @@ impl<'a> ScalarLlamaSession<'a> {
         let mut hidden = self.model.weights.token_embedding.row_values(token_id)?;
 
         for (layer_index, layer) in self.model.weights.layers.iter().enumerate() {
+            if on_layer(layer_index)? == PromptEvaluationControl::Cancel {
+                return Err(InferenceError::new("prompt evaluation cancelled"));
+            }
             let normed = rms_norm(
                 &hidden,
                 &layer.attn_norm,
