@@ -47,6 +47,10 @@ What is proven:
 - Direct TCP disconnect after a generated SSE chat event releases Ferrite's
   inference permit in the live HTTP fixture test
   `live_http_server_releases_inference_permit_after_streaming_tcp_disconnect`.
+- Direct TCP disconnect after the initial assistant-role SSE event but before
+  generated content releases Ferrite's inference permit in the live HTTP
+  fixture test
+  `live_http_server_releases_inference_permit_after_tcp_disconnect_before_generated_content`.
 
 What is not proven:
 
@@ -54,8 +58,8 @@ What is not proven:
 - whether the request would have stopped naturally after a short delay;
 - whether Kubernetes port-forward buffering hid the real client state;
 - whether the observed CPU belonged to the killed request or another request;
-- whether cancellation behavior differs before first token versus after first
-  streamed token.
+- whether cancellation behavior differs before the first SSE event, during
+  long prompt prefill, versus after the server has started streaming.
 
 ## Direct Route Evidence
 
@@ -102,6 +106,28 @@ release the permit in the fixture path. The still-unproven paths are:
 - real-model cancellation timing under long CPU-bound Qwen generation, where
   observing cancellation may depend on when the inference loop next emits text.
 
+## Pre-Generated-Content TCP Evidence
+
+Commit `8fc9805` added a live HTTP fixture test for a narrower pre-generated
+content path:
+
+```text
+cargo test -p ferrite-server live_http_server_releases_inference_permit_after_tcp_disconnect_before_generated_content -- --nocapture
+```
+
+The test starts a real local TCP listener, sends a streaming
+`/v1/chat/completions` request with `max_completion_tokens=4096`, reads only
+until the initial assistant-role SSE event with empty content is observed,
+asserts that no generated `delta.content` event has been received, drops the
+socket, and waits for the shared inference permit to become available again.
+It passed on 2026-07-03.
+
+This proves fixture-path cancellation works after the server has started SSE
+streaming but before generated content is delivered. It still does not prove
+cancellation during long real-model prompt prefill, because that phase may do
+substantial CPU work before any SSE event can be sent and before socket closure
+is observed through a failed stream write.
+
 ## Minimal Experiment
 
 Use a small, repeatable model/server setup and avoid Kubernetes port-forward for
@@ -120,9 +146,9 @@ the first pass.
 6. Repeat through Kubernetes port-forward only after the direct local or
    in-pod path is understood.
 
-The next experiment should use a real model or a deliberately slow fixture path
-that disconnects before first generated content, so it can distinguish prompt
-prefill cancellation from post-token stream cancellation.
+The next experiment should use a real model or a deliberately slow prefill path
+that disconnects before the first SSE event, so it can distinguish prompt
+prefill cancellation from already-started stream cancellation.
 
 ## Expected Outcomes
 
