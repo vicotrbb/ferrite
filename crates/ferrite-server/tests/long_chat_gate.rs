@@ -1278,6 +1278,85 @@ fn required_models_make_summary_incomplete_when_model_set_is_partial(
 }
 
 #[test]
+fn required_probes_make_summary_incomplete_when_probe_set_is_partial(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--models"),
+        OsString::from("fixture-model"),
+        OsString::from("--token-lengths"),
+        OsString::from("256"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+        OsString::from("--error-probe"),
+        OsString::from("--require-probes"),
+        OsString::from("error,disconnect"),
+    ])?;
+    let results = config
+        .scenarios()
+        .iter()
+        .map(|scenario| {
+            let source = if scenario.turn() == 1 {
+                LongChatAssistantContextSource::Seed
+            } else {
+                LongChatAssistantContextSource::Generated
+            };
+            let assistant_context = if scenario.turn() == 1 {
+                "seed answer".to_owned()
+            } else {
+                format!("generated-{}", scenario.turn() - 1)
+            };
+            LongChatScenarioResult::new_with_assistant_context_source_and_identity(
+                scenario,
+                ThroughputResult {
+                    completed_requests: 1,
+                    elapsed: Duration::from_millis(400),
+                    streaming_finish: Some(StreamingFinishSummary::new("length")),
+                    streaming_timing: StreamingTimingSummary::from_event_offsets(&[
+                        Duration::from_millis(100),
+                        Duration::from_millis(140),
+                    ]),
+                    streaming_text: Some(StreamingTextSummary::new(format!(
+                        "generated-{}",
+                        scenario.turn()
+                    ))),
+                    streaming_token_ids: Some(StreamingTokenIdsSummary::new(
+                        2,
+                        2,
+                        scenario.token_length(),
+                    )),
+                    streaming_usage: Some(StreamingUsageSummary::new(
+                        16,
+                        scenario.token_length() as u64,
+                        scenario.token_length() as u64 + 16,
+                    )),
+                    rss: None,
+                },
+                source,
+                LongChatTextIdentity::from_text(&assistant_context),
+            )
+        })
+        .collect::<Vec<_>>();
+    let error_probe = LongChatErrorProbeResult::new(401, true, true, 8);
+
+    let summary = format_run_summary(&config, &results, Some(&error_probe), None, None);
+
+    assert_eq!(
+        config
+            .required_probes()
+            .iter()
+            .map(|probe| probe.as_str())
+            .collect::<Vec<_>>(),
+        ["error", "disconnect"]
+    );
+    assert!(format_plan(&config).contains("long_chat_required_probes=error,disconnect"));
+    assert!(summary.contains("long_chat_summary_required_probes=error,disconnect"));
+    assert!(summary.contains("long_chat_summary_required_probes_completed=false"));
+    assert!(summary.contains("long_chat_summary_run_complete=false"));
+    Ok(())
+}
+
+#[test]
 fn queue_probe_participates_in_long_chat_run_summary() -> Result<(), Box<dyn std::error::Error>> {
     let config = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),

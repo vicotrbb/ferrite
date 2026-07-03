@@ -76,11 +76,14 @@ Use these closure flags for dedicated gate attempts:
 ```text
 --require-models Qwen2.5-0.5B-Instruct-Q4_K_M,Qwen2.5-1.5B-Instruct-Q8_0,Qwen2.5-1.5B-Instruct-Q6_K,SmolLM2-1.7B-Instruct-Q4_K_M
 --require-token-lengths 256,512,1024
+--require-probes error,disconnect,queue
 ```
 
 These keep partial one-model or one-length runs useful as evidence while
 preventing `long_chat_summary_run_complete=true` from passing a closure attempt
-that omits part of the required model set or token-length ladder.
+that omits part of the required model set, token-length ladder, or operational
+probe set. Required probes still need their matching execution flags, such as
+`--error-probe`, `--disconnect-probe`, and `--queue-probe`.
 
 ## Required Scenarios
 

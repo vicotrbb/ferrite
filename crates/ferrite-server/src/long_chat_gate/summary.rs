@@ -1,6 +1,6 @@
 use super::{
     LongChatDisconnectProbeResult, LongChatErrorProbeResult, LongChatGateConfig,
-    LongChatQueueProbeResult, LongChatScenarioResult, LongChatTextIdentity,
+    LongChatQueueProbeResult, LongChatRequiredProbe, LongChatScenarioResult, LongChatTextIdentity,
 };
 use std::collections::HashMap;
 
@@ -72,6 +72,30 @@ pub fn format_run_summary(
     let queue_probe_completed = queue_probe.is_some_and(LongChatQueueProbeResult::completed);
     let queue_probe_contender_started_after_holder =
         queue_probe.is_some_and(LongChatQueueProbeResult::contender_started_after_holder);
+    let required_probes_completed = required_probes_completed(
+        config.required_probes(),
+        RequiredProbeStatus {
+            error_probe_completed,
+            error_probe_reconnect_started_new_generation,
+            disconnect_probe_completed,
+            disconnect_probe_reconnect_started_new_generation,
+            queue_probe_completed,
+            queue_probe_contender_started_after_holder,
+        },
+    );
+    let required_probes_summary = if config.required_probes().is_empty() {
+        String::new()
+    } else {
+        format!(
+            "\nlong_chat_summary_required_probes={}\nlong_chat_summary_required_probes_completed={required_probes_completed}",
+            config
+                .required_probes()
+                .iter()
+                .map(|probe| probe.as_str())
+                .collect::<Vec<_>>()
+                .join(",")
+        )
+    };
     let required_models_present = required_models_present(results, config.required_models());
     let required_models_summary = if config.required_models().is_empty() {
         String::new()
@@ -110,6 +134,7 @@ pub fn format_run_summary(
             || (disconnect_probe_completed && disconnect_probe_reconnect_started_new_generation))
         && (!queue_probe_required
             || (queue_probe_completed && queue_probe_contender_started_after_holder))
+        && required_probes_completed
         && required_models_present
         && required_token_lengths_present;
 
@@ -148,16 +173,45 @@ long_chat_summary_disconnect_probe_completed={disconnect_probe_completed}\n\
 long_chat_summary_disconnect_probe_reconnect_started_new_generation={disconnect_probe_reconnect_started_new_generation}\n\
 long_chat_summary_queue_probe_required={queue_probe_required}\n\
 long_chat_summary_queue_probe_completed={queue_probe_completed}\n\
-long_chat_summary_queue_probe_contender_started_after_holder={queue_probe_contender_started_after_holder}{}{}\n\
+long_chat_summary_queue_probe_contender_started_after_holder={queue_probe_contender_started_after_holder}{}{}{}\n\
 long_chat_summary_run_complete={run_complete}",
         generated_context_identity.required,
         generated_context_identity.links,
         generated_context_identity.matching_links,
         generated_context_identity.all_links_present(),
         generated_context_identity.all_links_present_and_matching(),
+        required_probes_summary,
         required_models_summary,
         required_token_lengths_summary,
     )
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct RequiredProbeStatus {
+    error_probe_completed: bool,
+    error_probe_reconnect_started_new_generation: bool,
+    disconnect_probe_completed: bool,
+    disconnect_probe_reconnect_started_new_generation: bool,
+    queue_probe_completed: bool,
+    queue_probe_contender_started_after_holder: bool,
+}
+
+fn required_probes_completed(
+    required_probes: &[LongChatRequiredProbe],
+    status: RequiredProbeStatus,
+) -> bool {
+    required_probes.iter().all(|probe| match probe {
+        LongChatRequiredProbe::Error => {
+            status.error_probe_completed && status.error_probe_reconnect_started_new_generation
+        }
+        LongChatRequiredProbe::Disconnect => {
+            status.disconnect_probe_completed
+                && status.disconnect_probe_reconnect_started_new_generation
+        }
+        LongChatRequiredProbe::Queue => {
+            status.queue_probe_completed && status.queue_probe_contender_started_after_holder
+        }
+    })
 }
 
 fn required_models_present(results: &[LongChatScenarioResult], required_models: &[String]) -> bool {

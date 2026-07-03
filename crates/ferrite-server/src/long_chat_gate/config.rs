@@ -17,6 +17,7 @@ pub struct LongChatGateConfig {
     error_probe: bool,
     disconnect_probe: bool,
     queue_probe: bool,
+    required_probes: Vec<LongChatRequiredProbe>,
     require_cached_follow_ups: bool,
     models: Vec<String>,
     required_models: Vec<String>,
@@ -73,6 +74,10 @@ impl LongChatGateConfig {
                 }
                 "--queue-probe" => {
                     config.queue_probe = true;
+                }
+                "--require-probes" => {
+                    config.required_probes =
+                        parse_required_probes(next_value(&mut iter, "--require-probes")?)?;
                 }
                 "--require-cached-follow-ups" => {
                     config.require_cached_follow_ups = true;
@@ -275,6 +280,10 @@ impl LongChatGateConfig {
         self.queue_probe
     }
 
+    pub fn required_probes(&self) -> &[LongChatRequiredProbe] {
+        &self.required_probes
+    }
+
     pub fn require_cached_follow_ups(&self) -> bool {
         self.require_cached_follow_ups
     }
@@ -416,6 +425,7 @@ impl Default for LongChatGateConfig {
             error_probe: false,
             disconnect_probe: false,
             queue_probe: false,
+            required_probes: Vec::new(),
             require_cached_follow_ups: false,
             models: vec![
                 "Qwen2.5-0.5B-Instruct-Q4_K_M".to_owned(),
@@ -567,5 +577,40 @@ fn os_string_to_string(value: OsString) -> Result<String, LongChatGateError> {
 }
 
 fn usage() -> &'static str {
-    "usage: ferrite-openai-long-chat-gate [--execute] [--error-probe] [--disconnect-probe] [--queue-probe] [--require-cached-follow-ups] [--addr 127.0.0.1:8080] [--api-key local-secret] [--models MODEL[,MODEL...]] [--require-models MODEL[,MODEL...]] [--prompt TEXT] [--assistant-context TEXT] [--follow-up TEXT] [--prompt-cache-key KEY] [--prompt-cache-keys KEY[,KEY...]] [--prompt-cache-trace] [--stop TEXT] [--expect-finish-reason REASON] [--probe-max-tokens TOKENS] [--require-token-lengths 256,512,1024] [--generated-context-max-chars CHARS] [--generated-context-max-tokens TOKENS] [--generated-context-state-capsule TEXT] [--generated-context-state-capsule-placement assistant-context|assistant-context-only|follow-up] [--require-generated-response-contains TEXT] [--disconnect-reconnect-timeout-ms 30000] [--rss-pid PID] [--proof-log PATH] [--proof-exit-code PATH] [--token-lengths 256,512,1024] [--turns 4]"
+    "usage: ferrite-openai-long-chat-gate [--execute] [--error-probe] [--disconnect-probe] [--queue-probe] [--require-probes error,disconnect,queue] [--require-cached-follow-ups] [--addr 127.0.0.1:8080] [--api-key local-secret] [--models MODEL[,MODEL...]] [--require-models MODEL[,MODEL...]] [--prompt TEXT] [--assistant-context TEXT] [--follow-up TEXT] [--prompt-cache-key KEY] [--prompt-cache-keys KEY[,KEY...]] [--prompt-cache-trace] [--stop TEXT] [--expect-finish-reason REASON] [--probe-max-tokens TOKENS] [--require-token-lengths 256,512,1024] [--generated-context-max-chars CHARS] [--generated-context-max-tokens TOKENS] [--generated-context-state-capsule TEXT] [--generated-context-state-capsule-placement assistant-context|assistant-context-only|follow-up] [--require-generated-response-contains TEXT] [--disconnect-reconnect-timeout-ms 30000] [--rss-pid PID] [--proof-log PATH] [--proof-exit-code PATH] [--token-lengths 256,512,1024] [--turns 4]"
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LongChatRequiredProbe {
+    Error,
+    Disconnect,
+    Queue,
+}
+
+impl LongChatRequiredProbe {
+    pub fn parse(value: &str) -> Result<Self, LongChatGateError> {
+        match value {
+            "error" => Ok(Self::Error),
+            "disconnect" => Ok(Self::Disconnect),
+            "queue" => Ok(Self::Queue),
+            other => Err(LongChatGateError::new(format!(
+                "invalid --require-probes entry {other:?}; expected error, disconnect, or queue"
+            ))),
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Error => "error",
+            Self::Disconnect => "disconnect",
+            Self::Queue => "queue",
+        }
+    }
+}
+
+fn parse_required_probes(value: OsString) -> Result<Vec<LongChatRequiredProbe>, LongChatGateError> {
+    parse_non_empty_list(value, "--require-probes")?
+        .into_iter()
+        .map(|part| LongChatRequiredProbe::parse(&part))
+        .collect()
 }
