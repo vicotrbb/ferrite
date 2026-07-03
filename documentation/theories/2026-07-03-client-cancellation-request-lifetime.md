@@ -343,6 +343,20 @@ evaluation reaches its first cancellation poll, such as request body handling,
 chat-template formatting, tokenization, prompt allocation, model page faults, or
 other prompt setup work.
 
+Stage-timing follow-up:
+`documentation/benchmarks/2026-07-03-local-qwen-0-5b-prefill-cancel-stage-timing.md`.
+The same local model and probe reported:
+
+```text
+openai_stream_lifecycle request_id=stream-0 finish_reason=cancelled disconnect_point=prompt_evaluation prompt_tokens_started=1 prompt_cancellation_polls=1 prompt_cancellation_closed_polls=1 generated_chunks=0 generated_token_ids=0 elapsed_ms=8132 disconnect_observed_elapsed_ms=8132 disconnect_to_finish_ms=0 prompt_cancellation_token_index=0 prompt_cancellation_layer_index=none engine_lock_acquired_elapsed_ms=0 generation_started_elapsed_ms=0 first_prompt_token_started_elapsed_ms=8132 first_prompt_cancellation_poll_elapsed_ms=8132
+```
+
+This rejects engine-lock wait as the dominant delay source for this run. The
+delay happens after generation starts and before the first prompt-token
+callback. The next theory should split runtime prefill setup into tokenization,
+prefix-cache lookup, session setup, prompt allocation, and first-touch model
+page faults.
+
 ## Minimal Experiment
 
 Use a small, repeatable model/server setup and avoid Kubernetes port-forward for

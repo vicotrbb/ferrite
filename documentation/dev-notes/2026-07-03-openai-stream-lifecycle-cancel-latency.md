@@ -131,3 +131,17 @@ same cancellation scenario was rerun against local Qwen2.5-0.5B Q4_K_M:
 
 That proof places the remaining delay before the first prompt-token layer
 evaluation, not inside one transformer layer.
+
+A further stage-timing run added:
+
+- `engine_lock_acquired_elapsed_ms`;
+- `generation_started_elapsed_ms`;
+- `first_prompt_token_started_elapsed_ms`;
+- `first_prompt_cancellation_poll_elapsed_ms`.
+
+The real-model proof is recorded in
+`documentation/benchmarks/2026-07-03-local-qwen-0-5b-prefill-cancel-stage-timing.md`.
+It reported `engine_lock_acquired_elapsed_ms=0`,
+`generation_started_elapsed_ms=0`, and
+`first_prompt_cancellation_poll_elapsed_ms=8132`, placing the delay inside
+runtime setup before the first prompt-token callback.
