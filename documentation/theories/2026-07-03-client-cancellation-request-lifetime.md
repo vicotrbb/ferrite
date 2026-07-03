@@ -357,6 +357,19 @@ callback. The next theory should split runtime prefill setup into tokenization,
 prefix-cache lookup, session setup, prompt allocation, and first-touch model
 page faults.
 
+Runtime-stage follow-up:
+`documentation/benchmarks/2026-07-03-local-qwen-0-5b-prefill-cancel-runtime-stage.md`.
+The abandoned stream reported:
+
+```text
+openai_stream_lifecycle request_id=stream-0 finish_reason=cancelled disconnect_point=prompt_evaluation prompt_tokens_started=1 prompt_cancellation_polls=1 prompt_cancellation_closed_polls=1 generated_chunks=0 generated_token_ids=0 elapsed_ms=8581 disconnect_observed_elapsed_ms=8581 disconnect_to_finish_ms=0 prompt_cancellation_token_index=0 prompt_cancellation_layer_index=none engine_lock_acquired_elapsed_ms=0 generation_started_elapsed_ms=0 prompt_tokenized_elapsed_ms=8581 prefix_cache_key_built_elapsed_ms=8581 session_started_elapsed_ms=8581 prefix_cache_lookup_finished_elapsed_ms=8581 prefix_cache_restored_elapsed_ms=none prompt_evaluation_started_elapsed_ms=8581 first_prompt_token_started_elapsed_ms=8581 first_prompt_cancellation_poll_elapsed_ms=8581
+```
+
+This rejects prefix-cache lookup, session setup, prompt allocation, and
+transformer execution as the dominant delay for this local run. The current best
+theory is that long-prompt tokenization owns the observed delay, and stream
+closure is not checked until after tokenization completes.
+
 ## Minimal Experiment
 
 Use a small, repeatable model/server setup and avoid Kubernetes port-forward for

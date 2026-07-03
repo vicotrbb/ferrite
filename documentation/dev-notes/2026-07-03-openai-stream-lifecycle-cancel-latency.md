@@ -145,3 +145,18 @@ It reported `engine_lock_acquired_elapsed_ms=0`,
 `generation_started_elapsed_ms=0`, and
 `first_prompt_cancellation_poll_elapsed_ms=8132`, placing the delay inside
 runtime setup before the first prompt-token callback.
+
+Runtime-stage instrumentation then split that setup window into:
+
+- `prompt_tokenized_elapsed_ms`;
+- `prefix_cache_key_built_elapsed_ms`;
+- `session_started_elapsed_ms`;
+- `prefix_cache_lookup_finished_elapsed_ms`;
+- `prefix_cache_restored_elapsed_ms`;
+- `prompt_evaluation_started_elapsed_ms`.
+
+The real-model proof is recorded in
+`documentation/benchmarks/2026-07-03-local-qwen-0-5b-prefill-cancel-runtime-stage.md`.
+It reported `prompt_tokenized_elapsed_ms=8581`; all later runtime setup fields
+were also `8581`. That places the measured delay in prompt tokenization before
+the first stream-closure poll.
