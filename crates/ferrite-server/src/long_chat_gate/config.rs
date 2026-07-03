@@ -19,6 +19,7 @@ pub struct LongChatGateConfig {
     queue_probe: bool,
     require_cached_follow_ups: bool,
     models: Vec<String>,
+    required_models: Vec<String>,
     prompt: String,
     assistant_context: String,
     follow_up: String,
@@ -79,6 +80,12 @@ impl LongChatGateConfig {
                 "--models" => {
                     config.models =
                         parse_non_empty_list(next_value(&mut iter, "--models")?, "--models")?;
+                }
+                "--require-models" => {
+                    config.required_models = parse_non_empty_list(
+                        next_value(&mut iter, "--require-models")?,
+                        "--require-models",
+                    )?;
                 }
                 "--prompt" => {
                     config.prompt =
@@ -280,6 +287,10 @@ impl LongChatGateConfig {
         &self.models
     }
 
+    pub fn required_models(&self) -> &[String] {
+        &self.required_models
+    }
+
     pub fn prompt(&self) -> &str {
         &self.prompt
     }
@@ -412,6 +423,7 @@ impl Default for LongChatGateConfig {
                 "Qwen2.5-1.5B-Instruct-Q6_K".to_owned(),
                 "SmolLM2-1.7B-Instruct-Q4_K_M".to_owned(),
             ],
+            required_models: Vec::new(),
             prompt: "Write a concise paragraph about CPU inference.".to_owned(),
             assistant_context: "CPU inference prioritizes memory locality, predictable scheduling, and efficient token streaming.".to_owned(),
             follow_up: "Continue with the operational risks for a long streaming chat.".to_owned(),
@@ -555,5 +567,5 @@ fn os_string_to_string(value: OsString) -> Result<String, LongChatGateError> {
 }
 
 fn usage() -> &'static str {
-    "usage: ferrite-openai-long-chat-gate [--execute] [--error-probe] [--disconnect-probe] [--queue-probe] [--require-cached-follow-ups] [--addr 127.0.0.1:8080] [--api-key local-secret] [--models MODEL[,MODEL...]] [--prompt TEXT] [--assistant-context TEXT] [--follow-up TEXT] [--prompt-cache-key KEY] [--prompt-cache-keys KEY[,KEY...]] [--prompt-cache-trace] [--stop TEXT] [--expect-finish-reason REASON] [--probe-max-tokens TOKENS] [--require-token-lengths 256,512,1024] [--generated-context-max-chars CHARS] [--generated-context-max-tokens TOKENS] [--generated-context-state-capsule TEXT] [--generated-context-state-capsule-placement assistant-context|assistant-context-only|follow-up] [--require-generated-response-contains TEXT] [--disconnect-reconnect-timeout-ms 30000] [--rss-pid PID] [--proof-log PATH] [--proof-exit-code PATH] [--token-lengths 256,512,1024] [--turns 4]"
+    "usage: ferrite-openai-long-chat-gate [--execute] [--error-probe] [--disconnect-probe] [--queue-probe] [--require-cached-follow-ups] [--addr 127.0.0.1:8080] [--api-key local-secret] [--models MODEL[,MODEL...]] [--require-models MODEL[,MODEL...]] [--prompt TEXT] [--assistant-context TEXT] [--follow-up TEXT] [--prompt-cache-key KEY] [--prompt-cache-keys KEY[,KEY...]] [--prompt-cache-trace] [--stop TEXT] [--expect-finish-reason REASON] [--probe-max-tokens TOKENS] [--require-token-lengths 256,512,1024] [--generated-context-max-chars CHARS] [--generated-context-max-tokens TOKENS] [--generated-context-state-capsule TEXT] [--generated-context-state-capsule-placement assistant-context|assistant-context-only|follow-up] [--require-generated-response-contains TEXT] [--disconnect-reconnect-timeout-ms 30000] [--rss-pid PID] [--proof-log PATH] [--proof-exit-code PATH] [--token-lengths 256,512,1024] [--turns 4]"
 }

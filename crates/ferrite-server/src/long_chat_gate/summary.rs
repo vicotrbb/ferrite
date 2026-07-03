@@ -72,6 +72,15 @@ pub fn format_run_summary(
     let queue_probe_completed = queue_probe.is_some_and(LongChatQueueProbeResult::completed);
     let queue_probe_contender_started_after_holder =
         queue_probe.is_some_and(LongChatQueueProbeResult::contender_started_after_holder);
+    let required_models_present = required_models_present(results, config.required_models());
+    let required_models_summary = if config.required_models().is_empty() {
+        String::new()
+    } else {
+        format!(
+            "\nlong_chat_summary_required_models={}\nlong_chat_summary_required_models_present={required_models_present}",
+            config.required_models().join(",")
+        )
+    };
     let required_token_lengths_present =
         required_token_lengths_present(results, config.required_token_lengths());
     let required_token_lengths_summary = if config.required_token_lengths().is_empty() {
@@ -101,6 +110,7 @@ pub fn format_run_summary(
             || (disconnect_probe_completed && disconnect_probe_reconnect_started_new_generation))
         && (!queue_probe_required
             || (queue_probe_completed && queue_probe_contender_started_after_holder))
+        && required_models_present
         && required_token_lengths_present;
 
     format!(
@@ -138,15 +148,22 @@ long_chat_summary_disconnect_probe_completed={disconnect_probe_completed}\n\
 long_chat_summary_disconnect_probe_reconnect_started_new_generation={disconnect_probe_reconnect_started_new_generation}\n\
 long_chat_summary_queue_probe_required={queue_probe_required}\n\
 long_chat_summary_queue_probe_completed={queue_probe_completed}\n\
-long_chat_summary_queue_probe_contender_started_after_holder={queue_probe_contender_started_after_holder}{}\n\
+long_chat_summary_queue_probe_contender_started_after_holder={queue_probe_contender_started_after_holder}{}{}\n\
 long_chat_summary_run_complete={run_complete}",
         generated_context_identity.required,
         generated_context_identity.links,
         generated_context_identity.matching_links,
         generated_context_identity.all_links_present(),
         generated_context_identity.all_links_present_and_matching(),
+        required_models_summary,
         required_token_lengths_summary,
     )
+}
+
+fn required_models_present(results: &[LongChatScenarioResult], required_models: &[String]) -> bool {
+    required_models
+        .iter()
+        .all(|required| results.iter().any(|result| result.model() == required))
 }
 
 fn required_token_lengths_present(
