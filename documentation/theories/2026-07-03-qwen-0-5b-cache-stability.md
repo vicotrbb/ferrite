@@ -128,3 +128,13 @@ of 1054, with TTFT around 375 to 378 seconds. Turn 4 then reported
 `exact_hit`, 1054 cached prompt tokens, and TTFT of 308 ms. This directly links
 prompt-cache depth to user-visible TTFT for the x86 1024-token generated-context
 lane.
+
+The turn 4 exact hit creates a narrower follow-up theory:
+
+`documentation/theories/2026-07-03-generated-context-fixed-point-cache.md`
+
+That theory should be tested before changing cache behavior. The next
+implementation slice should add generated-response and next-turn
+assistant-context identity observability to the long-chat proof tooling, so the
+project can distinguish useful prompt-cache reuse from accidental repeated
+assistant output.
