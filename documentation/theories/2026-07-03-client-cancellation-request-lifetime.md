@@ -300,6 +300,10 @@ stream was observed. The remaining latency is before closure observation, so
 the next missing counter is `disconnect_observed_elapsed_ms`, followed by prompt
 token index and transformer layer index.
 
+The next instrumentation slice added `disconnect_observed_elapsed_ms` to the
+same lifecycle line. The remaining missing counters are prompt token index and
+transformer layer index at cancellation.
+
 ## Minimal Experiment
 
 Use a small, repeatable model/server setup and avoid Kubernetes port-forward for

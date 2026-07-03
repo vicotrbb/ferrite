@@ -51,6 +51,7 @@ pub(super) struct StreamLifecycleSummary {
     pub generated_chunks: usize,
     pub generated_token_ids: usize,
     pub elapsed_ms: u128,
+    pub disconnect_observed_elapsed_ms: Option<u128>,
     pub disconnect_to_finish_ms: Option<u128>,
 }
 
@@ -123,6 +124,9 @@ impl StreamLifecycle {
 
     pub(super) fn finish(&self, finish_reason: StreamFinishReason) -> StreamLifecycleSummary {
         let elapsed_ms = self.started.elapsed().as_millis();
+        let disconnect_observed_elapsed_ms = self
+            .disconnect_observed_at
+            .map(|observed_at| observed_at.duration_since(self.started).as_millis());
         let disconnect_to_finish_ms = self
             .disconnect_observed_at
             .map(|observed_at| observed_at.elapsed().as_millis());
@@ -136,6 +140,7 @@ impl StreamLifecycle {
             generated_chunks: self.generated_chunks,
             generated_token_ids: self.generated_token_ids,
             elapsed_ms,
+            disconnect_observed_elapsed_ms,
             disconnect_to_finish_ms,
         }
     }
@@ -151,8 +156,12 @@ impl StreamLifecycleSummary {
             .disconnect_to_finish_ms
             .map(|elapsed_ms| elapsed_ms.to_string())
             .unwrap_or_else(|| "none".to_string());
+        let disconnect_observed_elapsed_ms = self
+            .disconnect_observed_elapsed_ms
+            .map(|elapsed_ms| elapsed_ms.to_string())
+            .unwrap_or_else(|| "none".to_string());
         format!(
-            "openai_stream_lifecycle request_id={} finish_reason={} disconnect_point={} prompt_tokens_started={} prompt_cancellation_polls={} prompt_cancellation_closed_polls={} generated_chunks={} generated_token_ids={} elapsed_ms={} disconnect_to_finish_ms={}",
+            "openai_stream_lifecycle request_id={} finish_reason={} disconnect_point={} prompt_tokens_started={} prompt_cancellation_polls={} prompt_cancellation_closed_polls={} generated_chunks={} generated_token_ids={} elapsed_ms={} disconnect_observed_elapsed_ms={} disconnect_to_finish_ms={}",
             self.request_id,
             self.finish_reason.as_str(),
             disconnect_point,
@@ -162,6 +171,7 @@ impl StreamLifecycleSummary {
             self.generated_chunks,
             self.generated_token_ids,
             self.elapsed_ms,
+            disconnect_observed_elapsed_ms,
             disconnect_to_finish_ms
         )
     }
@@ -195,6 +205,7 @@ mod tests {
         assert_eq!(summary.prompt_tokens_started, 1);
         assert_eq!(summary.prompt_cancellation_polls, 2);
         assert_eq!(summary.prompt_cancellation_closed_polls, 1);
+        assert!(summary.disconnect_observed_elapsed_ms.is_some());
         assert!(summary.disconnect_to_finish_ms.is_some());
         assert_eq!(summary.generated_chunks, 1);
         assert_eq!(summary.generated_token_ids, 3);
@@ -205,6 +216,9 @@ mod tests {
         assert!(summary
             .log_line()
             .contains("prompt_cancellation_closed_polls=1"));
+        assert!(summary
+            .log_line()
+            .contains("disconnect_observed_elapsed_ms="));
         assert!(summary.log_line().contains("disconnect_to_finish_ms="));
     }
 }

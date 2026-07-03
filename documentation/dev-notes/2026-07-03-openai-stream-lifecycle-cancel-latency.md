@@ -16,16 +16,19 @@ disconnect and final lifecycle logging.
 
 - `prompt_cancellation_closed_polls`: prompt-cancellation polls that observed a
   closed stream;
+- `disconnect_observed_elapsed_ms`: elapsed request time when the closed stream
+  was first observed;
 - `disconnect_to_finish_ms`: elapsed time between first observed disconnect and
   final request lifecycle summary.
 
 The emitted lifecycle line now includes both fields:
 
 ```text
-openai_stream_lifecycle ... prompt_cancellation_closed_polls=N ... disconnect_to_finish_ms=N|none
+openai_stream_lifecycle ... prompt_cancellation_closed_polls=N ... disconnect_observed_elapsed_ms=N|none disconnect_to_finish_ms=N|none
 ```
 
 Completed requests with no disconnect report `disconnect_to_finish_ms=none`.
+They also report `disconnect_observed_elapsed_ms=none`.
 
 ## Validation
 
@@ -45,10 +48,27 @@ test openai::stream_lifecycle::tests::lifecycle_summary_records_prompt_generatio
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 391 filtered out
 ```
 
+Second red test evidence:
+
+```text
+cargo test -p ferrite-server stream_lifecycle -- --nocapture
+error[E0609]: no field `disconnect_observed_elapsed_ms` on type `StreamLifecycleSummary`
+```
+
+Second green test evidence:
+
+```text
+cargo test -p ferrite-server stream_lifecycle -- --nocapture
+test openai::stream_lifecycle::tests::lifecycle_summary_records_prompt_generation_and_disconnect_state ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 391 filtered out
+```
+
 Formatting:
 
 ```text
 cargo fmt
+cargo fmt -- --check
+git diff --check
 ```
 
 ## Limits
