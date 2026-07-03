@@ -168,6 +168,28 @@ fn cli_rejects_generation_and_benchmark_together() -> Result<(), Box<dyn Error>>
 }
 
 #[test]
+fn cli_rejects_tokenization_benchmark_without_text_prompt() -> Result<(), Box<dyn Error>> {
+    let model_path = write_fixture_model()?;
+    let binary = cli_binary()?;
+
+    let output = Command::new(binary)
+        .arg("--model")
+        .arg(&model_path)
+        .arg("--prompt-token-ids")
+        .arg("1")
+        .arg("--benchmark-tokenization-runs")
+        .arg("2")
+        .output()?;
+
+    remove_fixture_model(&model_path)?;
+
+    assert!(!output.status.success());
+    let stderr = String::from_utf8(output.stderr)?;
+    assert!(stderr.contains("use --benchmark-tokenization-runs with --prompt"));
+    Ok(())
+}
+
+#[test]
 fn cli_streams_generated_token_chunks() -> Result<(), Box<dyn Error>> {
     let model_path = write_fixture_model()?;
     let binary = cli_binary()?;

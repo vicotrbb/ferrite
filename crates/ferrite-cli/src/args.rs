@@ -10,6 +10,7 @@ pub struct CliArgs {
     pub expected_token_id: Option<usize>,
     pub expected_generated_token_ids: Option<Vec<usize>>,
     pub benchmark_runs: Option<usize>,
+    pub benchmark_tokenization_runs: Option<usize>,
     pub generate_tokens: Option<usize>,
     pub top_logits: Option<usize>,
     pub profile_next_token: bool,
@@ -33,6 +34,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
     let mut expected_token_id = None;
     let mut expected_generated_token_ids = None;
     let mut benchmark_runs = None;
+    let mut benchmark_tokenization_runs = None;
     let mut generate_tokens = None;
     let mut top_logits = None;
     let mut profile_next_token = false;
@@ -79,6 +81,12 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
                 benchmark_runs = Some(parse_nonzero_usize(
                     next_value(&mut iter, "--benchmark-runs")?,
                     "--benchmark-runs",
+                )?);
+            }
+            "--benchmark-tokenization-runs" => {
+                benchmark_tokenization_runs = Some(parse_nonzero_usize(
+                    next_value(&mut iter, "--benchmark-tokenization-runs")?,
+                    "--benchmark-tokenization-runs",
                 )?);
             }
             "--generate-tokens" => {
@@ -136,6 +144,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
     validate_modes(ModeValidation {
         generate_tokens,
         benchmark_runs,
+        benchmark_tokenization_runs,
         profile_next_token,
         profile_benchmark_token,
         q8_k_activation: Q8KActivationModeValidation {
@@ -145,6 +154,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
         },
         stream,
         expected_generated_token_ids: expected_generated_token_ids.as_deref(),
+        prompt_token_ids: prompt_token_ids.as_deref(),
     })?;
 
     Ok(CliArgs {
@@ -153,6 +163,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
         expected_token_id,
         expected_generated_token_ids,
         benchmark_runs,
+        benchmark_tokenization_runs,
         generate_tokens,
         top_logits,
         profile_next_token,
@@ -168,11 +179,13 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
 struct ModeValidation<'a> {
     generate_tokens: Option<usize>,
     benchmark_runs: Option<usize>,
+    benchmark_tokenization_runs: Option<usize>,
     profile_next_token: bool,
     profile_benchmark_token: bool,
     q8_k_activation: Q8KActivationModeValidation,
     stream: bool,
     expected_generated_token_ids: Option<&'a [usize]>,
+    prompt_token_ids: Option<&'a [usize]>,
 }
 
 struct Q8KActivationModeValidation {
@@ -186,6 +199,24 @@ fn validate_modes(validation: ModeValidation<'_>) -> Result<(), Box<dyn Error>> 
         return Err(
             io::Error::other("use either --generate-tokens or --benchmark-runs, not both").into(),
         );
+    }
+    if validation.benchmark_tokenization_runs.is_some() {
+        if validation.prompt_token_ids.is_some() {
+            return Err(io::Error::other(
+                "use --benchmark-tokenization-runs with --prompt, not --prompt-token-ids",
+            )
+            .into());
+        }
+        if validation.generate_tokens.is_some()
+            || validation.benchmark_runs.is_some()
+            || validation.profile_next_token
+            || validation.profile_benchmark_token
+        {
+            return Err(io::Error::other(
+                "use --benchmark-tokenization-runs without generation, token benchmark, or profile modes",
+            )
+            .into());
+        }
     }
     if validation.stream && validation.generate_tokens.is_none() {
         return Err(io::Error::other("use --stream with --generate-tokens").into());
@@ -293,7 +324,7 @@ fn parse_token_ids(value: OsString) -> Result<Vec<usize>, Box<dyn Error>> {
 }
 
 fn usage() -> &'static str {
-    "usage: ferrite --model <path.gguf> (--prompt <text> | --prompt-token-ids <id[,id...]>) [--expect-token-id <id>] [--top-logits <count>] [--profile-next-token] [--generate-tokens <count>] [--expect-generated-token-ids <id[,id...]>] [--stream] [--benchmark-runs <count>] [--profile-benchmark-token] [--sleep-after-load-ms <ms>] [--experimental-q8-k-activation-matvec] [--experimental-q8-k-activation-roles <role[,role...]>] [--compare-q8-k-activation-matvec]"
+    "usage: ferrite --model <path.gguf> (--prompt <text> | --prompt-token-ids <id[,id...]>) [--expect-token-id <id>] [--top-logits <count>] [--profile-next-token] [--generate-tokens <count>] [--expect-generated-token-ids <id[,id...]>] [--stream] [--benchmark-runs <count>] [--benchmark-tokenization-runs <count>] [--profile-benchmark-token] [--sleep-after-load-ms <ms>] [--experimental-q8-k-activation-matvec] [--experimental-q8-k-activation-roles <role[,role...]>] [--compare-q8-k-activation-matvec]"
 }
 
 #[cfg(test)]

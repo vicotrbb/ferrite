@@ -20,6 +20,9 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
     let model_file_bytes = bytes.len();
     let gguf = parse_gguf(&bytes)?;
     let tokenizer = GgufTokenizer::from_gguf(&gguf)?;
+    if let Some(runs) = args.benchmark_tokenization_runs {
+        return benchmark_tokenization(&tokenizer, args.prompt, runs, model_file_bytes);
+    }
     let model = ScalarLlamaModel::from_gguf_scalar(&gguf, &bytes)?;
     drop(bytes);
     if let Some(sleep_ms) = args.sleep_after_load_ms {
@@ -233,6 +236,35 @@ fn prompt_token_ids(
         PromptSource::Text(prompt) => Ok(tokenizer.encode(&prompt)?),
         PromptSource::TokenIds(token_ids) => Ok(token_ids),
     }
+}
+
+fn benchmark_tokenization(
+    tokenizer: &GgufTokenizer,
+    prompt: PromptSource,
+    runs: usize,
+    model_file_bytes: usize,
+) -> Result<(), Box<dyn Error>> {
+    let PromptSource::Text(prompt) = prompt else {
+        return Err(io::Error::other(
+            "use --benchmark-tokenization-runs with --prompt, not --prompt-token-ids",
+        )
+        .into());
+    };
+    let mut token_ids = Vec::new();
+    let started = Instant::now();
+    for _ in 0..runs {
+        token_ids = tokenizer.encode(&prompt)?;
+    }
+    let total_ns = started.elapsed().as_nanos();
+    let avg_ns = total_ns / runs as u128;
+    println!("tokenization_benchmark_runs={runs}");
+    println!("tokenization_benchmark_prompt_bytes={}", prompt.len());
+    println!("tokenization_benchmark_token_count={}", token_ids.len());
+    println!("tokenization_benchmark_total_ns={total_ns}");
+    println!("tokenization_benchmark_avg_ns={avg_ns}");
+    println!("model_file_bytes={model_file_bytes}");
+    println!("model_file_retained_bytes=0");
+    Ok(())
 }
 
 fn join_token_ids(token_ids: &[usize]) -> String {

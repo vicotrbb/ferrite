@@ -75,6 +75,39 @@ fn cli_can_pause_after_model_load_for_memory_sampling() -> Result<(), Box<dyn Er
 }
 
 #[test]
+fn cli_benchmarks_tokenization_without_generation() -> Result<(), Box<dyn Error>> {
+    let model_path = write_fixture_model()?;
+    let binary = cli_binary()?;
+
+    let output = Command::new(binary)
+        .arg("--model")
+        .arg(&model_path)
+        .arg("--prompt")
+        .arg("hello")
+        .arg("--benchmark-tokenization-runs")
+        .arg("3")
+        .output()?;
+
+    remove_fixture_model(&model_path)?;
+
+    assert!(
+        output.status.success(),
+        "cli failed with stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout)?;
+    assert!(stdout.contains("tokenization_benchmark_runs=3"));
+    assert!(stdout.contains("tokenization_benchmark_prompt_bytes=5"));
+    assert!(stdout.contains("tokenization_benchmark_token_count=1"));
+    assert!(stdout.contains("tokenization_benchmark_total_ns="));
+    assert!(stdout.contains("tokenization_benchmark_avg_ns="));
+    assert!(stdout.contains("model_file_bytes="));
+    assert!(stdout.contains("model_file_retained_bytes=0"));
+    assert!(!stdout.contains("next_token_id="));
+    Ok(())
+}
+
+#[test]
 fn cli_profiles_benchmark_token_id_decode() -> Result<(), Box<dyn Error>> {
     let model_path = write_fixture_model()?;
     let binary = cli_binary()?;
