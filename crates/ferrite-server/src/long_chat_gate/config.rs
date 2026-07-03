@@ -1,4 +1,4 @@
-use super::LongChatScenario;
+use super::{LongChatScenario, LongChatStateCapsulePlacement};
 use std::{error::Error, ffi::OsString, fmt, time::Duration};
 
 const DEFAULT_DISCONNECT_RECONNECT_TIMEOUT: Duration = Duration::from_secs(30);
@@ -22,6 +22,7 @@ pub struct LongChatGateConfig {
     generated_context_max_chars: Option<usize>,
     generated_context_max_tokens: Option<usize>,
     generated_context_state_capsule: Option<String>,
+    generated_context_state_capsule_placement: LongChatStateCapsulePlacement,
     required_generated_response_substrings: Vec<String>,
     disconnect_reconnect_timeout: Duration,
     rss_pid: Option<u32>,
@@ -127,6 +128,14 @@ impl LongChatGateConfig {
                         next_value(&mut iter, "--generated-context-state-capsule")?,
                         "--generated-context-state-capsule",
                     )?);
+                }
+                "--generated-context-state-capsule-placement" => {
+                    let value = parse_non_empty_string(
+                        next_value(&mut iter, "--generated-context-state-capsule-placement")?,
+                        "--generated-context-state-capsule-placement",
+                    )?;
+                    config.generated_context_state_capsule_placement =
+                        LongChatStateCapsulePlacement::parse(&value)?;
                 }
                 "--require-generated-response-contains" => {
                     config
@@ -254,6 +263,10 @@ impl LongChatGateConfig {
         self.generated_context_state_capsule.as_deref()
     }
 
+    pub fn generated_context_state_capsule_placement(&self) -> LongChatStateCapsulePlacement {
+        self.generated_context_state_capsule_placement
+    }
+
     pub fn required_generated_response_substrings(&self) -> &[String] {
         &self.required_generated_response_substrings
     }
@@ -312,6 +325,7 @@ impl Default for LongChatGateConfig {
             generated_context_max_chars: None,
             generated_context_max_tokens: None,
             generated_context_state_capsule: None,
+            generated_context_state_capsule_placement: LongChatStateCapsulePlacement::default(),
             required_generated_response_substrings: Vec::new(),
             disconnect_reconnect_timeout: DEFAULT_DISCONNECT_RECONNECT_TIMEOUT,
             rss_pid: None,
@@ -327,7 +341,7 @@ pub struct LongChatGateError {
 }
 
 impl LongChatGateError {
-    fn new(message: impl Into<String>) -> Self {
+    pub(super) fn new(message: impl Into<String>) -> Self {
         Self {
             message: message.into(),
         }
@@ -430,5 +444,5 @@ fn os_string_to_string(value: OsString) -> Result<String, LongChatGateError> {
 }
 
 fn usage() -> &'static str {
-    "usage: ferrite-openai-long-chat-gate [--execute] [--error-probe] [--disconnect-probe] [--require-cached-follow-ups] [--addr 127.0.0.1:8080] [--api-key local-secret] [--models MODEL[,MODEL...]] [--prompt TEXT] [--assistant-context TEXT] [--follow-up TEXT] [--prompt-cache-key KEY] [--stop TEXT] [--expect-finish-reason REASON] [--probe-max-tokens TOKENS] [--generated-context-max-chars CHARS] [--generated-context-max-tokens TOKENS] [--generated-context-state-capsule TEXT] [--require-generated-response-contains TEXT] [--disconnect-reconnect-timeout-ms 30000] [--rss-pid PID] [--token-lengths 256,512,1024] [--turns 4]"
+    "usage: ferrite-openai-long-chat-gate [--execute] [--error-probe] [--disconnect-probe] [--require-cached-follow-ups] [--addr 127.0.0.1:8080] [--api-key local-secret] [--models MODEL[,MODEL...]] [--prompt TEXT] [--assistant-context TEXT] [--follow-up TEXT] [--prompt-cache-key KEY] [--stop TEXT] [--expect-finish-reason REASON] [--probe-max-tokens TOKENS] [--generated-context-max-chars CHARS] [--generated-context-max-tokens TOKENS] [--generated-context-state-capsule TEXT] [--generated-context-state-capsule-placement assistant-context|follow-up] [--require-generated-response-contains TEXT] [--disconnect-reconnect-timeout-ms 30000] [--rss-pid PID] [--token-lengths 256,512,1024] [--turns 4]"
 }

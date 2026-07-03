@@ -1,6 +1,6 @@
 use super::{
-    state_capsule::format_state_capsule_context, LongChatAssistantContextSource,
-    LongChatGateConfig, LongChatScenarioResult,
+    state_capsule::{format_state_capsule_context, format_state_capsule_follow_up},
+    LongChatAssistantContextSource, LongChatGateConfig, LongChatScenarioResult,
 };
 use crate::throughput_client::{
     run_completion_benchmark, ThroughputClientConfig, ThroughputResult,
@@ -22,14 +22,17 @@ impl LongChatGateConfig {
             self.generated_context_max_chars(),
             self.generated_context_max_tokens(),
             self.generated_context_state_capsule(),
+            self.generated_context_state_capsule_placement(),
         );
         let mut results = Vec::with_capacity(scenarios.len());
 
         for scenario in &scenarios {
             let assistant_context = assistant_contexts.context_for(scenario);
-            let throughput_config = self.throughput_config_with_assistant_context(
+            let follow_up = self.follow_up_for_assistant_context(assistant_context.source);
+            let throughput_config = self.throughput_config_with_chat_context(
                 scenario,
                 assistant_context.text.as_str(),
+                follow_up.as_str(),
             )?;
             let throughput = run_completion_benchmark(&throughput_config).await?;
             self.validate_finish_reason(&throughput)?;
@@ -69,14 +72,17 @@ impl LongChatGateConfig {
             self.generated_context_max_chars(),
             self.generated_context_max_tokens(),
             self.generated_context_state_capsule(),
+            self.generated_context_state_capsule_placement(),
         );
         let mut results = Vec::with_capacity(scenarios.len());
 
         for scenario in &scenarios {
             let assistant_context = assistant_contexts.context_for(scenario);
-            let throughput_config = self.throughput_config_with_assistant_context(
+            let follow_up = self.follow_up_for_assistant_context(assistant_context.source);
+            let throughput_config = self.throughput_config_with_chat_context(
                 scenario,
                 assistant_context.text.as_str(),
+                follow_up.as_str(),
             )?;
             let throughput = executor(&throughput_config)?;
             self.validate_finish_reason(&throughput)?;
@@ -115,6 +121,23 @@ impl LongChatGateConfig {
         Ok(())
     }
 
+    fn follow_up_for_assistant_context(
+        &self,
+        assistant_context_source: LongChatAssistantContextSource,
+    ) -> String {
+        let Some(capsule) = self.generated_context_state_capsule() else {
+            return self.follow_up().to_owned();
+        };
+        if assistant_context_source.is_generated()
+            && self
+                .generated_context_state_capsule_placement()
+                .decorates_follow_up()
+        {
+            return format_state_capsule_follow_up(capsule, self.follow_up());
+        }
+        self.follow_up().to_owned()
+    }
+
     fn validate_required_generated_response_substrings(
         &self,
         scenario: &super::LongChatScenario<'_>,
@@ -149,6 +172,7 @@ struct LongChatAssistantContexts {
     generated_context_max_chars: Option<usize>,
     generated_context_max_tokens: Option<usize>,
     generated_context_state_capsule: Option<String>,
+    generated_context_state_capsule_placement: super::LongChatStateCapsulePlacement,
     generated_by_scenario: HashMap<(String, usize), String>,
 }
 
@@ -163,12 +187,14 @@ impl LongChatAssistantContexts {
         generated_context_max_chars: Option<usize>,
         generated_context_max_tokens: Option<usize>,
         generated_context_state_capsule: Option<&str>,
+        generated_context_state_capsule_placement: super::LongChatStateCapsulePlacement,
     ) -> Self {
         Self {
             seed: seed.to_owned(),
             generated_context_max_chars,
             generated_context_max_tokens,
             generated_context_state_capsule: generated_context_state_capsule.map(str::to_owned),
+            generated_context_state_capsule_placement,
             generated_by_scenario: HashMap::new(),
         }
     }
@@ -178,10 +204,15 @@ impl LongChatAssistantContexts {
             .generated_by_scenario
             .get(&(scenario.model().to_owned(), scenario.token_length()))
         {
-            let text = if let Some(capsule) = &self.generated_context_state_capsule {
-                format_state_capsule_context(capsule, text)
-            } else {
-                text.clone()
+            let text = match &self.generated_context_state_capsule {
+                Some(capsule)
+                    if self
+                        .generated_context_state_capsule_placement
+                        .decorates_assistant_context() =>
+                {
+                    format_state_capsule_context(capsule, text)
+                }
+                _ => text.clone(),
             };
             return LongChatAssistantContext {
                 text,

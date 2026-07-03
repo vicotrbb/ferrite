@@ -78,6 +78,8 @@ fn parses_custom_long_chat_token_lengths_turns_and_models() -> Result<(), Box<dy
         OsString::from("256"),
         OsString::from("--generated-context-state-capsule"),
         OsString::from(r#"{"state_anchor":"7291"}"#),
+        OsString::from("--generated-context-state-capsule-placement"),
+        OsString::from("follow-up"),
         OsString::from("--require-generated-response-contains"),
         OsString::from("continuity-marker"),
         OsString::from("--disconnect-reconnect-timeout-ms"),
@@ -105,6 +107,10 @@ fn parses_custom_long_chat_token_lengths_turns_and_models() -> Result<(), Box<dy
     assert_eq!(
         config.generated_context_state_capsule(),
         Some(r#"{"state_anchor":"7291"}"#)
+    );
+    assert_eq!(
+        config.generated_context_state_capsule_placement().as_str(),
+        "follow-up"
     );
     assert_eq!(
         config.required_generated_response_substrings(),
@@ -381,7 +387,31 @@ fn formats_long_chat_gate_plan_with_state_capsule() -> Result<(), Box<dyn std::e
 
     assert_eq!(
         format_plan(&config),
-        "long_chat_models=fixture-model\nlong_chat_token_lengths=256\nlong_chat_turns=4\nlong_chat_generated_context_state_capsule_configured=true\nlong_chat_addr=127.0.0.1:8080\nlong_chat_planned_scenarios=4"
+        "long_chat_models=fixture-model\nlong_chat_token_lengths=256\nlong_chat_turns=4\nlong_chat_generated_context_state_capsule_configured=true\nlong_chat_generated_context_state_capsule_placement=assistant-context\nlong_chat_addr=127.0.0.1:8080\nlong_chat_planned_scenarios=4"
+    );
+    Ok(())
+}
+
+#[test]
+fn formats_long_chat_gate_plan_with_follow_up_state_capsule_placement(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--models"),
+        OsString::from("fixture-model"),
+        OsString::from("--token-lengths"),
+        OsString::from("256"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+        OsString::from("--generated-context-state-capsule"),
+        OsString::from(r#"state_anchor=7291"#),
+        OsString::from("--generated-context-state-capsule-placement"),
+        OsString::from("follow-up"),
+    ])?;
+
+    assert_eq!(
+        format_plan(&config),
+        "long_chat_models=fixture-model\nlong_chat_token_lengths=256\nlong_chat_turns=4\nlong_chat_generated_context_state_capsule_configured=true\nlong_chat_generated_context_state_capsule_placement=follow-up\nlong_chat_addr=127.0.0.1:8080\nlong_chat_planned_scenarios=4"
     );
     Ok(())
 }
@@ -1372,6 +1402,104 @@ fn can_add_state_capsule_to_generated_follow_up_contexts_only(
                     .to_owned()
             ),
         ]
+    );
+    Ok(())
+}
+
+#[test]
+fn can_add_state_capsule_to_generated_follow_up_prompt_instead_of_assistant_context(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--models"),
+        OsString::from("fixture-model"),
+        OsString::from("--token-lengths"),
+        OsString::from("256"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+        OsString::from("--assistant-context"),
+        OsString::from("seed answer"),
+        OsString::from("--follow-up"),
+        OsString::from("second turn"),
+        OsString::from("--generated-context-state-capsule"),
+        OsString::from(r#"state_anchor=7291"#),
+        OsString::from("--generated-context-state-capsule-placement"),
+        OsString::from("follow-up"),
+    ])?;
+    let mut observed_contexts = Vec::new();
+    let mut observed_follow_ups = Vec::new();
+    let generated = ["alpha", "beta", "gamma", "delta"];
+    let mut calls = 0usize;
+
+    let results = config.run_with_executor(|throughput| {
+        observed_contexts.push(throughput.assistant_context().map(str::to_owned));
+        observed_follow_ups.push(throughput.follow_up().map(str::to_owned));
+        let text = generated[calls].to_owned();
+        calls += 1;
+        Ok(ThroughputResult {
+            completed_requests: throughput.requests(),
+            elapsed: Duration::from_millis(10),
+            streaming_finish: Some(StreamingFinishSummary::new("length")),
+            streaming_timing: None,
+            streaming_text: Some(StreamingTextSummary::new(text)),
+            streaming_token_ids: None,
+            streaming_usage: Some(StreamingUsageSummary::new(
+                8,
+                throughput.max_tokens() as u64,
+                throughput.max_tokens() as u64 + 8,
+            )),
+            rss: None,
+        })
+    })?;
+
+    assert_eq!(results.len(), 4);
+    assert_eq!(
+        observed_contexts,
+        [
+            Some("seed answer".to_owned()),
+            Some("alpha".to_owned()),
+            Some("beta".to_owned()),
+            Some("gamma".to_owned()),
+        ]
+    );
+    assert_eq!(
+        observed_follow_ups,
+        [
+            Some("second turn".to_owned()),
+            Some(
+                "Ferrite state capsule:\nstate_anchor=7291\n\nFollow-up instruction:\nsecond turn"
+                    .to_owned()
+            ),
+            Some(
+                "Ferrite state capsule:\nstate_anchor=7291\n\nFollow-up instruction:\nsecond turn"
+                    .to_owned()
+            ),
+            Some(
+                "Ferrite state capsule:\nstate_anchor=7291\n\nFollow-up instruction:\nsecond turn"
+                    .to_owned()
+            ),
+        ]
+    );
+    Ok(())
+}
+
+#[test]
+fn rejects_invalid_state_capsule_placement() -> Result<(), Box<dyn std::error::Error>> {
+    let result = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--generated-context-state-capsule-placement"),
+        OsString::from("system"),
+    ]);
+    let error = match result {
+        Ok(config) => return Err(format!("expected error, got config: {config:?}").into()),
+        Err(error) => error,
+    };
+
+    assert!(
+        error
+            .to_string()
+            .contains("--generated-context-state-capsule-placement"),
+        "{error}"
     );
     Ok(())
 }

@@ -17,9 +17,20 @@ impl LongChatGateConfig {
         scenario: &LongChatScenario<'_>,
         assistant_context: &str,
     ) -> Result<ThroughputClientConfig, Box<dyn Error>> {
-        ThroughputClientConfig::parse(
-            self.throughput_args_with_assistant_context(scenario, assistant_context),
-        )
+        self.throughput_config_with_chat_context(scenario, assistant_context, self.follow_up())
+    }
+
+    pub fn throughput_config_with_chat_context(
+        &self,
+        scenario: &LongChatScenario<'_>,
+        assistant_context: &str,
+        follow_up: &str,
+    ) -> Result<ThroughputClientConfig, Box<dyn Error>> {
+        ThroughputClientConfig::parse(self.throughput_args_with_chat_context(
+            scenario,
+            assistant_context,
+            follow_up,
+        ))
         .map_err(|error| Box::new(error) as Box<dyn Error>)
     }
 
@@ -31,6 +42,15 @@ impl LongChatGateConfig {
         &self,
         scenario: &LongChatScenario<'_>,
         assistant_context: &str,
+    ) -> Vec<OsString> {
+        self.throughput_args_with_chat_context(scenario, assistant_context, self.follow_up())
+    }
+
+    fn throughput_args_with_chat_context(
+        &self,
+        scenario: &LongChatScenario<'_>,
+        assistant_context: &str,
+        follow_up: &str,
     ) -> Vec<OsString> {
         let mut args: Vec<OsString> = [
             "ferrite-openai-throughput",
@@ -45,7 +65,7 @@ impl LongChatGateConfig {
             "--assistant-context",
             assistant_context,
             "--follow-up",
-            self.follow_up(),
+            follow_up,
             "--requests",
             "1",
             "--concurrency",
