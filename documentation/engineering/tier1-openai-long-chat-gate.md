@@ -89,13 +89,15 @@ Partial local required-gate proofs exist for Qwen2.5-0.5B:
 
 - `documentation/benchmarks/2026-07-03-local-qwen-0-5b-long-chat-required-gates-256.md`
 - `documentation/benchmarks/2026-07-03-local-qwen-0-5b-long-chat-required-gates-512.md`
+- `documentation/benchmarks/2026-07-03-local-qwen-0-5b-long-chat-required-gates-1024.md`
 - `long_chat_summary_run_complete=true`
 - required model: `qwen2.5-0.5b-q4_k_m`
-- required token lengths covered so far: `256`, `512`
+- required token lengths covered so far: `256`, `512`, `1024`
 - required probes: `error,disconnect`
 
-This is partial evidence only. It does not cover `1024`, the remaining Tier 1
-model artifacts, or stop/EOS behavior.
+This completes the local Qwen2.5-0.5B 256/512/1024 ladder, but remains partial
+evidence. It does not cover the remaining Tier 1 model artifacts, queue
+behavior, or stop/EOS behavior.
 
 ## Required Scenarios
 
