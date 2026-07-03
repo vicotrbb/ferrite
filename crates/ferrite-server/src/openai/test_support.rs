@@ -72,6 +72,14 @@ pub(super) fn write_chat_fixture_model() -> Result<std::path::PathBuf, Box<dyn s
     write_fixture_model_bytes(ferrite_fixtures::scalar_llama_chat_f32_gguf_fixture())
 }
 
+pub(super) fn write_chat_fixture_model_with_eos_token_id(
+    eos_token_id: u64,
+) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+    write_fixture_model_bytes(
+        ferrite_fixtures::scalar_llama_chat_f32_gguf_fixture_with_eos_token_id(eos_token_id),
+    )
+}
+
 fn write_fixture_model_bytes(
     bytes: Vec<u8>,
 ) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {

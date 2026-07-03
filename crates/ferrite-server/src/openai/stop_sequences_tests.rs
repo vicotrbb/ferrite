@@ -1,7 +1,8 @@
 use super::{
     routes::router,
     test_support::{
-        remove_fixture_model, to_json, to_text, write_chat_fixture_model, write_fixture_model,
+        remove_fixture_model, to_json, to_text, write_chat_fixture_model,
+        write_chat_fixture_model_with_eos_token_id, write_fixture_model,
         write_fixture_model_with_eos_token_id,
     },
 };
@@ -183,6 +184,33 @@ async fn completions_stream_endpoint_suppresses_visible_eos_text(
     Ok(())
 }
 
+#[tokio::test]
+async fn chat_stream_endpoint_reports_eos_finish_source_in_usage(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let body = post_chat_stream_with_eos_token_id(
+        r#"{"model":"fixture-model","messages":[{"role":"user","content":"hello"}],"max_completion_tokens":3,"stream":true,"stream_options":{"include_usage":true}}"#,
+        2,
+    )
+    .await?;
+
+    let events = sse_json_events(&body)?;
+    assert_eq!(chat_content_chunks(&events), Vec::<&str>::new(), "{body}");
+    assert!(
+        events
+            .iter()
+            .any(|event| event["choices"][0]["finish_reason"] == "stop"),
+        "{body}"
+    );
+    assert!(
+        events.iter().any(|event| {
+            event["usage"]["completion_tokens_details"]["ferrite_finish_source"] == "eos"
+        }),
+        "{body}"
+    );
+    assert!(body.contains("data: [DONE]"), "{body}");
+    Ok(())
+}
+
 async fn post_completion(payload: &str) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
     let model_path = write_fixture_model()?;
     let engine = InferenceEngine::load(&model_path)?;
@@ -267,6 +295,27 @@ async fn post_completion_stream_with_eos_token_id(
 
 async fn post_chat_stream(payload: &str) -> Result<String, Box<dyn std::error::Error>> {
     post_stream(payload, "/v1/chat/completions", write_chat_fixture_model).await
+}
+
+async fn post_chat_stream_with_eos_token_id(
+    payload: &str,
+    eos_token_id: u64,
+) -> Result<String, Box<dyn std::error::Error>> {
+    let model_path = write_chat_fixture_model_with_eos_token_id(eos_token_id)?;
+    let engine = InferenceEngine::load(&model_path)?;
+    let app = router(ServerState::with_engine("fixture-model".to_owned(), engine));
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/chat/completions")
+        .header("content-type", "application/json")
+        .body(Body::from(payload.to_owned()))?;
+    let response = app.oneshot(request).await?;
+    remove_fixture_model(&model_path)?;
+
+    let status = response.status();
+    let body = to_text(response.into_body()).await?;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    Ok(body)
 }
 
 async fn post_stream(
