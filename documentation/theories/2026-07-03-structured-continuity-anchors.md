@@ -264,6 +264,41 @@ It does show that capsule-only state can carry a compact named field through
 the current OpenAI-compatible long-chat gate with lower prompt cost than the
 numeric-anchor capsule-only run.
 
+## Semantic Capsule-Only Prefix-Cache Probe
+
+The next run repeated the semantic capsule-only lane with
+`--experimental-prefix-cache`, `--prompt-cache-trace`, and
+`--require-cached-follow-ups`. The benchmark note is
+`documentation/benchmarks/2026-07-03-openai-long-chat-x86-qwen-1-5b-q8-capsule-only-semantic-cache-64.md`.
+
+Result:
+
+| Variant | Window 64 | Generated prompt avg | Cached prompt avg | TTFT avg | Cache read |
+| --- | --- | ---: | ---: | ---: | --- |
+| Semantic capsule only, no cache | completed 4 turns | 74.00 | 0.00 | 17377.33 ms | no cache key |
+| Semantic capsule only, prefix cache | completed 4 turns | 75.00 | 58.00 | 4170.67 ms | all 3 follow-ups cached |
+
+Turn 2 was a shared-prefix hit with `24` cached prompt tokens and `12295` ms
+TTFT. Turns 3 and 4 were exact hits with `75` cached prompt tokens and TTFT of
+`123` ms and `94` ms. The gate exited `0` and reported:
+
+```text
+long_chat_summary_cached_generated_follow_up_turns=3
+long_chat_summary_uncached_generated_follow_up_turns=0
+long_chat_summary_all_generated_follow_up_turns_cached=true
+```
+
+This is the strongest optimization signal in this theory so far. Capsule-only
+state did not merely reduce prompt size; it also created a stable prompt shape
+that Ferrite's OpenAI-compatible prefix cache could reuse almost completely on
+later turns. Decode throughput stayed CPU-bound near 4 tokens per second, so
+the win is specifically prefill and TTFT, not token generation speed.
+
+The same identity caveat remains:
+`long_chat_summary_run_complete=false`. Capsule-only placement replaces the
+previous generated response, so it cannot satisfy full generated-context
+identity matching by design.
+
 ## Next Steps
 
 1. Test capsule placement in the follow-up user message instead of assistant
@@ -280,5 +315,11 @@ numeric-anchor capsule-only run.
    fact without requiring the exact full marker. Done for one
    `mitigation_code=reduce_batch_size` capsule-only lane; broader semantic
    continuity remains unproven.
-5. Only after those pass, draft an HTTP serving policy that makes truncation and
+5. Test whether capsule-only semantic fixed points become cacheable with the
+   OpenAI-compatible prefix cache. Done for the same lane; all three generated
+   follow-up turns were cached, and exact hits on turns 3-4 reduced TTFT to
+   sub-125 ms.
+6. Repeat the cache proof at 512-token and 1024-token budgets before claiming
+   long-output stability.
+7. Only after those pass, draft an HTTP serving policy that makes truncation and
    state retention explicit to clients.
