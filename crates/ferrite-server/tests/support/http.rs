@@ -39,6 +39,44 @@ Connection: close\r\n\
     Ok(String::from_utf8(response)?)
 }
 
+pub async fn abort_http_stream_after_marker(
+    addr: SocketAddr,
+    method: &str,
+    path: &str,
+    body: &[u8],
+    marker: &str,
+) -> Result<String, Box<dyn std::error::Error>> {
+    let mut stream = TcpStream::connect(addr).await?;
+    let request = format!(
+        "{method} {path} HTTP/1.1\r\n\
+Host: {addr}\r\n\
+Authorization: Bearer local-test\r\n\
+Content-Type: application/json\r\n\
+Content-Length: {}\r\n\
+Connection: close\r\n\
+\r\n",
+        body.len()
+    );
+    stream.write_all(request.as_bytes()).await?;
+    stream.write_all(body).await?;
+
+    let mut response = Vec::new();
+    loop {
+        let mut chunk = [0_u8; 1024];
+        let bytes_read = stream.read(&mut chunk).await?;
+        if bytes_read == 0 {
+            break;
+        }
+        response.extend_from_slice(&chunk[..bytes_read]);
+        let text = std::str::from_utf8(&response)?;
+        if text.contains(marker) {
+            return Ok(text.to_owned());
+        }
+    }
+
+    Err(format!("stream ended before marker {marker:?}").into())
+}
+
 pub fn response_json(response: &str) -> Result<Value, Box<dyn std::error::Error>> {
     let (_, body) = response
         .split_once("\r\n\r\n")

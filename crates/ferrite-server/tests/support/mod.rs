@@ -18,6 +18,7 @@ pub const MODEL_ID: &str = "fixture-model";
 
 pub struct LiveServer {
     addr: SocketAddr,
+    state: ServerState,
     model_path_to_remove: Option<PathBuf>,
     server: JoinHandle<Result<(), std::io::Error>>,
 }
@@ -80,11 +81,12 @@ impl LiveServer {
         let listener = TcpListener::bind(SocketAddr::from((Ipv4Addr::LOCALHOST, 0))).await?;
         let addr = listener.local_addr()?;
         let state = configure(ServerState::with_engine(model_id.to_owned(), engine));
-        let app = ferrite_server::router(state);
+        let app = ferrite_server::router(state.clone());
         let server = tokio::spawn(async move { axum::serve(listener, app).await });
 
         Ok(Self {
             addr,
+            state,
             model_path_to_remove,
             server,
         })
@@ -92,6 +94,10 @@ impl LiveServer {
 
     pub fn addr(&self) -> SocketAddr {
         self.addr
+    }
+
+    pub fn state(&self) -> &ServerState {
+        &self.state
     }
 }
 

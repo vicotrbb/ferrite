@@ -1,6 +1,10 @@
 mod support;
 
-use support::http::{response_json, send_http_request, send_http_request_with_bearer};
+use ferrite_server::limits::TokenLimits;
+use std::time::{Duration, Instant};
+use support::http::{
+    abort_http_stream_after_marker, response_json, send_http_request, send_http_request_with_bearer,
+};
 
 #[tokio::test]
 async fn live_http_server_accepts_openai_style_model_list() -> Result<(), Box<dyn std::error::Error>>
@@ -148,6 +152,48 @@ async fn live_http_server_streams_openai_style_chat_chunks(
     assert!(response.contains("\"object\":\"chat.completion.chunk\""));
     assert!(response.contains("\"delta\":{\"content\":\"winner\"}"));
     assert!(response.contains("data: [DONE]"));
+    Ok(())
+}
+
+#[tokio::test]
+async fn live_http_server_releases_inference_permit_after_streaming_tcp_disconnect(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let token_limits = TokenLimits::new(16, 4096)?;
+    let server =
+        support::LiveServer::start_configured(|state| state.with_token_limits(token_limits))
+            .await?;
+    let request_body = format!(
+        r#"{{"model":"{}","messages":[{{"role":"user","content":"hello"}}],"max_completion_tokens":4096,"stream":true}}"#,
+        support::MODEL_ID
+    );
+
+    let partial_response = abort_http_stream_after_marker(
+        server.addr(),
+        "POST",
+        "/v1/chat/completions",
+        request_body.as_bytes(),
+        "\"delta\":{\"content\":\"",
+    )
+    .await?;
+    assert!(
+        partial_response.starts_with("HTTP/1.1 200 OK"),
+        "unexpected response: {partial_response}"
+    );
+    assert!(server.state().try_acquire_inference_permit().is_none());
+
+    let deadline = Instant::now() + Duration::from_secs(2);
+    loop {
+        if server.state().try_acquire_inference_permit().is_some() {
+            break;
+        }
+        if Instant::now() >= deadline {
+            return Err(
+                "streaming TCP disconnect kept the inference permit after generated content".into(),
+            );
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+
     Ok(())
 }
 
