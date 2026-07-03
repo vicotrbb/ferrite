@@ -117,3 +117,14 @@ visible: generated follow-ups reused only 14 to 16 prompt tokens out of roughly
 157 to 158 prompt tokens, and TTFT stayed around 6.3 to 6.4 seconds. The result
 does not prove an optimization; it proves the next optimization target is
 measurable.
+
+The first x86_64 1024-token traced run completed on the bounded staging pod:
+
+`documentation/benchmarks/2026-07-03-openai-long-chat-x86-qwen-0-5b-trace-1024.md`
+
+That run gives the strongest evidence so far for this theory. Turns 2 and 3
+reported shallow `shared_prefix_hit` reuse, 12 and 16 cached prompt tokens out
+of 1054, with TTFT around 375 to 378 seconds. Turn 4 then reported
+`exact_hit`, 1054 cached prompt tokens, and TTFT of 308 ms. This directly links
+prompt-cache depth to user-visible TTFT for the x86 1024-token generated-context
+lane.
