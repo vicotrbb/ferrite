@@ -4,7 +4,7 @@ use super::{
     stop_filter::StopSequenceFilter,
     streaming,
 };
-use crate::runtime::{GenerationCacheOptions, GenerationControl};
+use crate::runtime::{GenerationCacheOptions, GenerationControl, PromptEvaluationControl};
 use axum::response::Response;
 use std::sync::{Arc, Mutex};
 use tokio::sync::OwnedSemaphorePermit;
@@ -199,10 +199,11 @@ where
                 .lock()
                 .map_err(|_| OpenAiHttpError::internal("inference engine lock is poisoned"))?;
             let generated = engine
-                .generate_with_token_event_callback_and_cache_options(
+                .generate_with_prompt_callback_and_cache_options(
                     &input.prompt,
                     input.max_tokens,
                     input.cache_options,
+                    |_, _| prompt_control_from_stream_state(&sender),
                     |piece, token_ids| {
                         if include_token_ids {
                             sender
@@ -241,4 +242,32 @@ where
         }
     });
     response
+}
+
+fn prompt_control_from_stream_state(sender: &streaming::StreamSender) -> PromptEvaluationControl {
+    if sender.is_closed() {
+        PromptEvaluationControl::Cancel
+    } else {
+        PromptEvaluationControl::Continue
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn prompt_control_cancels_when_stream_receiver_is_closed() {
+        let (sender, response) = streaming::channel_response();
+
+        assert_eq!(
+            prompt_control_from_stream_state(&sender),
+            PromptEvaluationControl::Continue
+        );
+        drop(response);
+        assert_eq!(
+            prompt_control_from_stream_state(&sender),
+            PromptEvaluationControl::Cancel
+        );
+    }
 }

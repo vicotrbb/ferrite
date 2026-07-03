@@ -5,7 +5,9 @@ mod prefix_cache;
 pub use cache_options::GenerationCacheOptions;
 pub use cache_trace::{PromptCacheLookup, PromptCacheTrace};
 
-use ferrite_inference::scalar::ScalarLlamaModel;
+use ferrite_inference::scalar::{
+    PromptEvaluationControl as ScalarPromptEvaluationControl, ScalarLlamaModel,
+};
 use ferrite_model::{gguf::parse_gguf, tokenizer::GgufTokenizer};
 use prefix_cache::{fnv64_bytes, RuntimePrefixCache};
 use std::{error::Error, fmt, fs, path::Path, sync::Mutex};
@@ -14,6 +16,12 @@ use std::{error::Error, fmt, fs, path::Path, sync::Mutex};
 pub enum GenerationControl {
     Continue,
     Stop,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PromptEvaluationControl {
+    Continue,
+    Cancel,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -105,6 +113,23 @@ impl InferenceEngine {
         cache_options: GenerationCacheOptions,
         mut on_token: impl FnMut(&str, &[usize]) -> Result<GenerationControl, RuntimeError>,
     ) -> Result<GeneratedText, RuntimeError> {
+        self.generate_with_prompt_callback_and_cache_options(
+            prompt,
+            max_tokens,
+            cache_options,
+            |_, _| PromptEvaluationControl::Continue,
+            &mut on_token,
+        )
+    }
+
+    pub(crate) fn generate_with_prompt_callback_and_cache_options(
+        &self,
+        prompt: &str,
+        max_tokens: usize,
+        cache_options: GenerationCacheOptions,
+        mut on_prompt_token: impl FnMut(usize, usize) -> PromptEvaluationControl,
+        mut on_token: impl FnMut(&str, &[usize]) -> Result<GenerationControl, RuntimeError>,
+    ) -> Result<GeneratedText, RuntimeError> {
         let prompt_token_ids = self
             .tokenizer
             .encode(prompt)
@@ -135,9 +160,16 @@ impl InferenceEngine {
                         RuntimeError::new("prefix cache hit is missing exact next token")
                     })?
                 } else {
-                    let next = session.accept_prompt(suffix).map_err(|error| {
-                        RuntimeError::new(format!("failed to evaluate prompt suffix: {error}"))
-                    })?;
+                    let next = session
+                        .accept_prompt_with_control(suffix, |index, token_id| {
+                            Ok(map_prompt_control(on_prompt_token(
+                                cached_prompt_tokens + index,
+                                token_id,
+                            )))
+                        })
+                        .map_err(|error| {
+                            RuntimeError::new(format!("failed to evaluate prompt suffix: {error}"))
+                        })?;
                     self.store_prefix_cache_value(
                         prefix_cache_key.clone(),
                         session.cache_snapshot(),
@@ -146,9 +178,13 @@ impl InferenceEngine {
                     next
                 }
             } else {
-                let next = session.accept_prompt(&prompt_token_ids).map_err(|error| {
-                    RuntimeError::new(format!("failed to evaluate prompt: {error}"))
-                })?;
+                let next = session
+                    .accept_prompt_with_control(&prompt_token_ids, |index, token_id| {
+                        Ok(map_prompt_control(on_prompt_token(index, token_id)))
+                    })
+                    .map_err(|error| {
+                        RuntimeError::new(format!("failed to evaluate prompt: {error}"))
+                    })?;
                 self.store_prefix_cache_value(
                     prefix_cache_key.clone(),
                     session.cache_snapshot(),
@@ -158,7 +194,9 @@ impl InferenceEngine {
             }
         } else {
             session
-                .accept_prompt(&prompt_token_ids)
+                .accept_prompt_with_control(&prompt_token_ids, |index, token_id| {
+                    Ok(map_prompt_control(on_prompt_token(index, token_id)))
+                })
                 .map_err(|error| RuntimeError::new(format!("failed to evaluate prompt: {error}")))?
         };
         if cache_options.prompt_cache_trace_enabled() && !cache_options.prefix_cache_enabled() {
@@ -232,6 +270,13 @@ impl InferenceEngine {
         self.tokenizer
             .decode_if_complete(token_ids)
             .map_err(|error| RuntimeError::new(format!("failed to decode token text: {error}")))
+    }
+}
+
+fn map_prompt_control(control: PromptEvaluationControl) -> ScalarPromptEvaluationControl {
+    match control {
+        PromptEvaluationControl::Continue => ScalarPromptEvaluationControl::Continue,
+        PromptEvaluationControl::Cancel => ScalarPromptEvaluationControl::Cancel,
     }
 }
 
@@ -458,6 +503,40 @@ mod tests {
             .token_id_chunks()
             .iter()
             .all(|chunk| !chunk.is_empty()));
+        Ok(())
+    }
+
+    #[test]
+    fn generate_with_prompt_callback_cancels_before_next_prompt_token(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let model_path = write_fixture_model()?;
+        let engine = InferenceEngine::load(&model_path)?;
+        remove_fixture_model(&model_path)?;
+        let mut observed_tokens = Vec::new();
+
+        let error = match engine.generate_with_prompt_callback_and_cache_options(
+            "hellowinner",
+            1,
+            GenerationCacheOptions::default(),
+            |index, token_id| {
+                observed_tokens.push((index, token_id));
+                if index == 1 {
+                    PromptEvaluationControl::Cancel
+                } else {
+                    PromptEvaluationControl::Continue
+                }
+            },
+            |_, _| Ok(GenerationControl::Continue),
+        ) {
+            Ok(_) => return Err("generation should stop when prompt callback cancels".into()),
+            Err(error) => error,
+        };
+
+        assert_eq!(
+            error.to_string(),
+            "failed to evaluate prompt: prompt evaluation cancelled"
+        );
+        assert_eq!(observed_tokens, [(0, 1), (1, 2)]);
         Ok(())
     }
 
