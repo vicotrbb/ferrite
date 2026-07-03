@@ -77,3 +77,17 @@ This is lifecycle observability only. It does not change cancellation policy,
 prompt evaluation, streaming behavior, or OpenAI response shape. The next
 real-model cancellation proof must rerun the prefill-disconnect scenario before
 these fields can support a performance or latency claim.
+
+## Real-Model Follow-Up
+
+The observed-elapsed field was exercised against local Qwen2.5-0.5B Q4_K_M:
+
+- `documentation/benchmarks/2026-07-03-local-qwen-0-5b-prefill-cancel-observed-elapsed.md`
+- `disconnect_observed_elapsed_ms=6495`
+- `disconnect_to_finish_ms=0`
+- `generated_chunks=0`
+- `generated_token_ids=0`
+
+The result shows the remaining local delay sits before the server observes the
+closed stream. The next useful lifecycle fields are prompt token index and
+transformer layer index at cancellation.

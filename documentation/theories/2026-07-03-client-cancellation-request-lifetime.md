@@ -304,6 +304,20 @@ The next instrumentation slice added `disconnect_observed_elapsed_ms` to the
 same lifecycle line. The remaining missing counters are prompt token index and
 transformer layer index at cancellation.
 
+The observed-elapsed real-model rerun is documented in
+`documentation/benchmarks/2026-07-03-local-qwen-0-5b-prefill-cancel-observed-elapsed.md`.
+It reported:
+
+```text
+openai_stream_lifecycle request_id=stream-0 finish_reason=cancelled disconnect_point=prompt_evaluation prompt_tokens_started=1 prompt_cancellation_polls=1 prompt_cancellation_closed_polls=1 generated_chunks=0 generated_token_ids=0 elapsed_ms=6495 disconnect_observed_elapsed_ms=6495 disconnect_to_finish_ms=0
+```
+
+This proves the remaining local delay is before closure observation. Once the
+closed stream is observed, cancellation returns immediately enough to round to
+zero milliseconds. The next theory slice should identify prompt token and
+transformer layer position at cancellation before moving cancellation checks
+deeper into hot kernels.
+
 ## Minimal Experiment
 
 Use a small, repeatable model/server setup and avoid Kubernetes port-forward for
