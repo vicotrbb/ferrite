@@ -85,17 +85,17 @@ that omits part of the required model set, token-length ladder, or operational
 probe set. Required probes still need their matching execution flags, such as
 `--error-probe`, `--disconnect-probe`, and `--queue-probe`.
 
-A first partial local required-gate proof exists for Qwen2.5-0.5B at the
-256-token length:
+Partial local required-gate proofs exist for Qwen2.5-0.5B:
 
 - `documentation/benchmarks/2026-07-03-local-qwen-0-5b-long-chat-required-gates-256.md`
+- `documentation/benchmarks/2026-07-03-local-qwen-0-5b-long-chat-required-gates-512.md`
 - `long_chat_summary_run_complete=true`
 - required model: `qwen2.5-0.5b-q4_k_m`
-- required token length: `256`
+- required token lengths covered so far: `256`, `512`
 - required probes: `error,disconnect`
 
-This is partial evidence only. It does not cover `512`, `1024`, the remaining
-Tier 1 model artifacts, or stop/EOS behavior.
+This is partial evidence only. It does not cover `1024`, the remaining Tier 1
+model artifacts, or stop/EOS behavior.
 
 ## Required Scenarios
 
