@@ -7,6 +7,7 @@ use axum::{
     body::Body,
     http::{Request, StatusCode},
 };
+use std::time::{Duration, Instant};
 use tower::ServiceExt;
 
 #[tokio::test]
@@ -113,5 +114,42 @@ async fn completion_stream_helper_emits_tokens_from_generation_callback(
 
     assert!(body.contains("\"text\":\"winner\""));
     assert!(body.contains("data: [DONE]"));
+    Ok(())
+}
+
+#[tokio::test]
+async fn chat_stream_releases_inference_permit_when_response_body_is_dropped(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let model_path = write_chat_fixture_model()?;
+    let engine = InferenceEngine::load(&model_path)?;
+    let state = ServerState::with_engine("fixture-model".to_owned(), engine);
+    let app = router(state.clone());
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/chat/completions")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            r#"{"model":"fixture-model","messages":[{"role":"user","content":"hello"}],"max_tokens":128,"stream":true}"#,
+        ))?;
+
+    let response = app.oneshot(request).await?;
+    assert_eq!(response.status(), StatusCode::OK);
+    assert!(state.try_acquire_inference_permit().is_none());
+
+    drop(response);
+
+    let deadline = Instant::now() + Duration::from_secs(2);
+    loop {
+        if state.try_acquire_inference_permit().is_some() {
+            break;
+        }
+        if Instant::now() >= deadline {
+            remove_fixture_model(&model_path)?;
+            return Err("streaming request kept the inference permit after body drop".into());
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+
+    remove_fixture_model(&model_path)?;
     Ok(())
 }
