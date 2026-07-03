@@ -55,12 +55,20 @@ pub(super) struct StreamLifecycleSummary {
     pub disconnect_to_finish_ms: Option<u128>,
     pub prompt_cancellation_token_index: Option<usize>,
     pub prompt_cancellation_layer_index: Option<usize>,
+    pub engine_lock_acquired_elapsed_ms: Option<u128>,
+    pub generation_started_elapsed_ms: Option<u128>,
+    pub first_prompt_token_started_elapsed_ms: Option<u128>,
+    pub first_prompt_cancellation_poll_elapsed_ms: Option<u128>,
 }
 
 #[derive(Debug)]
 pub(super) struct StreamLifecycle {
     request_id: String,
     started: Instant,
+    engine_lock_acquired_at: Option<Instant>,
+    generation_started_at: Option<Instant>,
+    first_prompt_token_started_at: Option<Instant>,
+    first_prompt_cancellation_poll_at: Option<Instant>,
     prompt_tokens_started: usize,
     prompt_cancellation_polls: usize,
     prompt_cancellation_closed_polls: usize,
@@ -78,6 +86,10 @@ impl StreamLifecycle {
         Self {
             request_id: format!("stream-{id}"),
             started: Instant::now(),
+            engine_lock_acquired_at: None,
+            generation_started_at: None,
+            first_prompt_token_started_at: None,
+            first_prompt_cancellation_poll_at: None,
             prompt_tokens_started: 0,
             prompt_cancellation_polls: 0,
             prompt_cancellation_closed_polls: 0,
@@ -90,11 +102,24 @@ impl StreamLifecycle {
         }
     }
 
+    pub(super) fn record_engine_lock_acquired(&mut self) {
+        self.engine_lock_acquired_at
+            .get_or_insert_with(Instant::now);
+    }
+
+    pub(super) fn record_generation_started(&mut self) {
+        self.generation_started_at.get_or_insert_with(Instant::now);
+    }
+
     pub(super) fn record_prompt_token_started(&mut self) {
+        self.first_prompt_token_started_at
+            .get_or_insert_with(Instant::now);
         self.prompt_tokens_started += 1;
     }
 
     pub(super) fn record_prompt_cancellation_poll(&mut self) {
+        self.first_prompt_cancellation_poll_at
+            .get_or_insert_with(Instant::now);
         self.prompt_cancellation_polls += 1;
     }
 
@@ -142,6 +167,18 @@ impl StreamLifecycle {
         let disconnect_to_finish_ms = self
             .disconnect_observed_at
             .map(|observed_at| observed_at.elapsed().as_millis());
+        let engine_lock_acquired_elapsed_ms = self
+            .engine_lock_acquired_at
+            .map(|instant| instant.duration_since(self.started).as_millis());
+        let generation_started_elapsed_ms = self
+            .generation_started_at
+            .map(|instant| instant.duration_since(self.started).as_millis());
+        let first_prompt_token_started_elapsed_ms = self
+            .first_prompt_token_started_at
+            .map(|instant| instant.duration_since(self.started).as_millis());
+        let first_prompt_cancellation_poll_elapsed_ms = self
+            .first_prompt_cancellation_poll_at
+            .map(|instant| instant.duration_since(self.started).as_millis());
         StreamLifecycleSummary {
             request_id: self.request_id.clone(),
             finish_reason,
@@ -156,6 +193,10 @@ impl StreamLifecycle {
             disconnect_to_finish_ms,
             prompt_cancellation_token_index: self.prompt_cancellation_token_index,
             prompt_cancellation_layer_index: self.prompt_cancellation_layer_index,
+            engine_lock_acquired_elapsed_ms,
+            generation_started_elapsed_ms,
+            first_prompt_token_started_elapsed_ms,
+            first_prompt_cancellation_poll_elapsed_ms,
         }
     }
 }
@@ -182,8 +223,15 @@ impl StreamLifecycleSummary {
             .prompt_cancellation_layer_index
             .map(|index| index.to_string())
             .unwrap_or_else(|| "none".to_string());
+        let engine_lock_acquired_elapsed_ms =
+            format_optional_ms(self.engine_lock_acquired_elapsed_ms);
+        let generation_started_elapsed_ms = format_optional_ms(self.generation_started_elapsed_ms);
+        let first_prompt_token_started_elapsed_ms =
+            format_optional_ms(self.first_prompt_token_started_elapsed_ms);
+        let first_prompt_cancellation_poll_elapsed_ms =
+            format_optional_ms(self.first_prompt_cancellation_poll_elapsed_ms);
         format!(
-            "openai_stream_lifecycle request_id={} finish_reason={} disconnect_point={} prompt_tokens_started={} prompt_cancellation_polls={} prompt_cancellation_closed_polls={} generated_chunks={} generated_token_ids={} elapsed_ms={} disconnect_observed_elapsed_ms={} disconnect_to_finish_ms={} prompt_cancellation_token_index={} prompt_cancellation_layer_index={}",
+            "openai_stream_lifecycle request_id={} finish_reason={} disconnect_point={} prompt_tokens_started={} prompt_cancellation_polls={} prompt_cancellation_closed_polls={} generated_chunks={} generated_token_ids={} elapsed_ms={} disconnect_observed_elapsed_ms={} disconnect_to_finish_ms={} prompt_cancellation_token_index={} prompt_cancellation_layer_index={} engine_lock_acquired_elapsed_ms={} generation_started_elapsed_ms={} first_prompt_token_started_elapsed_ms={} first_prompt_cancellation_poll_elapsed_ms={}",
             self.request_id,
             self.finish_reason.as_str(),
             disconnect_point,
@@ -196,9 +244,19 @@ impl StreamLifecycleSummary {
             disconnect_observed_elapsed_ms,
             disconnect_to_finish_ms,
             prompt_cancellation_token_index,
-            prompt_cancellation_layer_index
+            prompt_cancellation_layer_index,
+            engine_lock_acquired_elapsed_ms,
+            generation_started_elapsed_ms,
+            first_prompt_token_started_elapsed_ms,
+            first_prompt_cancellation_poll_elapsed_ms
         )
     }
+}
+
+fn format_optional_ms(value: Option<u128>) -> String {
+    value
+        .map(|elapsed_ms| elapsed_ms.to_string())
+        .unwrap_or_else(|| "none".to_string())
 }
 
 #[cfg(test)]
@@ -209,6 +267,8 @@ mod tests {
     fn lifecycle_summary_records_prompt_generation_and_disconnect_state() {
         let mut lifecycle = StreamLifecycle::new();
 
+        lifecycle.record_engine_lock_acquired();
+        lifecycle.record_generation_started();
         lifecycle.record_prompt_token_started();
         lifecycle.record_prompt_cancellation_poll();
         lifecycle.record_prompt_cancellation_poll();
@@ -234,6 +294,10 @@ mod tests {
         assert_eq!(summary.prompt_tokens_started, 1);
         assert_eq!(summary.prompt_cancellation_polls, 2);
         assert_eq!(summary.prompt_cancellation_closed_polls, 1);
+        assert!(summary.engine_lock_acquired_elapsed_ms.is_some());
+        assert!(summary.generation_started_elapsed_ms.is_some());
+        assert!(summary.first_prompt_token_started_elapsed_ms.is_some());
+        assert!(summary.first_prompt_cancellation_poll_elapsed_ms.is_some());
         assert!(summary.disconnect_observed_elapsed_ms.is_some());
         assert!(summary.disconnect_to_finish_ms.is_some());
         assert_eq!(summary.prompt_cancellation_token_index, Some(4));
@@ -257,5 +321,17 @@ mod tests {
         assert!(summary
             .log_line()
             .contains("prompt_cancellation_layer_index=7"));
+        assert!(summary
+            .log_line()
+            .contains("engine_lock_acquired_elapsed_ms="));
+        assert!(summary
+            .log_line()
+            .contains("generation_started_elapsed_ms="));
+        assert!(summary
+            .log_line()
+            .contains("first_prompt_token_started_elapsed_ms="));
+        assert!(summary
+            .log_line()
+            .contains("first_prompt_cancellation_poll_elapsed_ms="));
     }
 }

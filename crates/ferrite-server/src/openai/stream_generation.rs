@@ -209,6 +209,11 @@ where
                 .engine
                 .lock()
                 .map_err(|_| OpenAiHttpError::internal("inference engine lock is poisoned"))?;
+            {
+                let mut lifecycle = lifecycle.borrow_mut();
+                lifecycle.record_engine_lock_acquired();
+                lifecycle.record_generation_started();
+            }
             let generated = engine
                 .generate_with_prompt_callbacks_and_cache_options(
                     &input.prompt,
