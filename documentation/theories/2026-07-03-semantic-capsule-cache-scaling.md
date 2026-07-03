@@ -2,7 +2,7 @@
 
 Date: 2026-07-03 UTC
 
-Status: Positive at 256 and 512 tokens; 1024 tokens still unproven
+Status: Positive at 256, 512, and 1024 tokens
 
 ## Hypothesis
 
@@ -31,6 +31,7 @@ disconnect/reconnect behavior.
 | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | 256 | 75.00 | 58.00 | 4170.67 ms | 123 ms | 94 ms | 0 |
 | 512 | 75.00 | 58.00 | 4082.33 ms | 80 ms | 80 ms | 0 |
+| 1024 | 75.00 | 58.00 | 4088.67 ms | 83 ms | 101 ms | 0 |
 
 Both runs reported:
 
@@ -42,14 +43,14 @@ long_chat_summary_all_generated_follow_up_turns_cached=true
 
 ## Read
 
-The cache behavior scaled from 256 to 512 output tokens. Turn 2 remained a
-shared-prefix hit, while turns 3 and 4 became exact hits after the fixed prompt
-shape was seeded.
+The cache behavior scaled from 256 to 512 to 1024 output tokens. Turn 2
+remained a shared-prefix hit, while turns 3 and 4 became exact hits after the
+fixed prompt shape was seeded.
 
 Decode throughput did not improve. That is expected because the cache removes
-repeated prefill work, not token sampling and decode work. The 512-token run
-therefore spent most of its wall-clock time producing completion tokens even
-after TTFT dropped to 80 ms.
+repeated prefill work, not token sampling and decode work. The 512-token and
+1024-token runs therefore spent most of their wall-clock time producing
+completion tokens even after TTFT dropped to sub-125 ms.
 
 ## Design Implications
 
@@ -67,7 +68,6 @@ after TTFT dropped to 80 ms.
 
 This theory does not yet prove:
 
-- 1024-token completion stability;
 - multi-client cache eviction behavior;
 - model-family generality;
 - cache correctness under varied follow-up text;
@@ -80,16 +80,10 @@ assistant prose with a state capsule.
 
 ## Next Experiment
 
-Run the same semantic capsule-only prefix-cache proof at a 1024-token budget.
-The success criteria should remain:
+The next experiment should stop repeating the same fixed single-client lane and
+stress a different risk:
 
-- gate exit code `0`;
-- four measured streaming turns;
-- `finish_reason=length`;
-- `reduce_batch_size` present in generated follow-up responses;
-- all three generated follow-up turns cached;
-- exact cache hits on turns 3 and 4;
-- RSS samples present;
-- unauthorized reconnect probe passed;
-- disconnect/reconnect probe passed;
-- cleanup verified on staging.
+- mixed cache keys under concurrent or queued clients;
+- varied follow-up text that preserves the capsule but changes user wording;
+- cache eviction behavior after several distinct prompt-cache keys;
+- a paired no-cache 1024 run if we need a direct long-output baseline.

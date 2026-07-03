@@ -320,8 +320,9 @@ identity matching by design.
    follow-up turns were cached, and exact hits on turns 3-4 reduced TTFT to
    sub-125 ms.
 6. Repeat the cache proof at 512-token and 1024-token budgets before claiming
-   long-output stability. The 512-token lane is now positive and tracked in
+   long-output stability. The 512-token and 1024-token lanes are now positive
+   for this fixed single-client proof and tracked in
    `documentation/theories/2026-07-03-semantic-capsule-cache-scaling.md`;
-   1024 tokens remain unproven.
+   broader cache behavior remains unproven.
 7. Only after those pass, draft an HTTP serving policy that makes truncation and
    state retention explicit to clients.
