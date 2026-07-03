@@ -172,6 +172,50 @@ fn encodes_with_ranked_bpe_merges_from_gguf_metadata() -> Result<(), Box<dyn Err
 }
 
 #[test]
+fn bpe_encoder_does_not_poll_through_irrelevant_merge_rules() -> Result<(), Box<dyn Error>> {
+    let mut tokens = ["<unk>", "h", "e", "l", "o", "he", "ll", "hell", "hello"]
+        .into_iter()
+        .map(str::to_owned)
+        .collect::<Vec<_>>();
+    let mut merges = ["h e", "l l", "he ll", "hell o"]
+        .into_iter()
+        .map(str::to_owned)
+        .collect::<Vec<_>>();
+
+    for index in 0..64 {
+        let left = format!("x{index}");
+        let right = format!("y{index}");
+        let merged = format!("{left}{right}");
+        merges.push(format!("{left} {right}"));
+        tokens.push(left);
+        tokens.push(right);
+        tokens.push(merged);
+    }
+
+    let token_types = std::iter::once(2)
+        .chain(std::iter::repeat(1).take(tokens.len() - 1))
+        .collect::<Vec<_>>();
+    let token_refs = tokens.iter().map(String::as_str).collect::<Vec<_>>();
+    let merge_refs = merges.iter().map(String::as_str).collect::<Vec<_>>();
+    let bytes = tokenizer_gguf_fixture(&token_refs, &token_types, &merge_refs);
+    let file = parse_gguf(&bytes)?;
+    let tokenizer = GgufTokenizer::from_gguf(&file)?;
+    let mut polls = 0usize;
+
+    let token_ids = tokenizer.encode_bpe_with_cancellation("hello", || {
+        polls += 1;
+        TokenizationControl::Continue
+    })?;
+
+    assert_eq!(token_ids, vec![8]);
+    assert!(
+        polls < 20,
+        "encoder should not poll through irrelevant merge rules, got {polls}"
+    );
+    Ok(())
+}
+
+#[test]
 fn rejects_invalid_bpe_merge_metadata_at_load_time() -> Result<(), Box<dyn Error>> {
     let bytes = tokenizer_gguf_fixture(&["<unk>", "h", "e", "he"], &[2, 1, 1, 1], &["h e extra"]);
     let file = parse_gguf(&bytes)?;

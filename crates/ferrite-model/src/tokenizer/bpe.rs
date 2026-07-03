@@ -4,13 +4,12 @@ use std::collections::BTreeMap;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct BpeMetadata {
     token_to_id: BTreeMap<String, usize>,
-    merges: Vec<BpeMerge>,
+    pair_merges: BTreeMap<String, BTreeMap<String, RankedBpeMerge>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-struct BpeMerge {
-    left: String,
-    right: String,
+struct RankedBpeMerge {
+    rank: usize,
     merged: String,
 }
 
@@ -21,8 +20,8 @@ impl BpeMetadata {
             .enumerate()
             .map(|(id, token)| (token.clone(), id))
             .collect::<BTreeMap<_, _>>();
-        let mut parsed_merges = Vec::new();
-        for merge in merges {
+        let mut pair_merges: BTreeMap<String, BTreeMap<String, RankedBpeMerge>> = BTreeMap::new();
+        for (rank, merge) in merges.iter().enumerate() {
             let Some((left, right)) = parse_merge(merge) else {
                 return Err(TokenizerError::new(format!(
                     "invalid BPE merge rule {merge:?}"
@@ -30,16 +29,16 @@ impl BpeMetadata {
             };
             let merged = format!("{left}{right}");
             if token_to_id.contains_key(merged.as_str()) {
-                parsed_merges.push(BpeMerge {
-                    left: left.to_owned(),
-                    right: right.to_owned(),
-                    merged,
-                });
+                pair_merges
+                    .entry(left.to_owned())
+                    .or_default()
+                    .entry(right.to_owned())
+                    .or_insert(RankedBpeMerge { rank, merged });
             }
         }
         Ok(Self {
             token_to_id,
-            merges: parsed_merges,
+            pair_merges,
         })
     }
 }
@@ -74,11 +73,16 @@ pub(super) fn encode_with_cancellation(
     }
     let mut symbols = seed_symbols(input, &metadata.token_to_id, &mut on_cancellation_poll)?;
 
-    for merge in &metadata.merges {
+    while let Some(candidate) = best_active_merge(&symbols, &metadata.pair_merges) {
         if on_cancellation_poll() == TokenizationControl::Cancel {
             return Err(TokenizerError::cancelled());
         }
-        apply_merge(&mut symbols, &merge.left, &merge.right, &merge.merged);
+        apply_merge(
+            &mut symbols,
+            &candidate.left,
+            &candidate.right,
+            &candidate.merged,
+        );
     }
 
     symbols
@@ -91,6 +95,44 @@ pub(super) fn encode_with_cancellation(
                 .ok_or_else(|| TokenizerError::new(format!("BPE token {symbol:?} is not in vocab")))
         })
         .collect()
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct ActiveMerge {
+    rank: usize,
+    left: String,
+    right: String,
+    merged: String,
+}
+
+fn best_active_merge(
+    symbols: &[String],
+    pair_merges: &BTreeMap<String, BTreeMap<String, RankedBpeMerge>>,
+) -> Option<ActiveMerge> {
+    let mut best = None;
+    for pair in symbols.windows(2) {
+        let left = &pair[0];
+        let right = &pair[1];
+        let Some(ranked) = pair_merges
+            .get(left.as_str())
+            .and_then(|right_merges| right_merges.get(right.as_str()))
+        else {
+            continue;
+        };
+
+        if best
+            .as_ref()
+            .map_or(true, |current: &ActiveMerge| ranked.rank < current.rank)
+        {
+            best = Some(ActiveMerge {
+                rank: ranked.rank,
+                left: left.clone(),
+                right: right.clone(),
+                merged: ranked.merged.clone(),
+            });
+        }
+    }
+    best
 }
 
 fn seed_symbols(
