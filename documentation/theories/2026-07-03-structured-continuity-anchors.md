@@ -196,6 +196,45 @@ because the 64-token generated-context window intentionally truncates prior
 output, so generated-context identity does not match the previous full
 response.
 
+## Capsule-Only Probe
+
+Commit `d9161d3` added and tested
+`--generated-context-state-capsule-placement assistant-context-only`. The
+benchmark note is
+`documentation/benchmarks/2026-07-03-openai-long-chat-x86-qwen-1-5b-q8-capsule-only-64.md`.
+
+This run kept the short `state_anchor=7291` capsule and the same 64-token
+window configuration, but omitted retained generated assistant prose from
+follow-up turns. Generated follow-up assistant context became only:
+
+```text
+Ferrite state capsule:
+state_anchor=7291
+```
+
+Result:
+
+| Variant | Window 64 | Generated prompt avg | TTFT avg | Response identity |
+| --- | --- | ---: | ---: | --- |
+| JSON capsule in follow-up message | completed 4 turns | 162.00 | 38759.67 ms | changing |
+| Short capsule in follow-up message | completed 4 turns | 151.00 | 36127.00 ms | changing |
+| Short capsule as assistant context only | completed 4 turns | 80.00 | 18775.33 ms | fixed point on turns 2-4 |
+
+Capsule-only placement preserved the exact `7291` anchor while dropping
+generated follow-up prompt cost by 71 tokens and TTFT by `17351.67` ms versus
+the short follow-up capsule run. It also produced the same generated response
+hash on turns 2-4: `fnv64:201ea36ecbb7d57c`.
+
+This is the strongest signal so far that, for this prompt, retained generated
+assistant prose is not needed for the exact-anchor continuity contract and may
+mostly add prompt cost and response drift. It still does not prove semantic
+continuity or production serving policy.
+
+The integrated long-chat summary remains intentionally incomplete:
+`long_chat_summary_run_complete=false`. Capsule-only placement replaces the
+previous full generated response, so it cannot satisfy full generated-context
+identity matching by design.
+
 ## Next Steps
 
 1. Test capsule placement in the follow-up user message instead of assistant
@@ -206,7 +245,8 @@ response.
    for the same 64-token Qwen 1.5B Q8 256-budget lane; it preserved the anchor
    with lower prompt cost and lower TTFT than the JSON capsule.
 3. Test a capsule-only generated follow-up mode that omits retained generated
-   prose.
+   prose. Done for the same lane; it preserved the anchor, reduced prompt cost
+   materially, and produced a fixed response hash across turns 2-4.
 4. Add a semantic recall probe that checks a short generated answer for a known
    fact without requiring the exact full marker.
 5. Only after those pass, draft an HTTP serving policy that makes truncation and
