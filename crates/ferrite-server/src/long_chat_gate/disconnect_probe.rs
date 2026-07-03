@@ -262,11 +262,14 @@ mod tests {
     }
 
     #[test]
-    fn rejects_reconnect_response_without_generated_event() {
+    fn rejects_reconnect_response_without_generated_event() -> Result<(), Box<dyn std::error::Error>>
+    {
         let response = "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\n\r\ndata: [DONE]\n";
 
-        let error = validate_reconnect_response(response)
-            .expect_err("done-only reconnect response should be rejected");
+        let error = match validate_reconnect_response(response) {
+            Ok(()) => return Err("done-only reconnect response should be rejected".into()),
+            Err(error) => error,
+        };
 
         assert!(
             error
@@ -274,5 +277,6 @@ mod tests {
                 .contains("expected reconnect response generated stream event"),
             "{error}"
         );
+        Ok(())
     }
 }

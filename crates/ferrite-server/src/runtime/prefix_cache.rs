@@ -1,4 +1,6 @@
-use super::{GenerationCacheOptions, InferenceEngine, RuntimeError};
+use super::{
+    GenerationCacheOptions, InferenceEngine, PromptCacheLookup, PromptCacheTrace, RuntimeError,
+};
 use ferrite_inference::prefix_cache::{
     PrefixCacheEntry, PrefixCacheFingerprints, PrefixCacheKey, PrefixCacheMetadataStore,
     TokenPrefixIdentity,
@@ -30,26 +32,57 @@ impl Default for RuntimePrefixCache {
 }
 
 impl RuntimePrefixCache {
-    pub(super) fn get_longest_prefix(
+    pub(super) fn lookup_longest_prefix(
         &mut self,
         key: &PrefixCacheKey,
-    ) -> Option<RuntimePrefixCacheValue> {
+    ) -> RuntimePrefixCacheLookup {
         let used_at_tick = self.advance_tick();
         if let Some(entry) = self.metadata.record_longest_prefix_hit(key, used_at_tick) {
-            return self.values.get(entry.key()).cloned();
+            let selected_entry_token_count = entry.key().prefix_token_count();
+            let selected_entry_token_hash = entry.key().prefix_token_hash();
+            let lookup = if selected_entry_token_count == key.prefix_token_count() {
+                PromptCacheLookup::ExactHit
+            } else {
+                PromptCacheLookup::PrefixHit
+            };
+            let Some(value) = self.values.get(entry.key()).cloned() else {
+                return RuntimePrefixCacheLookup::miss();
+            };
+            return RuntimePrefixCacheLookup {
+                value: Some(value),
+                lookup,
+                selected_entry_token_count: Some(selected_entry_token_count),
+                selected_entry_token_hash: Some(selected_entry_token_hash),
+                shared_prefix_tokens: selected_entry_token_count,
+            };
         }
-        let hit = self
+        let Some(hit) = self
             .metadata
-            .record_longest_shared_prefix_hit(key, used_at_tick)?;
-        let value = self.values.get(hit.entry().key())?;
-        let snapshot = value
-            .snapshot
-            .truncate_to_cached_token_count(hit.shared_prefix_token_count())
-            .ok()?;
-        Some(RuntimePrefixCacheValue {
-            snapshot,
-            next_token: None,
-        })
+            .record_longest_shared_prefix_hit(key, used_at_tick)
+        else {
+            return RuntimePrefixCacheLookup::miss();
+        };
+        let selected_entry_token_count = hit.entry().key().prefix_token_count();
+        let selected_entry_token_hash = hit.entry().key().prefix_token_hash();
+        let shared_prefix_tokens = hit.shared_prefix_token_count();
+        let Some(snapshot) = self.values.get(hit.entry().key()).and_then(|value| {
+            value
+                .snapshot
+                .truncate_to_cached_token_count(shared_prefix_tokens)
+                .ok()
+        }) else {
+            return RuntimePrefixCacheLookup::miss();
+        };
+        RuntimePrefixCacheLookup {
+            value: Some(RuntimePrefixCacheValue {
+                snapshot,
+                next_token: None,
+            }),
+            lookup: PromptCacheLookup::SharedPrefixHit,
+            selected_entry_token_count: Some(selected_entry_token_count),
+            selected_entry_token_hash: Some(selected_entry_token_hash),
+            shared_prefix_tokens,
+        }
     }
 
     pub(super) fn insert(
@@ -97,15 +130,58 @@ impl RuntimePrefixCacheValue {
     }
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub(super) struct RuntimePrefixCacheLookup {
+    value: Option<RuntimePrefixCacheValue>,
+    lookup: PromptCacheLookup,
+    selected_entry_token_count: Option<usize>,
+    selected_entry_token_hash: Option<u64>,
+    shared_prefix_tokens: usize,
+}
+
+impl RuntimePrefixCacheLookup {
+    fn miss() -> Self {
+        Self {
+            value: None,
+            lookup: PromptCacheLookup::Miss,
+            selected_entry_token_count: None,
+            selected_entry_token_hash: None,
+            shared_prefix_tokens: 0,
+        }
+    }
+
+    pub(super) fn into_value(self) -> Option<RuntimePrefixCacheValue> {
+        self.value
+    }
+
+    pub(super) fn to_trace(&self, key: &PrefixCacheKey, enabled: bool) -> PromptCacheTrace {
+        let mut trace = PromptCacheTrace::new(
+            enabled,
+            key.namespace().map(str::to_owned),
+            key.prefix_token_count(),
+            key.prefix_token_hash(),
+            self.lookup,
+        )
+        .with_shared_prefix_tokens(self.shared_prefix_tokens);
+        if let (Some(token_count), Some(token_hash)) = (
+            self.selected_entry_token_count,
+            self.selected_entry_token_hash,
+        ) {
+            trace = trace.with_selected_entry(token_count, token_hash);
+        }
+        trace
+    }
+}
+
 impl InferenceEngine {
-    pub(super) fn prefix_cache_hit(
+    pub(super) fn prefix_cache_lookup(
         &self,
         key: &PrefixCacheKey,
-    ) -> Result<Option<RuntimePrefixCacheValue>, RuntimeError> {
+    ) -> Result<RuntimePrefixCacheLookup, RuntimeError> {
         self.prefix_cache
             .lock()
             .map_err(|_| RuntimeError::new("runtime prefix cache lock is poisoned"))
-            .map(|mut cache| cache.get_longest_prefix(key))
+            .map(|mut cache| cache.lookup_longest_prefix(key))
     }
 
     pub(super) fn store_prefix_cache_value(
@@ -167,4 +243,54 @@ pub(super) fn fnv64_bytes(bytes: &[u8]) -> u64 {
         hash = hash.wrapping_mul(FNV_PRIME);
     }
     hash
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn lookup_misses_when_exact_metadata_entry_has_no_value() {
+        let mut cache = RuntimePrefixCache::default();
+        let key = test_key(&[1, 2, 3]);
+        cache
+            .metadata
+            .insert(PrefixCacheEntry::new(key.clone(), 1024, 1));
+
+        let lookup = cache.lookup_longest_prefix(&key);
+
+        assert_eq!(lookup.lookup, PromptCacheLookup::Miss);
+        assert!(lookup.value.is_none());
+        assert_eq!(lookup.shared_prefix_tokens, 0);
+    }
+
+    #[test]
+    fn lookup_misses_when_shared_metadata_entry_has_no_value() {
+        let mut cache = RuntimePrefixCache::default();
+        let cached_key = test_key(&[1, 2, 3]);
+        let requested_key = test_key(&[1, 4, 5]);
+        cache
+            .metadata
+            .insert(PrefixCacheEntry::new(cached_key, 1024, 1));
+
+        let lookup = cache.lookup_longest_prefix(&requested_key);
+
+        assert_eq!(lookup.lookup, PromptCacheLookup::Miss);
+        assert!(lookup.value.is_none());
+        assert_eq!(lookup.shared_prefix_tokens, 0);
+    }
+
+    fn test_key(tokens: &[usize]) -> PrefixCacheKey {
+        PrefixCacheKey::new(
+            PrefixCacheFingerprints::new(
+                "model",
+                "tokenizer",
+                "template",
+                "execution",
+                "request-shape",
+            ),
+            TokenPrefixIdentity::from_tokens(tokens.iter().copied()),
+        )
+        .with_namespace("tenant-a:thread-1")
+    }
 }

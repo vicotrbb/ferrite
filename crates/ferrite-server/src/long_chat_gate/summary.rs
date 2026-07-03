@@ -110,6 +110,7 @@ fn has_cached_prompt_tokens(result: &LongChatScenarioResult) -> bool {
     result
         .throughput()
         .streaming_usage
+        .as_ref()
         .is_some_and(|usage| usage.cached_prompt_tokens() > 0)
 }
 
@@ -128,7 +129,7 @@ fn usage_accounting_valid(result: &LongChatScenarioResult) -> bool {
     let Some(finish) = &result.throughput().streaming_finish else {
         return false;
     };
-    let Some(usage) = result.throughput().streaming_usage else {
+    let Some(usage) = &result.throughput().streaming_usage else {
         return false;
     };
 

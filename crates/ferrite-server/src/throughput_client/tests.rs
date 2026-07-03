@@ -153,6 +153,44 @@ fn builds_openai_compatible_chat_prompt_cache_key_request_body(
 }
 
 #[test]
+fn builds_chat_request_body_with_ferrite_cache_trace_metadata(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let config = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--endpoint"),
+        OsString::from("chat-completions"),
+        OsString::from("--model"),
+        OsString::from("fixture-model"),
+        OsString::from("--prompt"),
+        OsString::from("measure this"),
+        OsString::from("--max-tokens"),
+        OsString::from("2"),
+        OsString::from("--prompt-cache-key"),
+        OsString::from("benchy:smoke"),
+        OsString::from("--prompt-cache-trace"),
+    ])?;
+
+    assert!(config.prompt_cache_trace());
+    assert_eq!(
+        request_body(&config),
+        r#"{"model":"fixture-model","messages":[{"role":"user","content":"measure this"}],"max_tokens":2,"prompt_cache_key":"benchy:smoke","metadata":{"ferrite_cache_trace":"true"}}"#
+    );
+    Ok(())
+}
+
+#[test]
+fn rejects_prompt_cache_trace_for_legacy_completions() {
+    let result = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--endpoint"),
+        OsString::from("completions"),
+        OsString::from("--prompt-cache-trace"),
+    ]);
+
+    assert!(result.is_err());
+}
+
+#[test]
 fn summarizes_streaming_chat_token_ids_from_sse_body() -> Result<(), Box<dyn std::error::Error>> {
     let body = concat!(
         "data: {\"choices\":[{\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\n",
@@ -577,6 +615,60 @@ fn formats_streaming_usage_summary() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
+fn parses_and_formats_streaming_prompt_cache_trace() -> Result<(), Box<dyn std::error::Error>> {
+    let body = concat!(
+        "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":8,\"completion_tokens\":32,\"total_tokens\":40,",
+        "\"prompt_tokens_details\":{\"cached_tokens\":5,\"audio_tokens\":0,",
+        "\"ferrite_cache\":{\"enabled\":true,\"namespace\":\"benchy:smoke\",",
+        "\"prompt_token_count\":8,\"prompt_token_hash\":\"fnv64:0000000000001234\",",
+        "\"lookup\":\"shared_prefix_hit\",\"selected_entry_token_count\":5,",
+        "\"selected_entry_token_hash\":\"fnv64:0000000000004567\",",
+        "\"shared_prefix_tokens\":5}}}}\n\n",
+        "data: [DONE]\n\n",
+    );
+    let usage =
+        StreamingUsageSummary::from_sse_body(body).ok_or("expected streaming usage summary")?;
+    let trace = usage
+        .prompt_cache_trace()
+        .ok_or("expected prompt cache trace summary")?;
+
+    assert_eq!(trace.lookup(), "shared_prefix_hit");
+    assert_eq!(trace.prompt_token_hash(), "fnv64:0000000000001234");
+    assert_eq!(
+        trace.selected_entry_token_hash(),
+        Some("fnv64:0000000000004567")
+    );
+    assert_eq!(trace.shared_prefix_tokens(), 5);
+
+    let config = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--endpoint"),
+        OsString::from("chat-completions"),
+        OsString::from("--stream"),
+        OsString::from("--stream-usage"),
+    ])?;
+    let result = ThroughputResult {
+        completed_requests: 1,
+        elapsed: Duration::from_millis(400),
+        streaming_finish: None,
+        streaming_timing: None,
+        streaming_text: None,
+        streaming_token_ids: None,
+        streaming_usage: Some(usage),
+        rss: None,
+    };
+
+    let formatted = format_result(&config, result);
+
+    assert!(formatted.contains("streaming_usage_prompt_cache_lookup=shared_prefix_hit"));
+    assert!(
+        formatted.contains("streaming_usage_prompt_cache_prompt_token_hash=fnv64:0000000000001234")
+    );
+    assert!(formatted.contains("streaming_usage_prompt_cache_shared_prefix_tokens=5"));
+    Ok(())
+}
+
+#[test]
 fn formats_streaming_finish_summary() -> Result<(), Box<dyn std::error::Error>> {
     let config = ThroughputClientConfig::parse([
         OsString::from("ferrite-openai-throughput"),
@@ -702,11 +794,12 @@ fn accepts_length_streaming_usage_matching_requested_max_tokens(
         OsString::from("--max-tokens"),
         OsString::from("32"),
     ])?;
+    let usage = StreamingUsageSummary::new(8, 32, 40);
 
     validate_streaming_token_count(
         &config,
         Some(&StreamingFinishSummary::new("length")),
-        Some(StreamingUsageSummary::new(8, 32, 40)),
+        Some(&usage),
     )?;
     Ok(())
 }
@@ -721,11 +814,12 @@ fn rejects_length_streaming_usage_below_requested_max_tokens(
         OsString::from("--max-tokens"),
         OsString::from("32"),
     ])?;
+    let usage = StreamingUsageSummary::new(8, 31, 39);
 
     let result = validate_streaming_token_count(
         &config,
         Some(&StreamingFinishSummary::new("length")),
-        Some(StreamingUsageSummary::new(8, 31, 39)),
+        Some(&usage),
     );
     let error = match result {
         Ok(()) => return Err("expected streaming token-count validation error".into()),
@@ -747,11 +841,12 @@ fn accepts_stop_streaming_usage_below_requested_max_tokens(
         OsString::from("--max-tokens"),
         OsString::from("32"),
     ])?;
+    let usage = StreamingUsageSummary::new(8, 4, 12);
 
     validate_streaming_token_count(
         &config,
         Some(&StreamingFinishSummary::new("stop")),
-        Some(StreamingUsageSummary::new(8, 4, 12)),
+        Some(&usage),
     )?;
     Ok(())
 }

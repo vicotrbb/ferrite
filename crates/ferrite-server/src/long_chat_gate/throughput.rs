@@ -90,6 +90,9 @@ impl LongChatGateConfig {
                 OsString::from(prompt_cache_key),
             ]);
         }
+        if self.prompt_cache_trace() {
+            args.push(OsString::from("--prompt-cache-trace"));
+        }
         if let Some(rss_pid) = self.rss_pid() {
             args.extend([
                 OsString::from("--rss-pid"),

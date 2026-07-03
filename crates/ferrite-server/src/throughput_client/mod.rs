@@ -16,7 +16,7 @@ pub use streaming_finish::StreamingFinishSummary;
 pub use streaming_metrics::StreamingTimingSummary;
 pub use streaming_text::StreamingTextSummary;
 pub use streaming_token_ids::StreamingTokenIdsSummary;
-pub use streaming_usage::StreamingUsageSummary;
+pub use streaming_usage::{StreamingPromptCacheTraceSummary, StreamingUsageSummary};
 
 use std::{
     error::Error,
@@ -126,7 +126,11 @@ async fn run_requests(
             let response_text = response.streaming_text();
             let response_token_ids = response.streaming_token_ids();
             let response_usage = response.streaming_usage();
-            validate_streaming_token_count(config, response_finish.as_ref(), response_usage)?;
+            validate_streaming_token_count(
+                config,
+                response_finish.as_ref(),
+                response_usage.as_ref(),
+            )?;
             if stream && streaming_timing.is_none() {
                 streaming_timing = response.streaming_timing();
             }
@@ -208,6 +212,19 @@ pub fn format_result(config: &ThroughputClientConfig, result: ThroughputResult) 
             usage.completion_tokens(),
             usage.total_tokens(),
         ));
+        if let Some(trace) = usage.prompt_cache_trace() {
+            output.push_str(&format!(
+                "\nstreaming_usage_prompt_cache_lookup={}\nstreaming_usage_prompt_cache_prompt_token_hash={}\nstreaming_usage_prompt_cache_shared_prefix_tokens={}",
+                trace.lookup(),
+                trace.prompt_token_hash(),
+                trace.shared_prefix_tokens(),
+            ));
+            if let Some(selected_entry_token_hash) = trace.selected_entry_token_hash() {
+                output.push_str(&format!(
+                    "\nstreaming_usage_prompt_cache_selected_entry_token_hash={selected_entry_token_hash}"
+                ));
+            }
+        }
     }
     if let Some(rss) = result.rss {
         output.push_str(&format!(
@@ -223,7 +240,7 @@ pub fn format_result(config: &ThroughputClientConfig, result: ThroughputResult) 
 fn validate_streaming_token_count(
     config: &ThroughputClientConfig,
     finish: Option<&StreamingFinishSummary>,
-    usage: Option<StreamingUsageSummary>,
+    usage: Option<&StreamingUsageSummary>,
 ) -> Result<(), Box<dyn Error>> {
     if !config.stream() || !config.stream_usage() {
         return Ok(());
@@ -270,10 +287,11 @@ fn completion_request_body(config: &ThroughputClientConfig) -> String {
 fn chat_completion_request_body(config: &ThroughputClientConfig) -> String {
     let stop = stop_field(config);
     let prompt_cache_key = prompt_cache_key_field(config);
+    let prompt_cache_trace = prompt_cache_trace_field(config);
     let stream = stream_field(config);
     let stream_options = stream_options_field(config);
     format!(
-        r#"{{"model":{},"messages":{},"max_tokens":{}{stop}{prompt_cache_key}{stream}{stream_options}}}"#,
+        r#"{{"model":{},"messages":{},"max_tokens":{}{stop}{prompt_cache_key}{prompt_cache_trace}{stream}{stream_options}}}"#,
         serde_json::Value::String(config.model().to_owned()),
         chat_messages(config),
         config.max_tokens()
@@ -320,6 +338,14 @@ fn prompt_cache_key_field(config: &ThroughputClientConfig) -> String {
             )
         })
         .unwrap_or_default()
+}
+
+fn prompt_cache_trace_field(config: &ThroughputClientConfig) -> &'static str {
+    if config.prompt_cache_trace() {
+        r#","metadata":{"ferrite_cache_trace":"true"}"#
+    } else {
+        ""
+    }
 }
 
 fn stream_options_field(config: &ThroughputClientConfig) -> &'static str {

@@ -55,7 +55,7 @@ impl LongChatScenarioResult {
 
     pub fn hit_token_limit(&self) -> Option<bool> {
         let finish = self.throughput.streaming_finish.as_ref()?;
-        let usage = self.throughput.streaming_usage?;
+        let usage = self.throughput.streaming_usage.as_ref()?;
 
         Some(finish.reason() == "length" && usage.completion_tokens() == self.token_length as u64)
     }
@@ -97,7 +97,7 @@ pub fn format_scenario_result(result: &LongChatScenarioResult) -> String {
             finish.reason()
         ));
     }
-    if let Some(usage) = throughput.streaming_usage {
+    if let Some(usage) = &throughput.streaming_usage {
         output.push_str(&format!(
             "\nlong_chat_result_usage_prompt_tokens={}\nlong_chat_result_usage_cached_prompt_tokens={}\nlong_chat_result_usage_completion_tokens={}\nlong_chat_result_usage_total_tokens={}",
             usage.prompt_tokens(),
@@ -105,6 +105,19 @@ pub fn format_scenario_result(result: &LongChatScenarioResult) -> String {
             usage.completion_tokens(),
             usage.total_tokens()
         ));
+        if let Some(trace) = usage.prompt_cache_trace() {
+            output.push_str(&format!(
+                "\nlong_chat_result_prompt_cache_lookup={}\nlong_chat_result_prompt_cache_prompt_token_hash={}\nlong_chat_result_prompt_cache_shared_prefix_tokens={}",
+                trace.lookup(),
+                trace.prompt_token_hash(),
+                trace.shared_prefix_tokens(),
+            ));
+            if let Some(selected_entry_token_hash) = trace.selected_entry_token_hash() {
+                output.push_str(&format!(
+                    "\nlong_chat_result_prompt_cache_selected_entry_token_hash={selected_entry_token_hash}"
+                ));
+            }
+        }
     }
     if let Some(hit_token_limit) = result.hit_token_limit() {
         output.push_str(&format!(

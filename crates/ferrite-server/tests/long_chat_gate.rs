@@ -5,8 +5,8 @@ use ferrite_server::long_chat_gate::{
     LongChatProofArtifacts, LongChatScenarioResult,
 };
 use ferrite_server::throughput_client::{
-    OpenAiEndpoint, RssSummary, StreamingFinishSummary, StreamingTextSummary,
-    StreamingTimingSummary, StreamingTokenIdsSummary, StreamingUsageSummary,
+    OpenAiEndpoint, RssSummary, StreamingFinishSummary, StreamingPromptCacheTraceSummary,
+    StreamingTextSummary, StreamingTimingSummary, StreamingTokenIdsSummary, StreamingUsageSummary,
     ThroughputClientConfig, ThroughputResult,
 };
 use std::ffi::OsString;
@@ -642,6 +642,33 @@ fn passes_prompt_cache_key_to_long_chat_throughput_config() -> Result<(), Box<dy
 }
 
 #[test]
+fn passes_prompt_cache_trace_to_long_chat_throughput_config(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--models"),
+        OsString::from("fixture-model"),
+        OsString::from("--token-lengths"),
+        OsString::from("256"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+        OsString::from("--prompt-cache-key"),
+        OsString::from("long-chat:prefix"),
+        OsString::from("--prompt-cache-trace"),
+    ])?;
+    let scenario = config
+        .scenarios()
+        .into_iter()
+        .next()
+        .ok_or("expected scenario")?;
+    let throughput = config.throughput_config_with_assistant_context(&scenario, "context")?;
+
+    assert!(config.prompt_cache_trace());
+    assert!(throughput.prompt_cache_trace());
+    Ok(())
+}
+
+#[test]
 fn rejects_invalid_long_chat_rss_pid() -> Result<(), Box<dyn std::error::Error>> {
     let result = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),
@@ -912,6 +939,56 @@ fn formats_cache_observability_in_long_chat_run_summary() -> Result<(), Box<dyn 
     assert!(summary.contains("long_chat_summary_cached_generated_follow_up_turns=3"));
     assert!(summary.contains("long_chat_summary_uncached_generated_follow_up_turns=0"));
     assert!(summary.contains("long_chat_summary_all_generated_follow_up_turns_cached=true"));
+    Ok(())
+}
+
+#[test]
+fn formats_prompt_cache_trace_in_long_chat_scenario_result(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--models"),
+        OsString::from("fixture-model"),
+        OsString::from("--token-lengths"),
+        OsString::from("256"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+    ])?;
+    let scenario = config
+        .scenarios()
+        .into_iter()
+        .next()
+        .ok_or("expected scenario")?;
+    let usage = StreamingUsageSummary::new(16, 256, 272)
+        .with_cached_prompt_tokens(8)
+        .with_prompt_cache_trace(
+            StreamingPromptCacheTraceSummary::new(
+                "shared_prefix_hit".to_owned(),
+                "fnv64:0000000000001234".to_owned(),
+                5,
+            )
+            .with_selected_entry_token_hash("fnv64:0000000000004567".to_owned()),
+        );
+    let result = LongChatScenarioResult::new_with_assistant_context_source(
+        &scenario,
+        ThroughputResult {
+            completed_requests: 1,
+            elapsed: Duration::from_millis(400),
+            streaming_finish: Some(StreamingFinishSummary::new("length")),
+            streaming_timing: None,
+            streaming_text: None,
+            streaming_token_ids: None,
+            streaming_usage: Some(usage),
+            rss: None,
+        },
+        LongChatAssistantContextSource::Generated,
+    );
+    let formatted = format_scenario_result(&result);
+
+    assert!(formatted.contains("long_chat_result_prompt_cache_lookup=shared_prefix_hit"));
+    assert!(formatted
+        .contains("long_chat_result_prompt_cache_prompt_token_hash=fnv64:0000000000001234"));
+    assert!(formatted.contains("long_chat_result_prompt_cache_shared_prefix_tokens=5"));
     Ok(())
 }
 
@@ -1697,7 +1774,7 @@ fn rejects_empty_long_chat_prompt() -> Result<(), Box<dyn std::error::Error>> {
 fn unique_temp_dir(name: &str) -> std::path::PathBuf {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .expect("system clock should be after unix epoch")
-        .as_nanos();
+        .map(|duration| duration.as_nanos())
+        .unwrap_or_default();
     std::env::temp_dir().join(format!("{name}-{}-{nanos}", std::process::id()))
 }

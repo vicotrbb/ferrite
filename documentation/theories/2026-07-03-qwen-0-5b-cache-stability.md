@@ -62,7 +62,8 @@ inherit the 1024-token lane's full transcript.
 1. Deterministic prompt identity trace: record per-turn prompt token hashes,
    longest shared-prefix length, selected cache entry, and cache namespace for
    each lane. Acceptance: the reported cached token count can be explained from
-   the trace without reading generated text manually.
+   the trace without reading generated text manually. Implementation slice:
+   `documentation/dev-notes/2026-07-03-prompt-cache-trace-observability.md`.
 2. Lane-isolated replay: rerun only the 1024-token lane for four turns with the
    same prompt-cache key shape. Acceptance: cache depth and TTFT either repeat
    the collapse/recovery pattern or prove the previous run was nondeterministic.
@@ -91,3 +92,10 @@ code change should be narrow instrumentation first, placed in focused Rust
 modules around prompt/cache observability. The output must be useful to both the
 Ferrite long-chat gate and external OpenAI-compatible benchmarking tools such as
 `llama-benchy`.
+
+## Implementation Update
+
+The first instrumentation slice now exists as an opt-in trace. It does not
+change default OpenAI response shape and it does not claim cache behavior is
+optimized. The next proof step is a traced real-model rerun so each low-cache or
+high-TTFT row has a token-hash and selected-entry explanation.

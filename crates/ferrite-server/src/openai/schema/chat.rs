@@ -159,6 +159,7 @@ impl ChatCompletionRequest {
                 .and_then(Value::as_str)
                 .map(str::to_owned),
         )
+        .with_prompt_cache_trace_enabled(metadata_flag(&self.metadata, "ferrite_cache_trace"))
     }
 
     pub fn unsupported_fields(&self) -> Vec<String> {
@@ -250,6 +251,15 @@ impl ChatCompletionRequest {
     }
 }
 
+fn metadata_flag(metadata: &Option<Value>, key: &str) -> bool {
+    metadata
+        .as_ref()
+        .and_then(Value::as_object)
+        .and_then(|metadata| metadata.get(key))
+        .and_then(Value::as_str)
+        == Some("true")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -284,6 +294,40 @@ mod tests {
         )?;
 
         assert_eq!(request.cache_options().namespace(), None);
+        Ok(())
+    }
+
+    #[test]
+    fn chat_request_metadata_can_enable_ferrite_cache_trace(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let request: ChatCompletionRequest = serde_json::from_str(
+            r#"{
+                "model":"fixture-model",
+                "messages":[{"role":"user","content":"hello"}],
+                "prompt_cache_key":"tenant-a:thread-1",
+                "metadata":{"ferrite_cache_trace":"true"}
+            }"#,
+        )?;
+
+        let cache_options = request.cache_options();
+
+        assert_eq!(cache_options.namespace(), Some("tenant-a:thread-1"));
+        assert!(cache_options.prompt_cache_trace_enabled());
+        Ok(())
+    }
+
+    #[test]
+    fn chat_request_keeps_ferrite_cache_trace_disabled_by_default(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let request: ChatCompletionRequest = serde_json::from_str(
+            r#"{
+                "model":"fixture-model",
+                "messages":[{"role":"user","content":"hello"}],
+                "prompt_cache_key":"tenant-a:thread-1"
+            }"#,
+        )?;
+
+        assert!(!request.cache_options().prompt_cache_trace_enabled());
         Ok(())
     }
 }

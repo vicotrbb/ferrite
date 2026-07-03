@@ -44,7 +44,7 @@ impl OpenAiHttpResponse {
     }
 
     pub fn streaming_usage(&self) -> Option<StreamingUsageSummary> {
-        self.streaming_usage
+        self.streaming_usage.clone()
     }
 }
 

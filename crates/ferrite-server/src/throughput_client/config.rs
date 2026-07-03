@@ -9,6 +9,7 @@ pub struct ThroughputClientConfig {
     assistant_context: Option<String>,
     follow_up: Option<String>,
     prompt_cache_key: Option<String>,
+    prompt_cache_trace: bool,
     stop: Option<String>,
     requests: usize,
     concurrency: usize,
@@ -101,6 +102,9 @@ impl ThroughputClientConfig {
                     }
                     config.prompt_cache_key = Some(prompt_cache_key);
                 }
+                "--prompt-cache-trace" => {
+                    config.prompt_cache_trace = true;
+                }
                 "--stop" => {
                     let stop = os_string_to_string(next_value(&mut iter, "--stop")?)?;
                     if stop.is_empty() {
@@ -178,6 +182,11 @@ impl ThroughputClientConfig {
                 "--prompt-cache-key requires --endpoint chat-completions",
             ));
         }
+        if config.prompt_cache_trace && config.endpoint != OpenAiEndpoint::ChatCompletions {
+            return Err(ClientConfigError::new(
+                "--prompt-cache-trace requires --endpoint chat-completions",
+            ));
+        }
 
         Ok(config)
     }
@@ -208,6 +217,10 @@ impl ThroughputClientConfig {
 
     pub fn prompt_cache_key(&self) -> Option<&str> {
         self.prompt_cache_key.as_deref()
+    }
+
+    pub fn prompt_cache_trace(&self) -> bool {
+        self.prompt_cache_trace
     }
 
     pub fn stop(&self) -> Option<&str> {
@@ -257,6 +270,7 @@ impl Default for ThroughputClientConfig {
             assistant_context: None,
             follow_up: None,
             prompt_cache_key: None,
+            prompt_cache_trace: false,
             stop: None,
             requests: 3,
             concurrency: 1,
@@ -352,5 +366,5 @@ fn parse_endpoint(value: OsString) -> Result<OpenAiEndpoint, ClientConfigError> 
 }
 
 fn usage() -> &'static str {
-    "usage: ferrite-openai-throughput [--addr 127.0.0.1:8080] [--endpoint completions|chat-completions] [--model ferrite-local] [--prompt 'hello world'] [--assistant-context TEXT --follow-up TEXT] [--prompt-cache-key KEY] [--stop STOP] [--requests 3] [--concurrency 1] [--max-tokens 1] [--stream] [--stream-usage] [--rss-pid PID] [--rss-idle-ms 2000] [--api-key local-secret]"
+    "usage: ferrite-openai-throughput [--addr 127.0.0.1:8080] [--endpoint completions|chat-completions] [--model ferrite-local] [--prompt 'hello world'] [--assistant-context TEXT --follow-up TEXT] [--prompt-cache-key KEY] [--prompt-cache-trace] [--stop STOP] [--requests 3] [--concurrency 1] [--max-tokens 1] [--stream] [--stream-usage] [--rss-pid PID] [--rss-idle-ms 2000] [--api-key local-secret]"
 }

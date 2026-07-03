@@ -1,7 +1,9 @@
 mod cache_options;
+mod cache_trace;
 mod prefix_cache;
 
 pub use cache_options::GenerationCacheOptions;
+pub use cache_trace::{PromptCacheLookup, PromptCacheTrace};
 
 use ferrite_inference::scalar::ScalarLlamaModel;
 use ferrite_model::{gguf::parse_gguf, tokenizer::GgufTokenizer};
@@ -114,8 +116,13 @@ impl InferenceEngine {
 
         let mut session = self.model.start_session();
         let mut cached_prompt_tokens = 0;
+        let mut prompt_cache_trace = None;
         let next = if cache_options.prefix_cache_enabled() {
-            if let Some(cached) = self.prefix_cache_hit(&prefix_cache_key)? {
+            let lookup = self.prefix_cache_lookup(&prefix_cache_key)?;
+            if cache_options.prompt_cache_trace_enabled() {
+                prompt_cache_trace = Some(lookup.to_trace(&prefix_cache_key, true));
+            }
+            if let Some(cached) = lookup.into_value() {
                 session
                     .restore_cache_snapshot(cached.snapshot())
                     .map_err(|error| {
@@ -132,7 +139,7 @@ impl InferenceEngine {
                         RuntimeError::new(format!("failed to evaluate prompt suffix: {error}"))
                     })?;
                     self.store_prefix_cache_value(
-                        prefix_cache_key,
+                        prefix_cache_key.clone(),
                         session.cache_snapshot(),
                         next.clone(),
                     )?;
@@ -143,7 +150,7 @@ impl InferenceEngine {
                     RuntimeError::new(format!("failed to evaluate prompt: {error}"))
                 })?;
                 self.store_prefix_cache_value(
-                    prefix_cache_key,
+                    prefix_cache_key.clone(),
                     session.cache_snapshot(),
                     next.clone(),
                 )?;
@@ -154,6 +161,15 @@ impl InferenceEngine {
                 .accept_prompt(&prompt_token_ids)
                 .map_err(|error| RuntimeError::new(format!("failed to evaluate prompt: {error}")))?
         };
+        if cache_options.prompt_cache_trace_enabled() && !cache_options.prefix_cache_enabled() {
+            prompt_cache_trace = Some(PromptCacheTrace::new(
+                false,
+                prefix_cache_key.namespace().map(str::to_owned),
+                prefix_cache_key.prefix_token_count(),
+                prefix_cache_key.prefix_token_hash(),
+                PromptCacheLookup::Disabled,
+            ));
+        }
         let mut token_id = next.token_id;
         let mut generated_token_ids = Vec::with_capacity(max_tokens);
         let mut token_id_chunks = Vec::with_capacity(max_tokens);
@@ -208,7 +224,8 @@ impl InferenceEngine {
             finish_reason,
         )
         .with_token_id_chunks(token_id_chunks)?
-        .with_cached_prompt_tokens(cached_prompt_tokens)
+        .with_cached_prompt_tokens(cached_prompt_tokens)?
+        .with_optional_prompt_cache_trace(prompt_cache_trace)
     }
 
     fn decode_token_text(&self, token_ids: &[usize]) -> Result<Option<String>, RuntimeError> {
@@ -253,6 +270,7 @@ pub struct GeneratedText {
     text: String,
     prompt_tokens: usize,
     cached_prompt_tokens: usize,
+    prompt_cache_trace: Option<PromptCacheTrace>,
     completion_tokens: usize,
     token_texts: Vec<String>,
     token_id_chunks: Vec<Vec<usize>>,
@@ -286,6 +304,7 @@ impl GeneratedText {
             text,
             prompt_tokens,
             cached_prompt_tokens: 0,
+            prompt_cache_trace: None,
             completion_tokens,
             token_texts,
             token_id_chunks: Vec::new(),
@@ -317,6 +336,35 @@ impl GeneratedText {
         }
         self.cached_prompt_tokens = cached_prompt_tokens;
         Ok(self)
+    }
+
+    pub fn prompt_cache_trace(&self) -> Option<&PromptCacheTrace> {
+        self.prompt_cache_trace.as_ref()
+    }
+
+    pub fn with_prompt_cache_trace(
+        mut self,
+        prompt_cache_trace: PromptCacheTrace,
+    ) -> Result<Self, RuntimeError> {
+        if prompt_cache_trace.prompt_token_count() != self.prompt_tokens {
+            return Err(RuntimeError::new(format!(
+                "prompt cache trace token count {} does not match prompt tokens {}",
+                prompt_cache_trace.prompt_token_count(),
+                self.prompt_tokens
+            )));
+        }
+        self.prompt_cache_trace = Some(prompt_cache_trace);
+        Ok(self)
+    }
+
+    fn with_optional_prompt_cache_trace(
+        self,
+        prompt_cache_trace: Option<PromptCacheTrace>,
+    ) -> Result<Self, RuntimeError> {
+        match prompt_cache_trace {
+            Some(trace) => self.with_prompt_cache_trace(trace),
+            None => Ok(self),
+        }
     }
 
     pub fn completion_tokens(&self) -> usize {
@@ -424,14 +472,38 @@ mod tests {
     }
 
     #[test]
-    fn generated_text_rejects_cached_prompt_tokens_above_prompt_tokens() {
-        let error = GeneratedText::new("winner".to_owned(), 2, 1, vec!["winner".to_owned()])
+    fn generated_text_records_prompt_cache_trace() -> Result<(), Box<dyn std::error::Error>> {
+        let trace = PromptCacheTrace::new(
+            true,
+            Some("tenant-a:thread-1".to_owned()),
+            4,
+            0x1234,
+            PromptCacheLookup::SharedPrefixHit,
+        )
+        .with_selected_entry(2, 0x4567)
+        .with_shared_prefix_tokens(2);
+
+        let generated = GeneratedText::new("winner".to_owned(), 4, 1, vec!["winner".to_owned()])
+            .with_prompt_cache_trace(trace.clone())?;
+
+        assert_eq!(generated.prompt_cache_trace(), Some(&trace));
+        Ok(())
+    }
+
+    #[test]
+    fn generated_text_rejects_cached_prompt_tokens_above_prompt_tokens(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let error = match GeneratedText::new("winner".to_owned(), 2, 1, vec!["winner".to_owned()])
             .with_cached_prompt_tokens(3)
-            .expect_err("cached prompt tokens above prompt token count should fail");
+        {
+            Ok(_) => return Err("cached prompt tokens above prompt token count should fail".into()),
+            Err(error) => error,
+        };
 
         assert!(error
             .to_string()
             .contains("cached prompt tokens 3 exceed prompt tokens 2"));
+        Ok(())
     }
 
     #[test]
@@ -529,6 +601,36 @@ mod tests {
         );
         assert_eq!(cached_requested_prompt.prompt_tokens(), 2);
         assert_eq!(cached_requested_prompt.cached_prompt_tokens(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn prefix_cache_trace_explains_shared_prompt_prefix_hit(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let model_path = write_fixture_model()?;
+        let engine = InferenceEngine::load(&model_path)?;
+        remove_fixture_model(&model_path)?;
+        let cache_options =
+            GenerationCacheOptions::from_namespace(Some("tenant-a:thread-1".to_owned()))
+                .with_prefix_cache_enabled(true)
+                .with_prompt_cache_trace_enabled(true);
+
+        let first = engine.generate_with_cache_options("hellowinner", 1, cache_options.clone())?;
+        let second = engine.generate_with_cache_options("hellohello", 1, cache_options)?;
+        let trace = second
+            .prompt_cache_trace()
+            .ok_or("expected prompt cache trace")?;
+
+        assert_eq!(
+            first.prompt_cache_trace().map(PromptCacheTrace::lookup),
+            Some(PromptCacheLookup::Miss)
+        );
+        assert_eq!(second.cached_prompt_tokens(), 1);
+        assert_eq!(trace.namespace(), Some("tenant-a:thread-1"));
+        assert_eq!(trace.prompt_token_count(), 2);
+        assert_eq!(trace.selected_entry_token_count(), Some(2));
+        assert_eq!(trace.shared_prefix_tokens(), 1);
+        assert_eq!(trace.lookup(), PromptCacheLookup::SharedPrefixHit);
         Ok(())
     }
 

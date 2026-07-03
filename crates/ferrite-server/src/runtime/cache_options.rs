@@ -2,6 +2,7 @@
 pub struct GenerationCacheOptions {
     namespace: Option<String>,
     prefix_cache_enabled: bool,
+    prompt_cache_trace_enabled: bool,
 }
 
 impl GenerationCacheOptions {
@@ -9,6 +10,7 @@ impl GenerationCacheOptions {
         Self {
             namespace,
             prefix_cache_enabled: false,
+            prompt_cache_trace_enabled: false,
         }
     }
 
@@ -23,5 +25,14 @@ impl GenerationCacheOptions {
 
     pub fn prefix_cache_enabled(&self) -> bool {
         self.prefix_cache_enabled
+    }
+
+    pub fn with_prompt_cache_trace_enabled(mut self, enabled: bool) -> Self {
+        self.prompt_cache_trace_enabled = enabled;
+        self
+    }
+
+    pub fn prompt_cache_trace_enabled(&self) -> bool {
+        self.prompt_cache_trace_enabled
     }
 }
