@@ -172,6 +172,20 @@ fn encodes_with_ranked_bpe_merges_from_gguf_metadata() -> Result<(), Box<dyn Err
 }
 
 #[test]
+fn rejects_invalid_bpe_merge_metadata_at_load_time() -> Result<(), Box<dyn Error>> {
+    let bytes = tokenizer_gguf_fixture(&["<unk>", "h", "e", "he"], &[2, 1, 1, 1], &["h e extra"]);
+    let file = parse_gguf(&bytes)?;
+
+    let error = match GgufTokenizer::from_gguf(&file) {
+        Ok(_) => return Err(io::Error::other("invalid merge should fail tokenizer load").into()),
+        Err(error) => error,
+    };
+
+    assert!(error.to_string().contains("invalid BPE merge rule"));
+    Ok(())
+}
+
+#[test]
 fn bpe_tokenization_can_be_cancelled() -> Result<(), Box<dyn Error>> {
     let bytes = bpe_tokenizer_fixture();
     let file = parse_gguf(&bytes)?;

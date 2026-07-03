@@ -9,6 +9,7 @@ pub struct GgufTokenizer {
     tokens: Vec<String>,
     token_types: Vec<TokenType>,
     merges: Vec<String>,
+    bpe_metadata: Option<bpe::BpeMetadata>,
     eos_token_id: Option<usize>,
 }
 
@@ -33,11 +34,19 @@ impl GgufTokenizer {
             None => vec![TokenType::Normal; tokens.len()],
         };
 
+        let merges = metadata_optional_string_array(file, "tokenizer.ggml.merges")?;
+        let bpe_metadata = if merges.is_empty() {
+            None
+        } else {
+            Some(bpe::BpeMetadata::new(&tokens, &merges)?)
+        };
+
         Ok(Self {
             model,
             tokens,
             token_types,
-            merges: metadata_optional_string_array(file, "tokenizer.ggml.merges")?,
+            merges,
+            bpe_metadata,
             eos_token_id: metadata_optional_usize(file, "tokenizer.ggml.eos_token_id")?,
         })
     }
@@ -145,7 +154,10 @@ impl GgufTokenizer {
         input: &str,
         on_cancellation_poll: impl FnMut() -> TokenizationControl,
     ) -> Result<Vec<usize>, TokenizerError> {
-        bpe::encode_with_cancellation(input, &self.tokens, &self.merges, on_cancellation_poll)
+        let Some(metadata) = &self.bpe_metadata else {
+            return Err(TokenizerError::new("BPE tokenizer has no merge metadata"));
+        };
+        bpe::encode_with_cancellation(input, metadata, on_cancellation_poll)
     }
 
     fn longest_token_prefix(&self, input: &str) -> Option<(usize, &str)> {
