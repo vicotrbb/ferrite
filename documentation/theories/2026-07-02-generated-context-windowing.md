@@ -204,6 +204,29 @@ This strengthens the theory enough to keep testing, but it is still not enough
 to define a default public HTTP request policy. The missing proof is
 conversation continuity under harder prompts and a 1024-token probed run.
 
+## Continuity Anchor Probe
+
+A 256-token x86_64 Qwen2.5-1.5B Q8_0 probe added generated-response continuity
+assertions to the 32-token and 64-token generated-context windows. The benchmark
+note is
+`documentation/benchmarks/2026-07-03-openai-long-chat-x86-qwen-1-5b-q8-continuity-window-256.md`.
+
+The result was intentionally mixed:
+
+| Anchor | Window 32 | Window 64 | Read |
+| --- | --- | --- | --- |
+| `FERRITE-CONTINUITY-7291` | failed at turn 2 | failed at turn 2 | long arbitrary marker was brittle |
+| `7291` | passed 4 turns | passed 4 turns | compact anchor survived |
+
+Both numeric-anchor runs completed error probes, disconnect/reconnect probes,
+RSS sampling, streaming token ID checks, generated follow-up context, usage
+accounting, finish reason checks, and token-limit status.
+
+This changes the theory shape. The next optimization is not just a larger
+generated-context window; it is a better state representation. A focused
+follow-up theory is documented in
+`documentation/theories/2026-07-03-structured-continuity-anchors.md`.
+
 ## Risks
 
 - Windowing can hide long-range context regressions if the proof prompt is too
