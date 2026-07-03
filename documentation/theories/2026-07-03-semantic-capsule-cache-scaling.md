@@ -2,7 +2,7 @@
 
 Date: 2026-07-03 UTC
 
-Status: Positive at 256, 512, and 1024 tokens
+Status: Positive at 256, 512, 1024, and mixed-key 256-token lanes
 
 ## Hypothesis
 
@@ -15,14 +15,14 @@ This is a serving-shape optimization theory, not a general memory theory.
 
 ## Evidence
 
-The same Qwen2.5-1.5B-Instruct Q8_0 semantic capsule was tested at 256 and 512
-completion-token budgets:
+The same Qwen2.5-1.5B-Instruct Q8_0 semantic capsule was tested at 256, 512,
+and 1024 completion-token budgets:
 
 ```text
 risk=thermal_throttling mitigation_code=reduce_batch_size owner=runtime_scheduler
 ```
 
-Both runs required the model response to include `reduce_batch_size`, required
+All three runs required the model response to include `reduce_batch_size`, required
 cached generated follow-up turns, sampled RSS, checked streaming token IDs,
 covered unauthorized reconnect behavior, and covered client
 disconnect/reconnect behavior.
@@ -33,13 +33,29 @@ disconnect/reconnect behavior.
 | 512 | 75.00 | 58.00 | 4082.33 ms | 80 ms | 80 ms | 0 |
 | 1024 | 75.00 | 58.00 | 4088.67 ms | 83 ms | 101 ms | 0 |
 
-Both runs reported:
+All three runs reported:
 
 ```text
 long_chat_summary_cached_generated_follow_up_turns=3
 long_chat_summary_uncached_generated_follow_up_turns=0
 long_chat_summary_all_generated_follow_up_turns_cached=true
 ```
+
+The first mixed-key run then tested two prompt-cache keys in one 256-token gate:
+
+| Lane | Turn 1 | Turn 2 | Turn 3 | Turn 4 | Gate exit |
+| --- | --- | --- | --- | --- | ---: |
+| A | miss | shared_prefix_hit | exact_hit | exact_hit | 0 |
+| B | miss | shared_prefix_hit | exact_hit | exact_hit | 0 |
+
+Lane B turn 1 was a miss despite using the same prompt token hash as lane A turn
+1. That proves the cache key participates in namespace isolation for this
+sequential mixed-key proof.
+
+Benchmark evidence:
+
+- `documentation/benchmarks/2026-07-03-openai-long-chat-x86-qwen-1-5b-q8-mixed-cache-keys-256.md`
+- `documentation/theories/2026-07-03-mixed-cache-key-isolation.md`
 
 ## Read
 
@@ -71,6 +87,7 @@ This theory does not yet prove:
 - multi-client cache eviction behavior;
 - model-family generality;
 - cache correctness under varied follow-up text;
+- concurrent or queued mixed-key clients;
 - a production memory policy for hidden or explicit state capsules;
 - full generated-context identity preservation.
 
@@ -80,8 +97,7 @@ assistant prose with a state capsule.
 
 ## Next Experiment
 
-The next experiment should stop repeating the same fixed single-client lane and
-stress a different risk:
+The next experiment should stress a different risk:
 
 - mixed cache keys under concurrent or queued clients;
 - varied follow-up text that preserves the capsule but changes user wording;
