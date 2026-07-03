@@ -47,6 +47,16 @@ impl PromptEvaluationLocation {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum GenerationStage {
+    PromptTokenized,
+    PrefixCacheKeyBuilt,
+    SessionStarted,
+    PrefixCacheLookupFinished,
+    PrefixCacheRestored,
+    PromptEvaluationStarted,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GenerationFinishReason {
     Stop,
     Length,
@@ -171,20 +181,45 @@ impl InferenceEngine {
         mut on_prompt_cancellation_poll: impl FnMut(PromptEvaluationLocation) -> PromptEvaluationControl,
         mut on_token: impl FnMut(&str, &[usize]) -> Result<GenerationControl, RuntimeError>,
     ) -> Result<GeneratedText, RuntimeError> {
+        self.generate_with_stage_callbacks_and_cache_options(
+            prompt,
+            max_tokens,
+            cache_options,
+            |_| {},
+            &mut on_prompt_token,
+            &mut on_prompt_cancellation_poll,
+            &mut on_token,
+        )
+    }
+
+    pub(crate) fn generate_with_stage_callbacks_and_cache_options(
+        &self,
+        prompt: &str,
+        max_tokens: usize,
+        cache_options: GenerationCacheOptions,
+        mut on_generation_stage: impl FnMut(GenerationStage),
+        mut on_prompt_token: impl FnMut(usize, usize) -> PromptEvaluationControl,
+        mut on_prompt_cancellation_poll: impl FnMut(PromptEvaluationLocation) -> PromptEvaluationControl,
+        mut on_token: impl FnMut(&str, &[usize]) -> Result<GenerationControl, RuntimeError>,
+    ) -> Result<GeneratedText, RuntimeError> {
         let prompt_token_ids = self
             .tokenizer
             .encode(prompt)
             .map_err(|error| RuntimeError::new(format!("failed to tokenize prompt: {error}")))?;
+        on_generation_stage(GenerationStage::PromptTokenized);
         if prompt_token_ids.is_empty() {
             return Err(RuntimeError::new("prompt must contain at least one token"));
         }
         let prefix_cache_key = self.prefix_cache_key_for_tokens(&prompt_token_ids, &cache_options);
+        on_generation_stage(GenerationStage::PrefixCacheKeyBuilt);
 
         let mut session = self.model.start_session();
+        on_generation_stage(GenerationStage::SessionStarted);
         let mut cached_prompt_tokens = 0;
         let mut prompt_cache_trace = None;
         let next = if cache_options.prefix_cache_enabled() {
             let lookup = self.prefix_cache_lookup(&prefix_cache_key)?;
+            on_generation_stage(GenerationStage::PrefixCacheLookupFinished);
             if cache_options.prompt_cache_trace_enabled() {
                 prompt_cache_trace = Some(lookup.to_trace(&prefix_cache_key, true));
             }
@@ -194,6 +229,7 @@ impl InferenceEngine {
                     .map_err(|error| {
                         RuntimeError::new(format!("failed to restore prompt cache: {error}"))
                     })?;
+                on_generation_stage(GenerationStage::PrefixCacheRestored);
                 cached_prompt_tokens = cached.snapshot().cached_token_count();
                 let suffix = &prompt_token_ids[cached_prompt_tokens..];
                 if suffix.is_empty() {
@@ -201,6 +237,7 @@ impl InferenceEngine {
                         RuntimeError::new("prefix cache hit is missing exact next token")
                     })?
                 } else {
+                    on_generation_stage(GenerationStage::PromptEvaluationStarted);
                     let next = session
                         .accept_prompt_with_control_and_location_cancellation(
                             suffix,
@@ -227,6 +264,7 @@ impl InferenceEngine {
                     next
                 }
             } else {
+                on_generation_stage(GenerationStage::PromptEvaluationStarted);
                 let next = session
                     .accept_prompt_with_control_and_location_cancellation(
                         &prompt_token_ids,
@@ -248,6 +286,7 @@ impl InferenceEngine {
                 next
             }
         } else {
+            on_generation_stage(GenerationStage::PromptEvaluationStarted);
             session
                 .accept_prompt_with_control_and_location_cancellation(
                     &prompt_token_ids,
@@ -684,6 +723,37 @@ mod tests {
         assert_eq!(locations[1].prompt_token_index(), 0);
         assert_eq!(locations[1].token_id(), 1);
         assert_eq!(locations[1].layer_index(), Some(0));
+        Ok(())
+    }
+
+    #[test]
+    fn generation_stage_callback_reports_prefill_setup_order(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let model_path = write_fixture_model()?;
+        let engine = InferenceEngine::load(&model_path)?;
+        remove_fixture_model(&model_path)?;
+        let mut stages = Vec::new();
+
+        let generated = engine.generate_with_stage_callbacks_and_cache_options(
+            "hello",
+            1,
+            GenerationCacheOptions::default(),
+            |stage| stages.push(stage),
+            |_, _| PromptEvaluationControl::Continue,
+            |_| PromptEvaluationControl::Continue,
+            |_, _| Ok(GenerationControl::Stop),
+        )?;
+
+        assert_eq!(generated.finish_reason(), GenerationFinishReason::Stop);
+        assert_eq!(
+            stages,
+            vec![
+                GenerationStage::PromptTokenized,
+                GenerationStage::PrefixCacheKeyBuilt,
+                GenerationStage::SessionStarted,
+                GenerationStage::PromptEvaluationStarted,
+            ]
+        );
         Ok(())
     }
 

@@ -215,10 +215,13 @@ where
                 lifecycle.record_generation_started();
             }
             let generated = engine
-                .generate_with_prompt_callbacks_and_cache_options(
+                .generate_with_stage_callbacks_and_cache_options(
                     &input.prompt,
                     input.max_tokens,
                     input.cache_options,
+                    |stage| {
+                        lifecycle.borrow_mut().record_generation_stage(stage);
+                    },
                     |_, _| {
                         lifecycle.borrow_mut().record_prompt_token_started();
                         PromptEvaluationControl::Continue

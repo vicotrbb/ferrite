@@ -1,4 +1,4 @@
-use crate::runtime::PromptEvaluationControl;
+use crate::runtime::{GenerationStage, PromptEvaluationControl};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 
@@ -57,6 +57,12 @@ pub(super) struct StreamLifecycleSummary {
     pub prompt_cancellation_layer_index: Option<usize>,
     pub engine_lock_acquired_elapsed_ms: Option<u128>,
     pub generation_started_elapsed_ms: Option<u128>,
+    pub prompt_tokenized_elapsed_ms: Option<u128>,
+    pub prefix_cache_key_built_elapsed_ms: Option<u128>,
+    pub session_started_elapsed_ms: Option<u128>,
+    pub prefix_cache_lookup_finished_elapsed_ms: Option<u128>,
+    pub prefix_cache_restored_elapsed_ms: Option<u128>,
+    pub prompt_evaluation_started_elapsed_ms: Option<u128>,
     pub first_prompt_token_started_elapsed_ms: Option<u128>,
     pub first_prompt_cancellation_poll_elapsed_ms: Option<u128>,
 }
@@ -67,6 +73,12 @@ pub(super) struct StreamLifecycle {
     started: Instant,
     engine_lock_acquired_at: Option<Instant>,
     generation_started_at: Option<Instant>,
+    prompt_tokenized_at: Option<Instant>,
+    prefix_cache_key_built_at: Option<Instant>,
+    session_started_at: Option<Instant>,
+    prefix_cache_lookup_finished_at: Option<Instant>,
+    prefix_cache_restored_at: Option<Instant>,
+    prompt_evaluation_started_at: Option<Instant>,
     first_prompt_token_started_at: Option<Instant>,
     first_prompt_cancellation_poll_at: Option<Instant>,
     prompt_tokens_started: usize,
@@ -88,6 +100,12 @@ impl StreamLifecycle {
             started: Instant::now(),
             engine_lock_acquired_at: None,
             generation_started_at: None,
+            prompt_tokenized_at: None,
+            prefix_cache_key_built_at: None,
+            session_started_at: None,
+            prefix_cache_lookup_finished_at: None,
+            prefix_cache_restored_at: None,
+            prompt_evaluation_started_at: None,
             first_prompt_token_started_at: None,
             first_prompt_cancellation_poll_at: None,
             prompt_tokens_started: 0,
@@ -109,6 +127,33 @@ impl StreamLifecycle {
 
     pub(super) fn record_generation_started(&mut self) {
         self.generation_started_at.get_or_insert_with(Instant::now);
+    }
+
+    pub(super) fn record_generation_stage(&mut self, stage: GenerationStage) {
+        match stage {
+            GenerationStage::PromptTokenized => {
+                self.prompt_tokenized_at.get_or_insert_with(Instant::now);
+            }
+            GenerationStage::PrefixCacheKeyBuilt => {
+                self.prefix_cache_key_built_at
+                    .get_or_insert_with(Instant::now);
+            }
+            GenerationStage::SessionStarted => {
+                self.session_started_at.get_or_insert_with(Instant::now);
+            }
+            GenerationStage::PrefixCacheLookupFinished => {
+                self.prefix_cache_lookup_finished_at
+                    .get_or_insert_with(Instant::now);
+            }
+            GenerationStage::PrefixCacheRestored => {
+                self.prefix_cache_restored_at
+                    .get_or_insert_with(Instant::now);
+            }
+            GenerationStage::PromptEvaluationStarted => {
+                self.prompt_evaluation_started_at
+                    .get_or_insert_with(Instant::now);
+            }
+        }
     }
 
     pub(super) fn record_prompt_token_started(&mut self) {
@@ -173,6 +218,24 @@ impl StreamLifecycle {
         let generation_started_elapsed_ms = self
             .generation_started_at
             .map(|instant| instant.duration_since(self.started).as_millis());
+        let prompt_tokenized_elapsed_ms = self
+            .prompt_tokenized_at
+            .map(|instant| instant.duration_since(self.started).as_millis());
+        let prefix_cache_key_built_elapsed_ms = self
+            .prefix_cache_key_built_at
+            .map(|instant| instant.duration_since(self.started).as_millis());
+        let session_started_elapsed_ms = self
+            .session_started_at
+            .map(|instant| instant.duration_since(self.started).as_millis());
+        let prefix_cache_lookup_finished_elapsed_ms = self
+            .prefix_cache_lookup_finished_at
+            .map(|instant| instant.duration_since(self.started).as_millis());
+        let prefix_cache_restored_elapsed_ms = self
+            .prefix_cache_restored_at
+            .map(|instant| instant.duration_since(self.started).as_millis());
+        let prompt_evaluation_started_elapsed_ms = self
+            .prompt_evaluation_started_at
+            .map(|instant| instant.duration_since(self.started).as_millis());
         let first_prompt_token_started_elapsed_ms = self
             .first_prompt_token_started_at
             .map(|instant| instant.duration_since(self.started).as_millis());
@@ -195,6 +258,12 @@ impl StreamLifecycle {
             prompt_cancellation_layer_index: self.prompt_cancellation_layer_index,
             engine_lock_acquired_elapsed_ms,
             generation_started_elapsed_ms,
+            prompt_tokenized_elapsed_ms,
+            prefix_cache_key_built_elapsed_ms,
+            session_started_elapsed_ms,
+            prefix_cache_lookup_finished_elapsed_ms,
+            prefix_cache_restored_elapsed_ms,
+            prompt_evaluation_started_elapsed_ms,
             first_prompt_token_started_elapsed_ms,
             first_prompt_cancellation_poll_elapsed_ms,
         }
@@ -226,12 +295,22 @@ impl StreamLifecycleSummary {
         let engine_lock_acquired_elapsed_ms =
             format_optional_ms(self.engine_lock_acquired_elapsed_ms);
         let generation_started_elapsed_ms = format_optional_ms(self.generation_started_elapsed_ms);
+        let prompt_tokenized_elapsed_ms = format_optional_ms(self.prompt_tokenized_elapsed_ms);
+        let prefix_cache_key_built_elapsed_ms =
+            format_optional_ms(self.prefix_cache_key_built_elapsed_ms);
+        let session_started_elapsed_ms = format_optional_ms(self.session_started_elapsed_ms);
+        let prefix_cache_lookup_finished_elapsed_ms =
+            format_optional_ms(self.prefix_cache_lookup_finished_elapsed_ms);
+        let prefix_cache_restored_elapsed_ms =
+            format_optional_ms(self.prefix_cache_restored_elapsed_ms);
+        let prompt_evaluation_started_elapsed_ms =
+            format_optional_ms(self.prompt_evaluation_started_elapsed_ms);
         let first_prompt_token_started_elapsed_ms =
             format_optional_ms(self.first_prompt_token_started_elapsed_ms);
         let first_prompt_cancellation_poll_elapsed_ms =
             format_optional_ms(self.first_prompt_cancellation_poll_elapsed_ms);
         format!(
-            "openai_stream_lifecycle request_id={} finish_reason={} disconnect_point={} prompt_tokens_started={} prompt_cancellation_polls={} prompt_cancellation_closed_polls={} generated_chunks={} generated_token_ids={} elapsed_ms={} disconnect_observed_elapsed_ms={} disconnect_to_finish_ms={} prompt_cancellation_token_index={} prompt_cancellation_layer_index={} engine_lock_acquired_elapsed_ms={} generation_started_elapsed_ms={} first_prompt_token_started_elapsed_ms={} first_prompt_cancellation_poll_elapsed_ms={}",
+            "openai_stream_lifecycle request_id={} finish_reason={} disconnect_point={} prompt_tokens_started={} prompt_cancellation_polls={} prompt_cancellation_closed_polls={} generated_chunks={} generated_token_ids={} elapsed_ms={} disconnect_observed_elapsed_ms={} disconnect_to_finish_ms={} prompt_cancellation_token_index={} prompt_cancellation_layer_index={} engine_lock_acquired_elapsed_ms={} generation_started_elapsed_ms={} prompt_tokenized_elapsed_ms={} prefix_cache_key_built_elapsed_ms={} session_started_elapsed_ms={} prefix_cache_lookup_finished_elapsed_ms={} prefix_cache_restored_elapsed_ms={} prompt_evaluation_started_elapsed_ms={} first_prompt_token_started_elapsed_ms={} first_prompt_cancellation_poll_elapsed_ms={}",
             self.request_id,
             self.finish_reason.as_str(),
             disconnect_point,
@@ -247,6 +326,12 @@ impl StreamLifecycleSummary {
             prompt_cancellation_layer_index,
             engine_lock_acquired_elapsed_ms,
             generation_started_elapsed_ms,
+            prompt_tokenized_elapsed_ms,
+            prefix_cache_key_built_elapsed_ms,
+            session_started_elapsed_ms,
+            prefix_cache_lookup_finished_elapsed_ms,
+            prefix_cache_restored_elapsed_ms,
+            prompt_evaluation_started_elapsed_ms,
             first_prompt_token_started_elapsed_ms,
             first_prompt_cancellation_poll_elapsed_ms
         )
@@ -269,6 +354,10 @@ mod tests {
 
         lifecycle.record_engine_lock_acquired();
         lifecycle.record_generation_started();
+        lifecycle.record_generation_stage(GenerationStage::PromptTokenized);
+        lifecycle.record_generation_stage(GenerationStage::PrefixCacheKeyBuilt);
+        lifecycle.record_generation_stage(GenerationStage::SessionStarted);
+        lifecycle.record_generation_stage(GenerationStage::PromptEvaluationStarted);
         lifecycle.record_prompt_token_started();
         lifecycle.record_prompt_cancellation_poll();
         lifecycle.record_prompt_cancellation_poll();
@@ -296,6 +385,10 @@ mod tests {
         assert_eq!(summary.prompt_cancellation_closed_polls, 1);
         assert!(summary.engine_lock_acquired_elapsed_ms.is_some());
         assert!(summary.generation_started_elapsed_ms.is_some());
+        assert!(summary.prompt_tokenized_elapsed_ms.is_some());
+        assert!(summary.prefix_cache_key_built_elapsed_ms.is_some());
+        assert!(summary.session_started_elapsed_ms.is_some());
+        assert!(summary.prompt_evaluation_started_elapsed_ms.is_some());
         assert!(summary.first_prompt_token_started_elapsed_ms.is_some());
         assert!(summary.first_prompt_cancellation_poll_elapsed_ms.is_some());
         assert!(summary.disconnect_observed_elapsed_ms.is_some());
@@ -333,5 +426,13 @@ mod tests {
         assert!(summary
             .log_line()
             .contains("first_prompt_cancellation_poll_elapsed_ms="));
+        assert!(summary.log_line().contains("prompt_tokenized_elapsed_ms="));
+        assert!(summary
+            .log_line()
+            .contains("prefix_cache_key_built_elapsed_ms="));
+        assert!(summary.log_line().contains("session_started_elapsed_ms="));
+        assert!(summary
+            .log_line()
+            .contains("prompt_evaluation_started_elapsed_ms="));
     }
 }
