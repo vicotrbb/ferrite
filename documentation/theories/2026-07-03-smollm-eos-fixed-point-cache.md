@@ -80,6 +80,31 @@ Boundary: this rerun did not request prompt-cache trace fields, so it proves
 cached-token counts and finish source but does not add new `prompt_cache_lookup`
 evidence beyond the earlier trace-bearing lifecycle runs.
 
+## Trace-Bearing Finish-Source Observation
+
+A follow-up current-tree run removed that boundary by enabling
+`--prompt-cache-trace` while still requiring `finish_source=eos`:
+
+`documentation/benchmarks/2026-07-03-local-smollm-1-7b-eos-finish-source-trace-16.md`
+
+| Turn | Cached / Prompt | Lookup | Finish source | TTFT ms |
+| ---: | ---: | --- | --- | ---: |
+| 1 | 0 / 48 | `miss` | `eos` | 7961 |
+| 2 | 22 / 46 | `shared_prefix_hit` | `eos` | 4014 |
+| 3 | 46 / 46 | `exact_hit` | `eos` | 6 |
+| 4 | 46 / 46 | `exact_hit` | `eos` | 10 |
+
+The generated-response hash stabilized as `fnv64:af63c74c8601c8dd` from turn
+1 onward. The prompt hash changed from the seed prompt
+`fnv64:29bca34202dc5f0a` to the generated-context prompt
+`fnv64:67c5f682ed91f353` on turn 2, then stayed fixed for turns 3 and 4. The
+selected cache entry hash matched that generated-context prompt hash on turns
+3 and 4.
+
+This is stronger evidence for the theory: stable generated content plus a
+stable prompt renderer produced exact prompt-cache hits and millisecond TTFT,
+while the terminal condition remained observable as tokenizer EOS.
+
 ## Expected Measurement
 
 This theory is strengthened when a natural-EOS lane shows:
