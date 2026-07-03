@@ -281,6 +281,33 @@ client cancellation may not immediately stop in-flight server generation. That
 needs a focused cancellation/reconnect experiment with server-side CPU, RSS,
 and request-lifetime evidence.
 
+## Third x86_64 Paired Observation
+
+A bounded x86_64 1024-token paired run now exists:
+
+- Ferrite gate note:
+  `documentation/benchmarks/2026-07-03-latency-cache-x86-paired-qwen-0-5b-1024.md`
+- `llama-benchy` JSON:
+  `documentation/benchmarks/2026-07-03-llama-benchy-x86-qwen-0-5b-paired-cache-1024.json`
+
+The Ferrite gate reproduced the fixed-point cache mechanism on the bounded
+amd64 `staging` pod. Turns 2 and 3 were shallow shared-prefix hits:
+`12 / 1054` and `16 / 1054` cached prompt tokens, both with TTFT near
+369 seconds. Turn 3 generated the same response identity as its assistant
+context, and turn 4 became an exact prompt hit with `1054 / 1054` cached prompt
+tokens and TTFT `295` ms.
+
+The accepted in-pod `llama-benchy` run completed the system-context-prefix
+shape at depth 1024, prompt 1024, and generation 1024. It reported e2e TTFT of
+`359177.165560` ms for context load and `420147.330409` ms for inference with
+`--latency-mode none`.
+
+This completes the x86_64 Qwen 0.5B paired 256/512/1024 ladder. It strengthens
+the companion protocol because the external benchmark trend and Ferrite's
+internal cache trace now both exist for all three diagonal x86 lengths, while
+still preserving the boundary that only Ferrite's gate proves generated-context
+identity, cached-token metadata, reconnect/error behavior, and RSS invariants.
+
 ## Lifecycle Companion Observation
 
 A lifecycle-instrumented local companion run now exists:
