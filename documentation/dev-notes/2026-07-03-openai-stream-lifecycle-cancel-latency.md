@@ -189,3 +189,10 @@ For a same-size generated local prompt sample, GGUF parse was about `13.45 ms`,
 tokenizer load was about `86.46 ms`, and average prompt encode was about
 `6792.61 ms`. This makes the next optimization target more precise: improve
 BPE encode behavior before spending more effort on metadata setup.
+
+The tokenizer-only benchmark then gained a compact token-id fingerprint, with
+the proof recorded in
+`documentation/benchmarks/2026-07-03-local-qwen-0-5b-tokenizer-cli-fingerprint.md`.
+For the same prompt generator, the parity target is now
+`tokenization_benchmark_token_count=29527` and
+`tokenization_benchmark_token_ids_fingerprint=fnv1a64:468c718e7fb1e5a0`.
