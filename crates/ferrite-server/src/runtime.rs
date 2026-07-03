@@ -130,6 +130,43 @@ impl InferenceEngine {
         mut on_prompt_token: impl FnMut(usize, usize) -> PromptEvaluationControl,
         mut on_token: impl FnMut(&str, &[usize]) -> Result<GenerationControl, RuntimeError>,
     ) -> Result<GeneratedText, RuntimeError> {
+        self.generate_with_prompt_callbacks_and_cache_options(
+            prompt,
+            max_tokens,
+            cache_options,
+            &mut on_prompt_token,
+            || PromptEvaluationControl::Continue,
+            &mut on_token,
+        )
+    }
+
+    pub(crate) fn generate_with_prompt_cancellation_callback_and_cache_options(
+        &self,
+        prompt: &str,
+        max_tokens: usize,
+        cache_options: GenerationCacheOptions,
+        mut on_prompt_cancellation_poll: impl FnMut() -> PromptEvaluationControl,
+        mut on_token: impl FnMut(&str, &[usize]) -> Result<GenerationControl, RuntimeError>,
+    ) -> Result<GeneratedText, RuntimeError> {
+        self.generate_with_prompt_callbacks_and_cache_options(
+            prompt,
+            max_tokens,
+            cache_options,
+            |_, _| PromptEvaluationControl::Continue,
+            &mut on_prompt_cancellation_poll,
+            &mut on_token,
+        )
+    }
+
+    fn generate_with_prompt_callbacks_and_cache_options(
+        &self,
+        prompt: &str,
+        max_tokens: usize,
+        cache_options: GenerationCacheOptions,
+        mut on_prompt_token: impl FnMut(usize, usize) -> PromptEvaluationControl,
+        mut on_prompt_cancellation_poll: impl FnMut() -> PromptEvaluationControl,
+        mut on_token: impl FnMut(&str, &[usize]) -> Result<GenerationControl, RuntimeError>,
+    ) -> Result<GeneratedText, RuntimeError> {
         let prompt_token_ids = self
             .tokenizer
             .encode(prompt)
@@ -161,12 +198,16 @@ impl InferenceEngine {
                     })?
                 } else {
                     let next = session
-                        .accept_prompt_with_control(suffix, |index, token_id| {
-                            Ok(map_prompt_control(on_prompt_token(
-                                cached_prompt_tokens + index,
-                                token_id,
-                            )))
-                        })
+                        .accept_prompt_with_control_and_cancellation(
+                            suffix,
+                            |index, token_id| {
+                                Ok(map_prompt_control(on_prompt_token(
+                                    cached_prompt_tokens + index,
+                                    token_id,
+                                )))
+                            },
+                            || Ok(map_prompt_control(on_prompt_cancellation_poll())),
+                        )
                         .map_err(|error| {
                             RuntimeError::new(format!("failed to evaluate prompt suffix: {error}"))
                         })?;
@@ -179,9 +220,11 @@ impl InferenceEngine {
                 }
             } else {
                 let next = session
-                    .accept_prompt_with_control(&prompt_token_ids, |index, token_id| {
-                        Ok(map_prompt_control(on_prompt_token(index, token_id)))
-                    })
+                    .accept_prompt_with_control_and_cancellation(
+                        &prompt_token_ids,
+                        |index, token_id| Ok(map_prompt_control(on_prompt_token(index, token_id))),
+                        || Ok(map_prompt_control(on_prompt_cancellation_poll())),
+                    )
                     .map_err(|error| {
                         RuntimeError::new(format!("failed to evaluate prompt: {error}"))
                     })?;
@@ -194,9 +237,11 @@ impl InferenceEngine {
             }
         } else {
             session
-                .accept_prompt_with_control(&prompt_token_ids, |index, token_id| {
-                    Ok(map_prompt_control(on_prompt_token(index, token_id)))
-                })
+                .accept_prompt_with_control_and_cancellation(
+                    &prompt_token_ids,
+                    |index, token_id| Ok(map_prompt_control(on_prompt_token(index, token_id))),
+                    || Ok(map_prompt_control(on_prompt_cancellation_poll())),
+                )
                 .map_err(|error| RuntimeError::new(format!("failed to evaluate prompt: {error}")))?
         };
         if cache_options.prompt_cache_trace_enabled() && !cache_options.prefix_cache_enabled() {
@@ -537,6 +582,40 @@ mod tests {
             "failed to evaluate prompt: prompt evaluation cancelled"
         );
         assert_eq!(observed_tokens, [(0, 1), (1, 2)]);
+        Ok(())
+    }
+
+    #[test]
+    fn generate_with_prompt_cancellation_poll_stops_during_prompt_token_evaluation(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let model_path = write_fixture_model()?;
+        let engine = InferenceEngine::load(&model_path)?;
+        remove_fixture_model(&model_path)?;
+        let mut polls = 0;
+
+        let error = match engine.generate_with_prompt_cancellation_callback_and_cache_options(
+            "hello",
+            1,
+            GenerationCacheOptions::default(),
+            || {
+                polls += 1;
+                if polls == 2 {
+                    PromptEvaluationControl::Cancel
+                } else {
+                    PromptEvaluationControl::Continue
+                }
+            },
+            |_, _| Ok(GenerationControl::Continue),
+        ) {
+            Ok(_) => return Err("generation should stop during prompt token evaluation".into()),
+            Err(error) => error,
+        };
+
+        assert_eq!(
+            error.to_string(),
+            "failed to evaluate prompt: prompt evaluation cancelled"
+        );
+        assert_eq!(polls, 2);
         Ok(())
     }
 

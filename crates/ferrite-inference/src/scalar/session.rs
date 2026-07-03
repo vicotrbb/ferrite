@@ -29,13 +29,40 @@ pub enum PromptEvaluationControl {
 
 impl<'a> ScalarLlamaSession<'a> {
     pub fn accept_prompt(&mut self, tokens: &[usize]) -> Result<NextToken, InferenceError> {
-        self.accept_prompt_with_control(tokens, |_, _| Ok(PromptEvaluationControl::Continue))
+        self.accept_prompt_with_control_and_cancellation(
+            tokens,
+            |_, _| Ok(PromptEvaluationControl::Continue),
+            || Ok(PromptEvaluationControl::Continue),
+        )
     }
 
     pub fn accept_prompt_with_control(
         &mut self,
         tokens: &[usize],
         mut on_prompt_token: impl FnMut(usize, usize) -> Result<PromptEvaluationControl, InferenceError>,
+    ) -> Result<NextToken, InferenceError> {
+        self.accept_prompt_with_control_and_cancellation(tokens, &mut on_prompt_token, || {
+            Ok(PromptEvaluationControl::Continue)
+        })
+    }
+
+    pub fn accept_prompt_with_cancellation(
+        &mut self,
+        tokens: &[usize],
+        mut on_cancellation_poll: impl FnMut() -> Result<PromptEvaluationControl, InferenceError>,
+    ) -> Result<NextToken, InferenceError> {
+        self.accept_prompt_with_control_and_cancellation(
+            tokens,
+            |_, _| Ok(PromptEvaluationControl::Continue),
+            &mut on_cancellation_poll,
+        )
+    }
+
+    pub fn accept_prompt_with_control_and_cancellation(
+        &mut self,
+        tokens: &[usize],
+        mut on_prompt_token: impl FnMut(usize, usize) -> Result<PromptEvaluationControl, InferenceError>,
+        mut on_cancellation_poll: impl FnMut() -> Result<PromptEvaluationControl, InferenceError>,
     ) -> Result<NextToken, InferenceError> {
         if tokens.is_empty() {
             return Err(InferenceError::new(
@@ -48,25 +75,6 @@ impl<'a> ScalarLlamaSession<'a> {
             if on_prompt_token(index, token_id)? == PromptEvaluationControl::Cancel {
                 return Err(InferenceError::new("prompt evaluation cancelled"));
             }
-            next = Some(self.accept_token(token_id)?);
-        }
-
-        next.ok_or_else(|| InferenceError::new("prompt must contain at least one token"))
-    }
-
-    pub fn accept_prompt_with_cancellation(
-        &mut self,
-        tokens: &[usize],
-        mut on_cancellation_poll: impl FnMut() -> Result<PromptEvaluationControl, InferenceError>,
-    ) -> Result<NextToken, InferenceError> {
-        if tokens.is_empty() {
-            return Err(InferenceError::new(
-                "prompt must contain at least one token",
-            ));
-        }
-
-        let mut next = None;
-        for token_id in tokens.iter().copied() {
             if on_cancellation_poll()? == PromptEvaluationControl::Cancel {
                 return Err(InferenceError::new("prompt evaluation cancelled"));
             }

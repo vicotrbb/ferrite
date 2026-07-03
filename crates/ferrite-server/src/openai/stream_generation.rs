@@ -199,11 +199,11 @@ where
                 .lock()
                 .map_err(|_| OpenAiHttpError::internal("inference engine lock is poisoned"))?;
             let generated = engine
-                .generate_with_prompt_callback_and_cache_options(
+                .generate_with_prompt_cancellation_callback_and_cache_options(
                     &input.prompt,
                     input.max_tokens,
                     input.cache_options,
-                    |_, _| prompt_control_from_stream_state(&sender),
+                    || prompt_control_from_stream_state(&sender),
                     |piece, token_ids| {
                         if include_token_ids {
                             sender
