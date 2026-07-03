@@ -58,12 +58,35 @@ long_chat_summary_all_generated_follow_up_turns_cached=true
 long_chat_summary_run_complete=true
 ```
 
+## Finish-Source Observation
+
+A current-tree rerun now proves that the stable short-answer lane is actually
+terminating through tokenizer EOS, not an explicit stop sequence:
+
+`documentation/benchmarks/2026-07-03-local-smollm-1-7b-eos-finish-source-16.md`
+
+| Turn | Cached / Prompt | Finish source | TTFT ms | Context identity |
+| ---: | ---: | --- | ---: | --- |
+| 1 | 0 / 48 | `eos` | 7879 | seed context |
+| 2 | 22 / 46 | `eos` | 3999 | generated context matched turn 1 response |
+| 3 | 46 / 46 | `eos` | 8 | generated context matched turn 2 response |
+| 4 | 46 / 46 | `eos` | 11 | generated context matched turn 3 response |
+
+This strengthens the theory because the exact cached-token ratio appears only
+after the generated assistant response stabilizes, and the terminal condition
+is now explicitly observable as `eos`.
+
+Boundary: this rerun did not request prompt-cache trace fields, so it proves
+cached-token counts and finish source but does not add new `prompt_cache_lookup`
+evidence beyond the earlier trace-bearing lifecycle runs.
+
 ## Expected Measurement
 
 This theory is strengthened when a natural-EOS lane shows:
 
 - repeated generated-response identity across turns;
 - next-turn assistant-context identity matching the previous response;
+- `long_chat_result_finish_source=eos`;
 - `cached_prompt_tokens == prompt_tokens`;
 - `prompt_cache_lookup=exact_hit`;
 - TTFT near tens of milliseconds even when cache misses take seconds or
@@ -95,4 +118,5 @@ Add a small EOS prompt set with two lanes:
 
 The acceptance criterion is not lower latency alone. The proof must explain
 latency through generated-response identity, prompt token hash identity, cached
-prompt tokens, and lifecycle completion.
+prompt tokens, `finish_source=eos`, prompt-cache trace fields, and lifecycle
+completion.
