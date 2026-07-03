@@ -76,6 +76,8 @@ fn parses_custom_long_chat_token_lengths_turns_and_models() -> Result<(), Box<dy
         OsString::from("stop"),
         OsString::from("--probe-max-tokens"),
         OsString::from("256"),
+        OsString::from("--generated-context-state-capsule"),
+        OsString::from(r#"{"state_anchor":"7291"}"#),
         OsString::from("--require-generated-response-contains"),
         OsString::from("continuity-marker"),
         OsString::from("--disconnect-reconnect-timeout-ms"),
@@ -100,6 +102,10 @@ fn parses_custom_long_chat_token_lengths_turns_and_models() -> Result<(), Box<dy
     assert!(config.require_cached_follow_ups());
     assert_eq!(config.expected_finish_reason(), Some("stop"));
     assert_eq!(config.probe_max_tokens(), Some(256));
+    assert_eq!(
+        config.generated_context_state_capsule(),
+        Some(r#"{"state_anchor":"7291"}"#)
+    );
     assert_eq!(
         config.required_generated_response_substrings(),
         &["continuity-marker"]
@@ -355,6 +361,27 @@ fn formats_long_chat_gate_plan_with_generated_response_requirements(
     assert_eq!(
         format_plan(&config),
         "long_chat_models=fixture-model\nlong_chat_token_lengths=256\nlong_chat_turns=4\nlong_chat_required_generated_response_substrings=continuity-marker,anchor-token\nlong_chat_addr=127.0.0.1:8080\nlong_chat_planned_scenarios=4"
+    );
+    Ok(())
+}
+
+#[test]
+fn formats_long_chat_gate_plan_with_state_capsule() -> Result<(), Box<dyn std::error::Error>> {
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--models"),
+        OsString::from("fixture-model"),
+        OsString::from("--token-lengths"),
+        OsString::from("256"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+        OsString::from("--generated-context-state-capsule"),
+        OsString::from(r#"{"state_anchor":"7291"}"#),
+    ])?;
+
+    assert_eq!(
+        format_plan(&config),
+        "long_chat_models=fixture-model\nlong_chat_token_lengths=256\nlong_chat_turns=4\nlong_chat_generated_context_state_capsule_configured=true\nlong_chat_addr=127.0.0.1:8080\nlong_chat_planned_scenarios=4"
     );
     Ok(())
 }
@@ -1284,6 +1311,68 @@ fn can_window_generated_assistant_context_by_streaming_chunks(
         ]
     );
     assert!(format_plan(&config).contains("long_chat_generated_context_max_tokens=2"));
+    Ok(())
+}
+
+#[test]
+fn can_add_state_capsule_to_generated_follow_up_contexts_only(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--models"),
+        OsString::from("fixture-model"),
+        OsString::from("--token-lengths"),
+        OsString::from("256"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+        OsString::from("--assistant-context"),
+        OsString::from("seed answer"),
+        OsString::from("--generated-context-state-capsule"),
+        OsString::from(r#"{"state_anchor":"7291"}"#),
+    ])?;
+    let mut observed_contexts = Vec::new();
+    let generated = ["alpha", "beta", "gamma", "delta"];
+    let mut calls = 0usize;
+
+    let results = config.run_with_executor(|throughput| {
+        observed_contexts.push(throughput.assistant_context().map(str::to_owned));
+        let text = generated[calls].to_owned();
+        calls += 1;
+        Ok(ThroughputResult {
+            completed_requests: throughput.requests(),
+            elapsed: Duration::from_millis(10),
+            streaming_finish: Some(StreamingFinishSummary::new("length")),
+            streaming_timing: None,
+            streaming_text: Some(StreamingTextSummary::new(text)),
+            streaming_token_ids: None,
+            streaming_usage: Some(StreamingUsageSummary::new(
+                8,
+                throughput.max_tokens() as u64,
+                throughput.max_tokens() as u64 + 8,
+            )),
+            rss: None,
+        })
+    })?;
+
+    assert_eq!(results.len(), 4);
+    assert_eq!(
+        observed_contexts,
+        [
+            Some("seed answer".to_owned()),
+            Some(
+                "Ferrite state capsule:\n{\"state_anchor\":\"7291\"}\n\nGenerated assistant context:\nalpha"
+                    .to_owned()
+            ),
+            Some(
+                "Ferrite state capsule:\n{\"state_anchor\":\"7291\"}\n\nGenerated assistant context:\nbeta"
+                    .to_owned()
+            ),
+            Some(
+                "Ferrite state capsule:\n{\"state_anchor\":\"7291\"}\n\nGenerated assistant context:\ngamma"
+                    .to_owned()
+            ),
+        ]
+    );
     Ok(())
 }
 

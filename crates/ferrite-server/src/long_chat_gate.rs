@@ -5,6 +5,7 @@ mod report;
 mod result;
 mod runner;
 mod scenario;
+mod state_capsule;
 mod summary;
 mod throughput;
 

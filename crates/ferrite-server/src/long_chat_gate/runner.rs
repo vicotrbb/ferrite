@@ -1,4 +1,7 @@
-use super::{LongChatAssistantContextSource, LongChatGateConfig, LongChatScenarioResult};
+use super::{
+    state_capsule::format_state_capsule_context, LongChatAssistantContextSource,
+    LongChatGateConfig, LongChatScenarioResult,
+};
 use crate::throughput_client::{
     run_completion_benchmark, ThroughputClientConfig, ThroughputResult,
 };
@@ -18,6 +21,7 @@ impl LongChatGateConfig {
             self.assistant_context(),
             self.generated_context_max_chars(),
             self.generated_context_max_tokens(),
+            self.generated_context_state_capsule(),
         );
         let mut results = Vec::with_capacity(scenarios.len());
 
@@ -64,6 +68,7 @@ impl LongChatGateConfig {
             self.assistant_context(),
             self.generated_context_max_chars(),
             self.generated_context_max_tokens(),
+            self.generated_context_state_capsule(),
         );
         let mut results = Vec::with_capacity(scenarios.len());
 
@@ -143,6 +148,7 @@ struct LongChatAssistantContexts {
     seed: String,
     generated_context_max_chars: Option<usize>,
     generated_context_max_tokens: Option<usize>,
+    generated_context_state_capsule: Option<String>,
     generated_by_scenario: HashMap<(String, usize), String>,
 }
 
@@ -156,11 +162,13 @@ impl LongChatAssistantContexts {
         seed: &str,
         generated_context_max_chars: Option<usize>,
         generated_context_max_tokens: Option<usize>,
+        generated_context_state_capsule: Option<&str>,
     ) -> Self {
         Self {
             seed: seed.to_owned(),
             generated_context_max_chars,
             generated_context_max_tokens,
+            generated_context_state_capsule: generated_context_state_capsule.map(str::to_owned),
             generated_by_scenario: HashMap::new(),
         }
     }
@@ -170,8 +178,13 @@ impl LongChatAssistantContexts {
             .generated_by_scenario
             .get(&(scenario.model().to_owned(), scenario.token_length()))
         {
+            let text = if let Some(capsule) = &self.generated_context_state_capsule {
+                format_state_capsule_context(capsule, text)
+            } else {
+                text.clone()
+            };
             return LongChatAssistantContext {
-                text: text.clone(),
+                text,
                 source: LongChatAssistantContextSource::Generated,
             };
         }

@@ -20,6 +20,11 @@ pub fn format_plan(config: &LongChatGateConfig) -> String {
         .generated_context_max_tokens()
         .map(|tokens| format!("\nlong_chat_generated_context_max_tokens={tokens}"))
         .unwrap_or_default();
+    let generated_context_state_capsule = if config.generated_context_state_capsule().is_some() {
+        "\nlong_chat_generated_context_state_capsule_configured=true"
+    } else {
+        ""
+    };
     let required_generated_response_substrings =
         if config.required_generated_response_substrings().is_empty() {
             String::new()
@@ -76,11 +81,12 @@ pub fn format_plan(config: &LongChatGateConfig) -> String {
         String::new()
     };
     format!(
-        "long_chat_models={models}\nlong_chat_token_lengths={token_lengths}\nlong_chat_turns={}{}{}{}{}{}{}{}{}{}{}{}{}{}{}\nlong_chat_planned_scenarios={}",
+        "long_chat_models={models}\nlong_chat_token_lengths={token_lengths}\nlong_chat_turns={}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}\nlong_chat_planned_scenarios={}",
         config.turns(),
         prompt_cache_key,
         generated_context_max_chars,
         generated_context_max_tokens,
+        generated_context_state_capsule,
         required_generated_response_substrings,
         addr,
         execute,
