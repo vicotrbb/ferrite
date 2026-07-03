@@ -74,6 +74,15 @@ test result: ok. 66 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 This is harness correctness for generated-context identity. It does not change
 the request payload, model behavior, cache policy, or OpenAI server runtime.
 
-The next real-model proof should rerun the queue gate with an assistant-context
-state capsule and confirm `long_chat_summary_run_complete=true` on the rebuilt
-binary.
+## Real-Model Follow-Up
+
+The rebuilt binary was also exercised against local Qwen2.5-0.5B Q4_K_M:
+
+- `documentation/benchmarks/2026-07-03-local-qwen-0-5b-capsule-queue-proof-256.md`
+- `long_chat_summary_generated_context_identity_links=6`
+- `long_chat_summary_matching_generated_context_identity_links=6`
+- `long_chat_summary_queue_probe_completed=true`
+- `long_chat_summary_run_complete=true`
+
+The remaining gap is staging x86_64 Qwen2.5-1.5B Q8_0 proof when the
+Kubernetes API is reachable.
