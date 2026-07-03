@@ -100,6 +100,14 @@ The local 512-token capsule queue proof also passed:
 - `long_chat_summary_queue_probe_completed=true`
 - `long_chat_summary_run_complete=true`
 
-The remaining gaps are x86_64 512-token proof, 1024-token capsule queue proof,
-and a cold-key queue variant if queued behavior must also prove namespace
-isolation.
+The local 1024-token capsule queue proof also passed when the retained
+generated-context window was raised to 1024 tokens:
+
+- `documentation/benchmarks/2026-07-03-local-qwen-0-5b-capsule-queue-proof-1024.md`
+- `long_chat_summary_generated_context_identity_links=6`
+- `long_chat_summary_matching_generated_context_identity_links=6`
+- `long_chat_summary_queue_probe_completed=true`
+- `long_chat_summary_run_complete=true`
+
+The remaining gaps are x86_64 512-token and 1024-token capsule queue proof, and
+a cold-key queue variant if queued behavior must also prove namespace isolation.
