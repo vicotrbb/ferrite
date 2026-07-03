@@ -99,6 +99,18 @@ This completes the local Qwen2.5-0.5B 256/512/1024 ladder, but remains partial
 evidence. It does not cover the remaining Tier 1 model artifacts, queue
 behavior, or stop/EOS behavior.
 
+An additional bounded local queue-probe slice exists:
+
+- `documentation/benchmarks/2026-07-03-local-qwen-0-5b-queue-probe-128.md`
+- required probe: `queue`
+- required token length: `128`
+- prompt-cache keys: `queue-a`, `queue-b`
+- `long_chat_summary_queue_probe_completed=true`
+- `long_chat_summary_queue_probe_contender_started_after_holder=true`
+
+This proves the queue probe path can be required and completed locally, but it
+does not replace queue coverage in the required 256/512/1024 Tier 1 matrix.
+
 ## Required Scenarios
 
 For each required model, run three streaming chat lengths:
