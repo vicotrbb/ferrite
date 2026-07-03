@@ -1,3 +1,4 @@
+mod artifacts;
 mod config;
 mod disconnect_probe;
 mod error_probe;
@@ -9,6 +10,7 @@ mod state_capsule;
 mod summary;
 mod throughput;
 
+pub use artifacts::LongChatProofArtifacts;
 pub use config::{LongChatGateConfig, LongChatGateError};
 pub use disconnect_probe::{format_disconnect_probe_result, LongChatDisconnectProbeResult};
 pub use error_probe::{format_error_probe_result, LongChatErrorProbeResult};

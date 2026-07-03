@@ -2,7 +2,7 @@ use ferrite_server::long_chat_gate::{
     format_disconnect_probe_result, format_error_probe_result, format_plan, format_report,
     format_run_summary, format_scenario_result, format_scenarios, LongChatAssistantContextSource,
     LongChatDisconnectProbeResult, LongChatErrorProbeResult, LongChatGateConfig,
-    LongChatScenarioResult,
+    LongChatProofArtifacts, LongChatScenarioResult,
 };
 use ferrite_server::throughput_client::{
     OpenAiEndpoint, RssSummary, StreamingFinishSummary, StreamingTextSummary,
@@ -10,7 +10,7 @@ use ferrite_server::throughput_client::{
     ThroughputClientConfig, ThroughputResult,
 };
 use std::ffi::OsString;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 #[test]
 fn defaults_to_required_long_chat_token_lengths_and_turns() -> Result<(), Box<dyn std::error::Error>>
@@ -84,6 +84,10 @@ fn parses_custom_long_chat_token_lengths_turns_and_models() -> Result<(), Box<dy
         OsString::from("continuity-marker"),
         OsString::from("--disconnect-reconnect-timeout-ms"),
         OsString::from("45000"),
+        OsString::from("--proof-log"),
+        OsString::from("target/proof/long-chat.log"),
+        OsString::from("--proof-exit-code"),
+        OsString::from("target/proof/long-chat.exit"),
     ])?;
 
     assert_eq!(config.token_lengths(), &[128, 256]);
@@ -120,6 +124,39 @@ fn parses_custom_long_chat_token_lengths_turns_and_models() -> Result<(), Box<dy
         config.disconnect_reconnect_timeout(),
         Duration::from_secs(45)
     );
+    assert_eq!(
+        config.proof_log_path().map(|path| path.to_string_lossy()),
+        Some("target/proof/long-chat.log".into())
+    );
+    assert_eq!(
+        config
+            .proof_exit_code_path()
+            .map(|path| path.to_string_lossy()),
+        Some("target/proof/long-chat.exit".into())
+    );
+    Ok(())
+}
+
+#[test]
+fn proof_artifacts_write_log_and_exit_code_files() -> Result<(), Box<dyn std::error::Error>> {
+    let root = unique_temp_dir("ferrite-long-chat-artifacts");
+    let log_path = root.join("nested").join("proof.log");
+    let exit_code_path = root.join("nested").join("proof.exit");
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--proof-log"),
+        log_path.as_os_str().to_owned(),
+        OsString::from("--proof-exit-code"),
+        exit_code_path.as_os_str().to_owned(),
+    ])?;
+
+    let mut artifacts = LongChatProofArtifacts::create(&config)?;
+    artifacts.write_line("long_chat_result=ok")?;
+    artifacts.write_exit_code(7)?;
+
+    assert_eq!(std::fs::read_to_string(&log_path)?, "long_chat_result=ok\n");
+    assert_eq!(std::fs::read_to_string(&exit_code_path)?, "7\n");
+    std::fs::remove_dir_all(root)?;
     Ok(())
 }
 
@@ -293,6 +330,30 @@ fn formats_long_chat_gate_plan_with_required_cached_follow_ups(
     assert_eq!(
         format_plan(&config),
         "long_chat_models=fixture-model\nlong_chat_token_lengths=256\nlong_chat_turns=4\nlong_chat_prompt_cache_key=long-chat:prefix\nlong_chat_addr=127.0.0.1:8080\nlong_chat_require_cached_follow_ups=true\nlong_chat_planned_scenarios=4"
+    );
+    Ok(())
+}
+
+#[test]
+fn formats_long_chat_gate_plan_with_proof_artifact_paths() -> Result<(), Box<dyn std::error::Error>>
+{
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--models"),
+        OsString::from("fixture-model"),
+        OsString::from("--token-lengths"),
+        OsString::from("256"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+        OsString::from("--proof-log"),
+        OsString::from("target/proof/long-chat.log"),
+        OsString::from("--proof-exit-code"),
+        OsString::from("target/proof/long-chat.exit"),
+    ])?;
+
+    assert_eq!(
+        format_plan(&config),
+        "long_chat_models=fixture-model\nlong_chat_token_lengths=256\nlong_chat_turns=4\nlong_chat_proof_log_path=target/proof/long-chat.log\nlong_chat_proof_exit_code_path=target/proof/long-chat.exit\nlong_chat_addr=127.0.0.1:8080\nlong_chat_planned_scenarios=4"
     );
     Ok(())
 }
@@ -1631,4 +1692,12 @@ fn rejects_empty_long_chat_prompt() -> Result<(), Box<dyn std::error::Error>> {
 
     assert!(error.to_string().contains("--prompt"), "{error}");
     Ok(())
+}
+
+fn unique_temp_dir(name: &str) -> std::path::PathBuf {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("system clock should be after unix epoch")
+        .as_nanos();
+    std::env::temp_dir().join(format!("{name}-{}-{nanos}", std::process::id()))
 }

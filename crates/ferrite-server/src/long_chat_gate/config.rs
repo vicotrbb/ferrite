@@ -1,5 +1,11 @@
 use super::{LongChatScenario, LongChatStateCapsulePlacement};
-use std::{error::Error, ffi::OsString, fmt, time::Duration};
+use std::{
+    error::Error,
+    ffi::OsString,
+    fmt,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 const DEFAULT_DISCONNECT_RECONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -26,6 +32,8 @@ pub struct LongChatGateConfig {
     required_generated_response_substrings: Vec<String>,
     disconnect_reconnect_timeout: Duration,
     rss_pid: Option<u32>,
+    proof_log_path: Option<PathBuf>,
+    proof_exit_code_path: Option<PathBuf>,
     token_lengths: Vec<usize>,
     turns: usize,
 }
@@ -158,6 +166,18 @@ impl LongChatGateConfig {
                         "--rss-pid",
                     )?);
                 }
+                "--proof-log" => {
+                    config.proof_log_path = Some(parse_non_empty_path(
+                        next_value(&mut iter, "--proof-log")?,
+                        "--proof-log",
+                    )?);
+                }
+                "--proof-exit-code" => {
+                    config.proof_exit_code_path = Some(parse_non_empty_path(
+                        next_value(&mut iter, "--proof-exit-code")?,
+                        "--proof-exit-code",
+                    )?);
+                }
                 "--token-lengths" => {
                     config.token_lengths =
                         parse_token_lengths(next_value(&mut iter, "--token-lengths")?)?;
@@ -279,6 +299,14 @@ impl LongChatGateConfig {
         self.rss_pid
     }
 
+    pub fn proof_log_path(&self) -> Option<&Path> {
+        self.proof_log_path.as_deref()
+    }
+
+    pub fn proof_exit_code_path(&self) -> Option<&Path> {
+        self.proof_exit_code_path.as_deref()
+    }
+
     pub fn turns(&self) -> usize {
         self.turns
     }
@@ -329,6 +357,8 @@ impl Default for LongChatGateConfig {
             required_generated_response_substrings: Vec::new(),
             disconnect_reconnect_timeout: DEFAULT_DISCONNECT_RECONNECT_TIMEOUT,
             rss_pid: None,
+            proof_log_path: None,
+            proof_exit_code_path: None,
             token_lengths: vec![256, 512, 1024],
             turns: 4,
         }
@@ -417,6 +447,15 @@ fn parse_non_empty_string(value: OsString, flag: &str) -> Result<String, LongCha
     Ok(value)
 }
 
+fn parse_non_empty_path(value: OsString, flag: &str) -> Result<PathBuf, LongChatGateError> {
+    if value.as_os_str().is_empty() {
+        return Err(LongChatGateError::new(format!(
+            "{flag} must contain at least one value"
+        )));
+    }
+    Ok(PathBuf::from(value))
+}
+
 fn parse_turns(value: OsString) -> Result<usize, LongChatGateError> {
     let turns = parse_positive_usize(&os_string_to_string(value)?, "--turns")?;
     if turns < 4 {
@@ -444,5 +483,5 @@ fn os_string_to_string(value: OsString) -> Result<String, LongChatGateError> {
 }
 
 fn usage() -> &'static str {
-    "usage: ferrite-openai-long-chat-gate [--execute] [--error-probe] [--disconnect-probe] [--require-cached-follow-ups] [--addr 127.0.0.1:8080] [--api-key local-secret] [--models MODEL[,MODEL...]] [--prompt TEXT] [--assistant-context TEXT] [--follow-up TEXT] [--prompt-cache-key KEY] [--stop TEXT] [--expect-finish-reason REASON] [--probe-max-tokens TOKENS] [--generated-context-max-chars CHARS] [--generated-context-max-tokens TOKENS] [--generated-context-state-capsule TEXT] [--generated-context-state-capsule-placement assistant-context|follow-up] [--require-generated-response-contains TEXT] [--disconnect-reconnect-timeout-ms 30000] [--rss-pid PID] [--token-lengths 256,512,1024] [--turns 4]"
+    "usage: ferrite-openai-long-chat-gate [--execute] [--error-probe] [--disconnect-probe] [--require-cached-follow-ups] [--addr 127.0.0.1:8080] [--api-key local-secret] [--models MODEL[,MODEL...]] [--prompt TEXT] [--assistant-context TEXT] [--follow-up TEXT] [--prompt-cache-key KEY] [--stop TEXT] [--expect-finish-reason REASON] [--probe-max-tokens TOKENS] [--generated-context-max-chars CHARS] [--generated-context-max-tokens TOKENS] [--generated-context-state-capsule TEXT] [--generated-context-state-capsule-placement assistant-context|follow-up] [--require-generated-response-contains TEXT] [--disconnect-reconnect-timeout-ms 30000] [--rss-pid PID] [--proof-log PATH] [--proof-exit-code PATH] [--token-lengths 256,512,1024] [--turns 4]"
 }

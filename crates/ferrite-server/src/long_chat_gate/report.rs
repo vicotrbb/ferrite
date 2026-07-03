@@ -67,6 +67,19 @@ pub fn format_plan(config: &LongChatGateConfig) -> String {
         .rss_pid()
         .map(|pid| format!("\nlong_chat_rss_pid={pid}"))
         .unwrap_or_default();
+    let proof_log_path = config
+        .proof_log_path()
+        .map(|path| format!("\nlong_chat_proof_log_path={}", path.to_string_lossy()))
+        .unwrap_or_default();
+    let proof_exit_code_path = config
+        .proof_exit_code_path()
+        .map(|path| {
+            format!(
+                "\nlong_chat_proof_exit_code_path={}",
+                path.to_string_lossy()
+            )
+        })
+        .unwrap_or_default();
     let error_probe_required = if config.error_probe() {
         "\nlong_chat_error_probe_required=true"
     } else {
@@ -90,7 +103,7 @@ pub fn format_plan(config: &LongChatGateConfig) -> String {
         String::new()
     };
     format!(
-        "long_chat_models={models}\nlong_chat_token_lengths={token_lengths}\nlong_chat_turns={}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}\nlong_chat_planned_scenarios={}",
+        "long_chat_models={models}\nlong_chat_token_lengths={token_lengths}\nlong_chat_turns={}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}\nlong_chat_planned_scenarios={}",
         config.turns(),
         prompt_cache_key,
         generated_context_max_chars,
@@ -98,6 +111,8 @@ pub fn format_plan(config: &LongChatGateConfig) -> String {
         generated_context_state_capsule,
         generated_context_state_capsule_placement,
         required_generated_response_substrings,
+        proof_log_path,
+        proof_exit_code_path,
         addr,
         execute,
         require_cached_follow_ups,
