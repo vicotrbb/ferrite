@@ -209,3 +209,24 @@ TTFT dropped to `13743` ms, while turns 2 and 4 reused only `12 / 542` and
 The companion `llama-benchy` run completed the system-context-prefix shape at
 depth 512, prompt 512, and generation 512. It reported e2e TTFT of
 `26284.783375` ms for context load and `38107.459042` ms for inference.
+
+## Third Paired Observation
+
+A bounded local 1024-token paired run now exists:
+
+- Ferrite gate note:
+  `documentation/benchmarks/2026-07-03-latency-cache-paired-qwen-0-5b-1024.md`
+- `llama-benchy` JSON:
+  `documentation/benchmarks/2026-07-03-llama-benchy-qwen-0-5b-paired-cache-1024.json`
+
+The Ferrite gate reproduced the generated-context fixed-point mechanism inside
+the paired protocol. Turns 2 and 3 were shallow shared-prefix hits (`12 / 1054`
+and `16 / 1054`) with TTFT near 66 seconds. Turn 3 produced the same generated
+response identity as its assistant context, and turn 4 became an exact prompt
+hit with `1054 / 1054` cached prompt tokens and TTFT `230` ms.
+
+The companion `llama-benchy` run completed the system-context-prefix shape at
+depth 1024, prompt 1024, and generation 1024. It reported e2e TTFT of
+`65689.654583` ms for context load and `114978.518583` ms for inference. The
+local paired ladder now covers 256, 512, and 1024 tokens; x86_64 paired
+validation remains open.
