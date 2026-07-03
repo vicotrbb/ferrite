@@ -130,6 +130,29 @@ explanation. The stable fixed-answer lane converged to exact hits; the
 changing-answer lane retained only shared-prefix hits under the same server
 path and cache-key mechanism.
 
+## Rejected Strict EOS Fixtures
+
+Two follow-up fixture searches failed to produce a clean four-turn changing
+EOS lane:
+
+- `target/proof/local-smollm17-symbolic-changing-eos-8-2026-07-03/`
+  - prompt family: exact single-character outputs A, B, C, D;
+  - result: failed before recording turn results with
+    `expected finish_reason stop, got length`;
+  - proof log SHA256:
+    `e95c8004f94a441b1c3d5c3ebbe9c591f8004ac07dbe32e1c7e61609b2adb589`.
+- `target/proof/local-smollm17-capitals-changing-eos-16-2026-07-03/`
+  - prompt family: France, Germany, Japan, Brazil capital questions;
+  - result: France and Germany ended with `finish_source=eos`, then turn 3
+    failed with `expected finish_reason stop, got length`;
+  - proof log SHA256:
+    `5564967629f775a0f724ce5d0e0729345b693264f6cf87b15bd4677a4aee97a5`.
+
+Both failures use the same gate stderr hash:
+`778034d3b0083f381e8f809b8ccb43e7eb7639f6ff0323b509309f2c9113f3b1`.
+They should be treated as rejected fixture candidates, not as negative proof
+against the cache theory.
+
 ## Expected Measurement
 
 This theory is strengthened when a natural-EOS lane shows:
