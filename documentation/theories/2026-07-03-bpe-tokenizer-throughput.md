@@ -2,7 +2,7 @@
 
 Date: 2026-07-03
 
-Status: Locally validated for active-pair scan, broader validation still needed
+Status: Locally validated for tokenizer-only and OpenAI server tokenization stage
 
 ## Hypothesis
 
@@ -102,6 +102,17 @@ isolated CLI benchmark improved by more than 20 percent. The next falsification
 gate is server lifecycle proof. If `prompt_tokenized_elapsed_ms` does not move
 meaningfully in the OpenAI path, the CLI improvement is not enough by itself.
 
+The OpenAI server lifecycle proof then passed that gate:
+
+```text
+before prompt_tokenized_elapsed_ms=8323
+after  prompt_tokenized_elapsed_ms=4331
+```
+
+That is about a `47.96%` local improvement for the same-size server-stage
+probe. This validates the active-pair scan as a real request-path tokenizer
+improvement for the local Qwen 0.5B model.
+
 ## Risks
 
 - A naive priority queue can spend the saved merge-scan time on queue
@@ -114,7 +125,6 @@ meaningfully in the OpenAI path, the CLI improvement is not enough by itself.
 
 ## Next Step
 
-Rerun the long-prompt OpenAI streaming cancellation proof and compare
-`prompt_tokenized_elapsed_ms` against the prior `8323 ms` local server
-lifecycle baseline. Then decide whether to test a priority-queue active-pair
-structure.
+Run the dedicated long-chat gate with 256, 512, and 1024-token streaming
+responses. After that, test whether a priority-queue active-pair structure
+improves beyond the current scan loop without increasing memory too much.

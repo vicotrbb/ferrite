@@ -203,3 +203,10 @@ It preserved the same token count and fingerprint while reducing the
 tokenizer-only average encode field from `6894344416 ns` to `4062045166 ns`
 for the deterministic same-size prompt sample. The OpenAI server lifecycle
 proof still needs to be rerun before claiming a request-path latency reduction.
+
+That server lifecycle proof is now recorded in
+`documentation/benchmarks/2026-07-03-local-qwen-0-5b-openai-active-pair-tokenization-stage.md`.
+The long prompt reported `prompt_tokenized_elapsed_ms=4331`, compared with
+`8323` after the prior BPE metadata preparse slice. This validates the
+active-pair BPE change in the OpenAI-compatible request path for the local
+same-size Qwen 0.5B proof.
