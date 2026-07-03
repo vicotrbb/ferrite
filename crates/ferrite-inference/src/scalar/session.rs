@@ -21,8 +21,22 @@ pub struct ScalarLlamaSession<'a> {
     options: ScalarExecutionOptions,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PromptEvaluationControl {
+    Continue,
+    Cancel,
+}
+
 impl<'a> ScalarLlamaSession<'a> {
     pub fn accept_prompt(&mut self, tokens: &[usize]) -> Result<NextToken, InferenceError> {
+        self.accept_prompt_with_control(tokens, |_, _| Ok(PromptEvaluationControl::Continue))
+    }
+
+    pub fn accept_prompt_with_control(
+        &mut self,
+        tokens: &[usize],
+        mut on_prompt_token: impl FnMut(usize, usize) -> Result<PromptEvaluationControl, InferenceError>,
+    ) -> Result<NextToken, InferenceError> {
         if tokens.is_empty() {
             return Err(InferenceError::new(
                 "prompt must contain at least one token",
@@ -30,8 +44,11 @@ impl<'a> ScalarLlamaSession<'a> {
         }
 
         let mut next = None;
-        for token_id in tokens {
-            next = Some(self.accept_token(*token_id)?);
+        for (index, token_id) in tokens.iter().copied().enumerate() {
+            if on_prompt_token(index, token_id)? == PromptEvaluationControl::Cancel {
+                return Err(InferenceError::new("prompt evaluation cancelled"));
+            }
+            next = Some(self.accept_token(token_id)?);
         }
 
         next.ok_or_else(|| InferenceError::new("prompt must contain at least one token"))
