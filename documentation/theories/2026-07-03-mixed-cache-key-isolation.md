@@ -2,7 +2,7 @@
 
 Date: 2026-07-03 UTC
 
-Status: Positive first proof at 256 tokens
+Status: Positive first proof at 256 tokens; queued local proof added
 
 ## Hypothesis
 
@@ -59,6 +59,28 @@ This is the right default for an OpenAI-compatible HTTP server because
 `metadata.prompt_cache_key` is client-controlled and can represent a tenant,
 thread, or conversation boundary.
 
+## Queued-Client Follow-Up
+
+A local Qwen2.5-0.5B Q4_K_M follow-up proved the queued-client harness against a
+real OpenAI-compatible server:
+
+- `documentation/benchmarks/2026-07-03-local-qwen-0-5b-queue-probe-256.md`
+- `long_chat_queue_probe_holder_started_streaming=true`
+- `long_chat_queue_probe_contender_status=200`
+- `long_chat_queue_probe_contender_generated_event=true`
+- `long_chat_queue_probe_contender_started_after_holder=true`
+- `long_chat_summary_run_complete=true`
+
+That proof confirms queued streaming clients can complete while using two
+prompt-cache keys, and that the subsequent 8-scenario 256-token matrix keeps
+generated-context identity, token IDs, RSS, reconnect, and timing summaries
+valid.
+
+It is not cold-lane isolation evidence: the queue probe warms both keys before
+the normal scenario matrix, so lane B turn 1 reports `exact_hit` in the local
+run. The x86_64 Qwen2.5-1.5B Q8_0 mixed-key proof above remains the stronger
+cache-key namespace proof.
+
 ## Design Implications
 
 - Mixed-key gate output must make lane identity explicit. Commit `1914057`
@@ -67,13 +89,15 @@ thread, or conversation boundary.
   and prompt-cache key. The mixed-key harness now does that.
 - Throughput requests should prefer the scenario-specific key over the global
   single-key option. The mixed-key harness now does that.
+- Queue probes should be documented separately from cold-lane namespace proofs
+  because the holder and contender requests intentionally warm both keys.
 
 ## Limits
 
-This proof does not yet cover:
+The sequential namespace proof plus local queue proof do not yet cover:
 
-- concurrent clients;
-- queued clients that overlap while one request is streaming;
+- true concurrent multi-permit inference;
+- queued x86_64 Qwen2.5-1.5B Q8_0 behavior;
 - cache eviction after many keys;
 - varied follow-up text;
 - 512-token or 1024-token mixed-key budgets;
@@ -83,7 +107,7 @@ This proof does not yet cover:
 
 1. Run the same two-key proof at 512 and 1024 tokens only if 256-token behavior
    regresses or if we need long-output parity.
-2. Add a queued-client probe where lane B starts while lane A is still decoding.
+2. Repeat the queued-client probe on staging with Qwen2.5-1.5B Q8_0.
 3. Add an eviction probe with more keys than the intended cache retention
    policy.
 4. Add a varied-follow-up probe that preserves the capsule but changes user

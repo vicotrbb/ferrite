@@ -64,16 +64,23 @@ git diff --check
 
 ## Limits
 
-This is a proof-harness capability. It does not yet prove real-model queued
-mixed-key behavior; that still needs a bounded staging run with a nonzero
-`--inference-wait-ms` server timeout and two prompt-cache keys.
+This is a proof-harness capability. It now has one local real-model proof with
+Qwen2.5-0.5B Q4_K_M:
+
+- `documentation/benchmarks/2026-07-03-local-qwen-0-5b-queue-probe-256.md`
+- `long_chat_summary_queue_probe_completed=true`
+- `long_chat_summary_queue_probe_contender_started_after_holder=true`
+- `long_chat_summary_run_complete=true`
+
+The local proof does not replace a bounded staging run with Qwen2.5-1.5B Q8_0
+and x86_64 AVX2. Kubernetes staging was unreachable during this run.
 
 It also does not prove cache eviction, many-client behavior, or varied follow-up
 wording.
 
 ## Next Proof
 
-Run the same Qwen2.5-1.5B Q8_0 semantic capsule shape with:
+Run the same Qwen2.5-1.5B Q8_0 semantic capsule shape on staging with:
 
 ```text
 --queue-probe
