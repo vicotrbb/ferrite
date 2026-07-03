@@ -51,6 +51,10 @@ What is proven:
   generated content releases Ferrite's inference permit in the live HTTP
   fixture test
   `live_http_server_releases_inference_permit_after_tcp_disconnect_before_generated_content`.
+- Ferrite now checks whether the SSE receiver is already closed after queued
+  initial stream chunks and before entering generation. This avoids starting
+  generation for the cheap closed-receiver case that is visible at that
+  boundary.
 
 What is not proven:
 
@@ -128,6 +132,25 @@ cancellation during long real-model prompt prefill, because that phase may do
 substantial CPU work before any SSE event can be sent and before socket closure
 is observed through a failed stream write.
 
+## Pre-Generation Closed-Receiver Guard
+
+Commit `8706e43` exposed `StreamSender::is_closed()` and checks that state
+after initial SSE chunks are queued but before the stream worker locks the
+inference engine and enters generation.
+
+Validation:
+
+```text
+cargo test -p ferrite-server stream_sender_reports_when_receiver_is_closed -- --nocapture
+cargo test -p ferrite-server releases_inference_permit -- --nocapture
+```
+
+This is a small defensive improvement, not a full cancellation architecture.
+It can skip generation when the SSE receiver has already closed at the
+pre-generation boundary. It does not interrupt `accept_prompt` once prompt
+prefill has started, because the scalar runtime does not yet have a
+cooperative cancellation callback inside prompt evaluation.
+
 ## Minimal Experiment
 
 Use a small, repeatable model/server setup and avoid Kubernetes port-forward for
@@ -149,6 +172,10 @@ the first pass.
 The next experiment should use a real model or a deliberately slow prefill path
 that disconnects before the first SSE event, so it can distinguish prompt
 prefill cancellation from already-started stream cancellation.
+
+If that experiment shows continued CPU after disconnect, the next design
+candidate is cooperative cancellation in the runtime prompt-evaluation loop,
+not more HTTP-layer checks.
 
 ## Expected Outcomes
 
