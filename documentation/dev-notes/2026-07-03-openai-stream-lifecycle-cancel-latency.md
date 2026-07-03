@@ -160,3 +160,11 @@ The real-model proof is recorded in
 It reported `prompt_tokenized_elapsed_ms=8581`; all later runtime setup fields
 were also `8581`. That places the measured delay in prompt tokenization before
 the first stream-closure poll.
+
+Cooperative tokenization cancellation then moved the observed disconnect point
+earlier. The proof is recorded in
+`documentation/benchmarks/2026-07-03-local-qwen-0-5b-prefill-cancel-tokenization.md`.
+It reported `disconnect_point=tokenization`, `elapsed_ms=517`,
+`disconnect_observed_elapsed_ms=514`, and `disconnect_to_finish_ms=2` for the
+abandoned long prompt. The previous comparable runtime-stage run reported
+`elapsed_ms=8581`.

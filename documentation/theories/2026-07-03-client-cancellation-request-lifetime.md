@@ -370,6 +370,20 @@ transformer execution as the dominant delay for this local run. The current best
 theory is that long-prompt tokenization owns the observed delay, and stream
 closure is not checked until after tokenization completes.
 
+Tokenization-cancellation proof:
+`documentation/benchmarks/2026-07-03-local-qwen-0-5b-prefill-cancel-tokenization.md`.
+After adding cooperative tokenization polling, the same local model and prompt
+shape reported:
+
+```text
+openai_stream_lifecycle request_id=stream-0 finish_reason=cancelled disconnect_point=tokenization prompt_tokens_started=0 prompt_cancellation_polls=0 prompt_cancellation_closed_polls=0 generated_chunks=0 generated_token_ids=0 elapsed_ms=517 disconnect_observed_elapsed_ms=514 disconnect_to_finish_ms=2 prompt_cancellation_token_index=none prompt_cancellation_layer_index=none engine_lock_acquired_elapsed_ms=0 generation_started_elapsed_ms=0 prompt_tokenized_elapsed_ms=none prefix_cache_key_built_elapsed_ms=none session_started_elapsed_ms=none prefix_cache_lookup_finished_elapsed_ms=none prefix_cache_restored_elapsed_ms=none prompt_evaluation_started_elapsed_ms=none first_prompt_token_started_elapsed_ms=none first_prompt_cancellation_poll_elapsed_ms=none
+```
+
+This validates the tokenization-cancellation fix for this local proof. The
+abandoned request no longer reaches prompt evaluation, emits no generated
+chunks, and releases the single inference permit after about the client-close
+delay rather than after full tokenization.
+
 ## Minimal Experiment
 
 Use a small, repeatable model/server setup and avoid Kubernetes port-forward for
