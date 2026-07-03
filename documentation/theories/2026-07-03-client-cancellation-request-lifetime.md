@@ -62,6 +62,11 @@ What is proven:
   token, at transformer-layer boundaries. This reduces the expected
   post-disconnect CPU window for long prompt prefill without inserting checks
   into every matvec kernel.
+- A bounded x86_64 real-model Qwen 0.5B smoke closed a long-prompt streaming
+  request before generated content and immediately completed a reconnect
+  request with generated content. The reconnect generated event arrived after
+  about 8.9 seconds, consistent with the abandoned request not holding the
+  single inference permit for the full long-prompt prefill.
 
 What is not proven:
 
@@ -72,6 +77,8 @@ What is not proven:
 - how quickly a real large-model prompt prefill returns to idle after
   disconnect, because cancellation is cooperative at layer boundaries and does
   not interrupt a single in-progress layer or matvec operation.
+- the exact server-side cancellation latency, because the current real-model
+  smoke uses external reconnect timing rather than request-lifetime counters.
 
 ## Direct Route Evidence
 
@@ -201,6 +208,32 @@ matrix-heavy layer or matvec operation. For real models, the worst-case
 cancellation latency is therefore bounded by the time to finish the current
 layer plus the transport delay before the SSE receiver is marked closed.
 
+## Real-Model Prefill Disconnect Smoke
+
+Benchmark note:
+`documentation/benchmarks/2026-07-03-prefill-cancel-qwen-0-5b.md`
+
+Raw JSON:
+`documentation/benchmarks/2026-07-03-prefill-cancel-qwen-0-5b.json`
+
+The 2026-07-03 staging smoke used Qwen2.5-0.5B Q4_K_M in a bounded amd64 pod.
+The client sent a streaming chat request with a 140398-character prompt, read
+the initial assistant-role SSE event, waited 500 ms, and closed the socket
+before any generated content arrived.
+
+The reconnect request started 0.173 ms after closing the first socket. It
+returned `HTTP/1.1 200 OK`, emitted generated content after 8904.287 ms, and
+finished after 9206.984 ms. Server RSS stayed bounded, from 413924 KiB before
+the abort request to 428900 KiB immediately after abort and 426060 KiB after
+reconnect.
+
+This weakens the remaining theory for the direct in-pod path: the abandoned
+long-prompt request did not appear to hold the single inference permit for the
+full long prefill. It does not close the theory for Kubernetes port-forward or
+exact server-side cancellation timing, because the smoke did not instrument the
+precise disconnect observation point or the number of prompt layers evaluated
+after disconnect.
+
 ## Minimal Experiment
 
 Use a small, repeatable model/server setup and avoid Kubernetes port-forward for
@@ -224,11 +257,12 @@ after prompt evaluation starts but before generated content is delivered. It
 should measure how many seconds elapse between client disconnect and permit
 release with the cooperative prompt-prefill cancellation seam in place.
 
-If that experiment still shows unacceptable post-disconnect CPU, the next
-design candidate is lower-level cancellation inside a single layer, most
-likely at attention, FFN, or matvec boundaries. That is a higher-risk change
-and should not be attempted without real-model evidence that layer-boundary
-cancellation is insufficient.
+The direct in-pod smoke is positive enough that the next code slice should not
+jump to lower-level cancellation inside a single layer. If stronger proof is
+needed, add request-lifetime instrumentation first: request id, disconnect
+observation point, prompt-token count, prompt-layer count, and permit-release
+timestamp. Only consider attention, FFN, or matvec-level cancellation if those
+direct counters show layer-boundary cancellation is still too slow.
 
 ## Expected Outcomes
 
