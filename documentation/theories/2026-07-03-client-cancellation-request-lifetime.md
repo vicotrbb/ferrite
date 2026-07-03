@@ -241,6 +241,45 @@ exact server-side cancellation timing, because the smoke did not instrument the
 precise disconnect observation point or the number of prompt layers evaluated
 after disconnect.
 
+## Local Lifecycle Prefill Cancel Probe
+
+Benchmark note:
+`documentation/benchmarks/2026-07-03-local-qwen-0-5b-prefill-cancel-lifecycle.md`
+
+The next direct local probe reran the long-prompt prefill disconnect shape after
+`openai_stream_lifecycle` logging existed. The client sent a 155399-character
+streaming chat prompt, read the initial assistant-role SSE event, waited about
+510 ms, then closed the TCP socket before any generated content arrived. A
+short reconnect request started about 3.9 ms later.
+
+Client-side result:
+
+- reconnect returned `HTTP/1.1 200 OK`;
+- reconnect generated content after `6387.344` ms;
+- reconnect completed after `6421.889` ms.
+
+Server-side lifecycle result:
+
+```text
+openai_stream_lifecycle request_id=stream-0 finish_reason=cancelled disconnect_point=prompt_evaluation prompt_tokens_started=1 prompt_cancellation_polls=1 generated_chunks=0 generated_token_ids=0 elapsed_ms=6419
+openai_stream_lifecycle request_id=stream-1 finish_reason=completed disconnect_point=none prompt_tokens_started=8 prompt_cancellation_polls=200 generated_chunks=1 generated_token_ids=1 elapsed_ms=516
+```
+
+This narrows the theory again. Ferrite did observe the disconnect, cancelled at
+the prompt-evaluation boundary, and did not generate chunks for the abandoned
+request. But the cancelled request still occupied the single inference permit
+for about 6.4 seconds from request start. The short reconnect request itself
+took only 516 ms once it ran, so most client-observed reconnect latency came
+from waiting for the cancelled prompt-evaluation path to release the permit.
+
+The next implementation theory should not jump straight to matvec-level
+cancellation. First add finer prompt-evaluation lifecycle counters:
+
+- prompt token index at cancellation;
+- cancellation polls before and after the stream is observed closed;
+- current transformer layer when cancellation is observed;
+- elapsed time from first observed stream closure to cancellation return.
+
 ## Minimal Experiment
 
 Use a small, repeatable model/server setup and avoid Kubernetes port-forward for
