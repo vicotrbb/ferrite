@@ -19,16 +19,22 @@ disconnect and final lifecycle logging.
 - `disconnect_observed_elapsed_ms`: elapsed request time when the closed stream
   was first observed;
 - `disconnect_to_finish_ms`: elapsed time between first observed disconnect and
-  final request lifecycle summary.
+  final request lifecycle summary;
+- `prompt_cancellation_token_index`: prompt token index active when cancellation
+  observed the closed stream;
+- `prompt_cancellation_layer_index`: transformer layer active when cancellation
+  observed the closed stream, or `none` when cancellation happened before layer
+  execution.
 
-The emitted lifecycle line now includes both fields:
+The emitted lifecycle line now includes these fields:
 
 ```text
-openai_stream_lifecycle ... prompt_cancellation_closed_polls=N ... disconnect_observed_elapsed_ms=N|none disconnect_to_finish_ms=N|none
+openai_stream_lifecycle ... prompt_cancellation_closed_polls=N ... disconnect_observed_elapsed_ms=N|none disconnect_to_finish_ms=N|none prompt_cancellation_token_index=N|none prompt_cancellation_layer_index=N|none
 ```
 
 Completed requests with no disconnect report `disconnect_to_finish_ms=none`.
-They also report `disconnect_observed_elapsed_ms=none`.
+They also report `disconnect_observed_elapsed_ms=none` and no prompt
+cancellation location.
 
 ## Validation
 
@@ -63,6 +69,28 @@ test openai::stream_lifecycle::tests::lifecycle_summary_records_prompt_generatio
 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 391 filtered out
 ```
 
+Third red test evidence:
+
+```text
+cargo test -p ferrite-server prompt_cancellation_poll_reports_prompt_location -- --nocapture
+error[E0593]: closure is expected to take 0 arguments, but it takes 1 argument
+```
+
+Third green test evidence:
+
+```text
+cargo test -p ferrite-server prompt_cancellation_poll_reports_prompt_location -- --nocapture
+test runtime::tests::prompt_cancellation_poll_reports_prompt_location ... ok
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 392 filtered out
+```
+
+Inference compatibility check:
+
+```text
+cargo test -p ferrite-inference --test scalar_prompt_cancellation -- --nocapture
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+```
+
 Formatting:
 
 ```text
@@ -91,3 +119,7 @@ The observed-elapsed field was exercised against local Qwen2.5-0.5B Q4_K_M:
 The result shows the remaining local delay sits before the server observes the
 closed stream. The next useful lifecycle fields are prompt token index and
 transformer layer index at cancellation.
+
+The prompt-token and layer fields have now been added to the lifecycle log. The
+next real-model proof must rerun the same cancellation scenario before making a
+new performance claim from those fields.

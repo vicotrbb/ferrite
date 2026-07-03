@@ -318,6 +318,16 @@ zero milliseconds. The next theory slice should identify prompt token and
 transformer layer position at cancellation before moving cancellation checks
 deeper into hot kernels.
 
+That instrumentation now exists in `openai_stream_lifecycle` as:
+
+- `prompt_cancellation_token_index`;
+- `prompt_cancellation_layer_index`.
+
+The next proof run should rerun the same local Qwen 0.5B cancellation scenario
+and use these fields to decide whether the 6.5 second delay is dominated by
+tokenization, a single prompt-token evaluation, a specific transformer layer,
+or work before the runtime cancellation callback.
+
 ## Minimal Experiment
 
 Use a small, repeatable model/server setup and avoid Kubernetes port-forward for

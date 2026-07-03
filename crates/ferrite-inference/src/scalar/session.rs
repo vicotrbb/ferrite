@@ -27,6 +27,43 @@ pub enum PromptEvaluationControl {
     Cancel,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PromptEvaluationLocation {
+    prompt_token_index: usize,
+    token_id: usize,
+    layer_index: Option<usize>,
+}
+
+impl PromptEvaluationLocation {
+    pub fn before_token(prompt_token_index: usize, token_id: usize) -> Self {
+        Self {
+            prompt_token_index,
+            token_id,
+            layer_index: None,
+        }
+    }
+
+    pub fn layer(prompt_token_index: usize, token_id: usize, layer_index: usize) -> Self {
+        Self {
+            prompt_token_index,
+            token_id,
+            layer_index: Some(layer_index),
+        }
+    }
+
+    pub fn prompt_token_index(self) -> usize {
+        self.prompt_token_index
+    }
+
+    pub fn token_id(self) -> usize {
+        self.token_id
+    }
+
+    pub fn layer_index(self) -> Option<usize> {
+        self.layer_index
+    }
+}
+
 impl<'a> ScalarLlamaSession<'a> {
     pub fn accept_prompt(&mut self, tokens: &[usize]) -> Result<NextToken, InferenceError> {
         self.accept_prompt_with_control_and_cancellation(
@@ -64,6 +101,21 @@ impl<'a> ScalarLlamaSession<'a> {
         mut on_prompt_token: impl FnMut(usize, usize) -> Result<PromptEvaluationControl, InferenceError>,
         mut on_cancellation_poll: impl FnMut() -> Result<PromptEvaluationControl, InferenceError>,
     ) -> Result<NextToken, InferenceError> {
+        self.accept_prompt_with_control_and_location_cancellation(
+            tokens,
+            &mut on_prompt_token,
+            |_| on_cancellation_poll(),
+        )
+    }
+
+    pub fn accept_prompt_with_control_and_location_cancellation(
+        &mut self,
+        tokens: &[usize],
+        mut on_prompt_token: impl FnMut(usize, usize) -> Result<PromptEvaluationControl, InferenceError>,
+        mut on_cancellation_poll: impl FnMut(
+            PromptEvaluationLocation,
+        ) -> Result<PromptEvaluationControl, InferenceError>,
+    ) -> Result<NextToken, InferenceError> {
         if tokens.is_empty() {
             return Err(InferenceError::new(
                 "prompt must contain at least one token",
@@ -75,11 +127,20 @@ impl<'a> ScalarLlamaSession<'a> {
             if on_prompt_token(index, token_id)? == PromptEvaluationControl::Cancel {
                 return Err(InferenceError::new("prompt evaluation cancelled"));
             }
-            if on_cancellation_poll()? == PromptEvaluationControl::Cancel {
+            if on_cancellation_poll(PromptEvaluationLocation::before_token(index, token_id))?
+                == PromptEvaluationControl::Cancel
+            {
                 return Err(InferenceError::new("prompt evaluation cancelled"));
             }
-            next =
-                Some(self.accept_token_with_layer_control(token_id, |_| on_cancellation_poll())?);
+            next = Some(
+                self.accept_token_with_layer_control(token_id, |layer_index| {
+                    on_cancellation_poll(PromptEvaluationLocation::layer(
+                        index,
+                        token_id,
+                        layer_index,
+                    ))
+                })?,
+            );
         }
 
         next.ok_or_else(|| InferenceError::new("prompt must contain at least one token"))

@@ -53,6 +53,8 @@ pub(super) struct StreamLifecycleSummary {
     pub elapsed_ms: u128,
     pub disconnect_observed_elapsed_ms: Option<u128>,
     pub disconnect_to_finish_ms: Option<u128>,
+    pub prompt_cancellation_token_index: Option<usize>,
+    pub prompt_cancellation_layer_index: Option<usize>,
 }
 
 #[derive(Debug)]
@@ -66,6 +68,8 @@ pub(super) struct StreamLifecycle {
     generated_token_ids: usize,
     disconnect_point: Option<StreamDisconnectPoint>,
     disconnect_observed_at: Option<Instant>,
+    prompt_cancellation_token_index: Option<usize>,
+    prompt_cancellation_layer_index: Option<usize>,
 }
 
 impl StreamLifecycle {
@@ -81,6 +85,8 @@ impl StreamLifecycle {
             generated_token_ids: 0,
             disconnect_point: None,
             disconnect_observed_at: None,
+            prompt_cancellation_token_index: None,
+            prompt_cancellation_layer_index: None,
         }
     }
 
@@ -100,10 +106,16 @@ impl StreamLifecycle {
     pub(super) fn observe_stream_state(
         &mut self,
         point: StreamDisconnectPoint,
+        prompt_token_index: usize,
+        layer_index: Option<usize>,
         closed: bool,
     ) -> PromptEvaluationControl {
         if closed {
             self.prompt_cancellation_closed_polls += 1;
+            if self.prompt_cancellation_token_index.is_none() {
+                self.prompt_cancellation_token_index = Some(prompt_token_index);
+                self.prompt_cancellation_layer_index = layer_index;
+            }
             self.record_disconnect(point);
             PromptEvaluationControl::Cancel
         } else {
@@ -142,6 +154,8 @@ impl StreamLifecycle {
             elapsed_ms,
             disconnect_observed_elapsed_ms,
             disconnect_to_finish_ms,
+            prompt_cancellation_token_index: self.prompt_cancellation_token_index,
+            prompt_cancellation_layer_index: self.prompt_cancellation_layer_index,
         }
     }
 }
@@ -160,8 +174,16 @@ impl StreamLifecycleSummary {
             .disconnect_observed_elapsed_ms
             .map(|elapsed_ms| elapsed_ms.to_string())
             .unwrap_or_else(|| "none".to_string());
+        let prompt_cancellation_token_index = self
+            .prompt_cancellation_token_index
+            .map(|index| index.to_string())
+            .unwrap_or_else(|| "none".to_string());
+        let prompt_cancellation_layer_index = self
+            .prompt_cancellation_layer_index
+            .map(|index| index.to_string())
+            .unwrap_or_else(|| "none".to_string());
         format!(
-            "openai_stream_lifecycle request_id={} finish_reason={} disconnect_point={} prompt_tokens_started={} prompt_cancellation_polls={} prompt_cancellation_closed_polls={} generated_chunks={} generated_token_ids={} elapsed_ms={} disconnect_observed_elapsed_ms={} disconnect_to_finish_ms={}",
+            "openai_stream_lifecycle request_id={} finish_reason={} disconnect_point={} prompt_tokens_started={} prompt_cancellation_polls={} prompt_cancellation_closed_polls={} generated_chunks={} generated_token_ids={} elapsed_ms={} disconnect_observed_elapsed_ms={} disconnect_to_finish_ms={} prompt_cancellation_token_index={} prompt_cancellation_layer_index={}",
             self.request_id,
             self.finish_reason.as_str(),
             disconnect_point,
@@ -172,7 +194,9 @@ impl StreamLifecycleSummary {
             self.generated_token_ids,
             self.elapsed_ms,
             disconnect_observed_elapsed_ms,
-            disconnect_to_finish_ms
+            disconnect_to_finish_ms,
+            prompt_cancellation_token_index,
+            prompt_cancellation_layer_index
         )
     }
 }
@@ -189,7 +213,12 @@ mod tests {
         lifecycle.record_prompt_cancellation_poll();
         lifecycle.record_prompt_cancellation_poll();
         assert_eq!(
-            lifecycle.observe_stream_state(StreamDisconnectPoint::PromptEvaluation, true),
+            lifecycle.observe_stream_state(
+                StreamDisconnectPoint::PromptEvaluation,
+                4,
+                Some(7),
+                true
+            ),
             PromptEvaluationControl::Cancel
         );
         lifecycle.record_generated_chunk(3);
@@ -207,6 +236,8 @@ mod tests {
         assert_eq!(summary.prompt_cancellation_closed_polls, 1);
         assert!(summary.disconnect_observed_elapsed_ms.is_some());
         assert!(summary.disconnect_to_finish_ms.is_some());
+        assert_eq!(summary.prompt_cancellation_token_index, Some(4));
+        assert_eq!(summary.prompt_cancellation_layer_index, Some(7));
         assert_eq!(summary.generated_chunks, 1);
         assert_eq!(summary.generated_token_ids, 3);
         assert!(summary.log_line().contains("openai_stream_lifecycle"));
@@ -220,5 +251,11 @@ mod tests {
             .log_line()
             .contains("disconnect_observed_elapsed_ms="));
         assert!(summary.log_line().contains("disconnect_to_finish_ms="));
+        assert!(summary
+            .log_line()
+            .contains("prompt_cancellation_token_index=4"));
+        assert!(summary
+            .log_line()
+            .contains("prompt_cancellation_layer_index=7"));
     }
 }

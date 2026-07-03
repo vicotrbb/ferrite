@@ -6,7 +6,8 @@ pub use cache_options::GenerationCacheOptions;
 pub use cache_trace::{PromptCacheLookup, PromptCacheTrace};
 
 use ferrite_inference::scalar::{
-    PromptEvaluationControl as ScalarPromptEvaluationControl, ScalarLlamaModel,
+    PromptEvaluationControl as ScalarPromptEvaluationControl,
+    PromptEvaluationLocation as ScalarPromptEvaluationLocation, ScalarLlamaModel,
 };
 use ferrite_model::{gguf::parse_gguf, tokenizer::GgufTokenizer};
 use prefix_cache::{fnv64_bytes, RuntimePrefixCache};
@@ -22,6 +23,27 @@ pub enum GenerationControl {
 pub enum PromptEvaluationControl {
     Continue,
     Cancel,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PromptEvaluationLocation {
+    prompt_token_index: usize,
+    token_id: usize,
+    layer_index: Option<usize>,
+}
+
+impl PromptEvaluationLocation {
+    pub fn prompt_token_index(self) -> usize {
+        self.prompt_token_index
+    }
+
+    pub fn token_id(self) -> usize {
+        self.token_id
+    }
+
+    pub fn layer_index(self) -> Option<usize> {
+        self.layer_index
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -135,7 +157,7 @@ impl InferenceEngine {
             max_tokens,
             cache_options,
             &mut on_prompt_token,
-            || PromptEvaluationControl::Continue,
+            |_| PromptEvaluationControl::Continue,
             &mut on_token,
         )
     }
@@ -146,7 +168,7 @@ impl InferenceEngine {
         max_tokens: usize,
         cache_options: GenerationCacheOptions,
         mut on_prompt_token: impl FnMut(usize, usize) -> PromptEvaluationControl,
-        mut on_prompt_cancellation_poll: impl FnMut() -> PromptEvaluationControl,
+        mut on_prompt_cancellation_poll: impl FnMut(PromptEvaluationLocation) -> PromptEvaluationControl,
         mut on_token: impl FnMut(&str, &[usize]) -> Result<GenerationControl, RuntimeError>,
     ) -> Result<GeneratedText, RuntimeError> {
         let prompt_token_ids = self
@@ -180,7 +202,7 @@ impl InferenceEngine {
                     })?
                 } else {
                     let next = session
-                        .accept_prompt_with_control_and_cancellation(
+                        .accept_prompt_with_control_and_location_cancellation(
                             suffix,
                             |index, token_id| {
                                 Ok(map_prompt_control(on_prompt_token(
@@ -188,7 +210,11 @@ impl InferenceEngine {
                                     token_id,
                                 )))
                             },
-                            || Ok(map_prompt_control(on_prompt_cancellation_poll())),
+                            |location| {
+                                Ok(map_prompt_control(on_prompt_cancellation_poll(
+                                    map_prompt_location(location, cached_prompt_tokens),
+                                )))
+                            },
                         )
                         .map_err(|error| {
                             RuntimeError::new(format!("failed to evaluate prompt suffix: {error}"))
@@ -202,10 +228,14 @@ impl InferenceEngine {
                 }
             } else {
                 let next = session
-                    .accept_prompt_with_control_and_cancellation(
+                    .accept_prompt_with_control_and_location_cancellation(
                         &prompt_token_ids,
                         |index, token_id| Ok(map_prompt_control(on_prompt_token(index, token_id))),
-                        || Ok(map_prompt_control(on_prompt_cancellation_poll())),
+                        |location| {
+                            Ok(map_prompt_control(on_prompt_cancellation_poll(
+                                map_prompt_location(location, 0),
+                            )))
+                        },
                     )
                     .map_err(|error| {
                         RuntimeError::new(format!("failed to evaluate prompt: {error}"))
@@ -219,10 +249,14 @@ impl InferenceEngine {
             }
         } else {
             session
-                .accept_prompt_with_control_and_cancellation(
+                .accept_prompt_with_control_and_location_cancellation(
                     &prompt_token_ids,
                     |index, token_id| Ok(map_prompt_control(on_prompt_token(index, token_id))),
-                    || Ok(map_prompt_control(on_prompt_cancellation_poll())),
+                    |location| {
+                        Ok(map_prompt_control(on_prompt_cancellation_poll(
+                            map_prompt_location(location, 0),
+                        )))
+                    },
                 )
                 .map_err(|error| RuntimeError::new(format!("failed to evaluate prompt: {error}")))?
         };
@@ -304,6 +338,17 @@ fn map_prompt_control(control: PromptEvaluationControl) -> ScalarPromptEvaluatio
     match control {
         PromptEvaluationControl::Continue => ScalarPromptEvaluationControl::Continue,
         PromptEvaluationControl::Cancel => ScalarPromptEvaluationControl::Cancel,
+    }
+}
+
+fn map_prompt_location(
+    location: ScalarPromptEvaluationLocation,
+    prompt_token_offset: usize,
+) -> PromptEvaluationLocation {
+    PromptEvaluationLocation {
+        prompt_token_index: prompt_token_offset + location.prompt_token_index(),
+        token_id: location.token_id(),
+        layer_index: location.layer_index(),
     }
 }
 
@@ -580,7 +625,7 @@ mod tests {
             1,
             GenerationCacheOptions::default(),
             |_, _| PromptEvaluationControl::Continue,
-            || {
+            |_| {
                 polls += 1;
                 if polls == 2 {
                     PromptEvaluationControl::Cancel
@@ -599,6 +644,46 @@ mod tests {
             "failed to evaluate prompt: prompt evaluation cancelled"
         );
         assert_eq!(polls, 2);
+        Ok(())
+    }
+
+    #[test]
+    fn prompt_cancellation_poll_reports_prompt_location() -> Result<(), Box<dyn std::error::Error>>
+    {
+        let model_path = write_fixture_model()?;
+        let engine = InferenceEngine::load(&model_path)?;
+        remove_fixture_model(&model_path)?;
+        let mut locations = Vec::new();
+
+        let error = match engine.generate_with_prompt_callbacks_and_cache_options(
+            "hello",
+            1,
+            GenerationCacheOptions::default(),
+            |_, _| PromptEvaluationControl::Continue,
+            |location| {
+                locations.push(location);
+                if location.layer_index() == Some(0) {
+                    PromptEvaluationControl::Cancel
+                } else {
+                    PromptEvaluationControl::Continue
+                }
+            },
+            |_, _| Ok(GenerationControl::Continue),
+        ) {
+            Ok(_) => return Err("generation should stop during prompt layer evaluation".into()),
+            Err(error) => error,
+        };
+
+        assert_eq!(
+            error.to_string(),
+            "failed to evaluate prompt: prompt evaluation cancelled"
+        );
+        assert_eq!(locations[0].prompt_token_index(), 0);
+        assert_eq!(locations[0].token_id(), 1);
+        assert_eq!(locations[0].layer_index(), None);
+        assert_eq!(locations[1].prompt_token_index(), 0);
+        assert_eq!(locations[1].token_id(), 1);
+        assert_eq!(locations[1].layer_index(), Some(0));
         Ok(())
     }
 

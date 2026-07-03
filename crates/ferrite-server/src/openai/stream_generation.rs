@@ -218,11 +218,13 @@ where
                         lifecycle.borrow_mut().record_prompt_token_started();
                         PromptEvaluationControl::Continue
                     },
-                    || {
+                    |location| {
                         let mut lifecycle = lifecycle.borrow_mut();
                         lifecycle.record_prompt_cancellation_poll();
                         lifecycle.observe_stream_state(
                             StreamDisconnectPoint::PromptEvaluation,
+                            location.prompt_token_index(),
+                            location.layer_index(),
                             sender.is_closed(),
                         )
                     },
