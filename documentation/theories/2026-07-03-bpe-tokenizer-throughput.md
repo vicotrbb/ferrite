@@ -47,6 +47,19 @@ The comparable server lifecycle field after BPE metadata preparse was:
 prompt_tokenized_elapsed_ms=8323
 ```
 
+After split timing was added to the tokenizer-only CLI benchmark, a
+same-size local prompt sample reported:
+
+```text
+tokenization_benchmark_gguf_parse_ns=13452375
+tokenization_benchmark_tokenizer_load_ns=86463500
+tokenization_benchmark_encode_avg_ns=6792609791
+tokenization_benchmark_token_count=29527
+```
+
+That places the dominant local cost in BPE encode, not GGUF parse or tokenizer
+load.
+
 For this theory to remain worth pursuing, a first algorithm experiment should
 reduce the CLI tokenizer-only average by at least 20 percent on the same prompt
 without changing token IDs.

@@ -182,3 +182,10 @@ The same long prompt reported `tokenization_benchmark_total_ns=8188082917` and
 `tokenization_benchmark_token_count=19428`, with no retained scalar model file
 bytes. This isolates the next optimization target: the BPE encode algorithm
 itself, not OpenAI streaming or generation lifecycle behavior.
+
+The CLI benchmark then gained split timing fields and was rerun in
+`documentation/benchmarks/2026-07-03-local-qwen-0-5b-tokenizer-cli-split-timing.md`.
+For a same-size generated local prompt sample, GGUF parse was about `13.45 ms`,
+tokenizer load was about `86.46 ms`, and average prompt encode was about
+`6792.61 ms`. This makes the next optimization target more precise: improve
+BPE encode behavior before spending more effort on metadata setup.
