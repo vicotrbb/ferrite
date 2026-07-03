@@ -384,6 +384,22 @@ abandoned request no longer reaches prompt evaluation, emits no generated
 chunks, and releases the single inference permit after about the client-close
 delay rather than after full tokenization.
 
+BPE metadata preparse follow-up:
+`documentation/benchmarks/2026-07-03-local-qwen-0-5b-tokenizer-preparse.md`.
+After moving BPE merge validation and token-id map construction to tokenizer
+load time, a bounded full long-prompt request reported:
+
+```text
+prompt_tokenized_elapsed_ms=8323
+```
+
+The previous comparable runtime-stage proof reported
+`prompt_tokenized_elapsed_ms=8581`. This is directionally lower, but it is one
+local sample and not enough for a broad performance claim. The request still
+timed out at `180 s` during prompt evaluation, so the next tokenizer theory
+should target the BPE merge-scan algorithm itself and add tokenizer-only
+micro-benchmarking.
+
 ## Minimal Experiment
 
 Use a small, repeatable model/server setup and avoid Kubernetes port-forward for

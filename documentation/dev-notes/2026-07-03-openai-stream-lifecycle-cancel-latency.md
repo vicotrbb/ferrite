@@ -168,3 +168,10 @@ It reported `disconnect_point=tokenization`, `elapsed_ms=517`,
 `disconnect_observed_elapsed_ms=514`, and `disconnect_to_finish_ms=2` for the
 abandoned long prompt. The previous comparable runtime-stage run reported
 `elapsed_ms=8581`.
+
+BPE metadata preparse was then measured in
+`documentation/benchmarks/2026-07-03-local-qwen-0-5b-tokenizer-preparse.md`.
+The long-prompt request reported `prompt_tokenized_elapsed_ms=8323`, compared
+with `8581` in the earlier runtime-stage proof. This is only a single local
+sample and does not prove a broad throughput improvement; the full request
+timed out during prompt evaluation after `180 s`.
