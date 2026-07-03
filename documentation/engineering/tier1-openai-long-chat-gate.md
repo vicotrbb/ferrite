@@ -123,6 +123,17 @@ This proves explicit stop behavior on a small deterministic local Qwen2.5-0.5B
 slice. It does not prove tokenizer EOS behavior or replace stop/EOS coverage in
 the required Tier 1 matrix.
 
+A natural-EOS attempt also exists:
+
+- `documentation/benchmarks/2026-07-03-local-qwen-0-5b-natural-eos-probe-64.md`
+- expected finish reason: `stop`
+- observed failure: `expected finish_reason stop, got length`
+- exit files: `1`
+
+This is negative evidence. It shows the simple `Answer exactly: OK.` prompt is
+not a reliable natural-EOS proof for Qwen2.5-0.5B. EOS coverage remains open and
+needs a deterministic tokenizer-aware fixture or model-specific harness mode.
+
 ## Required Scenarios
 
 For each required model, run three streaming chat lengths:
