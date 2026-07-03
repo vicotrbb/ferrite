@@ -90,3 +90,19 @@ The first instrumentation slice is implemented in the proof tooling:
 Next, rerun the bounded 1024-token Qwen 0.5B trace with prompt-cache tracing
 enabled and compare generated-response hashes, next-turn assistant-context
 hashes, prompt token hashes, cached prompt tokens, and TTFT.
+
+## First Instrumented Observation
+
+A bounded local 128-token Qwen 0.5B trace confirmed that response/context
+identity observability works and that generated responses are carried into the
+next request:
+
+| Link | Response hash | Next context hash | Result |
+| --- | --- | --- | --- |
+| turn 1 -> turn 2 | `fnv64:d6e2f2c865e49919` | `fnv64:d6e2f2c865e49919` | match |
+| turn 2 -> turn 3 | `fnv64:0969ba966218802c` | `fnv64:0969ba966218802c` | match |
+| turn 3 -> turn 4 | `fnv64:a449d2a8d7a2519c` | `fnv64:a449d2a8d7a2519c` | match |
+
+That run did not show a fixed point: every generated response hash changed,
+generated follow-up turns reused only 12, 13, and 14 prompt tokens, and all
+generated follow-ups reported `shared_prefix_hit`, not `exact_hit`.
