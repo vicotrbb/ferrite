@@ -84,5 +84,13 @@ The rebuilt binary was also exercised against local Qwen2.5-0.5B Q4_K_M:
 - `long_chat_summary_queue_probe_completed=true`
 - `long_chat_summary_run_complete=true`
 
-The remaining gap is staging x86_64 Qwen2.5-1.5B Q8_0 proof when the
-Kubernetes API is reachable.
+The staging x86_64 Qwen2.5-1.5B Q8_0 proof also passed:
+
+- `documentation/benchmarks/2026-07-03-openai-long-chat-x86-qwen-1-5b-q8-capsule-queue-proof-256.md`
+- `long_chat_summary_generated_context_identity_links=6`
+- `long_chat_summary_matching_generated_context_identity_links=6`
+- `long_chat_summary_queue_probe_completed=true`
+- `long_chat_summary_run_complete=true`
+
+The remaining gaps are 512-token and 1024-token capsule queue proofs, plus a
+cold-key queue variant if queued behavior must also prove namespace isolation.
