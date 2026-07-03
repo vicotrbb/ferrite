@@ -99,6 +99,7 @@ fn cli_benchmarks_tokenization_without_generation() -> Result<(), Box<dyn Error>
     assert!(stdout.contains("tokenization_benchmark_runs=3"));
     assert!(stdout.contains("tokenization_benchmark_prompt_bytes=5"));
     assert!(stdout.contains("tokenization_benchmark_token_count=1"));
+    assert!(stdout.contains("tokenization_benchmark_token_ids_fingerprint=fnv1a64:"));
     assert!(stdout.contains("tokenization_benchmark_gguf_parse_ns="));
     assert!(stdout.contains("tokenization_benchmark_tokenizer_load_ns="));
     assert!(stdout.contains("tokenization_benchmark_encode_total_ns="));

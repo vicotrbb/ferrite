@@ -275,6 +275,10 @@ fn benchmark_tokenization(
     println!("tokenization_benchmark_prompt_bytes={}", prompt.len());
     println!("tokenization_benchmark_token_count={}", token_ids.len());
     println!(
+        "tokenization_benchmark_token_ids_fingerprint={}",
+        token_ids_fingerprint(&token_ids)
+    );
+    println!(
         "tokenization_benchmark_gguf_parse_ns={}",
         setup_timing.gguf_parse_ns
     );
@@ -294,6 +298,17 @@ fn benchmark_tokenization(
 struct TokenizationSetupTiming {
     gguf_parse_ns: u128,
     tokenizer_load_ns: u128,
+}
+
+fn token_ids_fingerprint(token_ids: &[usize]) -> String {
+    let mut hash = 0xcbf2_9ce4_8422_2325u64;
+    for token_id in token_ids {
+        for byte in (*token_id as u64).to_le_bytes() {
+            hash ^= u64::from(byte);
+            hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+    }
+    format!("fnv1a64:{hash:016x}")
 }
 
 fn join_token_ids(token_ids: &[usize]) -> String {
