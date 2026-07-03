@@ -105,13 +105,37 @@ alone. The next highest-value implementation theory is a proof-only state
 capsule mode in the long-chat gate, followed by a 1024-token run with both
 substring and semantic checks.
 
+## State Capsule Probe
+
+Commit `f202a84` added a proof-only
+`--generated-context-state-capsule TEXT` mode to the long-chat gate. The first
+real-model run is documented in
+`documentation/benchmarks/2026-07-03-openai-long-chat-x86-qwen-1-5b-q8-state-capsule-256.md`.
+
+The result was mixed:
+
+| Variant | Window 32 | Window 64 | Read |
+| --- | --- | --- | --- |
+| JSON state capsule with `7291` | passed 4 turns | failed at turn 2 | capsule placement is not robust |
+
+The 32-token window passed four 256-token streaming turns with generated
+follow-up context, RSS sampling, error probe, disconnect/reconnect probe,
+streaming token IDs, usage accounting, finish reason checks, and token-limit
+status. The 64-token window completed probes and turn 1, then failed the
+required generated-response substring check on turn 2.
+
+This is a useful falsification slice. It suggests that preserving more generated
+assistant prose can compete with the structured capsule. The next theory should
+test capsule placement and authority, not only window size.
+
 ## Next Steps
 
-1. Add a proof-only gate mode that appends a compact state capsule to follow-up
-   turns without changing the public server default.
-2. Run 32, 64, and 128 generated-token windows with numeric, key/value, JSON,
-   and summary-capsule anchors.
-3. Add a semantic recall probe that checks a short generated answer for a known
+1. Test capsule placement in the follow-up user message instead of assistant
+   context.
+2. Test a shorter `state_anchor=7291` capsule against the JSON capsule.
+3. Test a capsule-only generated follow-up mode that omits retained generated
+   prose.
+4. Add a semantic recall probe that checks a short generated answer for a known
    fact without requiring the exact full marker.
-4. Only after those pass, draft an HTTP serving policy that makes truncation and
+5. Only after those pass, draft an HTTP serving policy that makes truncation and
    state retention explicit to clients.
