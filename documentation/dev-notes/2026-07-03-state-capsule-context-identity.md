@@ -92,5 +92,14 @@ The staging x86_64 Qwen2.5-1.5B Q8_0 proof also passed:
 - `long_chat_summary_queue_probe_completed=true`
 - `long_chat_summary_run_complete=true`
 
-The remaining gaps are 512-token and 1024-token capsule queue proofs, plus a
-cold-key queue variant if queued behavior must also prove namespace isolation.
+The local 512-token capsule queue proof also passed:
+
+- `documentation/benchmarks/2026-07-03-local-qwen-0-5b-capsule-queue-proof-512.md`
+- `long_chat_summary_generated_context_identity_links=6`
+- `long_chat_summary_matching_generated_context_identity_links=6`
+- `long_chat_summary_queue_probe_completed=true`
+- `long_chat_summary_run_complete=true`
+
+The remaining gaps are x86_64 512-token proof, 1024-token capsule queue proof,
+and a cold-key queue variant if queued behavior must also prove namespace
+isolation.
