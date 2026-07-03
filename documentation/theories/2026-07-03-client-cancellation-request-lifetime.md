@@ -58,6 +58,10 @@ What is proven:
 - Ferrite now has a cooperative prompt-prefill cancellation seam. The scalar
   session checks a cancellation callback before each prompt token, and the
   OpenAI streaming path maps a closed SSE receiver to prompt cancellation.
+- Ferrite now also polls the same cancellation signal while evaluating a prompt
+  token, at transformer-layer boundaries. This reduces the expected
+  post-disconnect CPU window for long prompt prefill without inserting checks
+  into every matvec kernel.
 
 What is not proven:
 
@@ -66,8 +70,8 @@ What is not proven:
 - whether Kubernetes port-forward buffering hid the real client state;
 - whether the observed CPU belonged to the killed request or another request;
 - how quickly a real large-model prompt prefill returns to idle after
-  disconnect, because cancellation is cooperative at prompt-token boundaries
-  and does not interrupt a single in-progress token evaluation.
+  disconnect, because cancellation is cooperative at layer boundaries and does
+  not interrupt a single in-progress layer or matvec operation.
 
 ## Direct Route Evidence
 
@@ -175,12 +179,27 @@ cargo fmt -- --check
 git diff --check
 ```
 
+Commit `fb5221c` tightened that seam further:
+
+- `ScalarLlamaSession::accept_prompt_with_control_and_cancellation` combines
+  prompt-token context with a no-context cancellation poll.
+- `ScalarLlamaSession::accept_token_with_layer_control` checks cancellation
+  before each transformer layer.
+- The OpenAI streaming worker now uses the cancellation-poll path, so a closed
+  stream can stop long prompt prefill before the next layer starts.
+
+Additional validation:
+
+```text
+cargo test -p ferrite-inference --test scalar_prompt_cancellation -- --nocapture
+cargo test -p ferrite-server generate_with_prompt_cancellation_poll_stops_during_prompt_token_evaluation -- --nocapture
+```
+
 This improves the design from "HTTP-layer cancellation only" to cooperative
 runtime cancellation during prompt prefill. It still cannot preempt a single
-matrix-heavy token evaluation mid-token. For real models, the worst-case
+matrix-heavy layer or matvec operation. For real models, the worst-case
 cancellation latency is therefore bounded by the time to finish the current
-prompt token plus the transport delay before the SSE receiver is marked
-closed.
+layer plus the transport delay before the SSE receiver is marked closed.
 
 ## Minimal Experiment
 
@@ -206,9 +225,9 @@ should measure how many seconds elapse between client disconnect and permit
 release with the cooperative prompt-prefill cancellation seam in place.
 
 If that experiment still shows unacceptable post-disconnect CPU, the next
-design candidate is lower-level cancellation inside a single token evaluation,
-most likely at layer or matvec boundaries. That is a higher-risk change and
-should not be attempted without real-model evidence that token-boundary
+design candidate is lower-level cancellation inside a single layer, most
+likely at attention, FFN, or matvec boundaries. That is a higher-risk change
+and should not be attempted without real-model evidence that layer-boundary
 cancellation is insufficient.
 
 ## Expected Outcomes
