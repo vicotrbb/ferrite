@@ -280,3 +280,32 @@ The disconnected port-forward attempt also exposed a new theory candidate:
 client cancellation may not immediately stop in-flight server generation. That
 needs a focused cancellation/reconnect experiment with server-side CPU, RSS,
 and request-lifetime evidence.
+
+## Lifecycle Companion Observation
+
+A lifecycle-instrumented local companion run now exists:
+
+- benchmark note:
+  `documentation/benchmarks/2026-07-03-llama-benchy-qwen-0-5b-lifecycle-companion.md`
+- `llama-benchy` JSON:
+  `documentation/benchmarks/2026-07-03-llama-benchy-qwen-0-5b-lifecycle-companion-256.json`
+  `documentation/benchmarks/2026-07-03-llama-benchy-qwen-0-5b-lifecycle-companion-512.json`
+  `documentation/benchmarks/2026-07-03-llama-benchy-qwen-0-5b-lifecycle-companion-1024.json`
+
+This run repeats the diagonal `256`, `512`, and `1024`
+prompt/depth/generation shape against the current lifecycle-logging server.
+`llama-benchy` reported e2e TTFT of `11682.690542` ms and `14931.817000` ms
+for 256-token context and inference phases, `26427.955375` ms and
+`39347.656125` ms for 512-token phases, and `66191.389000` ms and
+`117547.157792` ms for 1024-token phases.
+
+Ferrite's server lifecycle log recorded the matching long streams as completed
+with no disconnect point. The 1024 context-load stream generated 1024 token IDs
+in `189889` ms, and the 1024 inference stream generated 1024 token IDs in
+`292133` ms.
+
+The observation strengthens the benchmark/tool split. `llama-benchy` can be
+kept as a standard external latency companion for OpenAI-compatible traffic,
+but the long-chat gate still owns correctness proof for generated context,
+cached-token metadata, reconnect/error handling, RSS sampling, and stop/EOS
+behavior.
