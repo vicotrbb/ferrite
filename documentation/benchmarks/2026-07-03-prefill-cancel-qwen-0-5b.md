@@ -161,7 +161,8 @@ This run does not prove:
 
 ## Next Step
 
-Add request-lifetime instrumentation if stronger proof is needed: request id,
-disconnect observation point, prompt-token count, prompt-layer count, and
-permit-release timestamp. That would convert this smoke from external timing
-evidence into a direct server-side cancellation-latency measurement.
+Rerun this gate with the OpenAI stream lifecycle log added in commit
+`b0ec7d0`. Preserve each `openai_stream_lifecycle` line beside the RSS and
+reconnect timing samples so the next result can report the server-side finish
+reason, disconnect point, prompt-token starts, prompt cancellation polls,
+generated chunks, generated token ids, and elapsed milliseconds.

@@ -67,6 +67,12 @@ What is proven:
   request with generated content. The reconnect generated event arrived after
   about 8.9 seconds, consistent with the abandoned request not holding the
   single inference permit for the full long-prompt prefill.
+- Ferrite now emits one server-side OpenAI streaming lifecycle log line per
+  request. The line includes a request id, finish reason, disconnect point,
+  prompt tokens started, prompt cancellation polls, generated chunks,
+  generated token ids, and elapsed milliseconds. This gives the next real-model
+  proof a direct server-side request-lifetime signal instead of relying only on
+  reconnect timing and RSS samples.
 
 What is not proven:
 
@@ -77,8 +83,9 @@ What is not proven:
 - how quickly a real large-model prompt prefill returns to idle after
   disconnect, because cancellation is cooperative at layer boundaries and does
   not interrupt a single in-progress layer or matvec operation.
-- the exact server-side cancellation latency, because the current real-model
-  smoke uses external reconnect timing rather than request-lifetime counters.
+- the exact real-model server-side cancellation latency, because the existing
+  Qwen 0.5B smoke was run before lifecycle logging existed and therefore used
+  external reconnect timing rather than request-lifetime counters.
 
 ## Direct Route Evidence
 
@@ -258,11 +265,18 @@ should measure how many seconds elapse between client disconnect and permit
 release with the cooperative prompt-prefill cancellation seam in place.
 
 The direct in-pod smoke is positive enough that the next code slice should not
-jump to lower-level cancellation inside a single layer. If stronger proof is
-needed, add request-lifetime instrumentation first: request id, disconnect
-observation point, prompt-token count, prompt-layer count, and permit-release
-timestamp. Only consider attention, FFN, or matvec-level cancellation if those
-direct counters show layer-boundary cancellation is still too slow.
+jump to lower-level cancellation inside a single layer. Commit `b0ec7d0` added
+request-lifetime instrumentation first: request id, finish reason, disconnect
+observation point, prompt-token starts, prompt cancellation polls, generated
+chunk count, generated token-id count, and elapsed milliseconds. Only consider
+attention, FFN, or matvec-level cancellation if those direct counters show
+layer-boundary cancellation is still too slow.
+
+Example log shape:
+
+```text
+openai_stream_lifecycle request_id=stream-0 finish_reason=cancelled disconnect_point=prompt_evaluation prompt_tokens_started=12 prompt_cancellation_polls=37 generated_chunks=0 generated_token_ids=0 elapsed_ms=1234
+```
 
 ## Expected Outcomes
 
@@ -277,18 +291,26 @@ next request is delayed.
 The theory weakens if direct local/in-pod disconnects cancel promptly and the
 only reproducible failure is Kubernetes port-forward stream loss.
 
-## Instrumentation Needed
+## Instrumentation Added And Remaining
 
-The next implementation-quality test should add request-lifetime evidence that
-does not depend on external inference from `top`:
+Commit `b0ec7d0` adds request-lifetime evidence that does not depend on
+external inference from `top`:
 
 - request id in server logs;
-- stream start and stream end reason;
+- stream finish reason;
 - client disconnect detection point;
-- generation cancellation signal observed by the inference worker;
-- tokens generated after disconnect;
-- prompt tokens evaluated after disconnect;
+- prompt cancellation polls observed by the inference worker;
+- generated chunk and token-id totals;
+- prompt-token-start totals;
 - per-request elapsed time and final state.
+
+The remaining proof work is to rerun the real-model gate and preserve these
+log lines beside the RSS, reconnect, and latency-per-token samples. If that run
+shows a high elapsed time after a prompt-evaluation disconnect, add more
+granular counters around prompt layers or add an explicit after-disconnect
+token counter. If it shows bounded elapsed time and no generated chunks for a
+pre-generation disconnect, do not widen cancellation into matvec-level checks
+yet.
 
 ## Decision Rule
 
