@@ -71,6 +71,11 @@ current tokenizer baseline and then measure end-to-end streaming behavior with
 the full matrix below. Do not infer long-chat readiness from tokenizer-stage
 improvement alone.
 
+Use `--require-token-lengths 256,512,1024` for dedicated closure attempts. This
+keeps partial one-length runs useful as evidence while preventing
+`long_chat_summary_run_complete=true` from passing a closure attempt that omits
+part of the required token-length ladder.
+
 ## Required Scenarios
 
 For each required model, run three streaming chat lengths:

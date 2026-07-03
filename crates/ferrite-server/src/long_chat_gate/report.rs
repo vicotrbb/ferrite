@@ -107,6 +107,14 @@ pub fn format_plan(config: &LongChatGateConfig) -> String {
         .probe_max_tokens()
         .map(|tokens| format!("\nlong_chat_probe_max_tokens={tokens}"))
         .unwrap_or_default();
+    let required_token_lengths = if config.required_token_lengths().is_empty() {
+        String::new()
+    } else {
+        format!(
+            "\nlong_chat_required_token_lengths={}",
+            format_usize_list(config.required_token_lengths())
+        )
+    };
     let disconnect_reconnect_timeout = if config.disconnect_probe() {
         format!(
             "\nlong_chat_disconnect_reconnect_timeout_ms={}",
@@ -116,7 +124,7 @@ pub fn format_plan(config: &LongChatGateConfig) -> String {
         String::new()
     };
     format!(
-        "long_chat_models={models}\nlong_chat_token_lengths={token_lengths}\nlong_chat_turns={}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}\nlong_chat_planned_scenarios={}",
+        "long_chat_models={models}\nlong_chat_token_lengths={token_lengths}\nlong_chat_turns={}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}\nlong_chat_planned_scenarios={}",
         config.turns(),
         prompt_cache_key,
         prompt_cache_keys,
@@ -137,9 +145,18 @@ pub fn format_plan(config: &LongChatGateConfig) -> String {
         disconnect_probe_required,
         queue_probe_required,
         probe_max_tokens,
+        required_token_lengths,
         disconnect_reconnect_timeout,
         config.planned_scenarios()
     )
+}
+
+fn format_usize_list(values: &[usize]) -> String {
+    values
+        .iter()
+        .map(usize::to_string)
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 pub fn format_scenarios(config: &LongChatGateConfig) -> String {
