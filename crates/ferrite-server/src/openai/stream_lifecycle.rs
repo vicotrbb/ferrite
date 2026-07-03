@@ -7,6 +7,7 @@ static NEXT_STREAM_ID: AtomicU64 = AtomicU64::new(0);
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum StreamDisconnectPoint {
     BeforeGeneration,
+    Tokenization,
     PromptEvaluation,
     TokenStreaming,
     FinalChunks,
@@ -16,6 +17,7 @@ impl StreamDisconnectPoint {
     fn as_str(self) -> &'static str {
         match self {
             Self::BeforeGeneration => "before_generation",
+            Self::Tokenization => "tokenization",
             Self::PromptEvaluation => "prompt_evaluation",
             Self::TokenStreaming => "token_streaming",
             Self::FinalChunks => "final_chunks",
@@ -187,6 +189,18 @@ impl StreamLifecycle {
                 self.prompt_cancellation_layer_index = layer_index;
             }
             self.record_disconnect(point);
+            PromptEvaluationControl::Cancel
+        } else {
+            PromptEvaluationControl::Continue
+        }
+    }
+
+    pub(super) fn observe_tokenization_stream_state(
+        &mut self,
+        closed: bool,
+    ) -> PromptEvaluationControl {
+        if closed {
+            self.record_disconnect(StreamDisconnectPoint::Tokenization);
             PromptEvaluationControl::Cancel
         } else {
             PromptEvaluationControl::Continue
@@ -434,5 +448,22 @@ mod tests {
         assert!(summary
             .log_line()
             .contains("prompt_evaluation_started_elapsed_ms="));
+    }
+
+    #[test]
+    fn lifecycle_summary_records_tokenization_disconnect_state() {
+        let mut lifecycle = StreamLifecycle::new();
+
+        assert_eq!(
+            lifecycle.observe_tokenization_stream_state(true),
+            PromptEvaluationControl::Cancel
+        );
+        let summary = lifecycle.finish(StreamFinishReason::Cancelled);
+
+        assert_eq!(
+            summary.disconnect_point,
+            Some(StreamDisconnectPoint::Tokenization)
+        );
+        assert!(summary.log_line().contains("disconnect_point=tokenization"));
     }
 }

@@ -219,6 +219,11 @@ where
                     &input.prompt,
                     input.max_tokens,
                     input.cache_options,
+                    || {
+                        lifecycle
+                            .borrow_mut()
+                            .observe_tokenization_stream_state(sender.is_closed())
+                    },
                     |stage| {
                         lifecycle.borrow_mut().record_generation_stage(stage);
                     },

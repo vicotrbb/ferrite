@@ -1,5 +1,5 @@
 use ferrite_model::gguf::parse_gguf;
-use ferrite_model::tokenizer::{GgufTokenizer, TokenType, TokenizerModel};
+use ferrite_model::tokenizer::{GgufTokenizer, TokenType, TokenizationControl, TokenizerModel};
 use std::error::Error;
 use std::io;
 
@@ -168,6 +168,26 @@ fn encodes_with_ranked_bpe_merges_from_gguf_metadata() -> Result<(), Box<dyn Err
     let tokenizer = GgufTokenizer::from_gguf(&file)?;
 
     assert_eq!(tokenizer.encode_bpe("hello hello")?, vec![8, 9, 8]);
+    Ok(())
+}
+
+#[test]
+fn bpe_tokenization_can_be_cancelled() -> Result<(), Box<dyn Error>> {
+    let bytes = bpe_tokenizer_fixture();
+    let file = parse_gguf(&bytes)?;
+    let tokenizer = GgufTokenizer::from_gguf(&file)?;
+    let mut polls = 0;
+
+    let error = match tokenizer.encode_with_cancellation("hello hello", || {
+        polls += 1;
+        TokenizationControl::Cancel
+    }) {
+        Ok(_) => return Err(io::Error::other("tokenization should cancel").into()),
+        Err(error) => error,
+    };
+
+    assert_eq!(error.to_string(), "tokenization cancelled");
+    assert_eq!(polls, 1);
     Ok(())
 }
 

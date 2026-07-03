@@ -9,7 +9,10 @@ use ferrite_inference::scalar::{
     PromptEvaluationControl as ScalarPromptEvaluationControl,
     PromptEvaluationLocation as ScalarPromptEvaluationLocation, ScalarLlamaModel,
 };
-use ferrite_model::{gguf::parse_gguf, tokenizer::GgufTokenizer};
+use ferrite_model::{
+    gguf::parse_gguf,
+    tokenizer::{GgufTokenizer, TokenizationControl},
+};
 use prefix_cache::{fnv64_bytes, RuntimePrefixCache};
 use std::{error::Error, fmt, fs, path::Path, sync::Mutex};
 
@@ -185,6 +188,7 @@ impl InferenceEngine {
             prompt,
             max_tokens,
             cache_options,
+            || PromptEvaluationControl::Continue,
             |_| {},
             &mut on_prompt_token,
             &mut on_prompt_cancellation_poll,
@@ -197,6 +201,7 @@ impl InferenceEngine {
         prompt: &str,
         max_tokens: usize,
         cache_options: GenerationCacheOptions,
+        mut on_tokenization_cancellation_poll: impl FnMut() -> PromptEvaluationControl,
         mut on_generation_stage: impl FnMut(GenerationStage),
         mut on_prompt_token: impl FnMut(usize, usize) -> PromptEvaluationControl,
         mut on_prompt_cancellation_poll: impl FnMut(PromptEvaluationLocation) -> PromptEvaluationControl,
@@ -204,7 +209,9 @@ impl InferenceEngine {
     ) -> Result<GeneratedText, RuntimeError> {
         let prompt_token_ids = self
             .tokenizer
-            .encode(prompt)
+            .encode_with_cancellation(prompt, || {
+                map_tokenization_control(on_tokenization_cancellation_poll())
+            })
             .map_err(|error| RuntimeError::new(format!("failed to tokenize prompt: {error}")))?;
         on_generation_stage(GenerationStage::PromptTokenized);
         if prompt_token_ids.is_empty() {
@@ -377,6 +384,13 @@ fn map_prompt_control(control: PromptEvaluationControl) -> ScalarPromptEvaluatio
     match control {
         PromptEvaluationControl::Continue => ScalarPromptEvaluationControl::Continue,
         PromptEvaluationControl::Cancel => ScalarPromptEvaluationControl::Cancel,
+    }
+}
+
+fn map_tokenization_control(control: PromptEvaluationControl) -> TokenizationControl {
+    match control {
+        PromptEvaluationControl::Continue => TokenizationControl::Continue,
+        PromptEvaluationControl::Cancel => TokenizationControl::Cancel,
     }
 }
 
@@ -738,6 +752,7 @@ mod tests {
             "hello",
             1,
             GenerationCacheOptions::default(),
+            || PromptEvaluationControl::Continue,
             |stage| stages.push(stage),
             |_, _| PromptEvaluationControl::Continue,
             |_| PromptEvaluationControl::Continue,
@@ -754,6 +769,36 @@ mod tests {
                 GenerationStage::PromptEvaluationStarted,
             ]
         );
+        Ok(())
+    }
+
+    #[test]
+    fn generation_tokenization_cancellation_stops_before_prompt_evaluation(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let model_path = write_fixture_model()?;
+        let engine = InferenceEngine::load(&model_path)?;
+        remove_fixture_model(&model_path)?;
+        let mut stages = Vec::new();
+
+        let error = match engine.generate_with_stage_callbacks_and_cache_options(
+            "hello",
+            1,
+            GenerationCacheOptions::default(),
+            || PromptEvaluationControl::Cancel,
+            |stage| stages.push(stage),
+            |_, _| PromptEvaluationControl::Continue,
+            |_| PromptEvaluationControl::Continue,
+            |_, _| Ok(GenerationControl::Continue),
+        ) {
+            Ok(_) => return Err("generation should stop during tokenization".into()),
+            Err(error) => error,
+        };
+
+        assert_eq!(
+            error.to_string(),
+            "failed to tokenize prompt: tokenization cancelled"
+        );
+        assert!(stages.is_empty());
         Ok(())
     }
 

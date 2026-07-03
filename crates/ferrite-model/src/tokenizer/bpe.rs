@@ -1,4 +1,4 @@
-use super::TokenizerError;
+use super::{TokenizationControl, TokenizerError};
 use std::collections::BTreeMap;
 
 pub(super) fn decode(ids: &[usize], tokens: &[String]) -> Result<String, TokenizerError> {
@@ -21,15 +21,22 @@ pub(super) fn decode(ids: &[usize], tokens: &[String]) -> Result<String, Tokeniz
     })
 }
 
-pub(super) fn encode(
+pub(super) fn encode_with_cancellation(
     input: &str,
     tokens: &[String],
     merges: &[String],
+    mut on_cancellation_poll: impl FnMut() -> TokenizationControl,
 ) -> Result<Vec<usize>, TokenizerError> {
+    if on_cancellation_poll() == TokenizationControl::Cancel {
+        return Err(TokenizerError::cancelled());
+    }
     let token_to_id = token_to_id(tokens);
-    let mut symbols = seed_symbols(input, &token_to_id)?;
+    let mut symbols = seed_symbols(input, &token_to_id, &mut on_cancellation_poll)?;
 
     for merge in merges {
+        if on_cancellation_poll() == TokenizationControl::Cancel {
+            return Err(TokenizerError::cancelled());
+        }
         let Some((left, right)) = parse_merge(merge) else {
             return Err(TokenizerError::new(format!(
                 "invalid BPE merge rule {merge:?}"
@@ -64,21 +71,23 @@ fn token_to_id(tokens: &[String]) -> BTreeMap<&str, usize> {
 fn seed_symbols(
     input: &str,
     token_to_id: &BTreeMap<&str, usize>,
+    on_cancellation_poll: &mut impl FnMut() -> TokenizationControl,
 ) -> Result<Vec<String>, TokenizerError> {
-    input
-        .as_bytes()
-        .iter()
-        .map(|byte| {
-            let symbol = byte_to_unicode(*byte)?.to_string();
-            if token_to_id.contains_key(symbol.as_str()) {
-                Ok(symbol)
-            } else {
-                Err(TokenizerError::new(format!(
-                    "no BPE seed token matches {symbol:?}"
-                )))
-            }
-        })
-        .collect()
+    let mut symbols = Vec::with_capacity(input.len());
+    for (index, byte) in input.as_bytes().iter().enumerate() {
+        if index % 1024 == 0 && on_cancellation_poll() == TokenizationControl::Cancel {
+            return Err(TokenizerError::cancelled());
+        }
+        let symbol = byte_to_unicode(*byte)?.to_string();
+        if token_to_id.contains_key(symbol.as_str()) {
+            symbols.push(symbol);
+        } else {
+            return Err(TokenizerError::new(format!(
+                "no BPE seed token matches {symbol:?}"
+            )));
+        }
+    }
+    Ok(symbols)
 }
 
 fn byte_to_unicode(byte: u8) -> Result<char, TokenizerError> {

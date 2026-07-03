@@ -91,9 +91,23 @@ impl GgufTokenizer {
     }
 
     pub fn encode_atomic(&self, input: &str) -> Result<Vec<usize>, TokenizerError> {
+        self.encode_atomic_with_cancellation(input, || TokenizationControl::Continue)
+    }
+
+    pub fn encode_atomic_with_cancellation(
+        &self,
+        input: &str,
+        mut on_cancellation_poll: impl FnMut() -> TokenizationControl,
+    ) -> Result<Vec<usize>, TokenizerError> {
         let mut output = Vec::new();
         let mut cursor = 0usize;
+        if on_cancellation_poll() == TokenizationControl::Cancel {
+            return Err(TokenizerError::cancelled());
+        }
         while cursor < input.len() {
+            if on_cancellation_poll() == TokenizationControl::Cancel {
+                return Err(TokenizerError::cancelled());
+            }
             let suffix = &input[cursor..];
             let Some((id, token)) = self.longest_token_prefix(suffix) else {
                 return Err(TokenizerError::new(format!(
@@ -107,15 +121,31 @@ impl GgufTokenizer {
     }
 
     pub fn encode(&self, input: &str) -> Result<Vec<usize>, TokenizerError> {
+        self.encode_with_cancellation(input, || TokenizationControl::Continue)
+    }
+
+    pub fn encode_with_cancellation(
+        &self,
+        input: &str,
+        on_cancellation_poll: impl FnMut() -> TokenizationControl,
+    ) -> Result<Vec<usize>, TokenizerError> {
         if self.merges.is_empty() {
-            self.encode_atomic(input)
+            self.encode_atomic_with_cancellation(input, on_cancellation_poll)
         } else {
-            self.encode_bpe(input)
+            self.encode_bpe_with_cancellation(input, on_cancellation_poll)
         }
     }
 
     pub fn encode_bpe(&self, input: &str) -> Result<Vec<usize>, TokenizerError> {
-        bpe::encode(input, &self.tokens, &self.merges)
+        self.encode_bpe_with_cancellation(input, || TokenizationControl::Continue)
+    }
+
+    pub fn encode_bpe_with_cancellation(
+        &self,
+        input: &str,
+        on_cancellation_poll: impl FnMut() -> TokenizationControl,
+    ) -> Result<Vec<usize>, TokenizerError> {
+        bpe::encode_with_cancellation(input, &self.tokens, &self.merges, on_cancellation_poll)
     }
 
     fn longest_token_prefix(&self, input: &str) -> Option<(usize, &str)> {
@@ -150,6 +180,12 @@ pub enum TokenType {
     Other(i32),
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TokenizationControl {
+    Continue,
+    Cancel,
+}
+
 impl TokenType {
     fn from_gguf(value: i32) -> Self {
         match value {
@@ -182,6 +218,10 @@ impl TokenizerError {
             message: message.into(),
             kind: TokenizerErrorKind::Other,
         }
+    }
+
+    pub(crate) fn cancelled() -> Self {
+        Self::new("tokenization cancelled")
     }
 
     pub(crate) fn incomplete_utf8(message: impl Into<String>) -> Self {
