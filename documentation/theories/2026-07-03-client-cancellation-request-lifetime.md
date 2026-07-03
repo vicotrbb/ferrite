@@ -285,8 +285,20 @@ The first follow-up instrumentation slice added
 `prompt_cancellation_closed_polls` and `disconnect_to_finish_ms` to
 `openai_stream_lifecycle`; see
 `documentation/dev-notes/2026-07-03-openai-stream-lifecycle-cancel-latency.md`.
-The remaining missing counters are prompt token index, transformer layer index,
-and an explicit first-closed-observed timestamp relative to request start.
+
+The counter-enabled real-model rerun is documented in
+`documentation/benchmarks/2026-07-03-local-qwen-0-5b-prefill-cancel-lifecycle-counters.md`.
+It reported:
+
+```text
+openai_stream_lifecycle request_id=stream-0 finish_reason=cancelled disconnect_point=prompt_evaluation prompt_tokens_started=1 prompt_cancellation_polls=1 prompt_cancellation_closed_polls=1 generated_chunks=0 generated_token_ids=0 elapsed_ms=6455 disconnect_to_finish_ms=0
+```
+
+That result shifts the immediate question. Ferrite returned from cancellation
+immediately enough to round to `disconnect_to_finish_ms=0` once the closed
+stream was observed. The remaining latency is before closure observation, so
+the next missing counter is `disconnect_observed_elapsed_ms`, followed by prompt
+token index and transformer layer index.
 
 ## Minimal Experiment
 
