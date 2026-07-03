@@ -47,6 +47,10 @@ impl StreamSender {
         self.send_event_blocking(Event::default().data("[DONE]"))
     }
 
+    pub fn is_closed(&self) -> bool {
+        self.sender.is_closed()
+    }
+
     fn send_event_blocking(&self, event: Event) -> Result<(), OpenAiHttpError> {
         self.sender
             .blocking_send(Ok(event))
@@ -83,6 +87,15 @@ mod tests {
         assert!(body.contains("data: {\"text\":\"winner\"}"));
         assert!(body.contains("data: [DONE]"));
         Ok(())
+    }
+
+    #[test]
+    fn stream_sender_reports_when_receiver_is_closed() {
+        let (sender, response) = channel_response();
+
+        assert!(!sender.is_closed());
+        drop(response);
+        assert!(sender.is_closed());
     }
 
     async fn to_text(body: Body) -> Result<String, Box<dyn std::error::Error>> {

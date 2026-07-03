@@ -189,6 +189,9 @@ where
             for chunk in input.initial_chunks {
                 sender.send_json_blocking(&chunk)?;
             }
+            if sender.is_closed() {
+                return Ok(());
+            }
             let include_token_ids = input.stop_sequences.is_empty();
             let mut stop_filter = StopSequenceFilter::new(input.stop_sequences);
             let engine = input
