@@ -272,13 +272,21 @@ for about 6.4 seconds from request start. The short reconnect request itself
 took only 516 ms once it ran, so most client-observed reconnect latency came
 from waiting for the cancelled prompt-evaluation path to release the permit.
 
-The next implementation theory should not jump straight to matvec-level
-cancellation. First add finer prompt-evaluation lifecycle counters:
+Commit `fe043a3` documented this proof. The next implementation theory should
+not jump straight to matvec-level cancellation. First add finer
+prompt-evaluation lifecycle counters:
 
 - prompt token index at cancellation;
 - cancellation polls before and after the stream is observed closed;
 - current transformer layer when cancellation is observed;
 - elapsed time from first observed stream closure to cancellation return.
+
+The first follow-up instrumentation slice added
+`prompt_cancellation_closed_polls` and `disconnect_to_finish_ms` to
+`openai_stream_lifecycle`; see
+`documentation/dev-notes/2026-07-03-openai-stream-lifecycle-cancel-latency.md`.
+The remaining missing counters are prompt token index, transformer layer index,
+and an explicit first-closed-observed timestamp relative to request start.
 
 ## Minimal Experiment
 
