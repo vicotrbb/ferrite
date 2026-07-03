@@ -9,6 +9,7 @@ pub struct LongChatScenarioResult {
     prompt_cache_key: Option<String>,
     assistant_context_source: LongChatAssistantContextSource,
     assistant_context_identity: Option<LongChatTextIdentity>,
+    generated_context_identity: Option<LongChatTextIdentity>,
     throughput: ThroughputResult,
 }
 
@@ -31,6 +32,7 @@ impl LongChatScenarioResult {
             throughput,
             assistant_context_source,
             None,
+            None,
         )
     }
 
@@ -40,11 +42,28 @@ impl LongChatScenarioResult {
         assistant_context_source: LongChatAssistantContextSource,
         assistant_context_identity: LongChatTextIdentity,
     ) -> Self {
+        Self::new_with_context_identities(
+            scenario,
+            throughput,
+            assistant_context_source,
+            assistant_context_identity,
+            None,
+        )
+    }
+
+    pub fn new_with_context_identities(
+        scenario: &LongChatScenario<'_>,
+        throughput: ThroughputResult,
+        assistant_context_source: LongChatAssistantContextSource,
+        assistant_context_identity: LongChatTextIdentity,
+        generated_context_identity: Option<LongChatTextIdentity>,
+    ) -> Self {
         Self::new_with_optional_assistant_context_identity(
             scenario,
             throughput,
             assistant_context_source,
             Some(assistant_context_identity),
+            generated_context_identity,
         )
     }
 
@@ -53,6 +72,7 @@ impl LongChatScenarioResult {
         throughput: ThroughputResult,
         assistant_context_source: LongChatAssistantContextSource,
         assistant_context_identity: Option<LongChatTextIdentity>,
+        generated_context_identity: Option<LongChatTextIdentity>,
     ) -> Self {
         Self {
             model: scenario.model().to_owned(),
@@ -61,6 +81,7 @@ impl LongChatScenarioResult {
             prompt_cache_key: scenario.prompt_cache_key().map(str::to_owned),
             assistant_context_source,
             assistant_context_identity,
+            generated_context_identity,
             throughput,
         }
     }
@@ -87,6 +108,10 @@ impl LongChatScenarioResult {
 
     pub fn assistant_context_identity(&self) -> Option<LongChatTextIdentity> {
         self.assistant_context_identity
+    }
+
+    pub fn generated_context_identity(&self) -> Option<LongChatTextIdentity> {
+        self.generated_context_identity
     }
 
     pub fn throughput(&self) -> &ThroughputResult {
@@ -145,6 +170,13 @@ pub fn format_scenario_result(result: &LongChatScenarioResult) -> String {
     if let Some(identity) = result.assistant_context_identity() {
         output.push_str(&format!(
             "\nlong_chat_result_assistant_context_bytes={}\nlong_chat_result_assistant_context_hash={}",
+            identity.byte_len(),
+            identity.formatted_hash(),
+        ));
+    }
+    if let Some(identity) = result.generated_context_identity() {
+        output.push_str(&format!(
+            "\nlong_chat_result_generated_context_bytes={}\nlong_chat_result_generated_context_hash={}",
             identity.byte_len(),
             identity.formatted_hash(),
         ));

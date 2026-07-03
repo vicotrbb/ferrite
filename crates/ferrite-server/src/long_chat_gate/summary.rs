@@ -212,7 +212,9 @@ fn summarize_generated_context_identity(
             result.prompt_cache_key().map(str::to_owned),
         );
         if is_generated_follow_up_turn(result) {
-            let current = result.assistant_context_identity();
+            let current = result
+                .generated_context_identity()
+                .or_else(|| result.assistant_context_identity());
             let previous = previous_response_by_lane.get(&lane).copied();
             if let (Some(current), Some(previous)) = (current, previous) {
                 summary.links += 1;

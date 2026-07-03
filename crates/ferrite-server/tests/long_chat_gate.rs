@@ -2122,6 +2122,58 @@ fn can_add_state_capsule_to_generated_follow_up_contexts_only(
 }
 
 #[test]
+fn state_capsule_wrapped_assistant_context_preserves_generated_identity_summary(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--models"),
+        OsString::from("fixture-model"),
+        OsString::from("--token-lengths"),
+        OsString::from("256"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+        OsString::from("--assistant-context"),
+        OsString::from("seed answer"),
+        OsString::from("--generated-context-state-capsule"),
+        OsString::from(r#"{"state_anchor":"7291"}"#),
+    ])?;
+    let generated = ["alpha", "beta", "gamma", "delta"];
+    let mut calls = 0usize;
+
+    let results = config.run_with_executor(|throughput| {
+        let text = generated[calls].to_owned();
+        calls += 1;
+        Ok(ThroughputResult {
+            completed_requests: throughput.requests(),
+            elapsed: Duration::from_millis(10),
+            streaming_finish: Some(StreamingFinishSummary::new("length")),
+            streaming_timing: StreamingTimingSummary::from_event_offsets(&[
+                Duration::from_millis(1),
+                Duration::from_millis(2),
+            ]),
+            streaming_text: Some(StreamingTextSummary::new(text)),
+            streaming_token_ids: Some(StreamingTokenIdsSummary::new(1, 1, throughput.max_tokens())),
+            streaming_usage: Some(StreamingUsageSummary::new(
+                8,
+                throughput.max_tokens() as u64,
+                throughput.max_tokens() as u64 + 8,
+            )),
+            rss: None,
+        })
+    })?;
+
+    let summary = format_run_summary(&config, &results, None, None, None);
+
+    assert!(summary.contains("long_chat_summary_generated_context_identity_links=3"));
+    assert!(summary.contains("long_chat_summary_matching_generated_context_identity_links=3"));
+    assert!(summary.contains(
+        "long_chat_summary_all_generated_context_identities_match_previous_response=true"
+    ));
+    assert!(summary.contains("long_chat_summary_run_complete=true"));
+    Ok(())
+}
+
+#[test]
 fn can_add_state_capsule_to_generated_follow_up_prompt_instead_of_assistant_context(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let config = LongChatGateConfig::parse([

@@ -45,11 +45,12 @@ impl LongChatGateConfig {
                 &throughput,
             )?;
             assistant_contexts.record_result(scenario, &throughput);
-            let result = LongChatScenarioResult::new_with_assistant_context_source_and_identity(
+            let result = LongChatScenarioResult::new_with_context_identities(
                 scenario,
                 throughput,
                 assistant_context.source,
                 LongChatTextIdentity::from_text(&assistant_context.text),
+                assistant_context.generated_context_identity,
             );
             observer(&result)?;
             results.push(result);
@@ -96,11 +97,12 @@ impl LongChatGateConfig {
                 &throughput,
             )?;
             assistant_contexts.record_result(scenario, &throughput);
-            let result = LongChatScenarioResult::new_with_assistant_context_source_and_identity(
+            let result = LongChatScenarioResult::new_with_context_identities(
                 scenario,
                 throughput,
                 assistant_context.source,
                 LongChatTextIdentity::from_text(&assistant_context.text),
+                assistant_context.generated_context_identity,
             );
             observer(&result)?;
             results.push(result);
@@ -184,6 +186,7 @@ struct LongChatAssistantContexts {
 struct LongChatAssistantContext {
     text: String,
     source: LongChatAssistantContextSource,
+    generated_context_identity: Option<LongChatTextIdentity>,
 }
 
 impl LongChatAssistantContexts {
@@ -206,6 +209,7 @@ impl LongChatAssistantContexts {
 
     fn context_for(&self, scenario: &super::LongChatScenario<'_>) -> LongChatAssistantContext {
         if let Some(text) = self.generated_by_scenario.get(&scenario_lane_key(scenario)) {
+            let generated_context_identity = Some(LongChatTextIdentity::from_text(text));
             let text = match &self.generated_context_state_capsule {
                 Some(capsule)
                     if self
@@ -224,6 +228,7 @@ impl LongChatAssistantContexts {
                 _ => text.clone(),
             };
             return LongChatAssistantContext {
+                generated_context_identity,
                 text,
                 source: LongChatAssistantContextSource::Generated,
             };
@@ -232,6 +237,7 @@ impl LongChatAssistantContexts {
         LongChatAssistantContext {
             text: self.seed.clone(),
             source: LongChatAssistantContextSource::Seed,
+            generated_context_identity: None,
         }
     }
 
