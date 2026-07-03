@@ -99,3 +99,21 @@ The first instrumentation slice now exists as an opt-in trace. It does not
 change default OpenAI response shape and it does not claim cache behavior is
 optimized. The next proof step is a traced real-model rerun so each low-cache or
 high-TTFT row has a token-hash and selected-entry explanation.
+
+## Trace Diagnostic Result
+
+The first local traced diagnostic completed for Qwen2.5-0.5B Q4_K_M at 128
+generated tokens:
+
+`documentation/benchmarks/2026-07-03-openai-long-chat-qwen-0-5b-trace-diagnostic-128.md`
+
+The run reported `long_chat_summary_run_complete=true`, three cached generated
+follow-up turns, and no uncached generated follow-up turns. Each generated row
+reported `lookup=shared_prefix_hit`, and `cached_prompt_tokens` matched
+`shared_prefix_tokens`.
+
+This strengthens the cache-stability theory because low reuse is now directly
+visible: generated follow-ups reused only 14 to 16 prompt tokens out of roughly
+157 to 158 prompt tokens, and TTFT stayed around 6.3 to 6.4 seconds. The result
+does not prove an optimization; it proves the next optimization target is
+measurable.
