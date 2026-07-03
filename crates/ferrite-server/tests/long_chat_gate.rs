@@ -852,6 +852,46 @@ fn formats_long_chat_scenario_result() -> Result<(), Box<dyn std::error::Error>>
 }
 
 #[test]
+fn formats_prompt_cache_key_in_long_chat_scenario_result() -> Result<(), Box<dyn std::error::Error>>
+{
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--models"),
+        OsString::from("fixture-model"),
+        OsString::from("--token-lengths"),
+        OsString::from("256"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+        OsString::from("--prompt-cache-keys"),
+        OsString::from("tenant-a:thread-1,tenant-b:thread-1"),
+    ])?;
+    let scenario = config
+        .scenarios()
+        .into_iter()
+        .next()
+        .ok_or("expected scenario")?;
+    let throughput = ThroughputResult {
+        completed_requests: 1,
+        elapsed: Duration::from_millis(400),
+        streaming_finish: Some(StreamingFinishSummary::new("length")),
+        streaming_timing: None,
+        streaming_text: None,
+        streaming_token_ids: None,
+        streaming_usage: Some(StreamingUsageSummary::new(16, 256, 272)),
+        rss: None,
+    };
+
+    let result = LongChatScenarioResult::new(&scenario, throughput);
+
+    assert!(
+        format_scenario_result(&result).contains(
+            "long_chat_result=model:fixture-model,turn:1,max_tokens:256,prompt_cache_key:tenant-a:thread-1"
+        )
+    );
+    Ok(())
+}
+
+#[test]
 fn formats_long_chat_stop_result_as_not_hitting_token_limit(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let config = LongChatGateConfig::parse([

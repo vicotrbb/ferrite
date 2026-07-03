@@ -122,11 +122,16 @@ impl LongChatAssistantContextSource {
 
 pub fn format_scenario_result(result: &LongChatScenarioResult) -> String {
     let throughput = result.throughput();
+    let prompt_cache_key = result
+        .prompt_cache_key()
+        .map(|key| format!(",prompt_cache_key:{key}"))
+        .unwrap_or_default();
     let mut output = format!(
-        "long_chat_result=model:{},turn:{},max_tokens:{}\nlong_chat_result_assistant_context_source={}\nlong_chat_result_completed_requests={}\nlong_chat_result_elapsed_ms={}",
+        "long_chat_result=model:{},turn:{},max_tokens:{}{}\nlong_chat_result_assistant_context_source={}\nlong_chat_result_completed_requests={}\nlong_chat_result_elapsed_ms={}",
         result.model(),
         result.turn(),
         result.token_length(),
+        prompt_cache_key,
         result.assistant_context_source().as_str(),
         throughput.completed_requests,
         throughput.elapsed.as_millis()
