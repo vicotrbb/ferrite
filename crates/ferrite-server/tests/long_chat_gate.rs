@@ -76,6 +76,8 @@ fn parses_custom_long_chat_token_lengths_turns_and_models() -> Result<(), Box<dy
         OsString::from("--require-cached-follow-ups"),
         OsString::from("--expect-finish-reason"),
         OsString::from("stop"),
+        OsString::from("--require-finish-sources"),
+        OsString::from("eos,stop_sequence"),
         OsString::from("--probe-max-tokens"),
         OsString::from("256"),
         OsString::from("--generated-context-state-capsule"),
@@ -109,6 +111,7 @@ fn parses_custom_long_chat_token_lengths_turns_and_models() -> Result<(), Box<dy
     assert!(config.disconnect_probe());
     assert!(config.require_cached_follow_ups());
     assert_eq!(config.expected_finish_reason(), Some("stop"));
+    assert_eq!(config.required_finish_sources(), &["eos", "stop_sequence"]);
     assert_eq!(config.probe_max_tokens(), Some(256));
     assert_eq!(
         config.generated_context_state_capsule(),
@@ -135,6 +138,25 @@ fn parses_custom_long_chat_token_lengths_turns_and_models() -> Result<(), Box<dy
             .proof_exit_code_path()
             .map(|path| path.to_string_lossy()),
         Some("target/proof/long-chat.exit".into())
+    );
+    Ok(())
+}
+
+#[test]
+fn rejects_empty_required_finish_sources() -> Result<(), Box<dyn std::error::Error>> {
+    let result = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--require-finish-sources"),
+        OsString::from(""),
+    ]);
+    let error = match result {
+        Ok(config) => return Err(format!("expected error, got config: {config:?}").into()),
+        Err(error) => error,
+    };
+
+    assert!(
+        error.to_string().contains("--require-finish-sources"),
+        "{error}"
     );
     Ok(())
 }
@@ -1476,6 +1498,92 @@ fn explicit_stop_summary_can_complete_without_generated_follow_up_context(
     assert!(summary
         .contains("long_chat_summary_disconnect_probe_reconnect_started_new_generation=true"));
     assert!(summary.contains("long_chat_summary_run_complete=true"));
+    Ok(())
+}
+
+#[test]
+fn required_finish_sources_participate_in_long_chat_summary(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--models"),
+        OsString::from("fixture-model"),
+        OsString::from("--token-lengths"),
+        OsString::from("1"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+        OsString::from("--stop"),
+        OsString::from("<STOP>"),
+        OsString::from("--expect-finish-reason"),
+        OsString::from("stop"),
+        OsString::from("--require-finish-sources"),
+        OsString::from("eos"),
+    ])?;
+    let results = config
+        .scenarios()
+        .iter()
+        .map(|scenario| {
+            LongChatScenarioResult::new_with_assistant_context_source_and_identity(
+                scenario,
+                ThroughputResult {
+                    completed_requests: 1,
+                    elapsed: Duration::from_millis(400),
+                    streaming_finish: Some(StreamingFinishSummary::new("stop")),
+                    streaming_timing: StreamingTimingSummary::from_event_offsets(&[
+                        Duration::from_millis(64),
+                    ]),
+                    streaming_text: None,
+                    streaming_token_ids: None,
+                    streaming_usage: Some(
+                        StreamingUsageSummary::new(18, 1, 19).with_finish_source("stop_sequence"),
+                    ),
+                    rss: None,
+                },
+                LongChatAssistantContextSource::Seed,
+                LongChatTextIdentity::from_text("short context"),
+            )
+        })
+        .collect::<Vec<_>>();
+
+    let missing_result = format_scenario_result(&results[0]);
+    let missing_summary = format_run_summary(&config, &results, None, None, None);
+
+    assert!(missing_result.contains("long_chat_result_finish_source=stop_sequence"));
+    assert!(missing_summary.contains("long_chat_summary_required_finish_sources=eos"));
+    assert!(missing_summary.contains("long_chat_summary_required_finish_sources_present=false"));
+    assert!(missing_summary.contains("long_chat_summary_run_complete=false"));
+
+    let eos_results = config
+        .scenarios()
+        .iter()
+        .map(|scenario| {
+            LongChatScenarioResult::new_with_assistant_context_source_and_identity(
+                scenario,
+                ThroughputResult {
+                    completed_requests: 1,
+                    elapsed: Duration::from_millis(400),
+                    streaming_finish: Some(StreamingFinishSummary::new("stop")),
+                    streaming_timing: StreamingTimingSummary::from_event_offsets(&[
+                        Duration::from_millis(64),
+                    ]),
+                    streaming_text: None,
+                    streaming_token_ids: None,
+                    streaming_usage: Some(
+                        StreamingUsageSummary::new(18, 1, 19).with_finish_source("eos"),
+                    ),
+                    rss: None,
+                },
+                LongChatAssistantContextSource::Seed,
+                LongChatTextIdentity::from_text("short context"),
+            )
+        })
+        .collect::<Vec<_>>();
+
+    let eos_summary = format_run_summary(&config, &eos_results, None, None, None);
+
+    assert!(eos_summary.contains("long_chat_summary_required_finish_sources=eos"));
+    assert!(eos_summary.contains("long_chat_summary_required_finish_sources_present=true"));
+    assert!(eos_summary.contains("long_chat_summary_run_complete=true"));
     Ok(())
 }
 

@@ -768,6 +768,21 @@ fn extracts_streaming_usage_from_sse_body() -> Result<(), Box<dyn std::error::Er
 }
 
 #[test]
+fn extracts_streaming_usage_finish_source_from_sse_body() -> Result<(), Box<dyn std::error::Error>>
+{
+    let body = concat!(
+        "data: {\"choices\":[{\"delta\":{\"content\":\"A\"}}],\"usage\":null}\n\n",
+        "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":8,\"prompt_tokens_details\":{\"cached_tokens\":5,\"audio_tokens\":0},\"completion_tokens\":32,\"completion_tokens_details\":{\"reasoning_tokens\":0,\"audio_tokens\":0,\"accepted_prediction_tokens\":0,\"rejected_prediction_tokens\":0,\"ferrite_finish_source\":\"eos\"},\"total_tokens\":40}}\n\n",
+        "data: [DONE]\n\n",
+    );
+
+    let usage = StreamingUsageSummary::from_sse_body(body).ok_or("expected streaming usage")?;
+
+    assert_eq!(usage.finish_source(), Some("eos"));
+    Ok(())
+}
+
+#[test]
 fn extracts_streaming_text_from_chat_and_completion_sse_bodies(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let chat_body = concat!(

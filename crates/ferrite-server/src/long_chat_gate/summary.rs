@@ -115,6 +115,16 @@ pub fn format_run_summary(
             format_usize_list(config.required_token_lengths())
         )
     };
+    let required_finish_sources_present =
+        required_finish_sources_present(results, config.required_finish_sources());
+    let required_finish_sources_summary = if config.required_finish_sources().is_empty() {
+        String::new()
+    } else {
+        format!(
+            "\nlong_chat_summary_required_finish_sources={}\nlong_chat_summary_required_finish_sources_present={required_finish_sources_present}",
+            config.required_finish_sources().join(",")
+        )
+    };
     let run_complete = completed_scenarios == planned_scenarios
         && all_finish_reasons_present
         && all_usage_accounting_valid
@@ -136,7 +146,8 @@ pub fn format_run_summary(
             || (queue_probe_completed && queue_probe_contender_started_after_holder))
         && required_probes_completed
         && required_models_present
-        && required_token_lengths_present;
+        && required_token_lengths_present
+        && required_finish_sources_present;
 
     format!(
         "long_chat_summary_planned_scenarios={planned_scenarios}\n\
@@ -173,7 +184,7 @@ long_chat_summary_disconnect_probe_completed={disconnect_probe_completed}\n\
 long_chat_summary_disconnect_probe_reconnect_started_new_generation={disconnect_probe_reconnect_started_new_generation}\n\
 long_chat_summary_queue_probe_required={queue_probe_required}\n\
 long_chat_summary_queue_probe_completed={queue_probe_completed}\n\
-long_chat_summary_queue_probe_contender_started_after_holder={queue_probe_contender_started_after_holder}{}{}{}\n\
+long_chat_summary_queue_probe_contender_started_after_holder={queue_probe_contender_started_after_holder}{}{}{}{}\n\
 long_chat_summary_run_complete={run_complete}",
         generated_context_identity.required,
         generated_context_identity.links,
@@ -183,6 +194,7 @@ long_chat_summary_run_complete={run_complete}",
         required_probes_summary,
         required_models_summary,
         required_token_lengths_summary,
+        required_finish_sources_summary,
     )
 }
 
@@ -228,6 +240,22 @@ fn required_token_lengths_present(
         results
             .iter()
             .any(|result| result.token_length() == *required)
+    })
+}
+
+fn required_finish_sources_present(
+    results: &[LongChatScenarioResult],
+    required_finish_sources: &[String],
+) -> bool {
+    required_finish_sources.iter().all(|required| {
+        results.iter().any(|result| {
+            result
+                .throughput()
+                .streaming_usage
+                .as_ref()
+                .and_then(|usage| usage.finish_source())
+                .is_some_and(|source| source == required)
+        })
     })
 }
 

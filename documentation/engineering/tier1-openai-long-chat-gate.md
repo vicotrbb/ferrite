@@ -77,6 +77,7 @@ Use these closure flags for dedicated gate attempts:
 --require-models Qwen2.5-0.5B-Instruct-Q4_K_M,Qwen2.5-1.5B-Instruct-Q8_0,Qwen2.5-1.5B-Instruct-Q6_K,SmolLM2-1.7B-Instruct-Q4_K_M
 --require-token-lengths 256,512,1024
 --require-probes error,disconnect,queue
+--require-finish-sources length,eos,stop_sequence
 ```
 
 These keep partial one-model or one-length runs useful as evidence while
@@ -84,6 +85,8 @@ preventing `long_chat_summary_run_complete=true` from passing a closure attempt
 that omits part of the required model set, token-length ladder, or operational
 probe set. Required probes still need their matching execution flags, such as
 `--error-probe`, `--disconnect-probe`, and `--queue-probe`.
+Required finish sources keep explicit stop and tokenizer EOS distinct even
+though both use OpenAI's standard `finish_reason: "stop"`.
 
 Partial local required-gate proofs exist for Qwen2.5-0.5B:
 
@@ -133,6 +136,15 @@ A natural-EOS attempt also exists:
 This is negative evidence. It shows the simple `Answer exactly: OK.` prompt is
 not a reliable natural-EOS proof for Qwen2.5-0.5B. EOS coverage remains open and
 needs a deterministic tokenizer-aware fixture or model-specific harness mode.
+
+Finish-source observability now exists in the long-chat gate:
+
+- `long_chat_result_finish_source=length|eos|generation_control|stop_sequence`
+- `long_chat_summary_required_finish_sources=...`
+- `long_chat_summary_required_finish_sources_present=true|false`
+
+This makes future EOS closure auditable without inferring EOS from
+`finish_reason: "stop"` alone.
 
 ## Required Scenarios
 
@@ -226,6 +238,8 @@ requested token count:
 The result must show:
 
 - `finish_reason: "stop"`;
+- `long_chat_result_finish_source=stop_sequence` for explicit stop strings or
+  `long_chat_result_finish_source=eos` for tokenizer EOS;
 - `[DONE]` still emitted exactly once;
 - usage reflects generated tokens before stop/EOS;
 - no extra content is emitted after the stop/EOS boundary.

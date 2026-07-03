@@ -79,6 +79,14 @@ pub fn format_plan(config: &LongChatGateConfig) -> String {
         .expected_finish_reason()
         .map(|reason| format!("\nlong_chat_expected_finish_reason={reason}"))
         .unwrap_or_default();
+    let required_finish_sources = if config.required_finish_sources().is_empty() {
+        String::new()
+    } else {
+        format!(
+            "\nlong_chat_required_finish_sources={}",
+            config.required_finish_sources().join(",")
+        )
+    };
     let rss_pid = config
         .rss_pid()
         .map(|pid| format!("\nlong_chat_rss_pid={pid}"))
@@ -145,7 +153,7 @@ pub fn format_plan(config: &LongChatGateConfig) -> String {
         String::new()
     };
     format!(
-        "long_chat_models={models}{}\nlong_chat_token_lengths={token_lengths}\nlong_chat_turns={}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}\nlong_chat_planned_scenarios={}",
+        "long_chat_models={models}{}\nlong_chat_token_lengths={token_lengths}\nlong_chat_turns={}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}\nlong_chat_planned_scenarios={}",
         required_models,
         config.turns(),
         prompt_cache_key,
@@ -162,6 +170,7 @@ pub fn format_plan(config: &LongChatGateConfig) -> String {
         require_cached_follow_ups,
         stop_configured,
         expected_finish_reason,
+        required_finish_sources,
         rss_pid,
         error_probe_required,
         disconnect_probe_required,

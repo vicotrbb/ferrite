@@ -212,6 +212,9 @@ pub fn format_result(config: &ThroughputClientConfig, result: ThroughputResult) 
             usage.completion_tokens(),
             usage.total_tokens(),
         ));
+        if let Some(finish_source) = usage.finish_source() {
+            output.push_str(&format!("\nstreaming_usage_finish_source={finish_source}"));
+        }
         if let Some(trace) = usage.prompt_cache_trace() {
             output.push_str(&format!(
                 "\nstreaming_usage_prompt_cache_lookup={}\nstreaming_usage_prompt_cache_prompt_token_hash={}\nstreaming_usage_prompt_cache_shared_prefix_tokens={}",

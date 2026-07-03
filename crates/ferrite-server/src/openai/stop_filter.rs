@@ -18,6 +18,7 @@ pub(super) fn apply_stop_sequences(
         token_texts,
         crate::runtime::GenerationFinishReason::Stop,
     )
+    .with_finish_source(crate::runtime::GenerationFinishSource::StopSequence)
 }
 
 fn first_stop_index(text: &str, stop_sequences: &[String]) -> Option<usize> {

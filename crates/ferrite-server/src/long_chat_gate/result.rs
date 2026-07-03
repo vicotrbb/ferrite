@@ -197,6 +197,9 @@ pub fn format_scenario_result(result: &LongChatScenarioResult) -> String {
             usage.completion_tokens(),
             usage.total_tokens()
         ));
+        if let Some(finish_source) = usage.finish_source() {
+            output.push_str(&format!("\nlong_chat_result_finish_source={finish_source}"));
+        }
         if let Some(trace) = usage.prompt_cache_trace() {
             output.push_str(&format!(
                 "\nlong_chat_result_prompt_cache_lookup={}\nlong_chat_result_prompt_cache_prompt_token_hash={}\nlong_chat_result_prompt_cache_shared_prefix_tokens={}",

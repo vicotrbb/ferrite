@@ -4,6 +4,7 @@ pub struct StreamingUsageSummary {
     cached_prompt_tokens: u64,
     completion_tokens: u64,
     total_tokens: u64,
+    finish_source: Option<String>,
     prompt_cache_trace: Option<StreamingPromptCacheTraceSummary>,
 }
 
@@ -14,6 +15,7 @@ impl StreamingUsageSummary {
             cached_prompt_tokens: 0,
             completion_tokens,
             total_tokens,
+            finish_source: None,
             prompt_cache_trace: None,
         }
     }
@@ -28,6 +30,11 @@ impl StreamingUsageSummary {
         prompt_cache_trace: StreamingPromptCacheTraceSummary,
     ) -> Self {
         self.prompt_cache_trace = Some(prompt_cache_trace);
+        self
+    }
+
+    pub fn with_finish_source(mut self, finish_source: impl Into<String>) -> Self {
+        self.finish_source = Some(finish_source.into());
         self
     }
 
@@ -57,6 +64,10 @@ impl StreamingUsageSummary {
         self.total_tokens
     }
 
+    pub fn finish_source(&self) -> Option<&str> {
+        self.finish_source.as_deref()
+    }
+
     pub fn prompt_cache_trace(&self) -> Option<&StreamingPromptCacheTraceSummary> {
         self.prompt_cache_trace.as_ref()
     }
@@ -66,6 +77,7 @@ impl StreamingUsageSummary {
             return None;
         }
         let prompt_details = value.get("prompt_tokens_details");
+        let completion_details = value.get("completion_tokens_details");
         Some(Self {
             prompt_tokens: value.get("prompt_tokens")?.as_u64()?,
             cached_prompt_tokens: prompt_details
@@ -74,6 +86,10 @@ impl StreamingUsageSummary {
                 .unwrap_or(0),
             completion_tokens: value.get("completion_tokens")?.as_u64()?,
             total_tokens: value.get("total_tokens")?.as_u64()?,
+            finish_source: completion_details
+                .and_then(|details| details.get("ferrite_finish_source"))
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_owned),
             prompt_cache_trace: prompt_details
                 .and_then(|details| details.get("ferrite_cache"))
                 .and_then(StreamingPromptCacheTraceSummary::from_value),

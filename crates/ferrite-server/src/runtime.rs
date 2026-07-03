@@ -65,6 +65,25 @@ pub enum GenerationFinishReason {
     Length,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum GenerationFinishSource {
+    Length,
+    Eos,
+    GenerationControl,
+    StopSequence,
+}
+
+impl GenerationFinishSource {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Length => "length",
+            Self::Eos => "eos",
+            Self::GenerationControl => "generation_control",
+            Self::StopSequence => "stop_sequence",
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct InferenceEngine {
     model: ScalarLlamaModel,
@@ -321,12 +340,14 @@ impl InferenceEngine {
         let mut token_texts = Vec::with_capacity(max_tokens);
         let mut token_text_buffer = TokenTextBuffer::new();
         let mut finish_reason = GenerationFinishReason::Length;
+        let mut finish_source = GenerationFinishSource::Length;
         let mut stopped_on_eos = false;
 
         for _ in 0..max_tokens {
             generated_token_ids.push(token_id);
             if Some(token_id) == self.tokenizer.eos_token_id() {
                 finish_reason = GenerationFinishReason::Stop;
+                finish_source = GenerationFinishSource::Eos;
                 stopped_on_eos = true;
                 break;
             }
@@ -342,6 +363,7 @@ impl InferenceEngine {
             )?;
             if control == GenerationControl::Stop {
                 finish_reason = GenerationFinishReason::Stop;
+                finish_source = GenerationFinishSource::GenerationControl;
                 break;
             }
             token_id = session.accept_token_id(token_id).map_err(|error| {
@@ -368,6 +390,7 @@ impl InferenceEngine {
             token_texts,
             finish_reason,
         )
+        .with_finish_source(finish_source)
         .with_token_id_chunks(token_id_chunks)?
         .with_cached_prompt_tokens(cached_prompt_tokens)?
         .with_optional_prompt_cache_trace(prompt_cache_trace)
@@ -445,6 +468,7 @@ pub struct GeneratedText {
     token_texts: Vec<String>,
     token_id_chunks: Vec<Vec<usize>>,
     finish_reason: GenerationFinishReason,
+    finish_source: GenerationFinishSource,
 }
 
 impl GeneratedText {
@@ -470,6 +494,10 @@ impl GeneratedText {
         token_texts: Vec<String>,
         finish_reason: GenerationFinishReason,
     ) -> Self {
+        let finish_source = match finish_reason {
+            GenerationFinishReason::Stop => GenerationFinishSource::GenerationControl,
+            GenerationFinishReason::Length => GenerationFinishSource::Length,
+        };
         Self {
             text,
             prompt_tokens,
@@ -479,6 +507,7 @@ impl GeneratedText {
             token_texts,
             token_id_chunks: Vec::new(),
             finish_reason,
+            finish_source,
         }
     }
 
@@ -574,6 +603,15 @@ impl GeneratedText {
     pub fn finish_reason(&self) -> GenerationFinishReason {
         self.finish_reason
     }
+
+    pub fn finish_source(&self) -> GenerationFinishSource {
+        self.finish_source
+    }
+
+    pub fn with_finish_source(mut self, finish_source: GenerationFinishSource) -> Self {
+        self.finish_source = finish_source;
+        self
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -628,6 +666,19 @@ mod tests {
             .token_id_chunks()
             .iter()
             .all(|chunk| !chunk.is_empty()));
+        Ok(())
+    }
+
+    #[test]
+    fn generate_marks_eos_finish_source() -> Result<(), Box<dyn std::error::Error>> {
+        let model_path = write_fixture_model_with_eos_token_id(2)?;
+        let engine = InferenceEngine::load(&model_path)?;
+        remove_fixture_model(&model_path)?;
+
+        let generated = engine.generate("hello", 4)?;
+
+        assert_eq!(generated.finish_reason(), GenerationFinishReason::Stop);
+        assert_eq!(generated.finish_source(), GenerationFinishSource::Eos);
         Ok(())
     }
 
@@ -1031,6 +1082,22 @@ mod tests {
             FIXTURE_COUNTER.fetch_add(1, Ordering::Relaxed)
         ));
         std::fs::write(&path, ferrite_fixtures::scalar_llama_f32_gguf_fixture())?;
+        Ok(path)
+    }
+
+    fn write_fixture_model_with_eos_token_id(
+        eos_token_id: u64,
+    ) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+        let mut path = std::env::temp_dir();
+        path.push(format!(
+            "ferrite-runtime-eos-fixture-{}-{}.gguf",
+            std::process::id(),
+            FIXTURE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::write(
+            &path,
+            ferrite_fixtures::scalar_llama_f32_gguf_fixture_with_eos_token_id(eos_token_id),
+        )?;
         Ok(path)
     }
 

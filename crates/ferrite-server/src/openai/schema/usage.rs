@@ -20,7 +20,7 @@ impl Usage {
                 generated.cached_prompt_tokens(),
                 generated.prompt_cache_trace(),
             ),
-            completion_tokens_details: CompletionTokensDetails::zero(),
+            completion_tokens_details: CompletionTokensDetails::from_generation(generated),
         }
     }
 
@@ -99,6 +99,8 @@ struct CompletionTokensDetails {
     audio_tokens: usize,
     accepted_prediction_tokens: usize,
     rejected_prediction_tokens: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    ferrite_finish_source: Option<&'static str>,
 }
 
 impl CompletionTokensDetails {
@@ -108,6 +110,14 @@ impl CompletionTokensDetails {
             audio_tokens: 0,
             accepted_prediction_tokens: 0,
             rejected_prediction_tokens: 0,
+            ferrite_finish_source: None,
+        }
+    }
+
+    fn from_generation(generated: &GeneratedText) -> Self {
+        Self {
+            ferrite_finish_source: Some(generated.finish_source().as_str()),
+            ..Self::zero()
         }
     }
 }

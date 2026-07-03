@@ -5,7 +5,9 @@ use super::{
     stream_lifecycle::{StreamDisconnectPoint, StreamFinishReason, StreamLifecycle},
     streaming,
 };
-use crate::runtime::{GenerationCacheOptions, GenerationControl, PromptEvaluationControl};
+use crate::runtime::{
+    GenerationCacheOptions, GenerationControl, GenerationFinishSource, PromptEvaluationControl,
+};
 use axum::response::Response;
 use std::cell::RefCell;
 use std::sync::{Arc, Mutex};
@@ -214,7 +216,7 @@ where
                 lifecycle.record_engine_lock_acquired();
                 lifecycle.record_generation_started();
             }
-            let generated = engine
+            let mut generated = engine
                 .generate_with_stage_callbacks_and_cache_options(
                     &input.prompt,
                     input.max_tokens,
@@ -273,6 +275,9 @@ where
                     },
                 )
                 .map_err(|error| OpenAiHttpError::internal(error.to_string()))?;
+            if stop_filter.stopped() {
+                generated = generated.with_finish_source(GenerationFinishSource::StopSequence);
+            }
             if !include_token_ids {
                 for visible_piece in stop_filter.finish() {
                     if let Err(error) =
