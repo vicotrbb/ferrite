@@ -145,3 +145,28 @@ The acceptance criterion is not lower latency alone. The proof must explain
 latency through generated-response identity, prompt token hash identity, cached
 prompt tokens, `finish_source=eos`, prompt-cache trace fields, and lifecycle
 completion.
+
+The long-chat gate now supports per-turn follow-up text with `--follow-ups`.
+Use that to run the changing-answer lane without changing the OpenAI server or
+runtime:
+
+```text
+--prompt 'Question: What is the capital of France? Answer only with the city name.'
+--assistant-context 'Paris.'
+--follow-ups 'Question: What is the capital of France? Answer only with the city name.,Question: What is the capital of Germany? Answer only with the city name.,Question: What is the capital of Italy? Answer only with the city name.,Question: What is the capital of Spain? Answer only with the city name.'
+--expect-finish-reason stop
+--require-finish-sources eos
+--prompt-cache-trace
+```
+
+Expected falsification signal:
+
+- fixed-answer lane: generated-response hashes stabilize, prompt hashes
+  converge, and turns 3-4 become exact hits;
+- changing-answer lane: generated-response hashes change by turn, prompt hashes
+  do not converge to the same exact prompt identity, or exact-hit TTFT collapse
+  disappears.
+
+If the changing-answer lane still reaches exact hits with changing generated
+responses, this theory is too weak and must be revised around prompt-template
+stability instead of generated-response identity.
