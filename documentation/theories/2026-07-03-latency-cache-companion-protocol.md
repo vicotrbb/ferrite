@@ -189,3 +189,23 @@ system-context-prefix shape at depth 256, prompt 256, and generation 256. It
 reported e2e TTFT of `11551.662375` ms for context load and `14724.025291` ms
 for inference. That result is useful external latency evidence, but it does not
 replace Ferrite's cache metadata or generated-context proof.
+
+## Second Paired Observation
+
+A bounded local 512-token paired run now exists:
+
+- Ferrite gate note:
+  `documentation/benchmarks/2026-07-03-latency-cache-paired-qwen-0-5b-512.md`
+- `llama-benchy` JSON:
+  `documentation/benchmarks/2026-07-03-llama-benchy-qwen-0-5b-paired-cache-512.json`
+
+The Ferrite gate again proved generated-context identity and reconnect
+behavior, but the generated-context lane did not converge to an exact prompt
+fixed point at 512 tokens. All follow-up turns stayed in
+`shared_prefix_hit`. Turn 3 reused a deeper shared prefix (`306 / 542`) and
+TTFT dropped to `13743` ms, while turns 2 and 4 reused only `12 / 542` and
+`20 / 542`, with TTFT near 27 seconds.
+
+The companion `llama-benchy` run completed the system-context-prefix shape at
+depth 512, prompt 512, and generation 512. It reported e2e TTFT of
+`26284.783375` ms for context load and `38107.459042` ms for inference.
