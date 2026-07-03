@@ -22,7 +22,8 @@ pub fn format_run_summary(
     let any_token_limit_hit = results
         .iter()
         .any(|result| result.hit_token_limit().unwrap_or(false));
-    let prompt_cache_key_present = config.prompt_cache_key().is_some();
+    let prompt_cache_key_present =
+        config.prompt_cache_key().is_some() || !config.prompt_cache_keys().is_empty();
     let any_cached_prompt_tokens = results.iter().any(has_cached_prompt_tokens);
     let generated_follow_up_turns = results
         .iter()
@@ -191,10 +192,15 @@ fn summarize_generated_context_identity(
         links: 0,
         matching_links: 0,
     };
-    let mut previous_response_by_lane = HashMap::<(String, usize), LongChatTextIdentity>::new();
+    let mut previous_response_by_lane =
+        HashMap::<(String, usize, Option<String>), LongChatTextIdentity>::new();
 
     for result in results {
-        let lane = (result.model().to_owned(), result.token_length());
+        let lane = (
+            result.model().to_owned(),
+            result.token_length(),
+            result.prompt_cache_key().map(str::to_owned),
+        );
         if is_generated_follow_up_turn(result) {
             let current = result.assistant_context_identity();
             let previous = previous_response_by_lane.get(&lane).copied();

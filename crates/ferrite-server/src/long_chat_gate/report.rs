@@ -12,6 +12,14 @@ pub fn format_plan(config: &LongChatGateConfig) -> String {
         .prompt_cache_key()
         .map(|key| format!("\nlong_chat_prompt_cache_key={key}"))
         .unwrap_or_default();
+    let prompt_cache_keys = if config.prompt_cache_keys().is_empty() {
+        String::new()
+    } else {
+        format!(
+            "\nlong_chat_prompt_cache_keys={}",
+            config.prompt_cache_keys().join(",")
+        )
+    };
     let generated_context_max_chars = config
         .generated_context_max_chars()
         .map(|chars| format!("\nlong_chat_generated_context_max_chars={chars}"))
@@ -103,9 +111,10 @@ pub fn format_plan(config: &LongChatGateConfig) -> String {
         String::new()
     };
     format!(
-        "long_chat_models={models}\nlong_chat_token_lengths={token_lengths}\nlong_chat_turns={}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}\nlong_chat_planned_scenarios={}",
+        "long_chat_models={models}\nlong_chat_token_lengths={token_lengths}\nlong_chat_turns={}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}{}\nlong_chat_planned_scenarios={}",
         config.turns(),
         prompt_cache_key,
+        prompt_cache_keys,
         generated_context_max_chars,
         generated_context_max_tokens,
         generated_context_state_capsule,
@@ -132,11 +141,16 @@ pub fn format_scenarios(config: &LongChatGateConfig) -> String {
         .scenarios()
         .iter()
         .map(|scenario| {
+            let prompt_cache_key = scenario
+                .prompt_cache_key()
+                .map(|key| format!(",prompt_cache_key:{key}"))
+                .unwrap_or_default();
             format!(
-                "long_chat_scenario=model:{},turn:{},max_tokens:{}",
+                "long_chat_scenario=model:{},turn:{},max_tokens:{}{}",
                 scenario.model(),
                 scenario.turn(),
-                scenario.token_length()
+                scenario.token_length(),
+                prompt_cache_key
             )
         })
         .collect::<Vec<_>>()

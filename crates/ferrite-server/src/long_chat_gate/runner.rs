@@ -178,7 +178,7 @@ struct LongChatAssistantContexts {
     generated_context_max_tokens: Option<usize>,
     generated_context_state_capsule: Option<String>,
     generated_context_state_capsule_placement: super::LongChatStateCapsulePlacement,
-    generated_by_scenario: HashMap<(String, usize), String>,
+    generated_by_scenario: HashMap<(String, usize, Option<String>), String>,
 }
 
 struct LongChatAssistantContext {
@@ -205,10 +205,7 @@ impl LongChatAssistantContexts {
     }
 
     fn context_for(&self, scenario: &super::LongChatScenario<'_>) -> LongChatAssistantContext {
-        if let Some(text) = self
-            .generated_by_scenario
-            .get(&(scenario.model().to_owned(), scenario.token_length()))
-        {
+        if let Some(text) = self.generated_by_scenario.get(&scenario_lane_key(scenario)) {
             let text = match &self.generated_context_state_capsule {
                 Some(capsule)
                     if self
@@ -251,8 +248,16 @@ impl LongChatAssistantContexts {
             (None, None) => text.text().to_owned(),
         };
         self.generated_by_scenario
-            .insert((scenario.model().to_owned(), scenario.token_length()), text);
+            .insert(scenario_lane_key(scenario), text);
     }
+}
+
+fn scenario_lane_key(scenario: &super::LongChatScenario<'_>) -> (String, usize, Option<String>) {
+    (
+        scenario.model().to_owned(),
+        scenario.token_length(),
+        scenario.prompt_cache_key().map(str::to_owned),
+    )
 }
 
 fn trailing_chars(text: &str, max_chars: usize) -> String {

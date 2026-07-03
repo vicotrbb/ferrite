@@ -22,6 +22,7 @@ pub struct LongChatGateConfig {
     assistant_context: String,
     follow_up: String,
     prompt_cache_key: Option<String>,
+    prompt_cache_keys: Vec<String>,
     prompt_cache_trace: bool,
     stop: Option<String>,
     expected_finish_reason: Option<String>,
@@ -95,6 +96,12 @@ impl LongChatGateConfig {
                         next_value(&mut iter, "--prompt-cache-key")?,
                         "--prompt-cache-key",
                     )?);
+                }
+                "--prompt-cache-keys" => {
+                    config.prompt_cache_keys = parse_non_empty_list(
+                        next_value(&mut iter, "--prompt-cache-keys")?,
+                        "--prompt-cache-keys",
+                    )?;
                 }
                 "--prompt-cache-trace" => {
                     config.prompt_cache_trace = true;
@@ -199,9 +206,17 @@ impl LongChatGateConfig {
             }
         }
 
-        if config.require_cached_follow_ups && config.prompt_cache_key.is_none() {
+        if config.prompt_cache_key.is_some() && !config.prompt_cache_keys.is_empty() {
             return Err(LongChatGateError::new(
-                "--require-cached-follow-ups requires --prompt-cache-key",
+                "--prompt-cache-key cannot be combined with --prompt-cache-keys",
+            ));
+        }
+        if config.require_cached_follow_ups
+            && config.prompt_cache_key.is_none()
+            && config.prompt_cache_keys.is_empty()
+        {
+            return Err(LongChatGateError::new(
+                "--require-cached-follow-ups requires --prompt-cache-key or --prompt-cache-keys",
             ));
         }
         if config.generated_context_max_chars.is_some()
@@ -263,6 +278,10 @@ impl LongChatGateConfig {
         self.prompt_cache_key.as_deref()
     }
 
+    pub fn prompt_cache_keys(&self) -> &[String] {
+        &self.prompt_cache_keys
+    }
+
     pub fn prompt_cache_trace(&self) -> bool {
         self.prompt_cache_trace
     }
@@ -320,19 +339,38 @@ impl LongChatGateConfig {
     }
 
     pub fn planned_scenarios(&self) -> usize {
-        self.models.len() * self.token_lengths.len() * self.turns
+        self.models.len() * self.token_lengths.len() * self.turns * self.prompt_cache_lane_count()
     }
 
     pub fn scenarios(&self) -> Vec<LongChatScenario<'_>> {
         let mut scenarios = Vec::with_capacity(self.planned_scenarios());
         for model in &self.models {
-            for turn in 1..=self.turns {
-                for token_length in &self.token_lengths {
-                    scenarios.push(LongChatScenario::new(model, turn, *token_length));
+            if self.prompt_cache_keys.is_empty() {
+                for turn in 1..=self.turns {
+                    for token_length in &self.token_lengths {
+                        scenarios.push(LongChatScenario::new(model, turn, *token_length));
+                    }
+                }
+            } else {
+                for prompt_cache_key in &self.prompt_cache_keys {
+                    for turn in 1..=self.turns {
+                        for token_length in &self.token_lengths {
+                            scenarios.push(LongChatScenario::new_with_prompt_cache_key(
+                                model,
+                                turn,
+                                *token_length,
+                                Some(prompt_cache_key),
+                            ));
+                        }
+                    }
                 }
             }
         }
         scenarios
+    }
+
+    fn prompt_cache_lane_count(&self) -> usize {
+        self.prompt_cache_keys.len().max(1)
     }
 }
 
@@ -355,6 +393,7 @@ impl Default for LongChatGateConfig {
             assistant_context: "CPU inference prioritizes memory locality, predictable scheduling, and efficient token streaming.".to_owned(),
             follow_up: "Continue with the operational risks for a long streaming chat.".to_owned(),
             prompt_cache_key: None,
+            prompt_cache_keys: Vec::new(),
             prompt_cache_trace: false,
             stop: None,
             expected_finish_reason: None,
@@ -492,5 +531,5 @@ fn os_string_to_string(value: OsString) -> Result<String, LongChatGateError> {
 }
 
 fn usage() -> &'static str {
-    "usage: ferrite-openai-long-chat-gate [--execute] [--error-probe] [--disconnect-probe] [--require-cached-follow-ups] [--addr 127.0.0.1:8080] [--api-key local-secret] [--models MODEL[,MODEL...]] [--prompt TEXT] [--assistant-context TEXT] [--follow-up TEXT] [--prompt-cache-key KEY] [--prompt-cache-trace] [--stop TEXT] [--expect-finish-reason REASON] [--probe-max-tokens TOKENS] [--generated-context-max-chars CHARS] [--generated-context-max-tokens TOKENS] [--generated-context-state-capsule TEXT] [--generated-context-state-capsule-placement assistant-context|assistant-context-only|follow-up] [--require-generated-response-contains TEXT] [--disconnect-reconnect-timeout-ms 30000] [--rss-pid PID] [--proof-log PATH] [--proof-exit-code PATH] [--token-lengths 256,512,1024] [--turns 4]"
+    "usage: ferrite-openai-long-chat-gate [--execute] [--error-probe] [--disconnect-probe] [--require-cached-follow-ups] [--addr 127.0.0.1:8080] [--api-key local-secret] [--models MODEL[,MODEL...]] [--prompt TEXT] [--assistant-context TEXT] [--follow-up TEXT] [--prompt-cache-key KEY] [--prompt-cache-keys KEY[,KEY...]] [--prompt-cache-trace] [--stop TEXT] [--expect-finish-reason REASON] [--probe-max-tokens TOKENS] [--generated-context-max-chars CHARS] [--generated-context-max-tokens TOKENS] [--generated-context-state-capsule TEXT] [--generated-context-state-capsule-placement assistant-context|assistant-context-only|follow-up] [--require-generated-response-contains TEXT] [--disconnect-reconnect-timeout-ms 30000] [--rss-pid PID] [--proof-log PATH] [--proof-exit-code PATH] [--token-lengths 256,512,1024] [--turns 4]"
 }

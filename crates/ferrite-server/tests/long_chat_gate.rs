@@ -312,6 +312,51 @@ fn formats_long_chat_gate_plan_with_prompt_cache_key() -> Result<(), Box<dyn std
 }
 
 #[test]
+fn formats_long_chat_gate_plan_with_prompt_cache_keys() -> Result<(), Box<dyn std::error::Error>> {
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--models"),
+        OsString::from("fixture-model"),
+        OsString::from("--token-lengths"),
+        OsString::from("256"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+        OsString::from("--prompt-cache-keys"),
+        OsString::from("tenant-a:thread-1,tenant-b:thread-1"),
+    ])?;
+
+    assert_eq!(
+        format_plan(&config),
+        "long_chat_models=fixture-model\nlong_chat_token_lengths=256\nlong_chat_turns=4\nlong_chat_prompt_cache_keys=tenant-a:thread-1,tenant-b:thread-1\nlong_chat_addr=127.0.0.1:8080\nlong_chat_planned_scenarios=8"
+    );
+    Ok(())
+}
+
+#[test]
+fn rejects_combining_prompt_cache_key_and_prompt_cache_keys(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let result = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--prompt-cache-key"),
+        OsString::from("tenant-a:thread-1"),
+        OsString::from("--prompt-cache-keys"),
+        OsString::from("tenant-a:thread-1,tenant-b:thread-1"),
+    ]);
+    let error = match result {
+        Ok(config) => return Err(format!("expected error, got config: {config:?}").into()),
+        Err(error) => error,
+    };
+
+    assert!(
+        error
+            .to_string()
+            .contains("--prompt-cache-key cannot be combined with --prompt-cache-keys"),
+        "{error}"
+    );
+    Ok(())
+}
+
+#[test]
 fn formats_long_chat_gate_plan_with_required_cached_follow_ups(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let config = LongChatGateConfig::parse([
@@ -527,6 +572,28 @@ fn formats_long_chat_gate_scenarios() -> Result<(), Box<dyn std::error::Error>> 
 }
 
 #[test]
+fn expands_prompt_cache_keys_as_separate_long_chat_lanes() -> Result<(), Box<dyn std::error::Error>>
+{
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--token-lengths"),
+        OsString::from("256"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+        OsString::from("--models"),
+        OsString::from("fixture-model"),
+        OsString::from("--prompt-cache-keys"),
+        OsString::from("tenant-a:thread-1,tenant-b:thread-1"),
+    ])?;
+
+    assert_eq!(
+        format_scenarios(&config),
+        "long_chat_scenario=model:fixture-model,turn:1,max_tokens:256,prompt_cache_key:tenant-a:thread-1\nlong_chat_scenario=model:fixture-model,turn:2,max_tokens:256,prompt_cache_key:tenant-a:thread-1\nlong_chat_scenario=model:fixture-model,turn:3,max_tokens:256,prompt_cache_key:tenant-a:thread-1\nlong_chat_scenario=model:fixture-model,turn:4,max_tokens:256,prompt_cache_key:tenant-a:thread-1\nlong_chat_scenario=model:fixture-model,turn:1,max_tokens:256,prompt_cache_key:tenant-b:thread-1\nlong_chat_scenario=model:fixture-model,turn:2,max_tokens:256,prompt_cache_key:tenant-b:thread-1\nlong_chat_scenario=model:fixture-model,turn:3,max_tokens:256,prompt_cache_key:tenant-b:thread-1\nlong_chat_scenario=model:fixture-model,turn:4,max_tokens:256,prompt_cache_key:tenant-b:thread-1"
+    );
+    Ok(())
+}
+
+#[test]
 fn formats_long_chat_gate_report_with_plan_and_scenarios() -> Result<(), Box<dyn std::error::Error>>
 {
     let config = LongChatGateConfig::parse([
@@ -638,6 +705,29 @@ fn passes_prompt_cache_key_to_long_chat_throughput_config() -> Result<(), Box<dy
 
     assert_eq!(config.prompt_cache_key(), Some("long-chat:prefix"));
     assert_eq!(throughput.prompt_cache_key(), Some("long-chat:prefix"));
+    Ok(())
+}
+
+#[test]
+fn passes_prompt_cache_keys_to_their_long_chat_lanes() -> Result<(), Box<dyn std::error::Error>> {
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--models"),
+        OsString::from("fixture-model"),
+        OsString::from("--token-lengths"),
+        OsString::from("256"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+        OsString::from("--prompt-cache-keys"),
+        OsString::from("tenant-a:thread-1,tenant-b:thread-1"),
+    ])?;
+    let scenarios = config.scenarios();
+
+    let first_lane = config.throughput_config_with_assistant_context(&scenarios[0], "context")?;
+    let second_lane = config.throughput_config_with_assistant_context(&scenarios[4], "context")?;
+
+    assert_eq!(first_lane.prompt_cache_key(), Some("tenant-a:thread-1"));
+    assert_eq!(second_lane.prompt_cache_key(), Some("tenant-b:thread-1"));
     Ok(())
 }
 

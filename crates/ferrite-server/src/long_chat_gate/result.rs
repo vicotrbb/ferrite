@@ -6,6 +6,7 @@ pub struct LongChatScenarioResult {
     model: String,
     turn: usize,
     token_length: usize,
+    prompt_cache_key: Option<String>,
     assistant_context_source: LongChatAssistantContextSource,
     assistant_context_identity: Option<LongChatTextIdentity>,
     throughput: ThroughputResult,
@@ -57,6 +58,7 @@ impl LongChatScenarioResult {
             model: scenario.model().to_owned(),
             turn: scenario.turn(),
             token_length: scenario.token_length(),
+            prompt_cache_key: scenario.prompt_cache_key().map(str::to_owned),
             assistant_context_source,
             assistant_context_identity,
             throughput,
@@ -73,6 +75,10 @@ impl LongChatScenarioResult {
 
     pub fn token_length(&self) -> usize {
         self.token_length
+    }
+
+    pub fn prompt_cache_key(&self) -> Option<&str> {
+        self.prompt_cache_key.as_deref()
     }
 
     pub fn assistant_context_source(&self) -> LongChatAssistantContextSource {

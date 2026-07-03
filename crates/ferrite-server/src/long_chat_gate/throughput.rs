@@ -84,7 +84,7 @@ impl LongChatGateConfig {
         if let Some(stop) = self.stop() {
             args.extend([OsString::from("--stop"), OsString::from(stop)]);
         }
-        if let Some(prompt_cache_key) = self.prompt_cache_key() {
+        if let Some(prompt_cache_key) = scenario.prompt_cache_key().or(self.prompt_cache_key()) {
             args.extend([
                 OsString::from("--prompt-cache-key"),
                 OsString::from(prompt_cache_key),
