@@ -2,7 +2,7 @@
 
 Date: 2026-07-03
 
-Status: Testing
+Status: Locally validated for active-pair scan, broader validation still needed
 
 ## Hypothesis
 
@@ -71,6 +71,18 @@ tokenization_benchmark_token_ids_fingerprint=fnv1a64:468c718e7fb1e5a0
 Any alternate BPE encode path must preserve both values before its timing can
 be compared.
 
+The first active adjacent-pair rank loop preserved that parity target and
+reduced tokenizer-only average encode time on the same generated prompt:
+
+```text
+before tokenization_benchmark_encode_avg_ns=6894344416
+after  tokenization_benchmark_encode_avg_ns=4062045166
+tokenization_benchmark_token_count=29527
+tokenization_benchmark_token_ids_fingerprint=fnv1a64:468c718e7fb1e5a0
+```
+
+That is about a `41.08%` local improvement for this sample.
+
 For this theory to remain worth pursuing, a first algorithm experiment should
 reduce the CLI tokenizer-only average by at least 20 percent on the same prompt
 without changing token IDs.
@@ -85,9 +97,10 @@ against the current path:
 - one-process CLI tokenizer benchmark on the long Qwen prompt;
 - server lifecycle rerun only if the CLI path improves.
 
-If parity requires excessive special casing or the isolated CLI benchmark does
-not improve by at least 20 percent, park the algorithm rewrite and prioritize
-prompt prefill or cache reuse instead.
+The active-pair scan passed the first falsification gate: parity held and the
+isolated CLI benchmark improved by more than 20 percent. The next falsification
+gate is server lifecycle proof. If `prompt_tokenized_elapsed_ms` does not move
+meaningfully in the OpenAI path, the CLI improvement is not enough by itself.
 
 ## Risks
 
@@ -101,6 +114,7 @@ prompt prefill or cache reuse instead.
 
 ## Next Step
 
-First add a repeated-run tokenizer benchmark path so load cost and encode cost
-can be separated. Then prototype the adjacent-pair rank algorithm behind token
-parity tests before making it the default.
+Rerun the long-prompt OpenAI streaming cancellation proof and compare
+`prompt_tokenized_elapsed_ms` against the prior `8323 ms` local server
+lifecycle baseline. Then decide whether to test a priority-queue active-pair
+structure.

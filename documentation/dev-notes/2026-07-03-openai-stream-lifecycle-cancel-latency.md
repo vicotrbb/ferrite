@@ -196,3 +196,10 @@ the proof recorded in
 For the same prompt generator, the parity target is now
 `tokenization_benchmark_token_count=29527` and
 `tokenization_benchmark_token_ids_fingerprint=fnv1a64:468c718e7fb1e5a0`.
+
+The first active-pair BPE encoder proof is recorded in
+`documentation/benchmarks/2026-07-03-local-qwen-0-5b-tokenizer-active-pair-bpe.md`.
+It preserved the same token count and fingerprint while reducing the
+tokenizer-only average encode field from `6894344416 ns` to `4062045166 ns`
+for the deterministic same-size prompt sample. The OpenAI server lifecycle
+proof still needs to be rerun before claiming a request-path latency reduction.
