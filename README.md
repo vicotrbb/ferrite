@@ -101,6 +101,14 @@ for the single inference permit before Ferrite returns an OpenAI-shaped
 backpressure. Ferrite does not yet execute multiple model generations in
 parallel.
 
+`--experimental-prefix-cache` enables explicit prompt-cache namespaces for
+OpenAI-compatible requests. When enabled, repeated
+`POST /v1/chat/completions` and `POST /v1/completions` calls with the same
+`prompt_cache_key` can report reused prompt tokens in
+`usage.prompt_tokens_details.cached_tokens`. Without the flag,
+`prompt_cache_key` is accepted as compatibility metadata but does not enable
+cross-request prefix-cache reuse.
+
 Streaming responses send token chunks as generation progresses:
 
 ```sh
