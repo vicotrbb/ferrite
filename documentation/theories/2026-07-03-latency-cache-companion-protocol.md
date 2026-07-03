@@ -230,3 +230,24 @@ depth 1024, prompt 1024, and generation 1024. It reported e2e TTFT of
 `65689.654583` ms for context load and `114978.518583` ms for inference. The
 local paired ladder now covers 256, 512, and 1024 tokens; x86_64 paired
 validation remains open.
+
+## First x86_64 Paired Observation
+
+A bounded x86_64 256-token paired run now exists:
+
+- Ferrite gate note:
+  `documentation/benchmarks/2026-07-03-latency-cache-x86-paired-qwen-0-5b-256.md`
+- `llama-benchy` JSON:
+  `documentation/benchmarks/2026-07-03-llama-benchy-x86-qwen-0-5b-paired-cache-256.json`
+
+The Ferrite gate proved generated-context identity and reconnect behavior on a
+bounded amd64 `staging` pod. The generated-context lane did not converge to an
+exact prompt fixed point at 256 tokens. Follow-up turns reused only 12 to 14
+prompt tokens and stayed in `shared_prefix_hit`; generated follow-up TTFT stayed
+near 90 seconds.
+
+The companion `llama-benchy` run completed the system-context-prefix shape via
+a local port-forward to the x86 server. It reported e2e TTFT of
+`87046.129750` ms for context load and `90266.089625` ms for inference. A first
+port-forward attempt failed during the inference phase, so x86 companion runs
+should record port-forward stability as part of the benchmark note.
