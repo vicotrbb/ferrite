@@ -106,3 +106,21 @@ next request:
 That run did not show a fixed point: every generated response hash changed,
 generated follow-up turns reused only 12, 13, and 14 prompt tokens, and all
 generated follow-ups reported `shared_prefix_hit`, not `exact_hit`.
+
+## Local 1024-Token Confirmation
+
+A later local 1024-token Qwen 0.5B identity-summary run confirmed the fixed
+point mechanism:
+
+| Turn | Context hash | Response hash | Cached / Prompt | Lookup | TTFT ms |
+| ---: | --- | --- | ---: | --- | ---: |
+| 2 | `fnv64:890bd91fd63ce8b0` | `fnv64:d3b6392e4ebce4da` | 12 / 1054 | `shared_prefix_hit` | 71818 |
+| 3 | `fnv64:d3b6392e4ebce4da` | `fnv64:d3b6392e4ebce4da` | 16 / 1054 | `shared_prefix_hit` | 70904 |
+| 4 | `fnv64:d3b6392e4ebce4da` | `fnv64:d3b6392e4ebce4da` | 1054 / 1054 | `exact_hit` | 228 |
+
+Turn 3 produced the same generated-response identity as its own assistant
+context. Turn 4 then used that same assistant-context identity, matched the
+previous prompt token hash, reused all prompt tokens, and collapsed TTFT to
+`228` ms. This supports the theory for at least the local Qwen 0.5B
+1024-token lane; x86_64 reruns with the same identity-summary gate remain the
+next stronger validation step.
