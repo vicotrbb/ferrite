@@ -882,7 +882,12 @@ fn formats_integrated_long_chat_run_summary() -> Result<(), Box<dyn std::error::
             } else {
                 LongChatAssistantContextSource::Generated
             };
-            LongChatScenarioResult::new_with_assistant_context_source(
+            let assistant_context = if scenario.turn() == 1 {
+                "seed answer".to_owned()
+            } else {
+                format!("generated-{}", scenario.turn() - 1)
+            };
+            LongChatScenarioResult::new_with_assistant_context_source_and_identity(
                 scenario,
                 ThroughputResult {
                     completed_requests: 1,
@@ -892,7 +897,10 @@ fn formats_integrated_long_chat_run_summary() -> Result<(), Box<dyn std::error::
                         Duration::from_millis(100),
                         Duration::from_millis(140),
                     ]),
-                    streaming_text: None,
+                    streaming_text: Some(StreamingTextSummary::new(format!(
+                        "generated-{}",
+                        scenario.turn()
+                    ))),
                     streaming_token_ids: Some(StreamingTokenIdsSummary::new(
                         2,
                         2,
@@ -906,6 +914,7 @@ fn formats_integrated_long_chat_run_summary() -> Result<(), Box<dyn std::error::
                     rss: Some(RssSummary::new(1000, 2000, 1500)),
                 },
                 source,
+                LongChatTextIdentity::from_text(&assistant_context),
             )
         })
         .collect::<Vec<_>>();
@@ -919,7 +928,7 @@ fn formats_integrated_long_chat_run_summary() -> Result<(), Box<dyn std::error::
             Some(&error_probe),
             Some(&disconnect_probe)
         ),
-        "long_chat_summary_planned_scenarios=4\nlong_chat_summary_completed_scenarios=4\nlong_chat_summary_all_finish_reasons_present=true\nlong_chat_summary_all_usage_accounting_valid=true\nlong_chat_summary_all_token_limit_status_present=true\nlong_chat_summary_any_token_limit_hit=true\nlong_chat_summary_prompt_cache_key_present=false\nlong_chat_summary_cached_follow_ups_required=false\nlong_chat_summary_any_cached_prompt_tokens=false\nlong_chat_summary_generated_follow_up_turns=3\nlong_chat_summary_cached_generated_follow_up_turns=0\nlong_chat_summary_uncached_generated_follow_up_turns=3\nlong_chat_summary_all_generated_follow_up_turns_cached=false\nlong_chat_summary_all_follow_up_turns_use_generated_context=true\nlong_chat_summary_all_timing_present=true\nlong_chat_summary_streaming_token_ids_required=true\nlong_chat_summary_all_streaming_token_id_summaries_present=true\nlong_chat_summary_all_streaming_content_chunks_have_token_ids=true\nlong_chat_summary_rss_required=true\nlong_chat_summary_all_rss_present=true\nlong_chat_summary_error_probe_required=true\nlong_chat_summary_error_probe_completed=true\nlong_chat_summary_disconnect_probe_required=true\nlong_chat_summary_disconnect_probe_completed=true\nlong_chat_summary_disconnect_probe_reconnect_started_new_generation=true\nlong_chat_summary_run_complete=true"
+        "long_chat_summary_planned_scenarios=4\nlong_chat_summary_completed_scenarios=4\nlong_chat_summary_all_finish_reasons_present=true\nlong_chat_summary_all_usage_accounting_valid=true\nlong_chat_summary_all_token_limit_status_present=true\nlong_chat_summary_any_token_limit_hit=true\nlong_chat_summary_prompt_cache_key_present=false\nlong_chat_summary_cached_follow_ups_required=false\nlong_chat_summary_any_cached_prompt_tokens=false\nlong_chat_summary_generated_follow_up_turns=3\nlong_chat_summary_cached_generated_follow_up_turns=0\nlong_chat_summary_uncached_generated_follow_up_turns=3\nlong_chat_summary_all_generated_follow_up_turns_cached=false\nlong_chat_summary_all_follow_up_turns_use_generated_context=true\nlong_chat_summary_generated_context_identity_required=true\nlong_chat_summary_generated_context_identity_links=3\nlong_chat_summary_matching_generated_context_identity_links=3\nlong_chat_summary_all_generated_context_identity_links_present=true\nlong_chat_summary_all_generated_context_identities_match_previous_response=true\nlong_chat_summary_all_timing_present=true\nlong_chat_summary_streaming_token_ids_required=true\nlong_chat_summary_all_streaming_token_id_summaries_present=true\nlong_chat_summary_all_streaming_content_chunks_have_token_ids=true\nlong_chat_summary_rss_required=true\nlong_chat_summary_all_rss_present=true\nlong_chat_summary_error_probe_required=true\nlong_chat_summary_error_probe_completed=true\nlong_chat_summary_disconnect_probe_required=true\nlong_chat_summary_disconnect_probe_completed=true\nlong_chat_summary_disconnect_probe_reconnect_started_new_generation=true\nlong_chat_summary_run_complete=true"
     );
     Ok(())
 }
@@ -982,6 +991,117 @@ fn formats_cache_observability_in_long_chat_run_summary() -> Result<(), Box<dyn 
     assert!(summary.contains("long_chat_summary_cached_generated_follow_up_turns=3"));
     assert!(summary.contains("long_chat_summary_uncached_generated_follow_up_turns=0"));
     assert!(summary.contains("long_chat_summary_all_generated_follow_up_turns_cached=true"));
+    Ok(())
+}
+
+#[test]
+fn summarizes_generated_context_identity_continuity() -> Result<(), Box<dyn std::error::Error>> {
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--models"),
+        OsString::from("fixture-model"),
+        OsString::from("--token-lengths"),
+        OsString::from("256"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+        OsString::from("--assistant-context"),
+        OsString::from("seed answer"),
+    ])?;
+    let mut turn = 0;
+    let results = config.run_with_executor(|throughput| {
+        turn += 1;
+        Ok(ThroughputResult {
+            completed_requests: throughput.requests(),
+            elapsed: Duration::from_millis(10),
+            streaming_finish: Some(StreamingFinishSummary::new("length")),
+            streaming_timing: StreamingTimingSummary::from_event_offsets(&[
+                Duration::from_millis(1),
+                Duration::from_millis(2),
+            ]),
+            streaming_text: Some(StreamingTextSummary::new(format!("generated-{turn}"))),
+            streaming_token_ids: Some(StreamingTokenIdsSummary::new(1, 1, throughput.max_tokens())),
+            streaming_usage: Some(StreamingUsageSummary::new(
+                8,
+                throughput.max_tokens() as u64,
+                throughput.max_tokens() as u64 + 8,
+            )),
+            rss: None,
+        })
+    })?;
+
+    let summary = format_run_summary(&config, &results, None, None);
+
+    assert!(summary.contains("long_chat_summary_generated_context_identity_required=true"));
+    assert!(summary.contains("long_chat_summary_generated_context_identity_links=3"));
+    assert!(summary.contains("long_chat_summary_matching_generated_context_identity_links=3"));
+    assert!(summary.contains("long_chat_summary_all_generated_context_identity_links_present=true"));
+    assert!(summary.contains(
+        "long_chat_summary_all_generated_context_identities_match_previous_response=true"
+    ));
+    assert!(summary.contains("long_chat_summary_run_complete=true"));
+    Ok(())
+}
+
+#[test]
+fn summary_is_incomplete_when_generated_context_identity_is_missing(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--models"),
+        OsString::from("fixture-model"),
+        OsString::from("--token-lengths"),
+        OsString::from("256"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+    ])?;
+    let results = config
+        .scenarios()
+        .iter()
+        .map(|scenario| {
+            let source = if scenario.turn() == 1 {
+                LongChatAssistantContextSource::Seed
+            } else {
+                LongChatAssistantContextSource::Generated
+            };
+            LongChatScenarioResult::new_with_assistant_context_source(
+                scenario,
+                ThroughputResult {
+                    completed_requests: 1,
+                    elapsed: Duration::from_millis(400),
+                    streaming_finish: Some(StreamingFinishSummary::new("length")),
+                    streaming_timing: StreamingTimingSummary::from_event_offsets(&[
+                        Duration::from_millis(100),
+                        Duration::from_millis(140),
+                    ]),
+                    streaming_text: Some(StreamingTextSummary::new(format!(
+                        "generated-{}",
+                        scenario.turn()
+                    ))),
+                    streaming_token_ids: Some(StreamingTokenIdsSummary::new(
+                        1,
+                        1,
+                        scenario.token_length(),
+                    )),
+                    streaming_usage: Some(StreamingUsageSummary::new(
+                        16,
+                        scenario.token_length() as u64,
+                        scenario.token_length() as u64 + 16,
+                    )),
+                    rss: None,
+                },
+                source,
+            )
+        })
+        .collect::<Vec<_>>();
+
+    let summary = format_run_summary(&config, &results, None, None);
+
+    assert!(summary.contains("long_chat_summary_generated_context_identity_required=true"));
+    assert!(summary.contains("long_chat_summary_generated_context_identity_links=0"));
+    assert!(
+        summary.contains("long_chat_summary_all_generated_context_identity_links_present=false")
+    );
+    assert!(summary.contains("long_chat_summary_run_complete=false"));
     Ok(())
 }
 

@@ -1,7 +1,8 @@
 use super::{
     LongChatDisconnectProbeResult, LongChatErrorProbeResult, LongChatGateConfig,
-    LongChatScenarioResult,
+    LongChatScenarioResult, LongChatTextIdentity,
 };
+use std::collections::HashMap;
 
 pub fn format_run_summary(
     config: &LongChatGateConfig,
@@ -40,6 +41,7 @@ pub fn format_run_summary(
     let all_follow_up_turns_use_generated_context = results
         .iter()
         .all(|result| result.turn() == 1 || result.assistant_context_source().is_generated());
+    let generated_context_identity = summarize_generated_context_identity(results);
     let all_timing_present = results
         .iter()
         .all(|result| result.throughput().streaming_timing.is_some());
@@ -66,6 +68,8 @@ pub fn format_run_summary(
         && all_usage_accounting_valid
         && all_token_limit_status_present
         && all_follow_up_turns_use_generated_context
+        && (!generated_context_identity.required
+            || generated_context_identity.all_links_present_and_matching())
         && (!cached_follow_ups_required || all_generated_follow_up_turns_cached)
         && all_timing_present
         && (!streaming_token_ids_required
@@ -91,6 +95,11 @@ long_chat_summary_cached_generated_follow_up_turns={cached_generated_follow_up_t
 long_chat_summary_uncached_generated_follow_up_turns={uncached_generated_follow_up_turns}\n\
 long_chat_summary_all_generated_follow_up_turns_cached={all_generated_follow_up_turns_cached}\n\
 long_chat_summary_all_follow_up_turns_use_generated_context={all_follow_up_turns_use_generated_context}\n\
+long_chat_summary_generated_context_identity_required={}\n\
+long_chat_summary_generated_context_identity_links={}\n\
+long_chat_summary_matching_generated_context_identity_links={}\n\
+long_chat_summary_all_generated_context_identity_links_present={}\n\
+long_chat_summary_all_generated_context_identities_match_previous_response={}\n\
 long_chat_summary_all_timing_present={all_timing_present}\n\
 long_chat_summary_streaming_token_ids_required={streaming_token_ids_required}\n\
 long_chat_summary_all_streaming_token_id_summaries_present={all_streaming_token_id_summaries_present}\n\
@@ -102,7 +111,12 @@ long_chat_summary_error_probe_completed={error_probe_completed}\n\
 long_chat_summary_disconnect_probe_required={disconnect_probe_required}\n\
 long_chat_summary_disconnect_probe_completed={disconnect_probe_completed}\n\
 long_chat_summary_disconnect_probe_reconnect_started_new_generation={disconnect_probe_reconnect_started_new_generation}\n\
-long_chat_summary_run_complete={run_complete}"
+long_chat_summary_run_complete={run_complete}",
+        generated_context_identity.required,
+        generated_context_identity.links,
+        generated_context_identity.matching_links,
+        generated_context_identity.all_links_present(),
+        generated_context_identity.all_links_present_and_matching(),
     )
 }
 
@@ -138,4 +152,57 @@ fn usage_accounting_valid(result: &LongChatScenarioResult) -> bool {
         "stop" => usage.completion_tokens() <= result.token_length() as u64,
         _ => false,
     }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct GeneratedContextIdentitySummary {
+    required: bool,
+    expected_links: usize,
+    links: usize,
+    matching_links: usize,
+}
+
+impl GeneratedContextIdentitySummary {
+    fn all_links_present(self) -> bool {
+        self.required && self.links == self.expected_links
+    }
+
+    fn all_links_present_and_matching(self) -> bool {
+        self.all_links_present() && self.matching_links == self.expected_links
+    }
+}
+
+fn summarize_generated_context_identity(
+    results: &[LongChatScenarioResult],
+) -> GeneratedContextIdentitySummary {
+    let expected_links = results
+        .iter()
+        .filter(|result| is_generated_follow_up_turn(result))
+        .count();
+    let mut summary = GeneratedContextIdentitySummary {
+        required: expected_links > 0,
+        expected_links,
+        links: 0,
+        matching_links: 0,
+    };
+    let mut previous_response_by_lane = HashMap::<(String, usize), LongChatTextIdentity>::new();
+
+    for result in results {
+        let lane = (result.model().to_owned(), result.token_length());
+        if is_generated_follow_up_turn(result) {
+            let current = result.assistant_context_identity();
+            let previous = previous_response_by_lane.get(&lane).copied();
+            if let (Some(current), Some(previous)) = (current, previous) {
+                summary.links += 1;
+                if current == previous {
+                    summary.matching_links += 1;
+                }
+            }
+        }
+        if let Some(text) = &result.throughput().streaming_text {
+            previous_response_by_lane.insert(lane, LongChatTextIdentity::from_text(text.text()));
+        }
+    }
+
+    summary
 }
