@@ -169,3 +169,23 @@ performance trend tracking. Do not use it to replace Ferrite's long-chat gate
 until it can prove generated-context continuity, cache usage metadata,
 reconnect/error behavior, stop/EOS behavior, and RSS invariants with the same
 strength as the internal proof tool.
+
+## First Paired Observation
+
+A bounded local 256-token paired run now exists:
+
+- Ferrite gate note:
+  `documentation/benchmarks/2026-07-03-latency-cache-paired-qwen-0-5b-256.md`
+- `llama-benchy` JSON:
+  `documentation/benchmarks/2026-07-03-llama-benchy-qwen-0-5b-paired-cache-256.json`
+
+The Ferrite gate proved generated-context identity and reconnect behavior, but
+the generated-context lane did not converge to an exact prompt fixed point at
+256 tokens. Follow-up turns reused only 12 to 14 prompt tokens and stayed in
+`shared_prefix_hit`.
+
+The companion `llama-benchy` run completed the different
+system-context-prefix shape at depth 256, prompt 256, and generation 256. It
+reported e2e TTFT of `11551.662375` ms for context load and `14724.025291` ms
+for inference. That result is useful external latency evidence, but it does not
+replace Ferrite's cache metadata or generated-context proof.
