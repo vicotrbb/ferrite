@@ -277,10 +277,11 @@ fn request_body(config: &ThroughputClientConfig) -> String {
 
 fn completion_request_body(config: &ThroughputClientConfig) -> String {
     let stop = stop_field(config);
+    let prompt_cache_key = prompt_cache_key_field(config);
     let stream = stream_field(config);
     let stream_options = stream_options_field(config);
     format!(
-        r#"{{"model":{},"prompt":{},"max_tokens":{}{stop}{stream}{stream_options}}}"#,
+        r#"{{"model":{},"prompt":{},"max_tokens":{}{stop}{prompt_cache_key}{stream}{stream_options}}}"#,
         serde_json::Value::String(config.model().to_owned()),
         serde_json::Value::String(config.prompt().to_owned()),
         config.max_tokens()

@@ -177,11 +177,6 @@ impl ThroughputClientConfig {
                 "--assistant-context and --follow-up require --endpoint chat-completions",
             ));
         }
-        if config.prompt_cache_key.is_some() && config.endpoint != OpenAiEndpoint::ChatCompletions {
-            return Err(ClientConfigError::new(
-                "--prompt-cache-key requires --endpoint chat-completions",
-            ));
-        }
         if config.prompt_cache_trace && config.endpoint != OpenAiEndpoint::ChatCompletions {
             return Err(ClientConfigError::new(
                 "--prompt-cache-trace requires --endpoint chat-completions",

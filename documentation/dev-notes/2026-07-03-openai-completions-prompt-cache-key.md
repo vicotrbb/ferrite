@@ -50,6 +50,10 @@ streaming completion path was still using default cache options.
   enabled.
 - Non-streaming and streaming completion generation now both receive the same
   completion cache options.
+- `ferrite-openai-throughput --endpoint completions` can now serialize
+  `--prompt-cache-key KEY` into the legacy completion request body. The
+  `--prompt-cache-trace` flag remains chat-only because completion requests do
+  not carry the `metadata.ferrite_cache_trace` extension.
 
 ## Validation
 
@@ -65,8 +69,18 @@ test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 374 filtered out
 
 The broader filter also walked the integration test binaries with no failures.
 
+```sh
+cargo test -p ferrite-server throughput_client::tests -- --nocapture
+```
+
+Result:
+
+```text
+test result: ok. 53 passed; 0 failed; 0 ignored; 0 measured; 348 filtered out
+```
+
 ## Boundaries
 
 This is not a new cache algorithm and it is not a real-model benchmark. It only
 closes the endpoint compatibility gap for the existing prompt-cache namespace
-mechanism on the local OpenAI-compatible completion surface.
+mechanism on the local OpenAI-compatible completion surface and proof client.

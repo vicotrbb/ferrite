@@ -71,6 +71,31 @@ fn builds_openai_compatible_completion_stop_request_body() -> Result<(), Box<dyn
 }
 
 #[test]
+fn builds_openai_compatible_completion_prompt_cache_key_request_body(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let config = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--endpoint"),
+        OsString::from("completions"),
+        OsString::from("--model"),
+        OsString::from("fixture-model"),
+        OsString::from("--prompt"),
+        OsString::from("measure this"),
+        OsString::from("--max-tokens"),
+        OsString::from("2"),
+        OsString::from("--prompt-cache-key"),
+        OsString::from("benchy:completion-smoke"),
+    ])?;
+
+    assert_eq!(config.prompt_cache_key(), Some("benchy:completion-smoke"));
+    assert_eq!(
+        completion_request_body(&config),
+        r#"{"model":"fixture-model","prompt":"measure this","max_tokens":2,"prompt_cache_key":"benchy:completion-smoke"}"#
+    );
+    Ok(())
+}
+
+#[test]
 fn parses_chat_completion_benchmark_config() -> Result<(), Box<dyn std::error::Error>> {
     let config = ThroughputClientConfig::parse([
         OsString::from("ferrite-openai-throughput"),
@@ -236,19 +261,6 @@ fn exposes_deterministic_streaming_text_identity() {
     assert_eq!(summary.chunk_count(), 2);
     assert_eq!(summary.text_hash(), 0xa430_d846_80aa_bd0b);
     assert_eq!(summary.formatted_text_hash(), "fnv64:a430d84680aabd0b");
-}
-
-#[test]
-fn rejects_prompt_cache_key_for_legacy_completions() {
-    let result = ThroughputClientConfig::parse([
-        OsString::from("ferrite-openai-throughput"),
-        OsString::from("--endpoint"),
-        OsString::from("completions"),
-        OsString::from("--prompt-cache-key"),
-        OsString::from("benchy:smoke"),
-    ]);
-
-    assert!(result.is_err());
 }
 
 #[test]
