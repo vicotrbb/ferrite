@@ -2,7 +2,7 @@
 
 Date: 2026-07-03
 
-Status: Candidate
+Status: Candidate, narrowed by direct-route test
 
 ## Hypothesis
 
@@ -41,6 +41,9 @@ What is proven:
 - Killing the local client did not immediately make the server look idle.
 - Restarting the server cleared the condition.
 - The same benchmark shape completed when the client ran inside the pod.
+- Direct in-process SSE body-drop cancellation releases Ferrite's inference
+  permit in the route-level fixture test
+  `chat_stream_releases_inference_permit_when_response_body_is_dropped`.
 
 What is not proven:
 
@@ -48,8 +51,30 @@ What is not proven:
 - whether the request would have stopped naturally after a short delay;
 - whether Kubernetes port-forward buffering hid the real client state;
 - whether the observed CPU belonged to the killed request or another request;
+- whether a real TCP client disconnect releases the permit as promptly as an
+  in-process dropped response body;
 - whether cancellation behavior differs before first token versus after first
   streamed token.
+
+## Direct Route Evidence
+
+Commit `7baf562` added a route-level regression test for the simplest
+cancellation path:
+
+```text
+cargo test -p ferrite-server chat_stream_releases_inference_permit_when_response_body_is_dropped -- --nocapture
+```
+
+The test opens a streaming `/v1/chat/completions` response against the fixture
+chat model, verifies the single inference permit is held, drops the response
+body without consuming the stream, and waits for the permit to become
+available again. It passed on 2026-07-03.
+
+This weakens the broad version of the theory. The remaining risk is not
+"Ferrite always ignores dropped streaming clients." The narrower theory is
+that cancellation may be delayed or hidden in real TCP, port-forwarded, or
+pre-first-token paths where the server has not yet attempted to send a chunk or
+where transport buffering delays disconnect observation.
 
 ## Minimal Experiment
 
@@ -68,6 +93,9 @@ the first pass.
    least 30 seconds after disconnect.
 6. Repeat through Kubernetes port-forward only after the direct local or
    in-pod path is understood.
+
+The next experiment should use a real TCP socket, not `tower::ServiceExt`, so
+it can distinguish application-body drop from network disconnect semantics.
 
 ## Expected Outcomes
 
