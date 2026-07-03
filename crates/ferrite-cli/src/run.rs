@@ -18,10 +18,23 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
     let args = args::parse(args)?;
     let bytes = fs::read(&args.model_path)?;
     let model_file_bytes = bytes.len();
+    let gguf_parse_started = Instant::now();
     let gguf = parse_gguf(&bytes)?;
+    let gguf_parse_ns = gguf_parse_started.elapsed().as_nanos();
+    let tokenizer_load_started = Instant::now();
     let tokenizer = GgufTokenizer::from_gguf(&gguf)?;
+    let tokenizer_load_ns = tokenizer_load_started.elapsed().as_nanos();
     if let Some(runs) = args.benchmark_tokenization_runs {
-        return benchmark_tokenization(&tokenizer, args.prompt, runs, model_file_bytes);
+        return benchmark_tokenization(
+            &tokenizer,
+            args.prompt,
+            runs,
+            model_file_bytes,
+            TokenizationSetupTiming {
+                gguf_parse_ns,
+                tokenizer_load_ns,
+            },
+        );
     }
     let model = ScalarLlamaModel::from_gguf_scalar(&gguf, &bytes)?;
     drop(bytes);
@@ -243,6 +256,7 @@ fn benchmark_tokenization(
     prompt: PromptSource,
     runs: usize,
     model_file_bytes: usize,
+    setup_timing: TokenizationSetupTiming,
 ) -> Result<(), Box<dyn Error>> {
     let PromptSource::Text(prompt) = prompt else {
         return Err(io::Error::other(
@@ -260,11 +274,26 @@ fn benchmark_tokenization(
     println!("tokenization_benchmark_runs={runs}");
     println!("tokenization_benchmark_prompt_bytes={}", prompt.len());
     println!("tokenization_benchmark_token_count={}", token_ids.len());
+    println!(
+        "tokenization_benchmark_gguf_parse_ns={}",
+        setup_timing.gguf_parse_ns
+    );
+    println!(
+        "tokenization_benchmark_tokenizer_load_ns={}",
+        setup_timing.tokenizer_load_ns
+    );
+    println!("tokenization_benchmark_encode_total_ns={total_ns}");
+    println!("tokenization_benchmark_encode_avg_ns={avg_ns}");
     println!("tokenization_benchmark_total_ns={total_ns}");
     println!("tokenization_benchmark_avg_ns={avg_ns}");
     println!("model_file_bytes={model_file_bytes}");
     println!("model_file_retained_bytes=0");
     Ok(())
+}
+
+struct TokenizationSetupTiming {
+    gguf_parse_ns: u128,
+    tokenizer_load_ns: u128,
 }
 
 fn join_token_ids(token_ids: &[usize]) -> String {
