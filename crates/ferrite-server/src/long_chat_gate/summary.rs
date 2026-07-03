@@ -38,6 +38,7 @@ pub fn format_run_summary(
         && generated_follow_up_turns > 0
         && generated_follow_up_turns == cached_generated_follow_up_turns;
     let cached_follow_ups_required = config.require_cached_follow_ups();
+    let generated_follow_up_context_required = config.stop().is_none();
     let all_follow_up_turns_use_generated_context = results
         .iter()
         .all(|result| result.turn() == 1 || result.assistant_context_source().is_generated());
@@ -69,7 +70,7 @@ pub fn format_run_summary(
         && all_finish_reasons_present
         && all_usage_accounting_valid
         && all_token_limit_status_present
-        && all_follow_up_turns_use_generated_context
+        && (!generated_follow_up_context_required || all_follow_up_turns_use_generated_context)
         && (!generated_context_identity.required
             || generated_context_identity.all_links_present_and_matching())
         && (!cached_follow_ups_required || all_generated_follow_up_turns_cached)
@@ -97,6 +98,7 @@ long_chat_summary_generated_follow_up_turns={generated_follow_up_turns}\n\
 long_chat_summary_cached_generated_follow_up_turns={cached_generated_follow_up_turns}\n\
 long_chat_summary_uncached_generated_follow_up_turns={uncached_generated_follow_up_turns}\n\
 long_chat_summary_all_generated_follow_up_turns_cached={all_generated_follow_up_turns_cached}\n\
+long_chat_summary_generated_follow_up_context_required={generated_follow_up_context_required}\n\
 long_chat_summary_all_follow_up_turns_use_generated_context={all_follow_up_turns_use_generated_context}\n\
 long_chat_summary_generated_context_identity_required={}\n\
 long_chat_summary_generated_context_identity_links={}\n\

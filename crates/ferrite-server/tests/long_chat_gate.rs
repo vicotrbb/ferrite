@@ -928,8 +928,76 @@ fn formats_integrated_long_chat_run_summary() -> Result<(), Box<dyn std::error::
             Some(&error_probe),
             Some(&disconnect_probe)
         ),
-        "long_chat_summary_planned_scenarios=4\nlong_chat_summary_completed_scenarios=4\nlong_chat_summary_all_finish_reasons_present=true\nlong_chat_summary_all_usage_accounting_valid=true\nlong_chat_summary_all_token_limit_status_present=true\nlong_chat_summary_any_token_limit_hit=true\nlong_chat_summary_prompt_cache_key_present=false\nlong_chat_summary_cached_follow_ups_required=false\nlong_chat_summary_any_cached_prompt_tokens=false\nlong_chat_summary_generated_follow_up_turns=3\nlong_chat_summary_cached_generated_follow_up_turns=0\nlong_chat_summary_uncached_generated_follow_up_turns=3\nlong_chat_summary_all_generated_follow_up_turns_cached=false\nlong_chat_summary_all_follow_up_turns_use_generated_context=true\nlong_chat_summary_generated_context_identity_required=true\nlong_chat_summary_generated_context_identity_links=3\nlong_chat_summary_matching_generated_context_identity_links=3\nlong_chat_summary_all_generated_context_identity_links_present=true\nlong_chat_summary_all_generated_context_identities_match_previous_response=true\nlong_chat_summary_all_timing_present=true\nlong_chat_summary_streaming_token_ids_required=true\nlong_chat_summary_all_streaming_token_id_summaries_present=true\nlong_chat_summary_all_streaming_content_chunks_have_token_ids=true\nlong_chat_summary_rss_required=true\nlong_chat_summary_all_rss_present=true\nlong_chat_summary_error_probe_required=true\nlong_chat_summary_error_probe_completed=true\nlong_chat_summary_error_probe_reconnect_started_new_generation=true\nlong_chat_summary_disconnect_probe_required=true\nlong_chat_summary_disconnect_probe_completed=true\nlong_chat_summary_disconnect_probe_reconnect_started_new_generation=true\nlong_chat_summary_run_complete=true"
+        "long_chat_summary_planned_scenarios=4\nlong_chat_summary_completed_scenarios=4\nlong_chat_summary_all_finish_reasons_present=true\nlong_chat_summary_all_usage_accounting_valid=true\nlong_chat_summary_all_token_limit_status_present=true\nlong_chat_summary_any_token_limit_hit=true\nlong_chat_summary_prompt_cache_key_present=false\nlong_chat_summary_cached_follow_ups_required=false\nlong_chat_summary_any_cached_prompt_tokens=false\nlong_chat_summary_generated_follow_up_turns=3\nlong_chat_summary_cached_generated_follow_up_turns=0\nlong_chat_summary_uncached_generated_follow_up_turns=3\nlong_chat_summary_all_generated_follow_up_turns_cached=false\nlong_chat_summary_generated_follow_up_context_required=true\nlong_chat_summary_all_follow_up_turns_use_generated_context=true\nlong_chat_summary_generated_context_identity_required=true\nlong_chat_summary_generated_context_identity_links=3\nlong_chat_summary_matching_generated_context_identity_links=3\nlong_chat_summary_all_generated_context_identity_links_present=true\nlong_chat_summary_all_generated_context_identities_match_previous_response=true\nlong_chat_summary_all_timing_present=true\nlong_chat_summary_streaming_token_ids_required=true\nlong_chat_summary_all_streaming_token_id_summaries_present=true\nlong_chat_summary_all_streaming_content_chunks_have_token_ids=true\nlong_chat_summary_rss_required=true\nlong_chat_summary_all_rss_present=true\nlong_chat_summary_error_probe_required=true\nlong_chat_summary_error_probe_completed=true\nlong_chat_summary_error_probe_reconnect_started_new_generation=true\nlong_chat_summary_disconnect_probe_required=true\nlong_chat_summary_disconnect_probe_completed=true\nlong_chat_summary_disconnect_probe_reconnect_started_new_generation=true\nlong_chat_summary_run_complete=true"
     );
+    Ok(())
+}
+
+#[test]
+fn explicit_stop_summary_can_complete_without_generated_follow_up_context(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--models"),
+        OsString::from("fixture-model"),
+        OsString::from("--token-lengths"),
+        OsString::from("1"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+        OsString::from("--stop"),
+        OsString::from("1"),
+        OsString::from("--expect-finish-reason"),
+        OsString::from("stop"),
+        OsString::from("--rss-pid"),
+        OsString::from("4242"),
+        OsString::from("--error-probe"),
+        OsString::from("--disconnect-probe"),
+    ])?;
+    let results = config
+        .scenarios()
+        .iter()
+        .map(|scenario| {
+            LongChatScenarioResult::new_with_assistant_context_source_and_identity(
+                scenario,
+                ThroughputResult {
+                    completed_requests: 1,
+                    elapsed: Duration::from_millis(400),
+                    streaming_finish: Some(StreamingFinishSummary::new("stop")),
+                    streaming_timing: StreamingTimingSummary::from_event_offsets(&[
+                        Duration::from_millis(64),
+                    ]),
+                    streaming_text: None,
+                    streaming_token_ids: None,
+                    streaming_usage: Some(StreamingUsageSummary::new(18, 1, 19)),
+                    rss: Some(RssSummary::new(1000, 2000, 1500)),
+                },
+                LongChatAssistantContextSource::Seed,
+                LongChatTextIdentity::from_text("short context"),
+            )
+        })
+        .collect::<Vec<_>>();
+    let error_probe = LongChatErrorProbeResult::new(401, true, true, 32);
+    let disconnect_probe = LongChatDisconnectProbeResult::new(true, true, 32);
+
+    let summary = format_run_summary(
+        &config,
+        &results,
+        Some(&error_probe),
+        Some(&disconnect_probe),
+    );
+
+    assert!(summary.contains("long_chat_summary_all_finish_reasons_present=true"));
+    assert!(summary.contains("long_chat_summary_all_usage_accounting_valid=true"));
+    assert!(summary.contains("long_chat_summary_all_token_limit_status_present=true"));
+    assert!(summary.contains("long_chat_summary_any_token_limit_hit=false"));
+    assert!(summary.contains("long_chat_summary_all_follow_up_turns_use_generated_context=false"));
+    assert!(summary.contains("long_chat_summary_all_timing_present=true"));
+    assert!(summary.contains("long_chat_summary_streaming_token_ids_required=false"));
+    assert!(summary.contains("long_chat_summary_all_rss_present=true"));
+    assert!(summary.contains("long_chat_summary_error_probe_reconnect_started_new_generation=true"));
+    assert!(summary
+        .contains("long_chat_summary_disconnect_probe_reconnect_started_new_generation=true"));
+    assert!(summary.contains("long_chat_summary_run_complete=true"));
     Ok(())
 }
 
