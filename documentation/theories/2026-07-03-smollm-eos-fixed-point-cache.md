@@ -105,6 +105,31 @@ This is stronger evidence for the theory: stable generated content plus a
 stable prompt renderer produced exact prompt-cache hits and millisecond TTFT,
 while the terminal condition remained observable as tokenizer EOS.
 
+## Changing Follow-Up Diagnostic
+
+A changing-question rerun used the new `--follow-ups` option to ask about
+France, Germany, Italy, and Spain across four turns:
+
+`documentation/benchmarks/2026-07-03-local-smollm-1-7b-changing-followups-cache-diagnostic-16.md`
+
+| Turn | Cached / Prompt | Lookup | Finish source | Prompt hash | Generated hash |
+| ---: | ---: | --- | --- | --- | --- |
+| 1 | 0 / 48 | `miss` | `eos` | `fnv64:29bca34202dc5f0a` | `fnv64:af63c74c8601c8dd` |
+| 2 | 22 / 46 | `shared_prefix_hit` | `eos` | `fnv64:69824ec3212819fa` | `fnv64:d975fd21291d28d9` |
+| 3 | 22 / 49 | `shared_prefix_hit` | `length` | `fnv64:ddbd1cc3509d39bd` | `fnv64:07b9f98c303e945b` |
+| 4 | 23 / 62 | `shared_prefix_hit` | `eos` | `fnv64:b8403071557d00a6` | `fnv64:21d43b1c9ec8810e` |
+
+The strict all-EOS variant of this experiment failed on turn 3 with
+`expected finish_reason stop, got length`, so it does not close an EOS-only
+falsification lane. The diagnostic rerun still provides useful cache evidence:
+when generated response hashes and prompt hashes changed every turn, the cache
+never reached `exact_hit`.
+
+This supports the fixed-point explanation over a weaker prompt-template-only
+explanation. The stable fixed-answer lane converged to exact hits; the
+changing-answer lane retained only shared-prefix hits under the same server
+path and cache-key mechanism.
+
 ## Expected Measurement
 
 This theory is strengthened when a natural-EOS lane shows:
@@ -159,7 +184,17 @@ runtime:
 --prompt-cache-trace
 ```
 
-Expected falsification signal:
+Current result:
+
+- fixed-answer lane: completed with `finish_source=eos`, exact hits on turns 3
+  and 4, and millisecond TTFT;
+- changing-answer diagnostic lane: completed four turns, changed generated
+  response and prompt hashes every turn after the seed, stayed in
+  `shared_prefix_hit`, and never reached `exact_hit`;
+- changing-answer strict all-EOS lane: not accepted because turn 3 reached the
+  token limit.
+
+Expected falsification signal for the remaining stricter lane:
 
 - fixed-answer lane: generated-response hashes stabilize, prompt hashes
   converge, and turns 3-4 become exact hits;
