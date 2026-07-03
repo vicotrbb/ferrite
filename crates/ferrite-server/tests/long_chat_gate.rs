@@ -1950,6 +1950,79 @@ fn can_add_state_capsule_to_generated_follow_up_prompt_instead_of_assistant_cont
 }
 
 #[test]
+fn can_use_state_capsule_as_generated_follow_up_context_without_retained_prose(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let config = LongChatGateConfig::parse([
+        OsString::from("ferrite-openai-long-chat-gate"),
+        OsString::from("--models"),
+        OsString::from("fixture-model"),
+        OsString::from("--token-lengths"),
+        OsString::from("256"),
+        OsString::from("--turns"),
+        OsString::from("4"),
+        OsString::from("--assistant-context"),
+        OsString::from("seed answer"),
+        OsString::from("--follow-up"),
+        OsString::from("second turn"),
+        OsString::from("--generated-context-state-capsule"),
+        OsString::from(r#"state_anchor=7291"#),
+        OsString::from("--generated-context-state-capsule-placement"),
+        OsString::from("assistant-context-only"),
+    ])?;
+    let mut observed_contexts = Vec::new();
+    let mut observed_follow_ups = Vec::new();
+    let generated = [
+        "alpha retained prose",
+        "beta retained prose",
+        "gamma retained prose",
+        "delta retained prose",
+    ];
+    let mut calls = 0usize;
+
+    let results = config.run_with_executor(|throughput| {
+        observed_contexts.push(throughput.assistant_context().map(str::to_owned));
+        observed_follow_ups.push(throughput.follow_up().map(str::to_owned));
+        let text = generated[calls].to_owned();
+        calls += 1;
+        Ok(ThroughputResult {
+            completed_requests: throughput.requests(),
+            elapsed: Duration::from_millis(10),
+            streaming_finish: Some(StreamingFinishSummary::new("length")),
+            streaming_timing: None,
+            streaming_text: Some(StreamingTextSummary::new(text)),
+            streaming_token_ids: None,
+            streaming_usage: Some(StreamingUsageSummary::new(
+                8,
+                throughput.max_tokens() as u64,
+                throughput.max_tokens() as u64 + 8,
+            )),
+            rss: None,
+        })
+    })?;
+
+    assert_eq!(results.len(), 4);
+    assert_eq!(
+        observed_contexts,
+        [
+            Some("seed answer".to_owned()),
+            Some("Ferrite state capsule:\nstate_anchor=7291".to_owned()),
+            Some("Ferrite state capsule:\nstate_anchor=7291".to_owned()),
+            Some("Ferrite state capsule:\nstate_anchor=7291".to_owned()),
+        ]
+    );
+    assert_eq!(
+        observed_follow_ups,
+        [
+            Some("second turn".to_owned()),
+            Some("second turn".to_owned()),
+            Some("second turn".to_owned()),
+            Some("second turn".to_owned()),
+        ]
+    );
+    Ok(())
+}
+
+#[test]
 fn rejects_invalid_state_capsule_placement() -> Result<(), Box<dyn std::error::Error>> {
     let result = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),

@@ -1,5 +1,7 @@
 use super::{
-    state_capsule::{format_state_capsule_context, format_state_capsule_follow_up},
+    state_capsule::{
+        format_state_capsule_context, format_state_capsule_follow_up, format_state_capsule_only,
+    },
     LongChatAssistantContextSource, LongChatGateConfig, LongChatScenarioResult,
     LongChatTextIdentity,
 };
@@ -208,6 +210,13 @@ impl LongChatAssistantContexts {
             .get(&(scenario.model().to_owned(), scenario.token_length()))
         {
             let text = match &self.generated_context_state_capsule {
+                Some(capsule)
+                    if self
+                        .generated_context_state_capsule_placement
+                        .replaces_assistant_context() =>
+                {
+                    format_state_capsule_only(capsule)
+                }
                 Some(capsule)
                     if self
                         .generated_context_state_capsule_placement
