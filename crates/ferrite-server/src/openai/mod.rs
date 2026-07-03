@@ -60,6 +60,7 @@ mod service_tier_tests;
 mod stop_filter;
 #[cfg(test)]
 mod stop_sequences_tests;
+mod stream_lifecycle;
 #[cfg(test)]
 mod stream_obfuscation_options_tests;
 #[cfg(test)]

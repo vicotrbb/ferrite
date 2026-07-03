@@ -2,10 +2,12 @@ use super::{
     error::OpenAiHttpError,
     schema::{ChatCompletionStreamContext, CompletionStreamContext},
     stop_filter::StopSequenceFilter,
+    stream_lifecycle::{StreamDisconnectPoint, StreamFinishReason, StreamLifecycle},
     streaming,
 };
 use crate::runtime::{GenerationCacheOptions, GenerationControl, PromptEvaluationControl};
 use axum::response::Response;
+use std::cell::RefCell;
 use std::sync::{Arc, Mutex};
 use tokio::sync::OwnedSemaphorePermit;
 
@@ -185,11 +187,20 @@ where
     let (sender, response) = streaming::channel_response();
     tokio::task::spawn_blocking(move || {
         let _permit = permit;
+        let lifecycle = RefCell::new(StreamLifecycle::new());
         let result = (|| -> Result<(), OpenAiHttpError> {
             for chunk in input.initial_chunks {
-                sender.send_json_blocking(&chunk)?;
+                if let Err(error) = sender.send_json_blocking(&chunk) {
+                    lifecycle
+                        .borrow_mut()
+                        .record_disconnect(StreamDisconnectPoint::BeforeGeneration);
+                    return Err(error);
+                }
             }
             if sender.is_closed() {
+                lifecycle
+                    .borrow_mut()
+                    .record_disconnect(StreamDisconnectPoint::BeforeGeneration);
                 return Ok(());
             }
             let include_token_ids = input.stop_sequences.is_empty();
@@ -199,16 +210,33 @@ where
                 .lock()
                 .map_err(|_| OpenAiHttpError::internal("inference engine lock is poisoned"))?;
             let generated = engine
-                .generate_with_prompt_cancellation_callback_and_cache_options(
+                .generate_with_prompt_callbacks_and_cache_options(
                     &input.prompt,
                     input.max_tokens,
                     input.cache_options,
-                    || prompt_control_from_stream_state(&sender),
+                    |_, _| {
+                        lifecycle.borrow_mut().record_prompt_token_started();
+                        PromptEvaluationControl::Continue
+                    },
+                    || {
+                        let mut lifecycle = lifecycle.borrow_mut();
+                        lifecycle.record_prompt_cancellation_poll();
+                        lifecycle.observe_stream_state(
+                            StreamDisconnectPoint::PromptEvaluation,
+                            sender.is_closed(),
+                        )
+                    },
                     |piece, token_ids| {
+                        lifecycle
+                            .borrow_mut()
+                            .record_generated_chunk(token_ids.len());
                         if include_token_ids {
                             sender
                                 .send_json_blocking(&token_chunk(piece, Some(token_ids)))
                                 .map_err(|error| {
+                                    lifecycle
+                                        .borrow_mut()
+                                        .record_disconnect(StreamDisconnectPoint::TokenStreaming);
                                     crate::runtime::RuntimeError::new(error.to_string())
                                 })?;
                         } else {
@@ -216,6 +244,9 @@ where
                                 sender
                                     .send_json_blocking(&token_chunk(&visible_piece, None))
                                     .map_err(|error| {
+                                        lifecycle.borrow_mut().record_disconnect(
+                                            StreamDisconnectPoint::TokenStreaming,
+                                        );
                                         crate::runtime::RuntimeError::new(error.to_string())
                                     })?;
                             }
@@ -229,45 +260,42 @@ where
                 .map_err(|error| OpenAiHttpError::internal(error.to_string()))?;
             if !include_token_ids {
                 for visible_piece in stop_filter.finish() {
-                    sender.send_json_blocking(&token_chunk(&visible_piece, None))?;
+                    if let Err(error) =
+                        sender.send_json_blocking(&token_chunk(&visible_piece, None))
+                    {
+                        lifecycle
+                            .borrow_mut()
+                            .record_disconnect(StreamDisconnectPoint::FinalChunks);
+                        return Err(error);
+                    }
                 }
             }
             for chunk in final_chunks(&generated) {
-                sender.send_json_blocking(&chunk)?;
+                if let Err(error) = sender.send_json_blocking(&chunk) {
+                    lifecycle
+                        .borrow_mut()
+                        .record_disconnect(StreamDisconnectPoint::FinalChunks);
+                    return Err(error);
+                }
             }
-            sender.send_done_blocking()
+            if let Err(error) = sender.send_done_blocking() {
+                lifecycle
+                    .borrow_mut()
+                    .record_disconnect(StreamDisconnectPoint::FinalChunks);
+                return Err(error);
+            }
+            Ok(())
         })();
+        let lifecycle = lifecycle.into_inner();
+        let finish_reason = match (&result, lifecycle.has_disconnect()) {
+            (_, true) => StreamFinishReason::Cancelled,
+            (Ok(()), false) => StreamFinishReason::Completed,
+            (Err(_), false) => StreamFinishReason::Failed,
+        };
+        eprintln!("{}", lifecycle.finish(finish_reason).log_line());
         if result.is_err() {
             let _ = sender.send_done_blocking();
         }
     });
     response
-}
-
-fn prompt_control_from_stream_state(sender: &streaming::StreamSender) -> PromptEvaluationControl {
-    if sender.is_closed() {
-        PromptEvaluationControl::Cancel
-    } else {
-        PromptEvaluationControl::Continue
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn prompt_control_cancels_when_stream_receiver_is_closed() {
-        let (sender, response) = streaming::channel_response();
-
-        assert_eq!(
-            prompt_control_from_stream_state(&sender),
-            PromptEvaluationControl::Continue
-        );
-        drop(response);
-        assert_eq!(
-            prompt_control_from_stream_state(&sender),
-            PromptEvaluationControl::Cancel
-        );
-    }
 }

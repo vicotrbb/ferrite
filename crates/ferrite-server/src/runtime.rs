@@ -140,25 +140,7 @@ impl InferenceEngine {
         )
     }
 
-    pub(crate) fn generate_with_prompt_cancellation_callback_and_cache_options(
-        &self,
-        prompt: &str,
-        max_tokens: usize,
-        cache_options: GenerationCacheOptions,
-        mut on_prompt_cancellation_poll: impl FnMut() -> PromptEvaluationControl,
-        mut on_token: impl FnMut(&str, &[usize]) -> Result<GenerationControl, RuntimeError>,
-    ) -> Result<GeneratedText, RuntimeError> {
-        self.generate_with_prompt_callbacks_and_cache_options(
-            prompt,
-            max_tokens,
-            cache_options,
-            |_, _| PromptEvaluationControl::Continue,
-            &mut on_prompt_cancellation_poll,
-            &mut on_token,
-        )
-    }
-
-    fn generate_with_prompt_callbacks_and_cache_options(
+    pub(crate) fn generate_with_prompt_callbacks_and_cache_options(
         &self,
         prompt: &str,
         max_tokens: usize,
@@ -593,10 +575,11 @@ mod tests {
         remove_fixture_model(&model_path)?;
         let mut polls = 0;
 
-        let error = match engine.generate_with_prompt_cancellation_callback_and_cache_options(
+        let error = match engine.generate_with_prompt_callbacks_and_cache_options(
             "hello",
             1,
             GenerationCacheOptions::default(),
+            |_, _| PromptEvaluationControl::Continue,
             || {
                 polls += 1;
                 if polls == 2 {
