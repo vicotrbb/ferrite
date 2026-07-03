@@ -235,6 +235,35 @@ The integrated long-chat summary remains intentionally incomplete:
 previous full generated response, so it cannot satisfy full generated-context
 identity matching by design.
 
+## Semantic Capsule-Only Probe
+
+Commit `414f0f0` tested whether capsule-only placement can preserve a named
+fact rather than only an arbitrary numeric anchor. The benchmark note is
+`documentation/benchmarks/2026-07-03-openai-long-chat-x86-qwen-1-5b-q8-capsule-only-semantic-64.md`.
+
+The state capsule was:
+
+```text
+risk=thermal_throttling mitigation_code=reduce_batch_size owner=runtime_scheduler
+```
+
+The generated-response assertion required `reduce_batch_size`. Result:
+
+| Variant | Window 64 | Generated prompt avg | TTFT avg | Response identity |
+| --- | --- | ---: | ---: | --- |
+| Short capsule as assistant context only | completed 4 turns | 80.00 | 18775.33 ms | fixed point on turns 2-4 |
+| Semantic capsule as assistant context only | completed 4 turns | 74.00 | 17377.33 ms | fixed point on turns 2-4 |
+
+The semantic capsule preserved the mitigation fact through turns 2-4 and
+produced the same generated response hash on those turns:
+`fnv64:7477d5f93ba8199e`.
+
+This strengthens the theory beyond exact numeric-marker repetition. It still
+uses a substring assertion, so it is not a general semantic-evaluation system.
+It does show that capsule-only state can carry a compact named field through
+the current OpenAI-compatible long-chat gate with lower prompt cost than the
+numeric-anchor capsule-only run.
+
 ## Next Steps
 
 1. Test capsule placement in the follow-up user message instead of assistant
@@ -248,6 +277,8 @@ identity matching by design.
    prose. Done for the same lane; it preserved the anchor, reduced prompt cost
    materially, and produced a fixed response hash across turns 2-4.
 4. Add a semantic recall probe that checks a short generated answer for a known
-   fact without requiring the exact full marker.
+   fact without requiring the exact full marker. Done for one
+   `mitigation_code=reduce_batch_size` capsule-only lane; broader semantic
+   continuity remains unproven.
 5. Only after those pass, draft an HTTP serving policy that makes truncation and
    state retention explicit to clients.
