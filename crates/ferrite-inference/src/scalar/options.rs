@@ -1,3 +1,18 @@
+/// Selects the KV-cache storage backend for a scalar session.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum KvBackend {
+    /// Default nested-`Vec` storage (today's behavior).
+    #[default]
+    Vec,
+    /// Locus block-pool storage (requires the `locus-kv` feature at build time).
+    Locus {
+        /// Tokens stored per fixed-size block.
+        tokens_per_block: usize,
+        /// Maximum tokens the pool is sized for; exceeding it is an error.
+        max_tokens: usize,
+    },
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Q8KActivationMatvecPolicy {
     #[default]
@@ -156,6 +171,7 @@ pub struct ScalarExecutionOptions {
     q8_k_activation_matvec_policy: Q8KActivationMatvecPolicy,
     q8_k_activation_matvec_roles: Q8KActivationMatvecRoleMask,
     compare_q8_k_activation_matvec: bool,
+    kv_backend: KvBackend,
 }
 
 impl ScalarExecutionOptions {
@@ -229,6 +245,15 @@ impl ScalarExecutionOptions {
 
     pub(in crate::scalar) fn compare_q8_k_activation_matvec(self) -> bool {
         self.compare_q8_k_activation_matvec
+    }
+
+    pub fn with_kv_backend(mut self, backend: KvBackend) -> Self {
+        self.kv_backend = backend;
+        self
+    }
+
+    pub fn kv_backend(self) -> KvBackend {
+        self.kv_backend
     }
 }
 
@@ -350,5 +375,21 @@ mod tests {
             "Q8_K activation matvec role alias all cannot be combined with other roles"
         );
         Ok(())
+    }
+
+    #[test]
+    fn default_kv_backend_is_vec() {
+        let options = ScalarExecutionOptions::default();
+        assert_eq!(options.kv_backend(), super::KvBackend::Vec);
+    }
+
+    #[test]
+    fn with_kv_backend_selects_locus() {
+        let backend = super::KvBackend::Locus {
+            tokens_per_block: 16,
+            max_tokens: 256,
+        };
+        let options = ScalarExecutionOptions::default().with_kv_backend(backend);
+        assert_eq!(options.kv_backend(), backend);
     }
 }
