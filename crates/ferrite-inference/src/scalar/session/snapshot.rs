@@ -36,6 +36,35 @@ impl ScalarLlamaSessionSnapshot {
     pub fn kv_cache_bytes(&self) -> u128 {
         memory::kv_cache_bytes(&self.layer_keys, &self.layer_values)
     }
+
+    pub(in crate::scalar) fn from_layers(
+        layer_keys: Vec<Vec<Vec<f32>>>,
+        layer_values: Vec<Vec<Vec<f32>>>,
+        cached_token_count: usize,
+    ) -> Result<Self, InferenceError> {
+        if layer_keys.len() != layer_values.len() {
+            return Err(InferenceError::new(
+                "snapshot key and value layer counts differ",
+            ));
+        }
+        Ok(Self {
+            layer_keys,
+            layer_values,
+            cached_token_count,
+        })
+    }
+
+    pub(in crate::scalar) fn layers_len(&self) -> usize {
+        self.layer_keys.len()
+    }
+
+    pub(in crate::scalar) fn layer_keys_owned(&self) -> Vec<Vec<Vec<f32>>> {
+        self.layer_keys.clone()
+    }
+
+    pub(in crate::scalar) fn layer_values_owned(&self) -> Vec<Vec<Vec<f32>>> {
+        self.layer_values.clone()
+    }
 }
 
 fn truncate_layers(layers: &[Vec<Vec<f32>>], token_count: usize) -> Vec<Vec<Vec<f32>>> {
