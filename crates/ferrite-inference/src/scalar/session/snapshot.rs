@@ -75,12 +75,8 @@ fn truncate_layers(layers: &[Vec<Vec<f32>>], token_count: usize) -> Vec<Vec<Vec<
 }
 
 impl<'a> ScalarLlamaSession<'a> {
-    pub fn cache_snapshot(&self) -> ScalarLlamaSessionSnapshot {
-        ScalarLlamaSessionSnapshot {
-            layer_keys: self.layer_keys.clone(),
-            layer_values: self.layer_values.clone(),
-            cached_token_count: self.cached_token_count,
-        }
+    pub fn cache_snapshot(&mut self) -> Result<ScalarLlamaSessionSnapshot, InferenceError> {
+        self.store.snapshot(self.cached_token_count)
     }
 
     pub fn restore_cache_snapshot(
@@ -112,8 +108,7 @@ impl<'a> ScalarLlamaSession<'a> {
             }
         }
 
-        self.layer_keys = snapshot.layer_keys.clone();
-        self.layer_values = snapshot.layer_values.clone();
+        self.store.restore(snapshot)?;
         self.cached_token_count = snapshot.cached_token_count;
         Ok(())
     }

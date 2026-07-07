@@ -143,7 +143,9 @@ impl ScalarLlamaModel {
         &self,
         options: ScalarExecutionOptions,
     ) -> ScalarLlamaSession<'_> {
-        ScalarLlamaSession::new_with_options(self, options)
+        let head_kv_dim = self.config.attention_head_count_kv * self.config.head_dim;
+        let store = kv_store::KvCacheStore::new_vec(self.weights.layers.len(), head_kv_dim);
+        ScalarLlamaSession::from_store(self, store, options)
     }
 
     pub fn scalar_weight_bytes(&self) -> u128 {

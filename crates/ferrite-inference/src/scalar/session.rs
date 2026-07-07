@@ -15,8 +15,7 @@ pub use snapshot::ScalarLlamaSessionSnapshot;
 #[derive(Debug)]
 pub struct ScalarLlamaSession<'a> {
     model: &'a ScalarLlamaModel,
-    layer_keys: Vec<Vec<Vec<f32>>>,
-    layer_values: Vec<Vec<Vec<f32>>>,
+    store: super::kv_store::KvCacheStore,
     cached_token_count: usize,
     options: ScalarExecutionOptions,
 }
@@ -313,15 +312,10 @@ impl<'a> ScalarLlamaSession<'a> {
                 self.model.config.attention_head_count_kv,
             )?;
 
-            self.layer_keys[layer_index].push(key);
-            self.layer_values[layer_index].push(value);
+            self.store.push(layer_index, &key, &value)?;
 
-            let attention = causal_attention(
-                &self.model.config,
-                &query,
-                &self.layer_keys[layer_index],
-                &self.layer_values[layer_index],
-            )?;
+            let attention =
+                causal_attention(&self.model.config, &query, &mut self.store, layer_index)?;
             let attention_output = profiled_layer_mul_vec(
                 &layer.o_proj,
                 &attention,

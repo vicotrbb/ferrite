@@ -284,7 +284,9 @@ impl InferenceEngine {
                         })?;
                     self.store_prefix_cache_value(
                         prefix_cache_key.clone(),
-                        session.cache_snapshot(),
+                        session.cache_snapshot().map_err(|error| {
+                            RuntimeError::new(format!("failed to snapshot prompt cache: {error}"))
+                        })?,
                         next.clone(),
                     )?;
                     next
@@ -306,7 +308,9 @@ impl InferenceEngine {
                     })?;
                 self.store_prefix_cache_value(
                     prefix_cache_key.clone(),
-                    session.cache_snapshot(),
+                    session.cache_snapshot().map_err(|error| {
+                        RuntimeError::new(format!("failed to snapshot prompt cache: {error}"))
+                    })?,
                     next.clone(),
                 )?;
                 next

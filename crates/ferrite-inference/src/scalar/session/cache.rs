@@ -1,19 +1,26 @@
 use super::ScalarLlamaSession;
+use crate::scalar::kv_store::KvCacheStore;
 use crate::scalar::{InferenceError, ScalarExecutionOptions, ScalarLlamaModel};
 
 impl<'a> ScalarLlamaSession<'a> {
     pub(in crate::scalar) fn new(model: &'a ScalarLlamaModel) -> Self {
-        Self::new_with_options(model, ScalarExecutionOptions::default())
+        let head_kv_dim = model.config.attention_head_count_kv * model.config.head_dim;
+        Self {
+            model,
+            store: KvCacheStore::new_vec(model.weights.layers.len(), head_kv_dim),
+            cached_token_count: 0,
+            options: ScalarExecutionOptions::default(),
+        }
     }
 
-    pub(in crate::scalar) fn new_with_options(
+    pub(in crate::scalar) fn from_store(
         model: &'a ScalarLlamaModel,
+        store: KvCacheStore,
         options: ScalarExecutionOptions,
     ) -> Self {
         Self {
             model,
-            layer_keys: vec![Vec::<Vec<f32>>::new(); model.weights.layers.len()],
-            layer_values: vec![Vec::<Vec<f32>>::new(); model.weights.layers.len()],
+            store,
             cached_token_count: 0,
             options,
         }
@@ -24,7 +31,7 @@ impl<'a> ScalarLlamaSession<'a> {
     }
 
     pub fn kv_cache_bytes(&self) -> u128 {
-        crate::scalar::memory::kv_cache_bytes(&self.layer_keys, &self.layer_values)
+        self.store.kv_cache_bytes()
     }
 
     pub fn truncate_cache(&mut self, token_count: usize) -> Result<(), InferenceError> {
@@ -34,13 +41,7 @@ impl<'a> ScalarLlamaSession<'a> {
                 self.cached_token_count
             )));
         }
-
-        for keys in &mut self.layer_keys {
-            keys.truncate(token_count);
-        }
-        for values in &mut self.layer_values {
-            values.truncate(token_count);
-        }
+        self.store.truncate(token_count)?;
         self.cached_token_count = token_count;
         Ok(())
     }

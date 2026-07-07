@@ -31,7 +31,7 @@ fn session_restores_cache_snapshot_to_resume_prefix() -> Result<(), Box<dyn Erro
     let mut prefix_session = model.start_session();
 
     prefix_session.accept_token(0)?;
-    let snapshot = prefix_session.cache_snapshot();
+    let snapshot = prefix_session.cache_snapshot()?;
     assert_eq!(snapshot.cached_token_count(), 1);
     assert_eq!(snapshot.kv_cache_bytes(), 16);
 
