@@ -189,17 +189,29 @@ analysis:
   `crates/ferrite-inference/src/scalar/kv_store.rs`.
 - The Locus backend allocates one pool block per `tokens_per_block` tokens per
   (layer, K/V) list: `2 * num_layers * ceil(tokens / tokens_per_block)` block
-  allocations, reused LIFO across sessions via `KvBlockPool::free` /
-  `KvReuseOrder::Lifo` (`crates/ferrite-inference/src/scalar/kv_store/locus.rs`).
+  allocations over a sequence of that many cached tokens
+  (`crates/ferrite-inference/src/scalar/kv_store/locus.rs`) — a
+  ~`tokens_per_block`× reduction in KV allocation count within the session
+  versus the Vec backend's one allocation per token.
+- The pool is per-session: `LocusKvStore::new` creates its own
+  `KvBlockPool`, owned by the `ScalarLlamaSession` built in
+  `start_session_with_options`, and the whole pool is released when the
+  session drops. `KvReuseOrder::Lifo` reuse (`KvBlockPool::free`) therefore
+  benefits only within-session reallocation — blocks freed by `truncate`
+  (or `restore`) are handed back out warm before any fresh block is
+  allocated. There is no cross-session block reuse; that would require a
+  longer-lived shared pool owned above the session, which is not part of
+  this design.
 - With `tokens_per_block = 16` (the CLI default), the allocation-count ratio
   approaches `tokens_per_block` (≈16×) as `tokens` grows, independent of
   `num_layers` (it cancels in the ratio). This was directly confirmed on the
   synthetic fixture above (`tokens_per_block = 2` → 8 measured block
   allocations vs. an unmeasured 16 Vec-backend allocations by the same
   formula).
-- This is an **allocation-count** argument only. It says nothing about
-  measured RSS or throughput on a real model — those require PENDING work
-  below.
+- This is an **allocation-count** argument only, and only about
+  within-session reallocation. It says nothing about measured RSS or
+  throughput on a real model, and nothing about cross-session behavior —
+  those require PENDING work below.
 
 ---
 

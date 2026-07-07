@@ -57,6 +57,16 @@ RoPE, and the dot-product kernels are unchanged — only the origin of the
 key/value slices changes, from an owned `Vec<f32>` to a block-backed `&[f32]`
 view.
 
+The pool is created in `LocusKvStore::new` and owned by the `LocusKvStore`,
+which is in turn owned by the `ScalarLlamaSession` that built it in
+`start_session_with_options` — the pool is per-session, not shared or
+global. LIFO reuse (`KvReuseOrder::Lifo`) therefore benefits only
+within-session reallocation: blocks freed by `truncate` (or by `restore`,
+which truncates to zero and re-pushes) are handed back out warm before any
+fresh block is allocated. There is no cross-session block reuse; a longer-
+lived, shared pool owned above the session would be required for that and is
+not part of this decision.
+
 The backend is opt-in at two independent levels, both required:
 
 - Compile time: the `locus-kv` Cargo feature on `ferrite-inference`, threaded
@@ -74,17 +84,13 @@ Output must be, and is, bit-identical between backends: same `token_id`,
 `logits`, and `kv_cache_bytes` for the same input, proven by a differential
 parity test (see Evidence). Swapping storage does not change model output.
 
-## Alignment and the unsafe boundary
-
 Ferrite's workspace denies unsafe code (`deny(unsafe_code)`), and this design
 adds no exception. `LocusKvStore` reinterprets pool block bytes (`&mut [u8]`,
 the only type `KvBlockPool::block_mut` returns) as `&[f32]` / `&mut [f32]`
 using `bytemuck::try_cast_slice` / `try_cast_slice_mut` — a safe API; the
 `unsafe` needed to reinterpret the bytes lives inside `bytemuck`, not in
-Ferrite.
-
-This is sound only because of an alignment invariant, which this decision
-states and which the code relies on:
+Ferrite. This is sound only because of an alignment invariant, which this
+decision states and which the code relies on:
 
 - `KvBlockPool::new_mapped` backs the pool with one contiguous `mmap` region,
   and `mmap` returns page-aligned memory. Every block therefore starts at an
@@ -103,8 +109,6 @@ code performs. `write_block` and `read_block` still handle the `Err` case
 explicitly rather than assuming it can't happen, so a future change that
 breaks this invariant fails as a clean `InferenceError`, not a panic or UB.
 
-## Dependencies
-
 `locus-alloc` (path dependency on `../../../locus/crates/locus-alloc`) and
 `bytemuck` are both added as `optional = true` dependencies of
 `ferrite-inference`, gated behind one feature:
@@ -122,26 +126,6 @@ locus-kv = ["dep:locus-alloc", "dep:bytemuck"]
 dependency is pulled in, only `VecKvStore` compiles, and behavior and code
 path are byte-for-byte the pre-existing Vec-only path. Locus's `numa` feature
 (Linux-only) is **not** enabled by this integration.
-
-## Rejected alternatives
-
-- **One max-context arena block per layer (Approach A).** Allocate a single
-  block sized for the hard maximum context length per `(layer, K|V)` up
-  front. Rejected because it over-commits memory for short sequences: a
-  session generating a handful of tokens would still reserve and (depending
-  on backing) potentially fault in memory for the full configured max
-  context, causing a short-sequence RSS regression relative to today's
-  Vec path, which only grows with actual token count. The chosen design
-  instead allocates incrementally in `tokens_per_block`-sized chunks, so
-  memory scales with the sequence actually generated.
-- **Pool only the prefix-cache snapshot storage (Approach C).** Apply Locus
-  to the server-side `RuntimePrefixCache`'s deep-cloned owned snapshots
-  instead of the live per-token session cache. Rejected as off-target for
-  this slice: it does not touch the per-token heap-allocation churn on the
-  hot decode path, which is the problem this design set out to solve. It
-  remains a separate, optional, lower-risk slice for later; this design
-  leaves the snapshot format (`ScalarLlamaSessionSnapshot`, owned
-  `Vec<Vec<Vec<f32>>>`) unchanged.
 
 ## Consequences
 
@@ -165,6 +149,12 @@ path are byte-for-byte the pre-existing Vec-only path. Locus's `numa` feature
   it returns a clean `OutOfBlocks`-derived `InferenceError` rather than
   growing or corrupting memory, consistent with Ferrite's existing hard
   token cap.
+- Because the pool is per-session and released whole when the session drops
+  (its `MappedRegion` unmaps), there is no cross-session block reuse; the
+  within-session win is allocation-count reduction over a sequence of cached
+  tokens (see Evidence), not warm reuse carried into a subsequent session.
+  Cross-session pooling would require a longer-lived shared pool owned above
+  the session and is explicit future work, not part of this decision.
 - Real-model evidence for the design's actual success-gate metrics — peak
   and post-load RSS, decode throughput, and allocation churn over a longer
   generation on a Tier 1 model — is pending a Tier 1 GGUF artifact (none is
@@ -174,6 +164,26 @@ path are byte-for-byte the pre-existing Vec-only path. Locus's `numa` feature
   the analytic formula exactly, and a clean release build with the feature.
   See `documentation/benchmarks/2026-07-06-locus-kv-backend.md` for the
   full proven/pending breakdown and exact repro commands.
+
+## Alternatives Considered
+
+- **One max-context arena block per layer (Approach A).** Allocate a single
+  block sized for the hard maximum context length per `(layer, K|V)` up
+  front. Rejected because it over-commits memory for short sequences: a
+  session generating a handful of tokens would still reserve and (depending
+  on backing) potentially fault in memory for the full configured max
+  context, causing a short-sequence RSS regression relative to today's
+  Vec path, which only grows with actual token count. The chosen design
+  instead allocates incrementally in `tokens_per_block`-sized chunks, so
+  memory scales with the sequence actually generated.
+- **Pool only the prefix-cache snapshot storage (Approach C).** Apply Locus
+  to the server-side `RuntimePrefixCache`'s deep-cloned owned snapshots
+  instead of the live per-token session cache. Rejected as off-target for
+  this slice: it does not touch the per-token heap-allocation churn on the
+  hot decode path, which is the problem this design set out to solve. It
+  remains a separate, optional, lower-risk slice for later; this design
+  leaves the snapshot format (`ScalarLlamaSessionSnapshot`, owned
+  `Vec<Vec<Vec<f32>>>`) unchanged.
 
 ## Evidence
 
