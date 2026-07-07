@@ -12,9 +12,14 @@ path = "src/lib.rs"
 [dependencies]
 ferrite-model = { path = "../ferrite-model" }
 rayon = "1.10"
+locus-alloc = { path = "../../../locus/crates/locus-alloc", optional = true }
+bytemuck = { version = "1", optional = true }
 
 [dev-dependencies]
 ferrite-fixtures = { path = "../ferrite-fixtures" }
+
+[features]
+locus-kv = ["dep:locus-alloc", "dep:bytemuck"]
 
 [lints]
 workspace = true

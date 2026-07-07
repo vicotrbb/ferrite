@@ -132,6 +132,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72f5acc6cb2ba439de613abc23857ec3d78374d8ed5ac84e9d11336e87da8649"
 
 [[package]]
+name = "bytemuck"
+version = "1.25.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c8efb64bd706a16a1bdde310ae86b351e4d21550d98d056f22f8a7f7a2183fec"
+
+[[package]]
 name = "bytes"
 version = "1.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -279,8 +285,10 @@ version = "0.1.0"
 name = "ferrite-inference"
 version = "0.1.0"
 dependencies = [
+ "bytemuck",
  "ferrite-fixtures",
  "ferrite-model",
+ "locus-alloc",
  "rayon",
 ]
 
@@ -653,6 +661,13 @@ name = "litemap"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "92daf443525c4cce67b150400bc2316076100ce0b3686209eb8cf3c31612e6f0"
+
+[[package]]
+name = "locus-alloc"
+version = "0.1.0"
+dependencies = [
+ "libc",
+]
 
 [[package]]
 name = "log"
