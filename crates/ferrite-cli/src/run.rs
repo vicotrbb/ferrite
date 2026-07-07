@@ -58,10 +58,24 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
     }
     let execution_options = match args.kv_backend {
         CliKvBackend::Vec => execution_options,
-        CliKvBackend::Locus => execution_options.with_kv_backend(KvBackend::Locus {
-            tokens_per_block: args.kv_tokens_per_block,
-            max_tokens: args.kv_max_tokens,
-        }),
+        CliKvBackend::Locus => {
+            // The Locus pool must be sized for the whole workload, not just the
+            // requested generation count: prompt tokens are pushed into the KV
+            // cache too. Default to prompt length + generated/benchmarked tokens
+            // + headroom unless the user gave an explicit override. Over-sizing
+            // is cheap (the pool is mmap-backed and lazily resident); under-sizing
+            // is the bug this sizing guards against.
+            let max_tokens = args.kv_max_tokens.unwrap_or_else(|| {
+                prompt_token_ids.len()
+                    + args.generate_tokens.unwrap_or(0)
+                    + args.benchmark_runs.unwrap_or(0)
+                    + 16
+            });
+            execution_options.with_kv_backend(KvBackend::Locus {
+                tokens_per_block: args.kv_tokens_per_block,
+                max_tokens,
+            })
+        }
     };
     let mut session = model.start_session_with_options(execution_options)?;
     let (next, profile) = accept_prompt(&mut session, &prompt_token_ids, args.profile_next_token)?;

@@ -22,7 +22,7 @@ pub struct CliArgs {
     pub sleep_after_load_ms: Option<u64>,
     pub kv_backend: CliKvBackend,
     pub kv_tokens_per_block: usize,
-    pub kv_max_tokens: usize,
+    pub kv_max_tokens: Option<usize>,
 }
 
 pub enum PromptSource {
@@ -197,8 +197,6 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
     })?;
 
     let kv_tokens_per_block = kv_tokens_per_block.unwrap_or(16);
-    let kv_max_tokens =
-        kv_max_tokens.unwrap_or_else(|| generate_tokens.or(benchmark_runs).unwrap_or(2048));
 
     Ok(CliArgs {
         model_path: model_path.ok_or_else(|| io::Error::other("missing --model argument"))?,
@@ -416,7 +414,7 @@ mod tests {
 
         assert_eq!(args.kv_backend, super::CliKvBackend::Vec);
         assert_eq!(args.kv_tokens_per_block, 16);
-        assert_eq!(args.kv_max_tokens, 2048);
+        assert_eq!(args.kv_max_tokens, None);
         Ok(())
     }
 
@@ -438,12 +436,12 @@ mod tests {
 
         assert_eq!(args.kv_backend, super::CliKvBackend::Locus);
         assert_eq!(args.kv_tokens_per_block, 32);
-        assert_eq!(args.kv_max_tokens, 4096);
+        assert_eq!(args.kv_max_tokens, Some(4096));
         Ok(())
     }
 
     #[test]
-    fn kv_max_tokens_defaults_to_generate_tokens_when_unset() -> Result<(), Box<dyn Error>> {
+    fn kv_max_tokens_is_none_when_unset_even_with_generate_tokens() -> Result<(), Box<dyn Error>> {
         let args = parse([
             OsString::from("ferrite"),
             OsString::from("--model"),
@@ -454,7 +452,10 @@ mod tests {
             OsString::from("64"),
         ])?;
 
-        assert_eq!(args.kv_max_tokens, 64);
+        assert_eq!(
+            args.kv_max_tokens, None,
+            "kv_max_tokens must stay unset in args::parse; sizing from the prompt happens in run.rs"
+        );
         Ok(())
     }
 
