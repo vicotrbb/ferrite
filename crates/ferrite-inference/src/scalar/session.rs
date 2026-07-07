@@ -312,7 +312,7 @@ impl<'a> ScalarLlamaSession<'a> {
                 self.model.config.attention_head_count_kv,
             )?;
 
-            self.store.push(layer_index, &key, &value)?;
+            self.store.push(layer_index, key, value)?;
 
             let attention =
                 causal_attention(&self.model.config, &query, &mut self.store, layer_index)?;

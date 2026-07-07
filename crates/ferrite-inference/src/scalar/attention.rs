@@ -85,7 +85,7 @@ mod tests {
     ) -> Result<KvCacheStore, InferenceError> {
         let dim = config.attention_head_count_kv * config.head_dim;
         let mut store = KvCacheStore::new_vec(1, dim);
-        store.push(0, &vec![0.0; dim], &value)?;
+        store.push(0, vec![0.0; dim], value)?;
         Ok(store)
     }
 

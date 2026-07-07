@@ -42,14 +42,6 @@ impl KvCacheStore {
         }
     }
 
-    pub(in crate::scalar) fn layer_count(&self) -> usize {
-        match self {
-            KvCacheStore::Vec(store) => store.layer_count(),
-            #[cfg(feature = "locus-kv")]
-            KvCacheStore::Locus(store) => store.layer_count(),
-        }
-    }
-
     pub(in crate::scalar) fn layer_len(&self, layer: usize) -> usize {
         match self {
             KvCacheStore::Vec(store) => store.layer_len(layer),
@@ -61,8 +53,8 @@ impl KvCacheStore {
     pub(in crate::scalar) fn push(
         &mut self,
         layer: usize,
-        key: &[f32],
-        value: &[f32],
+        key: Vec<f32>,
+        value: Vec<f32>,
     ) -> Result<(), InferenceError> {
         match self {
             KvCacheStore::Vec(store) => store.push(layer, key, value),
@@ -151,10 +143,6 @@ impl VecKvStore {
         }
     }
 
-    fn layer_count(&self) -> usize {
-        self.layer_keys.len()
-    }
-
     fn layer_len(&self, layer: usize) -> usize {
         self.layer_keys.get(layer).map_or(0, Vec::len)
     }
@@ -170,19 +158,19 @@ impl VecKvStore {
         Ok(())
     }
 
-    fn push(&mut self, layer: usize, key: &[f32], value: &[f32]) -> Result<(), InferenceError> {
-        self.check_dim("key", key)?;
-        self.check_dim("value", value)?;
+    fn push(&mut self, layer: usize, key: Vec<f32>, value: Vec<f32>) -> Result<(), InferenceError> {
+        self.check_dim("key", &key)?;
+        self.check_dim("value", &value)?;
         let keys = self
             .layer_keys
             .get_mut(layer)
             .ok_or_else(|| InferenceError::new(format!("kv layer {layer} out of bounds")))?;
-        keys.push(key.to_vec());
+        keys.push(key);
         let values = self
             .layer_values
             .get_mut(layer)
             .ok_or_else(|| InferenceError::new(format!("kv layer {layer} out of bounds")))?;
-        values.push(value.to_vec());
+        values.push(value);
         Ok(())
     }
 
@@ -263,8 +251,8 @@ mod tests {
             for layer in 0..2 {
                 store.push(
                     layer,
-                    &sample(layer, position, dim),
-                    &sample(layer + 100, position, dim),
+                    sample(layer, position, dim),
+                    sample(layer + 100, position, dim),
                 )?;
             }
         }
@@ -289,7 +277,7 @@ mod tests {
         let dim = 2;
         let mut store = KvCacheStore::new_vec(1, dim);
         for position in 0..4 {
-            store.push(0, &sample(0, position, dim), &sample(0, position, dim))?;
+            store.push(0, sample(0, position, dim), sample(0, position, dim))?;
         }
         store.truncate(2)?;
         assert_eq!(store.layer_len(0), 2);
@@ -329,8 +317,8 @@ mod tests {
             for layer in 0..2 {
                 store.push(
                     layer,
-                    &sample(layer, position, dim),
-                    &sample(layer, position, dim),
+                    sample(layer, position, dim),
+                    sample(layer, position, dim),
                 )?;
             }
         }
@@ -343,6 +331,68 @@ mod tests {
                 assert_eq!(restored.key(layer, position)?, store.key(layer, position)?);
             }
         }
+        Ok(())
+    }
+
+    #[cfg(not(feature = "locus-kv"))]
+    #[test]
+    fn from_backend_locus_without_feature_errors() -> Result<(), InferenceError> {
+        use crate::scalar::options::KvBackend;
+        let error = match KvCacheStore::from_backend(
+            2,
+            4,
+            KvBackend::Locus {
+                tokens_per_block: 4,
+                max_tokens: 16,
+            },
+        ) {
+            Ok(_) => return Err(InferenceError::new("expected locus-kv feature error")),
+            Err(error) => error,
+        };
+        assert!(error.to_string().contains("locus-kv"));
+        Ok(())
+    }
+
+    #[cfg(feature = "locus-kv")]
+    #[test]
+    fn vec_and_locus_backends_store_identical_bytes() -> Result<(), InferenceError> {
+        use crate::scalar::options::KvBackend;
+        let dim = 3;
+        let layer_count = 2;
+        let tokens_per_block = 2;
+        let position_count = 5; // spans multiple blocks with tokens_per_block=2
+        let mut vec_store = KvCacheStore::new_vec(layer_count, dim);
+        let mut locus_store = KvCacheStore::from_backend(
+            layer_count,
+            dim,
+            KvBackend::Locus {
+                tokens_per_block,
+                max_tokens: 32,
+            },
+        )?;
+        for position in 0..position_count {
+            for layer in 0..layer_count {
+                let key = sample(layer, position, dim);
+                let value = sample(layer + 100, position, dim);
+                vec_store.push(layer, key.clone(), value.clone())?;
+                locus_store.push(layer, key, value)?;
+            }
+        }
+        for layer in 0..layer_count {
+            for position in 0..position_count {
+                assert_eq!(
+                    vec_store.key(layer, position)?,
+                    locus_store.key(layer, position)?,
+                    "key mismatch at layer {layer} position {position}"
+                );
+                assert_eq!(
+                    vec_store.value(layer, position)?,
+                    locus_store.value(layer, position)?,
+                    "value mismatch at layer {layer} position {position}"
+                );
+            }
+        }
+        assert_eq!(vec_store.kv_cache_bytes(), locus_store.kv_cache_bytes());
         Ok(())
     }
 }

@@ -66,10 +66,11 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
             // is cheap (the pool is mmap-backed and lazily resident); under-sizing
             // is the bug this sizing guards against.
             let max_tokens = args.kv_max_tokens.unwrap_or_else(|| {
-                prompt_token_ids.len()
-                    + args.generate_tokens.unwrap_or(0)
-                    + args.benchmark_runs.unwrap_or(0)
-                    + 16
+                prompt_token_ids
+                    .len()
+                    .saturating_add(args.generate_tokens.unwrap_or(0))
+                    .saturating_add(args.benchmark_runs.unwrap_or(0))
+                    .saturating_add(16)
             });
             execution_options.with_kv_backend(KvBackend::Locus {
                 tokens_per_block: args.kv_tokens_per_block,

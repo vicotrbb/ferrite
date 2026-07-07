@@ -135,8 +135,8 @@ impl LocusKvStore {
     pub(in crate::scalar) fn push(
         &mut self,
         layer: usize,
-        key: &[f32],
-        value: &[f32],
+        key: Vec<f32>,
+        value: Vec<f32>,
     ) -> Result<(), InferenceError> {
         if key.len() != self.head_kv_dim || value.len() != self.head_kv_dim {
             return Err(InferenceError::new(format!(
@@ -148,8 +148,8 @@ impl LocusKvStore {
         }
         let position = self.layer_len(layer);
         self.ensure_block(layer, position)?;
-        self.write_block(true, layer, position, key)?;
-        self.write_block(false, layer, position, value)?;
+        self.write_block(true, layer, position, &key)?;
+        self.write_block(false, layer, position, &value)?;
         if let Some(len) = self.layer_len.get_mut(layer) {
             *len += 1;
         }
@@ -264,8 +264,8 @@ impl LocusKvStore {
         self.truncate(0)?;
         let keys = snapshot.layer_keys_owned();
         let values = snapshot.layer_values_owned();
-        for (layer, (layer_keys, layer_values)) in keys.iter().zip(values.iter()).enumerate() {
-            for (key, value) in layer_keys.iter().zip(layer_values.iter()) {
+        for (layer, (layer_keys, layer_values)) in keys.into_iter().zip(values).enumerate() {
+            for (key, value) in layer_keys.into_iter().zip(layer_values) {
                 self.push(layer, key, value)?;
             }
         }
@@ -291,7 +291,7 @@ mod tests {
         let mut store = LocusKvStore::new(2, dim, 2, 8)?;
         for position in 0..5 {
             for layer in 0..2 {
-                store.push(layer, &sample(layer, position, dim), &sample(layer + 100, position, dim))?;
+                store.push(layer, sample(layer, position, dim), sample(layer + 100, position, dim))?;
             }
         }
         for layer in 0..2 {
@@ -309,7 +309,7 @@ mod tests {
         let dim = 2;
         let mut store = LocusKvStore::new(1, dim, 2, 8)?;
         for position in 0..4 {
-            store.push(0, &sample(0, position, dim), &sample(0, position, dim))?;
+            store.push(0, sample(0, position, dim), sample(0, position, dim))?;
         }
         let allocated_before = store.pool_stats().allocated;
         store.truncate(1)?;
@@ -324,9 +324,9 @@ mod tests {
         let dim = 2;
         // capacity sized for 2 tokens; pushing a 3rd must error.
         let mut store = LocusKvStore::new(1, dim, 1, 2)?;
-        store.push(0, &sample(0, 0, dim), &sample(0, 0, dim))?;
-        store.push(0, &sample(0, 1, dim), &sample(0, 1, dim))?;
-        let error = match store.push(0, &sample(0, 2, dim), &sample(0, 2, dim)) {
+        store.push(0, sample(0, 0, dim), sample(0, 0, dim))?;
+        store.push(0, sample(0, 1, dim), sample(0, 1, dim))?;
+        let error = match store.push(0, sample(0, 2, dim), sample(0, 2, dim)) {
             Ok(()) => return Err(InferenceError::new("expected out-of-blocks error")),
             Err(error) => error,
         };
@@ -342,7 +342,7 @@ mod tests {
         let mut store = LocusKvStore::new(2, dim, 2, 8)?;
         for position in 0..5 {
             for layer in 0..2 {
-                store.push(layer, &sample(layer, position, dim), &sample(layer + 100, position, dim))?;
+                store.push(layer, sample(layer, position, dim), sample(layer + 100, position, dim))?;
             }
         }
         let snapshot = store.snapshot(5)?;
