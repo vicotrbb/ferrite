@@ -18,6 +18,30 @@ impl KvCacheStore {
         KvCacheStore::Vec(VecKvStore::new(layer_count, head_kv_dim))
     }
 
+    pub(in crate::scalar) fn from_backend(
+        layer_count: usize,
+        head_kv_dim: usize,
+        backend: super::options::KvBackend,
+    ) -> Result<Self, InferenceError> {
+        match backend {
+            super::options::KvBackend::Vec => Ok(Self::new_vec(layer_count, head_kv_dim)),
+            #[cfg(feature = "locus-kv")]
+            super::options::KvBackend::Locus {
+                tokens_per_block,
+                max_tokens,
+            } => Ok(KvCacheStore::Locus(locus::LocusKvStore::new(
+                layer_count,
+                head_kv_dim,
+                tokens_per_block,
+                max_tokens,
+            )?)),
+            #[cfg(not(feature = "locus-kv"))]
+            super::options::KvBackend::Locus { .. } => Err(InferenceError::new(
+                "locus kv backend requested but the `locus-kv` feature is not enabled",
+            )),
+        }
+    }
+
     pub(in crate::scalar) fn layer_count(&self) -> usize {
         match self {
             KvCacheStore::Vec(store) => store.layer_count(),
@@ -270,6 +294,30 @@ mod tests {
         store.truncate(2)?;
         assert_eq!(store.layer_len(0), 2);
         assert!(store.key(0, 2).is_err());
+        Ok(())
+    }
+
+    #[cfg(feature = "locus-kv")]
+    #[test]
+    fn build_from_backend_selects_locus() -> Result<(), crate::scalar::InferenceError> {
+        use crate::scalar::options::KvBackend;
+        let store = KvCacheStore::from_backend(
+            2,
+            4,
+            KvBackend::Locus {
+                tokens_per_block: 16,
+                max_tokens: 64,
+            },
+        )?;
+        assert!(matches!(store, KvCacheStore::Locus(_)));
+        Ok(())
+    }
+
+    #[test]
+    fn build_from_backend_defaults_to_vec() -> Result<(), crate::scalar::InferenceError> {
+        use crate::scalar::options::KvBackend;
+        let store = KvCacheStore::from_backend(2, 4, KvBackend::Vec)?;
+        assert!(matches!(store, KvCacheStore::Vec(_)));
         Ok(())
     }
 

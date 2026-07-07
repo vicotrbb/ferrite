@@ -426,7 +426,7 @@ fn q4_k_fixture_accepts_q8_k_session_options() -> Result<(), Box<dyn Error>> {
     let model = ScalarLlamaModel::from_gguf_scalar(&gguf, &bytes)?;
     let mut session = model.start_session_with_options(
         ScalarExecutionOptions::default().with_q8_k_activation_matvec(true),
-    );
+    )?;
 
     let next = session.accept_token(0)?;
 
@@ -456,7 +456,7 @@ fn q6_k_fixture_accepts_q8_k_session_options() -> Result<(), Box<dyn Error>> {
     let model = ScalarLlamaModel::from_gguf_scalar(&gguf, &bytes)?;
     let mut session = model.start_session_with_options(
         ScalarExecutionOptions::default().with_q8_k_activation_matvec(true),
-    );
+    )?;
 
     let next = session.accept_token(0)?;
 

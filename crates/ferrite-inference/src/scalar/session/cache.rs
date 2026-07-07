@@ -26,6 +26,19 @@ impl<'a> ScalarLlamaSession<'a> {
         }
     }
 
+    pub(in crate::scalar) fn new_with_options(
+        model: &'a ScalarLlamaModel,
+        options: ScalarExecutionOptions,
+    ) -> Result<Self, InferenceError> {
+        let head_kv_dim = model.config.attention_head_count_kv * model.config.head_dim;
+        let store = KvCacheStore::from_backend(
+            model.weights.layers.len(),
+            head_kv_dim,
+            options.kv_backend(),
+        )?;
+        Ok(Self::from_store(model, store, options))
+    }
+
     pub fn cached_token_count(&self) -> usize {
         self.cached_token_count
     }

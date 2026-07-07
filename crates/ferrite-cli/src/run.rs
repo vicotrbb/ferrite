@@ -56,7 +56,7 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
     if let Some(roles) = args.experimental_q8_k_activation_roles {
         execution_options = execution_options.with_q8_k_activation_matvec_roles(roles);
     }
-    let mut session = model.start_session_with_options(execution_options);
+    let mut session = model.start_session_with_options(execution_options)?;
     let (next, profile) = accept_prompt(&mut session, &prompt_token_ids, args.profile_next_token)?;
     let token = tokenizer.token(next.token_id).ok_or_else(|| {
         io::Error::other(format!(

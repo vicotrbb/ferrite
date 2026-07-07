@@ -13,7 +13,7 @@ pub(crate) fn profile_first_benchmark_token(
     input_token_id: usize,
     options: ScalarExecutionOptions,
 ) -> Result<BenchmarkTokenProfile, Box<dyn Error>> {
-    let mut session = model.start_session_with_options(options);
+    let mut session = model.start_session_with_options(options)?;
     let replayed_next = session.accept_prompt(prompt_token_ids)?;
     if replayed_next.token_id != input_token_id {
         return Err(io::Error::other(format!(
