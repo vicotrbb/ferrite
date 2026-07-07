@@ -17,5 +17,8 @@ ferrite-model = { path = "../ferrite-model" }
 [dev-dependencies]
 ferrite-fixtures = { path = "../ferrite-fixtures" }
 
+[features]
+locus-kv = ["ferrite-inference/locus-kv"]
+
 [lints]
 workspace = true

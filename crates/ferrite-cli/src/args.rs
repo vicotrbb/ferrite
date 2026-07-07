@@ -20,11 +20,30 @@ pub struct CliArgs {
     pub compare_q8_k_activation_matvec: bool,
     pub stream: bool,
     pub sleep_after_load_ms: Option<u64>,
+    pub kv_backend: CliKvBackend,
+    pub kv_tokens_per_block: usize,
+    pub kv_max_tokens: usize,
 }
 
 pub enum PromptSource {
     Text(String),
     TokenIds(Vec<usize>),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CliKvBackend {
+    Vec,
+    Locus,
+}
+
+impl CliKvBackend {
+    fn parse(value: &str) -> Result<Self, String> {
+        match value {
+            "vec" => Ok(Self::Vec),
+            "locus" => Ok(Self::Locus),
+            other => Err(format!("must be one of vec, locus (got {other})")),
+        }
+    }
 }
 
 pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dyn Error>> {
@@ -44,6 +63,9 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
     let mut compare_q8_k_activation_matvec = false;
     let mut stream = false;
     let mut sleep_after_load_ms = None;
+    let mut kv_backend = CliKvBackend::Vec;
+    let mut kv_tokens_per_block = None;
+    let mut kv_max_tokens = None;
     let mut iter = args.into_iter();
     let _program = iter.next();
 
@@ -130,6 +152,23 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
             "--compare-q8-k-activation-matvec" => {
                 compare_q8_k_activation_matvec = true;
             }
+            "--kv-backend" => {
+                let value = os_string_to_string(next_value(&mut iter, "--kv-backend")?)?;
+                kv_backend = CliKvBackend::parse(&value)
+                    .map_err(|error| io::Error::other(format!("--kv-backend {error}")))?;
+            }
+            "--kv-tokens-per-block" => {
+                kv_tokens_per_block = Some(parse_nonzero_usize(
+                    next_value(&mut iter, "--kv-tokens-per-block")?,
+                    "--kv-tokens-per-block",
+                )?);
+            }
+            "--kv-max-tokens" => {
+                kv_max_tokens = Some(parse_nonzero_usize(
+                    next_value(&mut iter, "--kv-max-tokens")?,
+                    "--kv-max-tokens",
+                )?);
+            }
             "--help" | "-h" => {
                 return Err(io::Error::other(usage()).into());
             }
@@ -157,6 +196,10 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
         prompt_token_ids: prompt_token_ids.as_deref(),
     })?;
 
+    let kv_tokens_per_block = kv_tokens_per_block.unwrap_or(16);
+    let kv_max_tokens =
+        kv_max_tokens.unwrap_or_else(|| generate_tokens.or(benchmark_runs).unwrap_or(2048));
+
     Ok(CliArgs {
         model_path: model_path.ok_or_else(|| io::Error::other("missing --model argument"))?,
         prompt: prompt_source(prompt, prompt_token_ids)?,
@@ -173,6 +216,9 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
         compare_q8_k_activation_matvec,
         stream,
         sleep_after_load_ms,
+        kv_backend,
+        kv_tokens_per_block,
+        kv_max_tokens,
     })
 }
 
@@ -324,7 +370,7 @@ fn parse_token_ids(value: OsString) -> Result<Vec<usize>, Box<dyn Error>> {
 }
 
 fn usage() -> &'static str {
-    "usage: ferrite --model <path.gguf> (--prompt <text> | --prompt-token-ids <id[,id...]>) [--expect-token-id <id>] [--top-logits <count>] [--profile-next-token] [--generate-tokens <count>] [--expect-generated-token-ids <id[,id...]>] [--stream] [--benchmark-runs <count>] [--benchmark-tokenization-runs <count>] [--profile-benchmark-token] [--sleep-after-load-ms <ms>] [--experimental-q8-k-activation-matvec] [--experimental-q8-k-activation-roles <role[,role...]>] [--compare-q8-k-activation-matvec]"
+    "usage: ferrite --model <path.gguf> (--prompt <text> | --prompt-token-ids <id[,id...]>) [--expect-token-id <id>] [--top-logits <count>] [--profile-next-token] [--generate-tokens <count>] [--expect-generated-token-ids <id[,id...]>] [--stream] [--benchmark-runs <count>] [--benchmark-tokenization-runs <count>] [--profile-benchmark-token] [--sleep-after-load-ms <ms>] [--experimental-q8-k-activation-matvec] [--experimental-q8-k-activation-roles <role[,role...]>] [--compare-q8-k-activation-matvec] [--kv-backend <vec|locus>] [--kv-tokens-per-block <count>] [--kv-max-tokens <count>]"
 }
 
 #[cfg(test)]
@@ -353,6 +399,82 @@ mod tests {
             error
                 .to_string()
                 .contains("unknown Q8_K activation matvec role unknown"),
+            "unexpected error: {error}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn kv_backend_defaults_to_vec_with_default_pool_sizing() -> Result<(), Box<dyn Error>> {
+        let args = parse([
+            OsString::from("ferrite"),
+            OsString::from("--model"),
+            OsString::from("model.gguf"),
+            OsString::from("--prompt"),
+            OsString::from("hello"),
+        ])?;
+
+        assert_eq!(args.kv_backend, super::CliKvBackend::Vec);
+        assert_eq!(args.kv_tokens_per_block, 16);
+        assert_eq!(args.kv_max_tokens, 2048);
+        Ok(())
+    }
+
+    #[test]
+    fn kv_backend_locus_parses_explicit_pool_sizing() -> Result<(), Box<dyn Error>> {
+        let args = parse([
+            OsString::from("ferrite"),
+            OsString::from("--model"),
+            OsString::from("model.gguf"),
+            OsString::from("--prompt"),
+            OsString::from("hello"),
+            OsString::from("--kv-backend"),
+            OsString::from("locus"),
+            OsString::from("--kv-tokens-per-block"),
+            OsString::from("32"),
+            OsString::from("--kv-max-tokens"),
+            OsString::from("4096"),
+        ])?;
+
+        assert_eq!(args.kv_backend, super::CliKvBackend::Locus);
+        assert_eq!(args.kv_tokens_per_block, 32);
+        assert_eq!(args.kv_max_tokens, 4096);
+        Ok(())
+    }
+
+    #[test]
+    fn kv_max_tokens_defaults_to_generate_tokens_when_unset() -> Result<(), Box<dyn Error>> {
+        let args = parse([
+            OsString::from("ferrite"),
+            OsString::from("--model"),
+            OsString::from("model.gguf"),
+            OsString::from("--prompt"),
+            OsString::from("hello"),
+            OsString::from("--generate-tokens"),
+            OsString::from("64"),
+        ])?;
+
+        assert_eq!(args.kv_max_tokens, 64);
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_unknown_kv_backend() -> Result<(), Box<dyn Error>> {
+        let error = match parse([
+            OsString::from("ferrite"),
+            OsString::from("--kv-backend"),
+            OsString::from("bogus"),
+        ]) {
+            Ok(_) => {
+                return Err(
+                    io::Error::other("unknown kv backend should fail argument parsing").into(),
+                );
+            }
+            Err(error) => error,
+        };
+
+        assert!(
+            error.to_string().contains("kv-backend"),
             "unexpected error: {error}"
         );
         Ok(())

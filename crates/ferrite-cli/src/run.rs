@@ -1,8 +1,8 @@
-use crate::args::{self, PromptSource};
+use crate::args::{self, CliKvBackend, PromptSource};
 use crate::benchmark::profile_first_benchmark_token;
 use crate::profile::{print_benchmark_token_profile, print_next_token_profile};
 use ferrite_inference::scalar::{
-    NextToken, ProfiledNextToken, Q8KActivationMatvecPolicy, ScalarExecutionOptions,
+    KvBackend, NextToken, ProfiledNextToken, Q8KActivationMatvecPolicy, ScalarExecutionOptions,
     ScalarLlamaModel, ScalarLlamaSession,
 };
 use ferrite_model::gguf::parse_gguf;
@@ -56,6 +56,13 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
     if let Some(roles) = args.experimental_q8_k_activation_roles {
         execution_options = execution_options.with_q8_k_activation_matvec_roles(roles);
     }
+    let execution_options = match args.kv_backend {
+        CliKvBackend::Vec => execution_options,
+        CliKvBackend::Locus => execution_options.with_kv_backend(KvBackend::Locus {
+            tokens_per_block: args.kv_tokens_per_block,
+            max_tokens: args.kv_max_tokens,
+        }),
+    };
     let mut session = model.start_session_with_options(execution_options)?;
     let (next, profile) = accept_prompt(&mut session, &prompt_token_ids, args.profile_next_token)?;
     let token = tokenizer.token(next.token_id).ok_or_else(|| {
@@ -153,6 +160,10 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
     println!("model_file_retained_bytes=0");
     println!("scalar_weight_bytes={}", model.scalar_weight_bytes());
     println!("kv_cache_bytes={}", session.kv_cache_bytes());
+    #[cfg(feature = "locus-kv")]
+    if let Some(allocations) = session.locus_pool_allocation_count() {
+        println!("locus_pool_allocation_count={allocations}");
+    }
     if let Some(expected_token_id) = args.expected_token_id {
         println!("expected_token_id={expected_token_id}");
         let matches = next.token_id == expected_token_id;
