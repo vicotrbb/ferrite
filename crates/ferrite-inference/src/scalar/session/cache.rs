@@ -45,4 +45,14 @@ impl<'a> ScalarLlamaSession<'a> {
         self.cached_token_count = token_count;
         Ok(())
     }
+
+    #[cfg(feature = "locus-kv")]
+    pub fn locus_pool_allocation_count(&self) -> Option<u64> {
+        match &self.store {
+            crate::scalar::kv_store::KvCacheStore::Locus(store) => {
+                Some(store.pool_stats().allocation_count)
+            }
+            crate::scalar::kv_store::KvCacheStore::Vec(_) => None,
+        }
+    }
 }

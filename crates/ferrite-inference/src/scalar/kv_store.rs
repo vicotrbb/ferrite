@@ -1,3 +1,6 @@
+#[cfg(feature = "locus-kv")]
+pub(in crate::scalar) mod locus;
+
 use super::session::ScalarLlamaSessionSnapshot;
 use super::InferenceError;
 
