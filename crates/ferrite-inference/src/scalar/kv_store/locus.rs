@@ -111,16 +111,24 @@ impl LocusKvStore {
         if !position.is_multiple_of(self.tokens_per_block) {
             return Ok(());
         }
+        // Validate `layer` for BOTH block lists before allocating anything, so a
+        // bad layer index never leaks a pool handle.
+        if layer >= self.key_blocks.len() || layer >= self.value_blocks.len() {
+            return Err(InferenceError::new(format!("locus kv layer {layer} out of bounds")));
+        }
         let key_handle = self.pool.allocate().map_err(map_pool_error)?;
-        let value_handle = self.pool.allocate().map_err(map_pool_error)?;
-        self.key_blocks
-            .get_mut(layer)
-            .ok_or_else(|| InferenceError::new(format!("locus kv layer {layer} out of bounds")))?
-            .push(key_handle);
-        self.value_blocks
-            .get_mut(layer)
-            .ok_or_else(|| InferenceError::new(format!("locus kv layer {layer} out of bounds")))?
-            .push(value_handle);
+        let value_handle = match self.pool.allocate() {
+            Ok(handle) => handle,
+            Err(error) => {
+                // Roll back the key handle so a failed second allocation never leaks
+                // the first (mirrors locus_alloc::KvBlockTable::append_tokens).
+                let _ = self.pool.free(key_handle);
+                return Err(map_pool_error(error));
+            }
+        };
+        // `layer` was validated above, so these cannot go out of bounds.
+        self.key_blocks[layer].push(key_handle);
+        self.value_blocks[layer].push(value_handle);
         Ok(())
     }
 
@@ -323,6 +331,30 @@ mod tests {
             Err(error) => error,
         };
         assert!(error.to_string().contains("out of blocks") || error.to_string().contains("OutOfBlocks"));
+        Ok(())
+    }
+
+    #[test]
+    fn locus_store_snapshot_round_trip() -> Result<(), InferenceError> {
+        let dim = 4;
+        // tokens_per_block = 2 forces multiple blocks across 5 positions, so
+        // restore's re-push path is exercised across block boundaries.
+        let mut store = LocusKvStore::new(2, dim, 2, 8)?;
+        for position in 0..5 {
+            for layer in 0..2 {
+                store.push(layer, &sample(layer, position, dim), &sample(layer + 100, position, dim))?;
+            }
+        }
+        let snapshot = store.snapshot(5)?;
+        let mut restored = LocusKvStore::new(2, dim, 2, 8)?;
+        restored.restore(&snapshot)?;
+        for layer in 0..2 {
+            assert_eq!(restored.layer_len(layer), store.layer_len(layer));
+            for position in 0..5 {
+                assert_eq!(restored.key(layer, position)?, store.key(layer, position)?);
+                assert_eq!(restored.value(layer, position)?, store.value(layer, position)?);
+            }
+        }
         Ok(())
     }
 }
