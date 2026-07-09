@@ -77,5 +77,33 @@ class AggregateSamplesTest(unittest.TestCase):
         self.assertEqual(agg, {"sample_count": 0})
 
 
+class ComputeCliMetricsTest(unittest.TestCase):
+    def test_synthetic_generation_timeline(self):
+        lines = [
+            (1.0, "sleep_after_load_ms=2000"),
+            (3.5, "prompt_token_ids=1,2,3"),
+            (3.55, "next_token_id=7"),
+            (3.6, "stream_token_id=7"),
+            (3.6, "stream_text=a"),
+            (3.7, "stream_token_id=8"),
+            (3.8, "stream_token_id=9"),
+            (3.9, "stream_token_id=10"),
+        ]
+        metrics = ev.compute_cli_metrics(t_spawn=0.0, lines=lines, sleep_ms=2000)
+        self.assertAlmostEqual(metrics["load_seconds"], 1.0)
+        self.assertAlmostEqual(metrics["ttft_prefill_seconds"], 0.5)
+        self.assertEqual(metrics["stream_token_count"], 4)
+        self.assertAlmostEqual(metrics["decode_tokens_per_second_streamed"], 10.0)
+        self.assertAlmostEqual(metrics["token_latency_ms_p50"], 100.0)
+        self.assertAlmostEqual(metrics["t_sleep"], 1.0)
+        self.assertAlmostEqual(metrics["t_gen_start"], 3.0)
+        self.assertAlmostEqual(metrics["t_last_stream"], 3.9)
+
+    def test_missing_sleep_marker_returns_empty(self):
+        self.assertEqual(
+            ev.compute_cli_metrics(0.0, [(1.0, "next_token_id=5")], 2000), {}
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

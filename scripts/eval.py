@@ -138,3 +138,73 @@ def aggregate_samples(samples, t_start=None, t_end=None):
         if deltas:
             result["cpu_peak_percent"] = round(max(deltas), 1)
     return result
+
+
+RunResult = namedtuple("RunResult", ["t_spawn", "lines", "returncode", "stderr", "samples"])
+
+
+def run_timestamped(cmd, timeout_s=1800):
+    """Run cmd, timestamping each stdout line while sampling the process."""
+    with tempfile.TemporaryFile(mode="w+", encoding="utf-8") as stderr_file:
+        t_spawn = time.monotonic()
+        proc = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=stderr_file, text=True
+        )
+        sampler = ProcessSampler(proc.pid)
+        sampler.start()
+        lines = []
+        try:
+            deadline = t_spawn + timeout_s
+            for line in proc.stdout:
+                lines.append((time.monotonic(), line.rstrip("\n")))
+                if time.monotonic() > deadline:
+                    proc.kill()
+                    raise TimeoutError(f"{cmd[0]} exceeded {timeout_s}s")
+            returncode = proc.wait(timeout=60)
+        finally:
+            sampler.stop()
+            if proc.poll() is None:
+                proc.kill()
+        stderr_file.seek(0)
+        stderr = stderr_file.read()
+    return RunResult(t_spawn, lines, returncode, stderr, sampler.samples)
+
+
+def compute_cli_metrics(t_spawn, lines, sleep_ms):
+    """Timing metrics from a timestamped `--stream` generation run.
+
+    Relies on ferrite's output ordering: `sleep_after_load_ms=` is printed
+    and flushed after weight load but before the sleep; `prompt_token_ids=`
+    is the first line printed after prefill; each generated token prints a
+    `stream_token_id=` line as it is produced.
+    """
+
+    def first_ts(prefix):
+        for t, line in lines:
+            if line.startswith(prefix):
+                return t
+        return None
+
+    metrics = {}
+    t_sleep = first_ts("sleep_after_load_ms=")
+    if t_sleep is None:
+        return metrics
+    t_gen_start = t_sleep + sleep_ms / 1000
+    metrics["load_seconds"] = round(t_sleep - t_spawn, 3)
+    metrics["t_sleep"] = t_sleep
+    metrics["t_gen_start"] = t_gen_start
+    t_prefill_done = first_ts("prompt_token_ids=")
+    if t_prefill_done is not None:
+        metrics["ttft_prefill_seconds"] = round(t_prefill_done - t_gen_start, 3)
+    stream_ts = [t for t, line in lines if line.startswith("stream_token_id=")]
+    if len(stream_ts) >= 2:
+        deltas_ms = [(b - a) * 1000 for a, b in zip(stream_ts, stream_ts[1:])]
+        metrics["stream_token_count"] = len(stream_ts)
+        metrics["decode_tokens_per_second_streamed"] = round(
+            (len(stream_ts) - 1) / (stream_ts[-1] - stream_ts[0]), 2
+        )
+        metrics["token_latency_ms_mean"] = round(sum(deltas_ms) / len(deltas_ms), 1)
+        metrics["token_latency_ms_p50"] = round(percentile(deltas_ms, 50), 1)
+        metrics["token_latency_ms_p95"] = round(percentile(deltas_ms, 95), 1)
+        metrics["t_last_stream"] = stream_ts[-1]
+    return metrics
