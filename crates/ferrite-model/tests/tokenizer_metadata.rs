@@ -193,7 +193,7 @@ fn bpe_encoder_does_not_poll_through_irrelevant_merge_rules() -> Result<(), Box<
     }
 
     let token_types = std::iter::once(2)
-        .chain(std::iter::repeat(1).take(tokens.len() - 1))
+        .chain(std::iter::repeat_n(1, tokens.len() - 1))
         .collect::<Vec<_>>();
     let token_refs = tokens.iter().map(String::as_str).collect::<Vec<_>>();
     let merge_refs = merges.iter().map(String::as_str).collect::<Vec<_>>();

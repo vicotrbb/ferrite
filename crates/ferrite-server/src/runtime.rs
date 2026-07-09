@@ -215,6 +215,10 @@ impl InferenceEngine {
         )
     }
 
+    // The callback tower mirrors the generation lifecycle stages one-to-one;
+    // collapsing them into a struct is deferred to the scheduler-owned decode
+    // loop planned for concurrent serving.
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn generate_with_stage_callbacks_and_cache_options(
         &self,
         prompt: &str,

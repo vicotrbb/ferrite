@@ -40,7 +40,7 @@ pub(super) fn causal_attention(
         }
 
         let weights = softmax(&scores)?;
-        for position in 0..position_count {
+        for (position, weight) in weights.iter().copied().enumerate() {
             let value = store.value(layer, position)?;
             ensure_len("cached value", value, expected_kv)?;
             let value_slice = &value[kv_start..kv_start + config.head_dim];
@@ -48,7 +48,7 @@ pub(super) fn causal_attention(
                 return Err(InferenceError::new("cached value must be finite"));
             }
             for dimension in 0..config.head_dim {
-                output[query_start + dimension] += weights[position] * value_slice[dimension];
+                output[query_start + dimension] += weight * value_slice[dimension];
             }
         }
     }

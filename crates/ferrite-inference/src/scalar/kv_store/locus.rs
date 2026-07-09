@@ -32,7 +32,9 @@ impl LocusKvStore {
             return Err(InferenceError::new("locus kv head_kv_dim must be non-zero"));
         }
         if tokens_per_block == 0 {
-            return Err(InferenceError::new("locus kv tokens_per_block must be non-zero"));
+            return Err(InferenceError::new(
+                "locus kv tokens_per_block must be non-zero",
+            ));
         }
         if max_tokens == 0 {
             return Err(InferenceError::new("locus kv max_tokens must be non-zero"));
@@ -93,9 +95,9 @@ impl LocusKvStore {
             } else {
                 &self.value_blocks
             };
-            let layer_blocks = blocks
-                .get(layer)
-                .ok_or_else(|| InferenceError::new(format!("locus kv layer {layer} out of bounds")))?;
+            let layer_blocks = blocks.get(layer).ok_or_else(|| {
+                InferenceError::new(format!("locus kv layer {layer} out of bounds"))
+            })?;
             *layer_blocks
                 .get(block_index)
                 .ok_or_else(|| InferenceError::new("locus kv block index out of bounds"))?
@@ -114,7 +116,9 @@ impl LocusKvStore {
         // Validate `layer` for BOTH block lists before allocating anything, so a
         // bad layer index never leaks a pool handle.
         if layer >= self.key_blocks.len() || layer >= self.value_blocks.len() {
-            return Err(InferenceError::new(format!("locus kv layer {layer} out of bounds")));
+            return Err(InferenceError::new(format!(
+                "locus kv layer {layer} out of bounds"
+            )));
         }
         let key_handle = self.pool.allocate().map_err(map_pool_error)?;
         let value_handle = match self.pool.allocate() {
@@ -291,14 +295,24 @@ mod tests {
         let mut store = LocusKvStore::new(2, dim, 2, 8)?;
         for position in 0..5 {
             for layer in 0..2 {
-                store.push(layer, sample(layer, position, dim), sample(layer + 100, position, dim))?;
+                store.push(
+                    layer,
+                    sample(layer, position, dim),
+                    sample(layer + 100, position, dim),
+                )?;
             }
         }
         for layer in 0..2 {
             assert_eq!(store.layer_len(layer), 5);
             for position in 0..5 {
-                assert_eq!(store.key(layer, position)?, sample(layer, position, dim).as_slice());
-                assert_eq!(store.value(layer, position)?, sample(layer + 100, position, dim).as_slice());
+                assert_eq!(
+                    store.key(layer, position)?,
+                    sample(layer, position, dim).as_slice()
+                );
+                assert_eq!(
+                    store.value(layer, position)?,
+                    sample(layer + 100, position, dim).as_slice()
+                );
             }
         }
         Ok(())
@@ -330,7 +344,10 @@ mod tests {
             Ok(()) => return Err(InferenceError::new("expected out-of-blocks error")),
             Err(error) => error,
         };
-        assert!(error.to_string().contains("out of blocks") || error.to_string().contains("OutOfBlocks"));
+        assert!(
+            error.to_string().contains("out of blocks")
+                || error.to_string().contains("OutOfBlocks")
+        );
         Ok(())
     }
 
@@ -342,7 +359,11 @@ mod tests {
         let mut store = LocusKvStore::new(2, dim, 2, 8)?;
         for position in 0..5 {
             for layer in 0..2 {
-                store.push(layer, sample(layer, position, dim), sample(layer + 100, position, dim))?;
+                store.push(
+                    layer,
+                    sample(layer, position, dim),
+                    sample(layer + 100, position, dim),
+                )?;
             }
         }
         let snapshot = store.snapshot(5)?;
@@ -352,7 +373,10 @@ mod tests {
             assert_eq!(restored.layer_len(layer), store.layer_len(layer));
             for position in 0..5 {
                 assert_eq!(restored.key(layer, position)?, store.key(layer, position)?);
-                assert_eq!(restored.value(layer, position)?, store.value(layer, position)?);
+                assert_eq!(
+                    restored.value(layer, position)?,
+                    store.value(layer, position)?
+                );
             }
         }
         Ok(())

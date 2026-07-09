@@ -122,7 +122,7 @@ fn best_active_merge(
 
         if best
             .as_ref()
-            .map_or(true, |current: &ActiveMerge| ranked.rank < current.rank)
+            .is_none_or(|current: &ActiveMerge| ranked.rank < current.rank)
         {
             best = Some(ActiveMerge {
                 rank: ranked.rank,
