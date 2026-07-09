@@ -24,6 +24,7 @@ pub struct CliArgs {
     pub kv_tokens_per_block: usize,
     pub kv_max_tokens: Option<usize>,
     pub threads: Option<usize>,
+    pub benchmark_batch_streams: Option<usize>,
 }
 
 pub enum PromptSource {
@@ -68,6 +69,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
     let mut kv_tokens_per_block = None;
     let mut kv_max_tokens = None;
     let mut threads = None;
+    let mut benchmark_batch_streams = None;
     let mut iter = args.into_iter();
     let _program = iter.next();
 
@@ -111,6 +113,12 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
                 threads = Some(parse_nonzero_usize(
                     next_value(&mut iter, "--threads")?,
                     "--threads",
+                )?);
+            }
+            "--benchmark-batch-streams" => {
+                benchmark_batch_streams = Some(parse_nonzero_usize(
+                    next_value(&mut iter, "--benchmark-batch-streams")?,
+                    "--benchmark-batch-streams",
                 )?);
             }
             "--benchmark-tokenization-runs" => {
@@ -226,6 +234,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
         kv_tokens_per_block,
         kv_max_tokens,
         threads,
+        benchmark_batch_streams,
     })
 }
 

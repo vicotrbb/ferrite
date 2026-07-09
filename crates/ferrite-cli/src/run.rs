@@ -142,6 +142,16 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
         }
     }
     if let Some(runs) = args.benchmark_runs {
+        if let Some(streams) = args.benchmark_batch_streams.filter(|streams| *streams > 1) {
+            return benchmark_batched_streams(
+                &model,
+                &prompt_token_ids,
+                next.token_id,
+                runs,
+                streams,
+                execution_options,
+            );
+        }
         let mut benchmark_token_id = next.token_id;
         let mut benchmark_token_ids = Vec::with_capacity(runs);
         let benchmark_profile = if args.profile_benchmark_token {
@@ -193,6 +203,54 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
             .into());
         }
     }
+    Ok(())
+}
+
+/// Decodes `runs` steps across `streams` sessions with the batched step,
+/// so each weight row is streamed once per step for the whole batch.
+/// Every stream starts from the same prompt; stream 0's token ids must
+/// match a single-session benchmark run of the same length.
+fn benchmark_batched_streams(
+    model: &ScalarLlamaModel,
+    prompt_token_ids: &[usize],
+    first_token_id: usize,
+    runs: usize,
+    streams: usize,
+    execution_options: ScalarExecutionOptions,
+) -> Result<(), Box<dyn Error>> {
+    let mut sessions = Vec::with_capacity(streams);
+    for _ in 0..streams {
+        let mut session = model.start_session_with_options(execution_options)?;
+        session.accept_prompt(prompt_token_ids)?;
+        sessions.push(session);
+    }
+    let mut token_ids = vec![first_token_id; streams];
+    let mut stream_zero_ids = Vec::with_capacity(runs);
+
+    let started = Instant::now();
+    for _ in 0..runs {
+        token_ids = ferrite_inference::scalar::accept_token_ids_batch(&mut sessions, &token_ids)?;
+        stream_zero_ids.push(token_ids[0]);
+    }
+    let total_ns = started.elapsed().as_nanos();
+
+    let total_tokens = runs as u128 * streams as u128;
+    println!("benchmark_runs={runs}");
+    println!("benchmark_batch_streams={streams}");
+    println!(
+        "benchmark_cached_tokens={}",
+        sessions[0].cached_token_count()
+    );
+    println!("benchmark_token_ids={}", join_token_ids(&stream_zero_ids));
+    println!("benchmark_total_ns={total_ns}");
+    println!("benchmark_avg_ns={}", total_ns / runs as u128);
+    println!(
+        "benchmark_batch_tokens_per_second={:.2}",
+        total_tokens as f64 / (total_ns as f64 / 1e9)
+    );
+    println!("model_file_retained_bytes=0");
+    println!("scalar_weight_bytes={}", model.scalar_weight_bytes());
+    println!("kv_cache_bytes={}", sessions[0].kv_cache_bytes());
     Ok(())
 }
 

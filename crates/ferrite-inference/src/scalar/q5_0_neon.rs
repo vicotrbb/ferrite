@@ -58,6 +58,102 @@ fn neon_q5_0_mul_vec_row_parallel(
     }
 }
 
+/// Batched matvec: streams each weight row once and dots it against every
+/// activation vector, so DRAM traffic and weight decode are amortized over
+/// the batch. Per-stream block/FMA order matches `neon_q5_0_mul_vec`
+/// exactly, so each stream's output is bit-identical to a single-vector
+/// call. Callers validate shapes and cap the batch at
+/// [`super::q5_0::Q5_0_MAX_BATCH`].
+pub(super) fn neon_q5_0_mul_vec_batch(
+    bytes: &[u8],
+    rows: usize,
+    cols: usize,
+    vectors: &[&[f32]],
+) -> Vec<Vec<f32>> {
+    let batch = vectors.len();
+    let row_bytes = (cols / Q5_0_BLOCK_VALUES) * Q5_0_BLOCK_BYTES;
+    let mut flat = vec![0.0f32; rows * batch];
+    bytes
+        .par_chunks_exact(row_bytes)
+        .zip(flat.par_chunks_exact_mut(batch))
+        .with_min_len(ROW_PARALLEL_MIN_ROWS_PER_TASK)
+        .for_each(|(row_chunk, row_out)| neon_q5_0_row_dot_batch(row_chunk, vectors, row_out));
+
+    (0..batch)
+        .map(|stream| (0..rows).map(|row| flat[row * batch + stream]).collect())
+        .collect()
+}
+
+fn neon_q5_0_row_dot_batch(row_chunk: &[u8], vectors: &[&[f32]], row_out: &mut [f32]) {
+    for (block_index, block) in row_chunk.chunks_exact(Q5_0_BLOCK_BYTES).enumerate() {
+        let col_base = block_index * Q5_0_BLOCK_VALUES;
+        // SAFETY: the dispatch path checks NEON support, `block` has exactly
+        // one Q5_0 block, and the caller validated every vector to `cols`
+        // (a multiple of 32), so the per-block slices are in bounds.
+        unsafe {
+            neon_q5_0_block_dot_batch(block, vectors, col_base, row_out);
+        }
+    }
+}
+
+/// Decodes one Q5_0 block once and dots it against every stream's
+/// activation window. Each stream's FMA sequence and per-block
+/// `horizontal-add × scale` shape match `neon_q5_0_block_dot` exactly, so
+/// per-stream sums stay bit-identical to the single-vector kernel.
+#[target_feature(enable = "neon")]
+unsafe fn neon_q5_0_block_dot_batch(
+    block: &[u8],
+    vectors: &[&[f32]],
+    col_base: usize,
+    row_out: &mut [f32],
+) {
+    let scale = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
+    let high_bits = u32::from_le_bytes([block[2], block[3], block[4], block[5]]);
+    let quants = &block[6..];
+
+    // SAFETY: same bounds argument as `neon_q5_0_block_dot`; every load is
+    // within the 16 quant bytes or a validated 32-element vector window.
+    unsafe {
+        let bit_mask = vld1q_u8(HIGH_BIT_LANE_MASK.as_ptr());
+        let quant_bytes = vld1q_u8(quants.as_ptr());
+        let low_nibbles = vandq_u8(quant_bytes, vdupq_n_u8(0x0f));
+        let high_nibbles = vshrq_n_u8(quant_bytes, 4);
+        let low_bit_bytes = vcombine_u8(
+            vdup_n_u8(high_bits as u8),
+            vdup_n_u8((high_bits >> 8) as u8),
+        );
+        let high_bit_bytes = vcombine_u8(
+            vdup_n_u8((high_bits >> 16) as u8),
+            vdup_n_u8((high_bits >> 24) as u8),
+        );
+        let low_high_bits = vandq_u8(vtstq_u8(low_bit_bytes, bit_mask), vdupq_n_u8(0x10));
+        let high_high_bits = vandq_u8(vtstq_u8(high_bit_bytes, bit_mask), vdupq_n_u8(0x10));
+        let offset = vdupq_n_s8(16);
+        let low_quads = widen_s8_lanes(vsubq_s8(
+            vreinterpretq_s8_u8(vorrq_u8(low_nibbles, low_high_bits)),
+            offset,
+        ));
+        let high_quads = widen_s8_lanes(vsubq_s8(
+            vreinterpretq_s8_u8(vorrq_u8(high_nibbles, high_high_bits)),
+            offset,
+        ));
+
+        for (stream, vector) in vectors.iter().enumerate() {
+            let window = vector.as_ptr().add(col_base);
+            let mut lanes = vdupq_n_f32(0.0);
+            for step in 0..4 {
+                lanes = vfmaq_f32(lanes, low_quads[step], vld1q_f32(window.add(step * 4)));
+                lanes = vfmaq_f32(
+                    lanes,
+                    high_quads[step],
+                    vld1q_f32(window.add(step * 4 + 16)),
+                );
+            }
+            row_out[stream] += vaddvq_f32(lanes) * scale;
+        }
+    }
+}
+
 fn neon_q5_0_row_dot(row_chunk: &[u8], vector: &[f32]) -> f32 {
     let mut sum = 0.0;
     for (block_index, block) in row_chunk.chunks_exact(Q5_0_BLOCK_BYTES).enumerate() {

@@ -82,6 +82,50 @@ pub(super) fn q5_0_mul_vec_with_backend(
     scalar_q5_0_mul_vec(bytes, rows, cols, vector)
 }
 
+/// Upper bound on how many activation vectors one batched matvec call
+/// serves; larger batches are processed in chunks of this size.
+pub(super) const Q5_0_MAX_BATCH: usize = 8;
+
+/// Batched matvec across several activation vectors. Each stream's output
+/// is bit-identical to a `q5_0_mul_vec` call with that vector.
+pub(super) fn q5_0_mul_vec_batch(
+    bytes: &[u8],
+    rows: usize,
+    cols: usize,
+    vectors: &[&[f32]],
+) -> Result<Vec<Vec<f32>>, InferenceError> {
+    let Some(first) = vectors.first() else {
+        return Ok(Vec::new());
+    };
+    for vector in vectors {
+        if vector.len() != cols {
+            return Err(InferenceError::new(format!(
+                "matrix columns {cols} do not match vector length {}",
+                vector.len()
+            )));
+        }
+    }
+    validate_q5_0_mul_vec(bytes, rows, cols, first)?;
+
+    #[cfg(target_arch = "aarch64")]
+    {
+        if std::arch::is_aarch64_feature_detected!("neon") {
+            let mut outputs = Vec::with_capacity(vectors.len());
+            for chunk in vectors.chunks(Q5_0_MAX_BATCH) {
+                outputs.extend(super::q5_0_neon::neon_q5_0_mul_vec_batch(
+                    bytes, rows, cols, chunk,
+                ));
+            }
+            return Ok(outputs);
+        }
+    }
+
+    vectors
+        .iter()
+        .map(|vector| q5_0_mul_vec(bytes, rows, cols, vector))
+        .collect()
+}
+
 pub(super) fn decode_q5_0_row(bytes: &[u8], cols: usize) -> Result<Vec<f32>, InferenceError> {
     let expected = q5_0_row_bytes(cols)?;
     if bytes.len() != expected {

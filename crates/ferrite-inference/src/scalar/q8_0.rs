@@ -94,6 +94,65 @@ pub(super) fn q8_0_argmax_mul_vec(
     scalar_q8_0_argmax_mul_vec(bytes, rows, cols, vector)
 }
 
+/// Batched matvec across several activation vectors; each stream's output
+/// is bit-identical to `q8_0_mul_vec` with that vector.
+pub(super) fn q8_0_mul_vec_batch(
+    bytes: &[u8],
+    rows: usize,
+    cols: usize,
+    vectors: &[&[f32]],
+) -> Result<Vec<Vec<f32>>, InferenceError> {
+    let Some(first) = vectors.first() else {
+        return Ok(Vec::new());
+    };
+    validate_q8_0_mul_vec(bytes, rows, cols, first)?;
+
+    #[cfg(target_arch = "aarch64")]
+    {
+        if std::arch::is_aarch64_feature_detected!("neon") {
+            return Ok(super::q8_0_neon::neon_q8_0_mul_vec_batch(
+                bytes, rows, cols, vectors,
+            ));
+        }
+    }
+
+    vectors
+        .iter()
+        .map(|vector| q8_0_mul_vec(bytes, rows, cols, vector))
+        .collect()
+}
+
+/// Batched greedy argmax over the logits matvec; each stream's result is
+/// identical to `q8_0_argmax_mul_vec` with that vector.
+pub(super) fn q8_0_argmax_mul_vec_batch(
+    bytes: &[u8],
+    rows: usize,
+    cols: usize,
+    vectors: &[&[f32]],
+) -> Result<Vec<usize>, InferenceError> {
+    let Some(first) = vectors.first() else {
+        return Ok(Vec::new());
+    };
+    validate_q8_0_mul_vec(bytes, rows, cols, first)?;
+    if rows == 0 {
+        return Err(InferenceError::new("argmax input must not be empty"));
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    {
+        if std::arch::is_aarch64_feature_detected!("neon") {
+            return Ok(super::q8_0_neon::neon_q8_0_argmax_mul_vec_batch(
+                bytes, cols, vectors,
+            ));
+        }
+    }
+
+    vectors
+        .iter()
+        .map(|vector| q8_0_argmax_mul_vec(bytes, rows, cols, vector))
+        .collect()
+}
+
 pub(super) fn q8_0_mul_vec_with_backend(
     bytes: &[u8],
     rows: usize,

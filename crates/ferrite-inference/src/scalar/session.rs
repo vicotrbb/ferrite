@@ -406,6 +406,146 @@ impl<'a> ScalarLlamaSession<'a> {
     }
 }
 
+/// Advances several sessions of the same model by one token each,
+/// batching every weight matvec across the sessions so each weight row is
+/// streamed from memory once per step instead of once per session.
+///
+/// Per-session arithmetic (norms, biases, RoPE, attention, residuals) and
+/// per-stream matvec accumulation order are identical to
+/// [`ScalarLlamaSession::accept_token_id`], so each session's next token
+/// is bit-identical to what a sequential call would produce. Batched
+/// matvecs use default kernel dispatch (no experimental Q8_K routing).
+pub fn accept_token_ids_batch(
+    sessions: &mut [ScalarLlamaSession<'_>],
+    token_ids: &[usize],
+) -> Result<Vec<usize>, InferenceError> {
+    if sessions.is_empty() {
+        return Err(InferenceError::new(
+            "batch must contain at least one session",
+        ));
+    }
+    if sessions.len() != token_ids.len() {
+        return Err(InferenceError::new(format!(
+            "batch has {} sessions but {} token ids",
+            sessions.len(),
+            token_ids.len()
+        )));
+    }
+    let model = sessions[0].model;
+    if sessions
+        .iter()
+        .any(|session| !std::ptr::eq(session.model, model))
+    {
+        return Err(InferenceError::new(
+            "all sessions in a batch must share the same model",
+        ));
+    }
+    for token_id in token_ids {
+        if *token_id >= model.config.vocab_size {
+            return Err(InferenceError::new(format!(
+                "token id {token_id} is out of bounds for vocab size {}",
+                model.config.vocab_size
+            )));
+        }
+    }
+
+    let batch = sessions.len();
+    let mut hidden = token_ids
+        .iter()
+        .map(|token_id| model.weights.token_embedding.row_values(*token_id))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    for (layer_index, layer) in model.weights.layers.iter().enumerate() {
+        let normed = hidden
+            .iter()
+            .map(|values| rms_norm(values, &layer.attn_norm, model.config.rms_norm_epsilon))
+            .collect::<Result<Vec<_>, _>>()?;
+        let normed_refs = normed.iter().map(Vec::as_slice).collect::<Vec<_>>();
+
+        let mut queries = layer.q_proj.mul_vec_batch(&normed_refs)?;
+        let mut keys = layer.k_proj.mul_vec_batch(&normed_refs)?;
+        let mut values = layer.v_proj.mul_vec_batch(&normed_refs)?;
+
+        let mut attention_outputs = Vec::with_capacity(batch);
+        for (index, session) in sessions.iter_mut().enumerate() {
+            add_optional_bias(&mut queries[index], layer.q_bias.as_deref())?;
+            add_optional_bias(&mut keys[index], layer.k_bias.as_deref())?;
+            add_optional_bias(&mut values[index], layer.v_bias.as_deref())?;
+
+            let position = session.cached_token_count;
+            let query = model.apply_rope_to_heads(
+                &queries[index],
+                position,
+                model.config.attention_head_count,
+            )?;
+            let key = model.apply_rope_to_heads(
+                &keys[index],
+                position,
+                model.config.attention_head_count_kv,
+            )?;
+
+            session
+                .store
+                .push(layer_index, key, std::mem::take(&mut values[index]))?;
+            attention_outputs.push(causal_attention(
+                &model.config,
+                &query,
+                &mut session.store,
+                layer_index,
+            )?);
+        }
+
+        let attention_refs = attention_outputs
+            .iter()
+            .map(Vec::as_slice)
+            .collect::<Vec<_>>();
+        let projected = layer.o_proj.mul_vec_batch(&attention_refs)?;
+        for (index, values) in projected.iter().enumerate() {
+            add_assign(&mut hidden[index], values)?;
+        }
+
+        let ffn_normed = hidden
+            .iter()
+            .map(|values| rms_norm(values, &layer.ffn_norm, model.config.rms_norm_epsilon))
+            .collect::<Result<Vec<_>, _>>()?;
+        let ffn_refs = ffn_normed.iter().map(Vec::as_slice).collect::<Vec<_>>();
+        let gates = layer.ffn_gate.mul_vec_batch(&ffn_refs)?;
+        let ups = layer.ffn_up.mul_vec_batch(&ffn_refs)?;
+        let activated = gates
+            .iter()
+            .zip(ups.iter())
+            .map(|(gate, up)| swiglu(gate, up))
+            .collect::<Result<Vec<_>, _>>()?;
+        let activated_refs = activated.iter().map(Vec::as_slice).collect::<Vec<_>>();
+        let downs = layer.ffn_down.mul_vec_batch(&activated_refs)?;
+        for (index, values) in downs.iter().enumerate() {
+            add_assign(&mut hidden[index], values)?;
+        }
+    }
+
+    let normed_final = hidden
+        .iter()
+        .map(|values| {
+            rms_norm(
+                values,
+                &model.weights.output_norm,
+                model.config.rms_norm_epsilon,
+            )
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let output = model
+        .weights
+        .output
+        .logits_matrix(&model.weights.token_embedding);
+    let normed_refs = normed_final.iter().map(Vec::as_slice).collect::<Vec<_>>();
+    let next_token_ids = output.argmax_mul_vec_batch(&normed_refs)?;
+
+    for session in sessions.iter_mut() {
+        session.cached_token_count += 1;
+    }
+    Ok(next_token_ids)
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum OutputMode {
     Logits,

@@ -42,6 +42,38 @@ pub(super) fn q4_k_mul_vec_with_backend(
     q4_k_mul_vec_with_options(bytes, rows, cols, vector, ScalarExecutionOptions::default())
 }
 
+/// Batched matvec across several activation vectors; each stream's output
+/// is bit-identical to a default-dispatch `q4_k_mul_vec_with_options` call.
+pub(super) fn q4_k_mul_vec_batch(
+    bytes: &[u8],
+    rows: usize,
+    cols: usize,
+    vectors: &[&[f32]],
+) -> Result<Vec<Vec<f32>>, InferenceError> {
+    let Some(first) = vectors.first() else {
+        return Ok(Vec::new());
+    };
+    validate_q4_k_mul_vec(bytes, rows, cols, first)?;
+
+    #[cfg(target_arch = "aarch64")]
+    {
+        if cols != 0
+            && cols.is_multiple_of(Q4_K_BLOCK_VALUES)
+            && std::arch::is_aarch64_feature_detected!("neon")
+        {
+            return super::q4_k_neon::neon_q4_k_mul_vec_batch(bytes, rows, cols, vectors);
+        }
+    }
+
+    vectors
+        .iter()
+        .map(|vector| {
+            q4_k_mul_vec_with_options(bytes, rows, cols, vector, ScalarExecutionOptions::default())
+                .map(|output| output.values)
+        })
+        .collect()
+}
+
 pub(super) fn q4_k_mul_vec_with_options(
     bytes: &[u8],
     rows: usize,

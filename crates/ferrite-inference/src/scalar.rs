@@ -65,7 +65,7 @@ pub use profile::{ProfiledNextToken, ProfiledTokenId, ScalarMatVecComparison, Sc
 use rope::apply_rope_with_layout;
 pub use rope::{apply_rope, RopeLayout};
 pub use session::{
-    PromptEvaluationControl, PromptEvaluationLocation, ScalarLlamaSession,
+    accept_token_ids_batch, PromptEvaluationControl, PromptEvaluationLocation, ScalarLlamaSession,
     ScalarLlamaSessionSnapshot,
 };
 

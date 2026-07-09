@@ -45,6 +45,43 @@ pub(super) fn neon_q4_k_mul_vec(
     })
 }
 
+/// Batched matvec: streams each Q4_K weight row once per step for the
+/// whole batch (rows stay cache-hot across streams). Per-stream block/FMA
+/// order matches `neon_q4_k_mul_vec` exactly.
+pub(super) fn neon_q4_k_mul_vec_batch(
+    bytes: &[u8],
+    rows: usize,
+    cols: usize,
+    vectors: &[&[f32]],
+) -> Result<Vec<Vec<f32>>, InferenceError> {
+    let batch = vectors.len();
+    let blocks_per_row = cols / Q4_K_BLOCK_VALUES;
+    let row_bytes = blocks_per_row * Q4_K_BLOCK_BYTES;
+    let mut flat = vec![0.0f32; rows * batch];
+    bytes
+        .par_chunks_exact(row_bytes)
+        .zip(flat.par_chunks_exact_mut(batch))
+        .with_min_len(64)
+        .try_for_each(|(row_chunk, row_out)| {
+            for (block_index, block) in row_chunk.chunks_exact(Q4_K_BLOCK_BYTES).enumerate() {
+                let col_base = block_index * Q4_K_BLOCK_VALUES;
+                for (out, vector) in row_out.iter_mut().zip(vectors.iter()) {
+                    // SAFETY: the dispatch path checks NEON support, `block`
+                    // has exactly one Q4_K block, and every vector was
+                    // validated to `cols` (a multiple of 256).
+                    *out += unsafe {
+                        neon_q4_k_block_dot(block, &vector[col_base..col_base + Q4_K_BLOCK_VALUES])?
+                    };
+                }
+            }
+            Ok::<(), InferenceError>(())
+        })?;
+
+    Ok((0..batch)
+        .map(|stream| (0..rows).map(|row| flat[row * batch + stream]).collect())
+        .collect())
+}
+
 #[target_feature(enable = "neon")]
 unsafe fn neon_q4_k_block_dot(block: &[u8], vector: &[f32]) -> Result<f32, InferenceError> {
     if block.len() != Q4_K_BLOCK_BYTES {
