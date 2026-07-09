@@ -12,8 +12,11 @@ use std::arch::aarch64::{
     vtstq_u8,
 };
 
-const ROW_PARALLEL_MIN_ROWS: usize = 4096;
-const ROW_PARALLEL_MAX_COLS: usize = 1024;
+const ROW_PARALLEL_MIN_ROWS: usize = 512;
+/// Minimum rows per rayon task: keeps per-task work in the tens of
+/// microseconds so fork-join overhead and straggler tails stay small
+/// relative to the streamed weight bytes.
+const ROW_PARALLEL_MIN_ROWS_PER_TASK: usize = 128;
 
 pub(super) fn neon_q5_0_mul_vec(
     bytes: &[u8],
@@ -45,6 +48,7 @@ fn neon_q5_0_mul_vec_row_parallel(
 ) -> Q5_0MatVecOutput {
     let values = bytes
         .par_chunks_exact(row_bytes)
+        .with_min_len(ROW_PARALLEL_MIN_ROWS_PER_TASK)
         .map(|row_chunk| neon_q5_0_row_dot(row_chunk, vector))
         .collect::<Vec<_>>();
     debug_assert_eq!(values.len(), rows);
@@ -68,8 +72,8 @@ fn neon_q5_0_row_dot(row_chunk: &[u8], vector: &[f32]) -> f32 {
     sum
 }
 
-fn uses_row_parallel(rows: usize, cols: usize) -> bool {
-    rows >= ROW_PARALLEL_MIN_ROWS && cols <= ROW_PARALLEL_MAX_COLS
+fn uses_row_parallel(rows: usize, _cols: usize) -> bool {
+    rows >= ROW_PARALLEL_MIN_ROWS
 }
 
 /// Bit masks selecting the per-lane high bit: lanes 0-7 test bits 0-7 of one

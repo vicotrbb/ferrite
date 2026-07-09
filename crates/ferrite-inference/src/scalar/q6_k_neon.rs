@@ -18,6 +18,7 @@ pub(super) fn neon_q6_k_mul_vec(
     let row_bytes = blocks_per_row * Q6_K_BLOCK_BYTES;
     let values = bytes
         .par_chunks_exact(row_bytes)
+        .with_min_len(64)
         .map(|row_chunk| {
             let mut sum = 0.0;
             for (block_index, block) in row_chunk.chunks_exact(Q6_K_BLOCK_BYTES).enumerate() {
@@ -50,6 +51,7 @@ pub(super) fn neon_q6_k_argmax_mul_vec(
     let row_bytes = blocks_per_row * Q6_K_BLOCK_BYTES;
     let row_scores = bytes
         .par_chunks_exact(row_bytes)
+        .with_min_len(64)
         .enumerate()
         .map(|(row_index, row_chunk)| {
             let mut sum = 0.0;

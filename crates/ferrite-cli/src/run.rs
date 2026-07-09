@@ -16,6 +16,8 @@ use std::time::{Duration, Instant};
 
 pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error>> {
     let args = args::parse(args)?;
+    let inference_threads = ferrite_inference::threading::init_global_pool(args.threads);
+    println!("inference_threads={inference_threads}");
     let bytes = fs::read(&args.model_path)?;
     let model_file_bytes = bytes.len();
     let gguf_parse_started = Instant::now();

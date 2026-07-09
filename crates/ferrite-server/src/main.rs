@@ -11,6 +11,9 @@ async fn main() {
 
 async fn run() -> Result<(), Box<dyn Error>> {
     let config = ServerConfig::parse(std::env::args_os())?;
+    let inference_threads =
+        ferrite_inference::threading::init_global_pool(config.inference_threads());
+    println!("inference_threads={inference_threads}");
     let listener = tokio::net::TcpListener::bind(config.bind_addr()).await?;
     let state = match config.model_path() {
         Some(path) => {
