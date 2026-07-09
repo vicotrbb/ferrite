@@ -132,6 +132,7 @@ class RenderMarkdownTest(unittest.TestCase):
             model_results=[{
                 "model_path": "target/models/model.gguf",
                 "cli": {"status": "ok", "load_seconds": 1.0,
+                        "inference_threads": 8,
                         "ttft_prefill_seconds": 0.5,
                         "decode_tokens_per_second_precise": 12.3,
                         "rss_peak_bytes": 1 << 30,
@@ -141,6 +142,7 @@ class RenderMarkdownTest(unittest.TestCase):
                             "average_step_ns": 20_000_000,
                             "aggregate_tokens_per_second": 100.0,
                             "per_stream_tokens_per_second": 50.0,
+                            "stream_0_matches_single": True,
                             "rss_peak_bytes": 2 << 30,
                         }]},
                 "server": {"status": "ok",
@@ -154,7 +156,8 @@ class RenderMarkdownTest(unittest.TestCase):
         self.assertIn("## model.gguf", markdown)
         self.assertIn("| load | 1.0 s |", markdown)
         self.assertIn("12.3", markdown)
-        self.assertIn("| 2 | 100.0 | 50.0 | 20.00 ms |", markdown)
+        self.assertIn("| inference threads | 8 |", markdown)
+        self.assertIn("| 2 | 100.0 | 50.0 | 20.00 ms | True |", markdown)
         self.assertIn("| TTFT | 450 ms |", markdown)
         self.assertIn("tag: unit-test", markdown)
 

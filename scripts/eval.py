@@ -241,6 +241,7 @@ def run_cli_batch_benchmark(ferrite_bin, model_path, cfg, streams):
 
     kv = parse_kv_lines(line for _, line in run.lines)
     for source, destination, conversion in (
+        ("inference_threads", "inference_threads", int),
         ("benchmark_runs", "decode_steps", int),
         ("benchmark_total_ns", "total_ns", int),
         ("benchmark_avg_ns", "average_step_ns", int),
@@ -288,13 +289,14 @@ def run_cli_phase(ferrite_bin, model_path, cfg):
 
     kv = parse_kv_lines(line for _, line in run.lines)
     for key in (
+        "inference_threads",
         "model_file_bytes",
         "scalar_weight_bytes",
         "kv_cache_bytes",
         "generated_stopped_on_eos",
     ):
         if key in kv:
-            phase[key] = kv[key]
+            phase[key] = int(kv[key]) if key == "inference_threads" else kv[key]
 
     if t_sleep is not None:
         load_window = aggregate_samples(run.samples, t_sleep, t_gen_start)
@@ -323,6 +325,8 @@ def run_cli_phase(ferrite_bin, model_path, cfg):
         if avg_ns > 0:
             phase["benchmark_avg_ns"] = avg_ns
             phase["decode_tokens_per_second_precise"] = round(1e9 / avg_ns, 2)
+        if "benchmark_token_ids" in bench_kv:
+            phase["benchmark_token_ids"] = bench_kv["benchmark_token_ids"]
     else:
         phase["benchmark_error"] = bench.stderr[-500:]
 
@@ -331,6 +335,12 @@ def run_cli_phase(ferrite_bin, model_path, cfg):
             run_cli_batch_benchmark(ferrite_bin, model_path, cfg, streams)
             for streams in cfg.batch_streams
         ]
+        single_token_ids = phase.get("benchmark_token_ids")
+        if single_token_ids is not None:
+            for batch in phase["batch_benchmarks"]:
+                batch_token_ids = batch.get("stream_0_token_ids")
+                if batch_token_ids is not None:
+                    batch["stream_0_matches_single"] = batch_token_ids == single_token_ids
     return phase
 
 
@@ -571,6 +581,7 @@ def render_markdown(report):
                 "| CLI metric | value |",
                 "| --- | --- |",
                 f"| status | {cli.get('status')} |",
+                f"| inference threads | {cli.get('inference_threads', '-')} |",
                 f"| load | {cli.get('load_seconds', '-')} s |",
                 f"| TTFT (prefill, load excluded) | {cli.get('ttft_prefill_seconds', '-')} s |",
                 f"| decode tok/s (precise, in-process) | {cli.get('decode_tokens_per_second_precise', '-')} |",
@@ -584,8 +595,8 @@ def render_markdown(report):
             if batches:
                 lines += [
                     "",
-                    "| Engine batch | aggregate tok/s | per-stream tok/s | step latency | peak RSS | CPU mean / peak | status |",
-                    "| --- | --- | --- | --- | --- | --- | --- |",
+                    "| Engine batch | aggregate tok/s | per-stream tok/s | step latency | stream-0 parity | peak RSS | CPU mean / peak | status |",
+                    "| --- | --- | --- | --- | --- | --- | --- | --- |",
                 ]
                 for batch in batches:
                     average_ns = batch.get("average_step_ns")
@@ -594,7 +605,8 @@ def render_markdown(report):
                         f"| {batch.get('streams')} | "
                         f"{batch.get('aggregate_tokens_per_second', '-')} | "
                         f"{batch.get('per_stream_tokens_per_second', '-')} | "
-                        f"{step_ms} | {_fmt_bytes(batch.get('rss_peak_bytes'))} | "
+                        f"{step_ms} | {batch.get('stream_0_matches_single', '-')} | "
+                        f"{_fmt_bytes(batch.get('rss_peak_bytes'))} | "
                         f"{batch.get('cpu_mean_percent', '-')} / "
                         f"{batch.get('cpu_peak_percent', '-')} % | "
                         f"{batch.get('status')} |"
