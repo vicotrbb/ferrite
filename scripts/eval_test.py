@@ -52,5 +52,30 @@ class ParseCputimeTest(unittest.TestCase):
         self.assertAlmostEqual(ev.parse_cputime("1-01:02:03"), 86400 + 3723.0)
 
 
+class AggregateSamplesTest(unittest.TestCase):
+    SAMPLES = [
+        ev.Sample(t=0.0, rss_bytes=100 << 20, cpu_seconds=0.0),
+        ev.Sample(t=1.0, rss_bytes=200 << 20, cpu_seconds=0.5),
+        ev.Sample(t=2.0, rss_bytes=150 << 20, cpu_seconds=1.5),
+    ]
+
+    def test_whole_run_aggregation(self):
+        agg = ev.aggregate_samples(self.SAMPLES)
+        self.assertEqual(agg["sample_count"], 3)
+        self.assertEqual(agg["rss_peak_bytes"], 200 << 20)
+        self.assertEqual(agg["rss_mean_bytes"], (450 << 20) // 3)
+        self.assertAlmostEqual(agg["cpu_mean_percent"], 75.0)
+        self.assertAlmostEqual(agg["cpu_peak_percent"], 100.0)
+
+    def test_windowed_aggregation(self):
+        agg = ev.aggregate_samples(self.SAMPLES, t_start=1.0, t_end=2.0)
+        self.assertEqual(agg["sample_count"], 2)
+        self.assertAlmostEqual(agg["cpu_mean_percent"], 100.0)
+
+    def test_empty_window(self):
+        agg = ev.aggregate_samples(self.SAMPLES, t_start=5.0)
+        self.assertEqual(agg, {"sample_count": 0})
+
+
 if __name__ == "__main__":
     unittest.main()
