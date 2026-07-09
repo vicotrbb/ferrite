@@ -1,0 +1,129 @@
+{
+  "schema_version": 1,
+  "tag": "final-q5-batch-ilp-clean",
+  "env": {
+    "timestamp_utc": "2026-07-09T20:52:46Z",
+    "hostname": "Mac.localdomain",
+    "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+    "python": "3.14.6",
+    "logical_cores": 15,
+    "git_commit": "eba8aec5f41e837b1ba948061e2ca1af1ad194f4",
+    "git_branch": "main",
+    "git_dirty": false,
+    "rustc_version": "rustc 1.96.0 (ac68faa20 2026-05-25)",
+    "cpu": "Apple M5 Pro",
+    "physical_cores": 15,
+    "ram_bytes": 25769803776
+  },
+  "config": {
+    "prompt": "Write a short story about a rusty robot who learns to sail.",
+    "generate_tokens": 64,
+    "benchmark_runs": 64,
+    "sleep_ms": 2000,
+    "requests": 4,
+    "batch_streams": [
+      2,
+      4,
+      8
+    ]
+  },
+  "models": [
+    {
+      "model_path": "target/models/qwen2.5-0.5b-instruct-q4_k_m.gguf",
+      "cli": {
+        "status": "ok",
+        "generation_command": "/Users/victorbona/Code/OpenSource/ferrite/target/release/ferrite --model target/models/qwen2.5-0.5b-instruct-q4_k_m.gguf --prompt Write a short story about a rusty robot who learns to sail. --sleep-after-load-ms 2000 --generate-tokens 64 --stream",
+        "load_seconds": 0.929,
+        "ttft_prefill_seconds": 0.255,
+        "stream_token_count": 64,
+        "decode_tokens_per_second_streamed": 65.94,
+        "token_latency_ms_mean": 15.2,
+        "token_latency_ms_p50": 15.1,
+        "token_latency_ms_p95": 16.4,
+        "inference_threads": 10,
+        "model_file_bytes": "491400032",
+        "scalar_weight_bytes": "485452288",
+        "kv_cache_bytes": "1892352",
+        "generated_stopped_on_eos": "false",
+        "rss_post_load_bytes": 1033863168,
+        "rss_peak_bytes": 1033863168,
+        "cpu_mean_percent": 725.7,
+        "cpu_peak_percent": 777.2,
+        "benchmark_command": "/Users/victorbona/Code/OpenSource/ferrite/target/release/ferrite --model target/models/qwen2.5-0.5b-instruct-q4_k_m.gguf --prompt Write a short story about a rusty robot who learns to sail. --benchmark-runs 64",
+        "benchmark_avg_ns": 15273990,
+        "decode_tokens_per_second_precise": 65.47,
+        "benchmark_token_ids": "5193,264,882,11,1052,572,264,12305,6941,431,12,16,17,18,13,431,12,16,17,18,572,264,12305,429,1030,1012,304,264,1584,315,827,76439,369,1635,13,1084,1030,1012,10865,369,773,1293,429,432,1030,3635,97453,323,902,5021,1030,279,5726,311,3271,13,431,12,16,17,18,572,264,12305",
+        "batch_benchmarks": [
+          {
+            "streams": 2,
+            "command": "/Users/victorbona/Code/OpenSource/ferrite/target/release/ferrite --model target/models/qwen2.5-0.5b-instruct-q4_k_m.gguf --prompt Write a short story about a rusty robot who learns to sail. --benchmark-runs 64 --benchmark-batch-streams 2",
+            "status": "ok",
+            "inference_threads": 10,
+            "decode_steps": 64,
+            "total_ns": 1580381000,
+            "average_step_ns": 24693453,
+            "aggregate_tokens_per_second": 80.99,
+            "stream_0_token_ids": "5193,264,882,11,1052,572,264,12305,6941,431,12,16,17,18,13,431,12,16,17,18,572,264,12305,429,1030,1012,304,264,1584,315,827,76439,369,1635,13,1084,1030,1012,10865,369,773,1293,429,432,1030,3635,97453,323,902,5021,1030,279,5726,311,3271,13,431,12,16,17,18,572,264,12305",
+            "kv_cache_bytes": 1892352,
+            "per_stream_tokens_per_second": 40.49,
+            "rss_peak_bytes": 1070940160,
+            "cpu_mean_percent": 668.8,
+            "cpu_peak_percent": 780.1,
+            "stream_0_matches_single": true
+          },
+          {
+            "streams": 4,
+            "command": "/Users/victorbona/Code/OpenSource/ferrite/target/release/ferrite --model target/models/qwen2.5-0.5b-instruct-q4_k_m.gguf --prompt Write a short story about a rusty robot who learns to sail. --benchmark-runs 64 --benchmark-batch-streams 4",
+            "status": "ok",
+            "inference_threads": 10,
+            "decode_steps": 64,
+            "total_ns": 2471579709,
+            "average_step_ns": 38618432,
+            "aggregate_tokens_per_second": 103.58,
+            "stream_0_token_ids": "5193,264,882,11,1052,572,264,12305,6941,431,12,16,17,18,13,431,12,16,17,18,572,264,12305,429,1030,1012,304,264,1584,315,827,76439,369,1635,13,1084,1030,1012,10865,369,773,1293,429,432,1030,3635,97453,323,902,5021,1030,279,5726,311,3271,13,431,12,16,17,18,572,264,12305",
+            "kv_cache_bytes": 1892352,
+            "per_stream_tokens_per_second": 25.89,
+            "rss_peak_bytes": 1069727744,
+            "cpu_mean_percent": 650.5,
+            "cpu_peak_percent": 772.2,
+            "stream_0_matches_single": true
+          },
+          {
+            "streams": 8,
+            "command": "/Users/victorbona/Code/OpenSource/ferrite/target/release/ferrite --model target/models/qwen2.5-0.5b-instruct-q4_k_m.gguf --prompt Write a short story about a rusty robot who learns to sail. --benchmark-runs 64 --benchmark-batch-streams 8",
+            "status": "ok",
+            "inference_threads": 10,
+            "decode_steps": 64,
+            "total_ns": 4357822167,
+            "average_step_ns": 68090971,
+            "aggregate_tokens_per_second": 117.49,
+            "stream_0_token_ids": "5193,264,882,11,1052,572,264,12305,6941,431,12,16,17,18,13,431,12,16,17,18,572,264,12305,429,1030,1012,304,264,1584,315,827,76439,369,1635,13,1084,1030,1012,10865,369,773,1293,429,432,1030,3635,97453,323,902,5021,1030,279,5726,311,3271,13,431,12,16,17,18,572,264,12305",
+            "kv_cache_bytes": 1892352,
+            "per_stream_tokens_per_second": 14.69,
+            "rss_peak_bytes": 1069809664,
+            "cpu_mean_percent": 627.7,
+            "cpu_peak_percent": 766.9,
+            "stream_0_matches_single": true
+          }
+        ]
+      },
+      "server": {
+        "status": "ok",
+        "server_command": "/Users/victorbona/Code/OpenSource/ferrite/target/release/ferrite-server --model target/models/qwen2.5-0.5b-instruct-q4_k_m.gguf --model-id eval --bind 127.0.0.1:65199 --api-key ferrite-eval --default-max-tokens 64 --hard-max-tokens 64 --inference-wait-ms 120000",
+        "client_command": "/Users/victorbona/Code/OpenSource/ferrite/target/release/ferrite-openai-throughput --addr 127.0.0.1:65199 --model eval --endpoint chat-completions --prompt Write a short story about a rusty robot who learns to sail. --requests 4 --max-tokens 64 --stream --stream-usage --api-key ferrite-eval",
+        "streaming_time_to_first_token_ms": "260",
+        "streaming_tokens_per_second": "51.127095",
+        "streaming_token_latency_p50_ms": "15",
+        "streaming_token_latency_p95_ms": "17",
+        "streaming_token_events": "65",
+        "requests_per_second": "0.785448",
+        "elapsed_ms": "5092",
+        "streaming_usage_prompt_tokens": "18",
+        "streaming_usage_completion_tokens": "64",
+        "server_rss_peak_bytes": 1068777472,
+        "server_cpu_mean_percent": 681.0,
+        "server_cpu_peak_percent": 773.2
+      }
+    }
+  ]
+}

@@ -3,7 +3,8 @@
 - Date: 2026-07-09
 - Scope: AArch64 NEON batched Q5_0 matvec
 - Baseline artifact: `scripts/evals/2026-07-09-202640-qwen2.5-0.5b-instruct-q4_k_m.json`
-- Accepted artifact: `scripts/evals/2026-07-09-204644-qwen2.5-0.5b-instruct-q4_k_m.json`
+- Accepted slice artifact: `scripts/evals/2026-07-09-204644-qwen2.5-0.5b-instruct-q4_k_m.json`
+- Clean final artifact: `scripts/evals/2026-07-09-205246-qwen2.5-0.5b-instruct-q4_k_m.json`
 
 ## Hypothesis
 
@@ -58,6 +59,13 @@ step fell from 91.22 ms to 78.70 ms. The cumulative single-stream result is
 49.49 tok/s versus the committed 31.99 tok/s starting baseline (+54.7%); batch
 8 is +217.8% against that starting rate. Single-stream variation in the table
 is ambient host load and is not attributed to this batch-only slice.
+
+After all commits and gates, a clean-tree cooldown run recorded 65.47 tok/s
+single-stream, 103.58 tok/s at batch 4, and 117.49 tok/s at batch 8. This is a
+104.7% single-stream improvement over the 31.99 tok/s starting baseline, and
+the 100 tok/s target is met at batch 4 as well as batch 8. The same run kept
+exact stream-0 parity at batch 2/4/8 and completed the server phase at 51.13
+streamed tok/s.
 
 ## Validation
 
