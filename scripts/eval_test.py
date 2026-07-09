@@ -128,13 +128,21 @@ class RenderMarkdownTest(unittest.TestCase):
                  "ram_bytes": 16 << 30, "platform": "macOS", "python": "3.14",
                  "git_commit": "abc123", "git_branch": "main", "git_dirty": False,
                  "rustc_version": "rustc 1.x", "logical_cores": 8},
-            cfg=ev.EvalConfig("hi", 64, 64, 2000, 4),
+            cfg=ev.EvalConfig("hi", 64, 64, 2000, 4, (2,)),
             model_results=[{
                 "model_path": "target/models/model.gguf",
                 "cli": {"status": "ok", "load_seconds": 1.0,
                         "ttft_prefill_seconds": 0.5,
                         "decode_tokens_per_second_precise": 12.3,
-                        "rss_peak_bytes": 1 << 30},
+                        "rss_peak_bytes": 1 << 30,
+                        "batch_benchmarks": [{
+                            "streams": 2,
+                            "status": "ok",
+                            "average_step_ns": 20_000_000,
+                            "aggregate_tokens_per_second": 100.0,
+                            "per_stream_tokens_per_second": 50.0,
+                            "rss_peak_bytes": 2 << 30,
+                        }]},
                 "server": {"status": "ok",
                            "streaming_time_to_first_token_ms": "450",
                            "streaming_tokens_per_second": "11.5"},
@@ -146,6 +154,7 @@ class RenderMarkdownTest(unittest.TestCase):
         self.assertIn("## model.gguf", markdown)
         self.assertIn("| load | 1.0 s |", markdown)
         self.assertIn("12.3", markdown)
+        self.assertIn("| 2 | 100.0 | 50.0 | 20.00 ms |", markdown)
         self.assertIn("| TTFT | 450 ms |", markdown)
         self.assertIn("tag: unit-test", markdown)
 

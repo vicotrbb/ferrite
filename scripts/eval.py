@@ -211,8 +211,55 @@ def compute_cli_metrics(t_spawn, lines, sleep_ms):
 
 
 EvalConfig = namedtuple(
-    "EvalConfig", ["prompt", "generate_tokens", "benchmark_runs", "sleep_ms", "requests"]
+    "EvalConfig",
+    [
+        "prompt",
+        "generate_tokens",
+        "benchmark_runs",
+        "sleep_ms",
+        "requests",
+        "batch_streams",
+    ],
 )
+
+
+def run_cli_batch_benchmark(ferrite_bin, model_path, cfg, streams):
+    """Measure aggregate decode throughput for one fixed engine batch size."""
+    cmd = [
+        str(ferrite_bin),
+        "--model", str(model_path),
+        "--prompt", cfg.prompt,
+        "--benchmark-runs", str(cfg.benchmark_runs),
+        "--benchmark-batch-streams", str(streams),
+    ]
+    result = {"streams": streams, "command": " ".join(cmd), "status": "ok"}
+    run = run_timestamped(cmd)
+    if run.returncode != 0:
+        result["status"] = "failed"
+        result["stderr"] = run.stderr[-2000:]
+        return result
+
+    kv = parse_kv_lines(line for _, line in run.lines)
+    for source, destination, conversion in (
+        ("benchmark_runs", "decode_steps", int),
+        ("benchmark_total_ns", "total_ns", int),
+        ("benchmark_avg_ns", "average_step_ns", int),
+        ("benchmark_batch_tokens_per_second", "aggregate_tokens_per_second", float),
+        ("benchmark_token_ids", "stream_0_token_ids", str),
+        ("kv_cache_bytes", "kv_cache_bytes", int),
+    ):
+        if source in kv:
+            result[destination] = conversion(kv[source])
+
+    aggregate = result.get("aggregate_tokens_per_second")
+    if aggregate is not None:
+        result["per_stream_tokens_per_second"] = round(aggregate / streams, 2)
+
+    samples = aggregate_samples(run.samples)
+    for key in ("rss_peak_bytes", "cpu_mean_percent", "cpu_peak_percent"):
+        if key in samples:
+            result[key] = samples[key]
+    return result
 
 
 def run_cli_phase(ferrite_bin, model_path, cfg):
@@ -278,6 +325,12 @@ def run_cli_phase(ferrite_bin, model_path, cfg):
             phase["decode_tokens_per_second_precise"] = round(1e9 / avg_ns, 2)
     else:
         phase["benchmark_error"] = bench.stderr[-500:]
+
+    if cfg.batch_streams:
+        phase["batch_benchmarks"] = [
+            run_cli_batch_benchmark(ferrite_bin, model_path, cfg, streams)
+            for streams in cfg.batch_streams
+        ]
     return phase
 
 
@@ -527,6 +580,25 @@ def render_markdown(report):
                 f"| CPU mean / peak (generation) | {cli.get('cpu_mean_percent', '-')} / {cli.get('cpu_peak_percent', '-')} % |",
                 f"| model file / weights / kv cache | {_fmt_bytes(cli.get('model_file_bytes'))} / {_fmt_bytes(cli.get('scalar_weight_bytes'))} / {_fmt_bytes(cli.get('kv_cache_bytes'))} |",
             ]
+            batches = cli.get("batch_benchmarks", [])
+            if batches:
+                lines += [
+                    "",
+                    "| Engine batch | aggregate tok/s | per-stream tok/s | step latency | peak RSS | CPU mean / peak | status |",
+                    "| --- | --- | --- | --- | --- | --- | --- |",
+                ]
+                for batch in batches:
+                    average_ns = batch.get("average_step_ns")
+                    step_ms = f"{average_ns / 1e6:.2f} ms" if average_ns else "-"
+                    lines.append(
+                        f"| {batch.get('streams')} | "
+                        f"{batch.get('aggregate_tokens_per_second', '-')} | "
+                        f"{batch.get('per_stream_tokens_per_second', '-')} | "
+                        f"{step_ms} | {_fmt_bytes(batch.get('rss_peak_bytes'))} | "
+                        f"{batch.get('cpu_mean_percent', '-')} / "
+                        f"{batch.get('cpu_peak_percent', '-')} % | "
+                        f"{batch.get('status')} |"
+                    )
         server = entry.get("server")
         if server:
             lines += [
@@ -587,6 +659,14 @@ def parse_args(argv):
     parser.add_argument("--generate-tokens", type=int, default=64)
     parser.add_argument("--benchmark-runs", type=int, default=64)
     parser.add_argument(
+        "--batch-streams",
+        action="append",
+        type=int,
+        default=[],
+        metavar="N",
+        help="also benchmark an N-stream engine batch (repeatable; N must be >= 2)",
+    )
+    parser.add_argument(
         "--sleep-ms", type=int, default=2000,
         help="post-load pause used to sample the load-only RSS footprint",
     )
@@ -604,6 +684,8 @@ def parse_args(argv):
 
 def main(argv=None):
     args = parse_args(argv)
+    if any(streams < 2 for streams in args.batch_streams):
+        raise SystemExit("--batch-streams values must be at least 2")
     models = resolve_models(args)
     bins = build_binaries()
     env = capture_env()
@@ -613,6 +695,7 @@ def main(argv=None):
         benchmark_runs=args.benchmark_runs,
         sleep_ms=args.sleep_ms,
         requests=args.requests,
+        batch_streams=tuple(dict.fromkeys(args.batch_streams)),
     )
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d-%H%M%S")
     model_results = []
