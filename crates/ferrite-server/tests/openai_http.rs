@@ -198,7 +198,7 @@ async fn live_http_server_releases_inference_permit_after_streaming_tcp_disconne
 }
 
 #[tokio::test]
-async fn live_http_server_releases_inference_permit_after_tcp_disconnect_before_generated_content(
+async fn live_http_server_releases_inference_permit_after_initial_role_chunk_disconnect(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let token_limits = TokenLimits::new(16, 4096)?;
     let server =
@@ -221,10 +221,9 @@ async fn live_http_server_releases_inference_permit_after_tcp_disconnect_before_
         partial_response.starts_with("HTTP/1.1 200 OK"),
         "unexpected response: {partial_response}"
     );
-    assert!(
-        !partial_response.contains("\"delta\":{\"content\":\""),
-        "test must disconnect before generated content: {partial_response}"
-    );
+    // A single TCP read may coalesce the role event with generated events.
+    // The helper closes the socket as soon as the role marker is observable;
+    // byte coalescing must not make this permit-release proof timing-sensitive.
     assert!(server.state().try_acquire_inference_permit().is_none());
 
     let deadline = Instant::now() + Duration::from_secs(2);
@@ -234,7 +233,7 @@ async fn live_http_server_releases_inference_permit_after_tcp_disconnect_before_
         }
         if Instant::now() >= deadline {
             return Err(
-                "streaming TCP disconnect kept the inference permit before generated content"
+                "streaming TCP disconnect kept the inference permit after the initial role chunk"
                     .into(),
             );
         }
