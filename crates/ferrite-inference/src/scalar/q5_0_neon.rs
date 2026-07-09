@@ -16,6 +16,10 @@ const ROW_PARALLEL_MIN_ROWS: usize = 512;
 /// microseconds so fork-join overhead and straggler tails stay small
 /// relative to the streamed weight bytes.
 const ROW_PARALLEL_MIN_ROWS_PER_TASK: usize = 128;
+/// Batched rows perform several dot products after each weight decode, so a
+/// smaller chunk still amortizes scheduling while exposing enough tasks for
+/// 896-row attention projections to occupy a 10-worker pool.
+const BATCH_ROWS_PER_TASK: usize = 64;
 
 pub(super) fn neon_q5_0_mul_vec(
     bytes: &[u8],
@@ -76,7 +80,7 @@ pub(super) fn neon_q5_0_mul_vec_batch(
     bytes
         .par_chunks_exact(row_bytes)
         .zip(flat.par_chunks_exact_mut(batch))
-        .with_min_len(ROW_PARALLEL_MIN_ROWS_PER_TASK)
+        .with_min_len(BATCH_ROWS_PER_TASK)
         .for_each(|(row_chunk, row_out)| neon_q5_0_row_dot_batch(row_chunk, vectors, row_out));
 
     (0..batch)
@@ -138,7 +142,71 @@ unsafe fn neon_q5_0_block_dot_batch(
             offset,
         ));
 
-        for (stream, vector) in vectors.iter().enumerate() {
+        let mut stream = 0usize;
+        while stream + 4 <= vectors.len() {
+            let windows = [
+                vectors[stream].as_ptr().add(col_base),
+                vectors[stream + 1].as_ptr().add(col_base),
+                vectors[stream + 2].as_ptr().add(col_base),
+                vectors[stream + 3].as_ptr().add(col_base),
+            ];
+            let mut lanes_0 = vdupq_n_f32(0.0);
+            let mut lanes_1 = vdupq_n_f32(0.0);
+            let mut lanes_2 = vdupq_n_f32(0.0);
+            let mut lanes_3 = vdupq_n_f32(0.0);
+            for step in 0..4 {
+                let low_offset = step * 4;
+                lanes_0 = vfmaq_f32(
+                    lanes_0,
+                    low_quads[step],
+                    vld1q_f32(windows[0].add(low_offset)),
+                );
+                lanes_1 = vfmaq_f32(
+                    lanes_1,
+                    low_quads[step],
+                    vld1q_f32(windows[1].add(low_offset)),
+                );
+                lanes_2 = vfmaq_f32(
+                    lanes_2,
+                    low_quads[step],
+                    vld1q_f32(windows[2].add(low_offset)),
+                );
+                lanes_3 = vfmaq_f32(
+                    lanes_3,
+                    low_quads[step],
+                    vld1q_f32(windows[3].add(low_offset)),
+                );
+
+                let high_offset = low_offset + 16;
+                lanes_0 = vfmaq_f32(
+                    lanes_0,
+                    high_quads[step],
+                    vld1q_f32(windows[0].add(high_offset)),
+                );
+                lanes_1 = vfmaq_f32(
+                    lanes_1,
+                    high_quads[step],
+                    vld1q_f32(windows[1].add(high_offset)),
+                );
+                lanes_2 = vfmaq_f32(
+                    lanes_2,
+                    high_quads[step],
+                    vld1q_f32(windows[2].add(high_offset)),
+                );
+                lanes_3 = vfmaq_f32(
+                    lanes_3,
+                    high_quads[step],
+                    vld1q_f32(windows[3].add(high_offset)),
+                );
+            }
+            row_out[stream] += vaddvq_f32(lanes_0) * scale;
+            row_out[stream + 1] += vaddvq_f32(lanes_1) * scale;
+            row_out[stream + 2] += vaddvq_f32(lanes_2) * scale;
+            row_out[stream + 3] += vaddvq_f32(lanes_3) * scale;
+            stream += 4;
+        }
+
+        for (out, vector) in row_out[stream..].iter_mut().zip(&vectors[stream..]) {
             let window = vector.as_ptr().add(col_base);
             let mut lanes = vdupq_n_f32(0.0);
             for step in 0..4 {
@@ -149,7 +217,7 @@ unsafe fn neon_q5_0_block_dot_batch(
                     vld1q_f32(window.add(step * 4 + 16)),
                 );
             }
-            row_out[stream] += vaddvq_f32(lanes) * scale;
+            *out += vaddvq_f32(lanes) * scale;
         }
     }
 }
@@ -236,7 +304,7 @@ pub(super) unsafe fn neon_q5_0_block_dot(block: &[u8], vector: &[f32]) -> f32 {
 
 #[cfg(test)]
 mod tests {
-    use super::neon_q5_0_block_dot;
+    use super::{neon_q5_0_block_dot, neon_q5_0_block_dot_batch};
     use crate::scalar::{
         q5_0::{decode_q5_0_row, Q5_0_BLOCK_BYTES, Q5_0_BLOCK_VALUES},
         InferenceError,
@@ -260,6 +328,27 @@ mod tests {
             (actual - expected).abs() < 0.001,
             "actual={actual} expected={expected}"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn batched_block_dot_is_bit_identical_per_stream() -> Result<(), InferenceError> {
+        let block = patterned_q5_0_block();
+        let vectors = (0..8)
+            .map(|stream| {
+                (0..Q5_0_BLOCK_VALUES)
+                    .map(|index| ((index + stream * 3) % 17) as f32 - 8.0)
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+        let references = vectors.iter().map(Vec::as_slice).collect::<Vec<_>>();
+        let mut actual = vec![0.0; references.len()];
+
+        unsafe { neon_q5_0_block_dot_batch(&block, &references, 0, &mut actual) };
+        for (index, vector) in references.iter().enumerate() {
+            let expected = unsafe { neon_q5_0_block_dot(&block, vector) };
+            assert_eq!(actual[index].to_bits(), expected.to_bits());
+        }
         Ok(())
     }
 
