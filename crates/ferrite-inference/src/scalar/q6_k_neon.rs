@@ -2,11 +2,15 @@
 
 use super::{
     float::f16_bits_to_f32,
+    neon_util::widen_s8_lanes,
     q6_k::{Q6KMatVecBackend, Q6KMatVecOutput, Q6_K_BLOCK_BYTES, Q6_K_BLOCK_VALUES},
     InferenceError,
 };
 use rayon::prelude::*;
-use std::arch::aarch64::{vaddvq_f32, vdupq_n_f32, vfmaq_f32, vld1q_f32, vmulq_f32};
+use std::arch::aarch64::{
+    vaddvq_f32, vandq_u8, vdupq_n_f32, vdupq_n_s8, vdupq_n_u8, vfmaq_f32, vld1q_f32, vld1q_u8,
+    vmulq_f32, vorrq_u8, vreinterpretq_s8_u8, vshlq_n_u8, vshrq_n_u8, vsubq_s8,
+};
 
 pub(super) fn neon_q6_k_mul_vec(
     bytes: &[u8],
@@ -106,73 +110,74 @@ pub(super) unsafe fn neon_q6_k_block_dot(
     let super_scale = f16_bits_to_f32(u16::from_le_bytes([block[208], block[209]]));
     let mut lanes = vdupq_n_f32(0.0);
 
-    for half in 0..2 {
-        let value_base = half * 128;
-        let low_base = half * 64;
-        let high_base = half * 32;
-        let scale_base = half * 8;
+    // SAFETY: `block` was length-checked above, so every 16-byte load from
+    // `low_bits`/`high_bits` and every 4-lane load from the 256-element
+    // `vector` slice below stays in bounds.
+    unsafe {
+        let nibble_mask = vdupq_n_u8(0x0f);
+        let two_bit_mask = vdupq_n_u8(0x03);
+        let offset = vdupq_n_s8(32);
 
-        for index in (0..32).step_by(4) {
-            let scale_index = index / 16;
-            let scale_1 =
-                vdupq_n_f32(super_scale * f32::from(scales[scale_base + scale_index] as i8));
-            let scale_2 =
-                vdupq_n_f32(super_scale * f32::from(scales[scale_base + scale_index + 2] as i8));
-            let scale_3 =
-                vdupq_n_f32(super_scale * f32::from(scales[scale_base + scale_index + 4] as i8));
-            let scale_4 =
-                vdupq_n_f32(super_scale * f32::from(scales[scale_base + scale_index + 6] as i8));
-            let mut q1 = [0.0; 4];
-            let mut q2 = [0.0; 4];
-            let mut q3 = [0.0; 4];
-            let mut q4 = [0.0; 4];
+        for half in 0..2 {
+            let value_base = half * 128;
+            let low_base = half * 64;
+            let high_base = half * 32;
+            let scale_base = half * 8;
 
-            for lane in 0..4 {
-                let offset = index + lane;
-                let high = high_bits[high_base + offset];
-                q1[lane] = (i32::from((low_bits[low_base + offset] & 0x0f) | ((high & 3) << 4))
-                    - 32) as f32;
-                q2[lane] = (i32::from(
-                    (low_bits[low_base + offset + 32] & 0x0f) | (((high >> 2) & 3) << 4),
-                ) - 32) as f32;
-                q3[lane] =
-                    (i32::from((low_bits[low_base + offset] >> 4) | (((high >> 4) & 3) << 4)) - 32)
-                        as f32;
-                q4[lane] =
-                    (i32::from((low_bits[low_base + offset + 32] >> 4) | (((high >> 6) & 3) << 4))
-                        - 32) as f32;
-            }
+            // Each 16-value window shares one scale per quarter; decode the
+            // four 16-value groups of the window entirely in registers, then
+            // replay the previous kernel's exact FMA sequence (q1..q4 per
+            // 4-lane step) so the accumulated sum stays bit-identical.
+            for window in 0..2 {
+                let window_base = window * 16;
+                let low_1 = vld1q_u8(low_bits.as_ptr().add(low_base + window_base));
+                let low_2 = vld1q_u8(low_bits.as_ptr().add(low_base + window_base + 32));
+                let high = vld1q_u8(high_bits.as_ptr().add(high_base + window_base));
 
-            // SAFETY: the temporary lane arrays and the vector slice each have
-            // four contiguous f32 values at these offsets.
-            unsafe {
-                let vector_values = vld1q_f32(vector.as_ptr().add(value_base + index));
-                lanes = vfmaq_f32(
-                    lanes,
-                    vmulq_f32(vld1q_f32(q1.as_ptr()), scale_1),
-                    vector_values,
+                let group_1 = vorrq_u8(
+                    vandq_u8(low_1, nibble_mask),
+                    vshlq_n_u8(vandq_u8(high, two_bit_mask), 4),
+                );
+                let group_2 = vorrq_u8(
+                    vandq_u8(low_2, nibble_mask),
+                    vshlq_n_u8(vandq_u8(vshrq_n_u8(high, 2), two_bit_mask), 4),
+                );
+                let group_3 = vorrq_u8(
+                    vshrq_n_u8(low_1, 4),
+                    vshlq_n_u8(vandq_u8(vshrq_n_u8(high, 4), two_bit_mask), 4),
+                );
+                let group_4 = vorrq_u8(
+                    vshrq_n_u8(low_2, 4),
+                    vshlq_n_u8(vandq_u8(vshrq_n_u8(high, 6), two_bit_mask), 4),
                 );
 
-                let vector_values = vld1q_f32(vector.as_ptr().add(value_base + index + 32));
-                lanes = vfmaq_f32(
-                    lanes,
-                    vmulq_f32(vld1q_f32(q2.as_ptr()), scale_2),
-                    vector_values,
-                );
+                let quads = [
+                    widen_s8_lanes(vsubq_s8(vreinterpretq_s8_u8(group_1), offset)),
+                    widen_s8_lanes(vsubq_s8(vreinterpretq_s8_u8(group_2), offset)),
+                    widen_s8_lanes(vsubq_s8(vreinterpretq_s8_u8(group_3), offset)),
+                    widen_s8_lanes(vsubq_s8(vreinterpretq_s8_u8(group_4), offset)),
+                ];
+                let group_scales = [
+                    vdupq_n_f32(super_scale * f32::from(scales[scale_base + window] as i8)),
+                    vdupq_n_f32(super_scale * f32::from(scales[scale_base + window + 2] as i8)),
+                    vdupq_n_f32(super_scale * f32::from(scales[scale_base + window + 4] as i8)),
+                    vdupq_n_f32(super_scale * f32::from(scales[scale_base + window + 6] as i8)),
+                ];
 
-                let vector_values = vld1q_f32(vector.as_ptr().add(value_base + index + 64));
-                lanes = vfmaq_f32(
-                    lanes,
-                    vmulq_f32(vld1q_f32(q3.as_ptr()), scale_3),
-                    vector_values,
-                );
-
-                let vector_values = vld1q_f32(vector.as_ptr().add(value_base + index + 96));
-                lanes = vfmaq_f32(
-                    lanes,
-                    vmulq_f32(vld1q_f32(q4.as_ptr()), scale_4),
-                    vector_values,
-                );
+                for step in 0..4 {
+                    let index = window_base + step * 4;
+                    for (group, (group_quads, group_scale)) in
+                        quads.iter().zip(group_scales.iter()).enumerate()
+                    {
+                        let vector_values =
+                            vld1q_f32(vector.as_ptr().add(value_base + index + group * 32));
+                        lanes = vfmaq_f32(
+                            lanes,
+                            vmulq_f32(group_quads[step], *group_scale),
+                            vector_values,
+                        );
+                    }
+                }
             }
         }
     }

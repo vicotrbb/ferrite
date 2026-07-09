@@ -7,6 +7,8 @@ mod math;
 mod matrix;
 mod matvec;
 mod memory;
+#[cfg(target_arch = "aarch64")]
+mod neon_util;
 mod options;
 mod output;
 mod profile;

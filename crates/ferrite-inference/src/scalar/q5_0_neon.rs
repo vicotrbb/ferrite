@@ -2,14 +2,13 @@
 
 use super::{
     float::f16_bits_to_f32,
+    neon_util::widen_s8_lanes,
     q5_0::{Q5_0MatVecBackend, Q5_0MatVecOutput, Q5_0_BLOCK_BYTES, Q5_0_BLOCK_VALUES},
 };
 use rayon::prelude::*;
 use std::arch::aarch64::{
-    int8x16_t, vaddvq_f32, vandq_u8, vcombine_u8, vcvtq_f32_s32, vdup_n_u8, vdupq_n_f32,
-    vdupq_n_s8, vdupq_n_u8, vfmaq_f32, vget_high_s16, vget_high_s8, vget_low_s16, vget_low_s8,
-    vld1q_f32, vld1q_u8, vmovl_s16, vmovl_s8, vorrq_u8, vreinterpretq_s8_u8, vshrq_n_u8, vsubq_s8,
-    vtstq_u8,
+    vaddvq_f32, vandq_u8, vcombine_u8, vdup_n_u8, vdupq_n_f32, vdupq_n_s8, vdupq_n_u8, vfmaq_f32,
+    vld1q_f32, vld1q_u8, vorrq_u8, vreinterpretq_s8_u8, vshrq_n_u8, vsubq_s8, vtstq_u8,
 };
 
 const ROW_PARALLEL_MIN_ROWS: usize = 512;
@@ -137,19 +136,6 @@ pub(super) unsafe fn neon_q5_0_block_dot(block: &[u8], vector: &[f32]) -> f32 {
 
         vaddvq_f32(lanes) * scale
     }
-}
-
-/// Widens 16 signed bytes into four 4-lane f32 vectors (exact conversion).
-#[target_feature(enable = "neon")]
-unsafe fn widen_s8_lanes(values: int8x16_t) -> [std::arch::aarch64::float32x4_t; 4] {
-    let low_half = vmovl_s8(vget_low_s8(values));
-    let high_half = vmovl_s8(vget_high_s8(values));
-    [
-        vcvtq_f32_s32(vmovl_s16(vget_low_s16(low_half))),
-        vcvtq_f32_s32(vmovl_s16(vget_high_s16(low_half))),
-        vcvtq_f32_s32(vmovl_s16(vget_low_s16(high_half))),
-        vcvtq_f32_s32(vmovl_s16(vget_high_s16(high_half))),
-    ]
 }
 
 #[cfg(test)]

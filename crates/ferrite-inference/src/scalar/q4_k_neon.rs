@@ -2,11 +2,15 @@
 
 use super::{
     float::f16_bits_to_f32,
+    neon_util::widen_s8_lanes,
     q4_k::{Q4KMatVecBackend, Q4KMatVecOutput, Q4_K_BLOCK_BYTES, Q4_K_BLOCK_VALUES},
     InferenceError,
 };
 use rayon::prelude::*;
-use std::arch::aarch64::{vaddvq_f32, vdupq_n_f32, vfmaq_f32, vld1q_f32, vmulq_f32, vsubq_f32};
+use std::arch::aarch64::{
+    vaddvq_f32, vandq_u8, vdupq_n_f32, vdupq_n_u8, vfmaq_f32, vld1q_f32, vld1q_u8, vmulq_f32,
+    vreinterpretq_s8_u8, vshrq_n_u8, vsubq_f32,
+};
 
 pub(super) fn neon_q4_k_mul_vec(
     bytes: &[u8],
@@ -64,51 +68,58 @@ unsafe fn neon_q4_k_block_dot(block: &[u8], vector: &[f32]) -> Result<f32, Infer
     let mut scale_index = 0usize;
     let mut vector_offset = 0usize;
 
-    for quant_chunk in quants.chunks_exact(32) {
-        let (scale_low, min_low) = q4_k_scale_min(scale_index, scales);
-        let (scale_high, min_high) = q4_k_scale_min(scale_index + 1, scales);
-        let d_low = vdupq_n_f32(d * f32::from(scale_low));
-        let d_high = vdupq_n_f32(d * f32::from(scale_high));
-        let min_low = vdupq_n_f32(dmin * f32::from(min_low));
-        let min_high = vdupq_n_f32(dmin * f32::from(min_high));
+    // SAFETY: `block` was length-checked above (128 quant bytes), and each
+    // 64-value chunk reads a 64-element window of the length-checked
+    // 256-element vector slice, so every 16-byte quant load and 4-lane
+    // vector load stays in bounds.
+    unsafe {
+        let nibble_mask = vdupq_n_u8(0x0f);
 
-        for lane_offset in (0..32).step_by(4) {
-            let quant_lanes = [
-                f32::from(quant_chunk[lane_offset] & 0x0f),
-                f32::from(quant_chunk[lane_offset + 1] & 0x0f),
-                f32::from(quant_chunk[lane_offset + 2] & 0x0f),
-                f32::from(quant_chunk[lane_offset + 3] & 0x0f),
+        for quant_chunk in quants.chunks_exact(32) {
+            let (scale_low, min_low) = q4_k_scale_min(scale_index, scales);
+            let (scale_high, min_high) = q4_k_scale_min(scale_index + 1, scales);
+            let d_low = vdupq_n_f32(d * f32::from(scale_low));
+            let d_high = vdupq_n_f32(d * f32::from(scale_high));
+            let min_low = vdupq_n_f32(dmin * f32::from(min_low));
+            let min_high = vdupq_n_f32(dmin * f32::from(min_high));
+
+            let bytes_0 = vld1q_u8(quant_chunk.as_ptr());
+            let bytes_1 = vld1q_u8(quant_chunk.as_ptr().add(16));
+
+            // Nibble values are 0..16, so the u8→s8 reinterpret and exact
+            // f32 widening preserve them; the previous kernel's FMA order
+            // (all 8 low quads, then all 8 high quads) is replayed so the
+            // sum stays bit-identical.
+            let low_quads = [
+                widen_s8_lanes(vreinterpretq_s8_u8(vandq_u8(bytes_0, nibble_mask))),
+                widen_s8_lanes(vreinterpretq_s8_u8(vandq_u8(bytes_1, nibble_mask))),
             ];
-            // SAFETY: the temporary lane array and the vector slice both have
-            // at least four contiguous f32 values from this offset.
-            unsafe {
-                let quant_values =
-                    vsubq_f32(vmulq_f32(vld1q_f32(quant_lanes.as_ptr()), d_low), min_low);
-                let vector_values = vld1q_f32(vector.as_ptr().add(vector_offset + lane_offset));
-                lanes = vfmaq_f32(lanes, quant_values, vector_values);
-            }
-        }
-
-        for lane_offset in (0..32).step_by(4) {
-            let quant_lanes = [
-                f32::from(quant_chunk[lane_offset] >> 4),
-                f32::from(quant_chunk[lane_offset + 1] >> 4),
-                f32::from(quant_chunk[lane_offset + 2] >> 4),
-                f32::from(quant_chunk[lane_offset + 3] >> 4),
+            let high_quads = [
+                widen_s8_lanes(vreinterpretq_s8_u8(vshrq_n_u8(bytes_0, 4))),
+                widen_s8_lanes(vreinterpretq_s8_u8(vshrq_n_u8(bytes_1, 4))),
             ];
-            // SAFETY: the temporary lane array and the vector slice both have
-            // at least four contiguous f32 values from this offset.
-            unsafe {
-                let quant_values =
-                    vsubq_f32(vmulq_f32(vld1q_f32(quant_lanes.as_ptr()), d_high), min_high);
-                let vector_values =
-                    vld1q_f32(vector.as_ptr().add(vector_offset + 32 + lane_offset));
-                lanes = vfmaq_f32(lanes, quant_values, vector_values);
-            }
-        }
 
-        scale_index += 2;
-        vector_offset += 64;
+            for (group, quads) in low_quads.iter().enumerate() {
+                for (step, quad) in quads.iter().enumerate() {
+                    let lane_offset = group * 16 + step * 4;
+                    let quant_values = vsubq_f32(vmulq_f32(*quad, d_low), min_low);
+                    let vector_values = vld1q_f32(vector.as_ptr().add(vector_offset + lane_offset));
+                    lanes = vfmaq_f32(lanes, quant_values, vector_values);
+                }
+            }
+            for (group, quads) in high_quads.iter().enumerate() {
+                for (step, quad) in quads.iter().enumerate() {
+                    let lane_offset = group * 16 + step * 4;
+                    let quant_values = vsubq_f32(vmulq_f32(*quad, d_high), min_high);
+                    let vector_values =
+                        vld1q_f32(vector.as_ptr().add(vector_offset + 32 + lane_offset));
+                    lanes = vfmaq_f32(lanes, quant_values, vector_values);
+                }
+            }
+
+            scale_index += 2;
+            vector_offset += 64;
+        }
     }
 
     Ok(vaddvq_f32(lanes))
