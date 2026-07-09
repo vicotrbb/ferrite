@@ -10,7 +10,7 @@ use crate::runtime::{
 };
 use axum::response::Response;
 use std::cell::RefCell;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use tokio::sync::OwnedSemaphorePermit;
 
 pub(super) struct CompletionStreamOptions {
@@ -64,7 +64,7 @@ impl ChatStreamOptions {
 }
 
 pub(super) fn completion_stream_response(
-    engine: Arc<Mutex<crate::runtime::InferenceEngine>>,
+    engine: Arc<crate::runtime::InferenceEngine>,
     model: String,
     prompt: String,
     max_tokens: usize,
@@ -104,7 +104,7 @@ pub(super) fn completion_stream_response(
 }
 
 pub(super) fn chat_stream_response(
-    engine: Arc<Mutex<crate::runtime::InferenceEngine>>,
+    engine: Arc<crate::runtime::InferenceEngine>,
     model: String,
     prompt: String,
     max_tokens: usize,
@@ -147,7 +147,7 @@ pub(super) fn chat_stream_response(
 }
 
 struct StreamGenerationInput<T> {
-    engine: Arc<Mutex<crate::runtime::InferenceEngine>>,
+    engine: Arc<crate::runtime::InferenceEngine>,
     prompt: String,
     max_tokens: usize,
     stop_sequences: Vec<String>,
@@ -157,7 +157,7 @@ struct StreamGenerationInput<T> {
 
 impl<T> StreamGenerationInput<T> {
     fn new(
-        engine: Arc<Mutex<crate::runtime::InferenceEngine>>,
+        engine: Arc<crate::runtime::InferenceEngine>,
         prompt: String,
         max_tokens: usize,
         stop_sequences: Vec<String>,
@@ -209,10 +209,7 @@ where
             }
             let include_token_ids = input.stop_sequences.is_empty();
             let mut stop_filter = StopSequenceFilter::new(input.stop_sequences);
-            let engine = input
-                .engine
-                .lock()
-                .map_err(|_| OpenAiHttpError::internal("inference engine lock is poisoned"))?;
+            let engine = input.engine;
             {
                 let mut lifecycle = lifecycle.borrow_mut();
                 lifecycle.record_engine_lock_acquired();

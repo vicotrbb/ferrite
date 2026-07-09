@@ -16,6 +16,7 @@ pub struct ServerConfig {
     inference_wait_timeout: Duration,
     experimental_prefix_cache_enabled: bool,
     inference_threads: Option<usize>,
+    max_concurrent_inferences: usize,
 }
 
 impl ServerConfig {
@@ -79,6 +80,19 @@ impl ServerConfig {
                     }
                     config.inference_threads = Some(threads);
                 }
+                "--max-concurrent-inferences" => {
+                    let value =
+                        os_string_to_string(next_value(&mut iter, "--max-concurrent-inferences")?)?;
+                    let permits = value.parse::<usize>().map_err(|error| {
+                        ConfigError::new(format!("invalid --max-concurrent-inferences: {error}"))
+                    })?;
+                    if permits == 0 {
+                        return Err(ConfigError::new(
+                            "--max-concurrent-inferences must be greater than zero",
+                        ));
+                    }
+                    config.max_concurrent_inferences = permits;
+                }
                 "--help" | "-h" => {
                     return Err(ConfigError::new(usage()));
                 }
@@ -127,6 +141,10 @@ impl ServerConfig {
     pub fn inference_threads(&self) -> Option<usize> {
         self.inference_threads
     }
+
+    pub fn max_concurrent_inferences(&self) -> usize {
+        self.max_concurrent_inferences
+    }
 }
 
 impl Default for ServerConfig {
@@ -140,6 +158,7 @@ impl Default for ServerConfig {
             inference_wait_timeout: Duration::ZERO,
             experimental_prefix_cache_enabled: false,
             inference_threads: None,
+            max_concurrent_inferences: 1,
         }
     }
 }
@@ -192,7 +211,7 @@ fn parse_millis(value: OsString, flag: &str) -> Result<u64, ConfigError> {
 }
 
 fn usage() -> &'static str {
-    "usage: ferrite-server [--bind 127.0.0.1:8080] [--model-id ferrite-local] [--model path/to/model.gguf] [--api-key local-secret] [--default-max-tokens 16] [--hard-max-tokens 256] [--inference-wait-ms 0] [--experimental-prefix-cache] [--threads N]"
+    "usage: ferrite-server [--bind 127.0.0.1:8080] [--model-id ferrite-local] [--model path/to/model.gguf] [--api-key local-secret] [--default-max-tokens 16] [--hard-max-tokens 256] [--inference-wait-ms 0] [--experimental-prefix-cache] [--threads N] [--max-concurrent-inferences 1]"
 }
 
 #[cfg(test)]

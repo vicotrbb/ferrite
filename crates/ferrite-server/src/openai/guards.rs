@@ -3,7 +3,7 @@ use super::{
     schema::{ChatCompletionRequest, CompletionRequest},
 };
 use crate::{limits::TokenLimitError, state::ServerState};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use tokio::sync::OwnedSemaphorePermit;
 
 pub(super) fn ensure_supported_completion_request(
@@ -61,7 +61,7 @@ pub(super) fn ensure_model(
 
 pub(super) fn required_engine(
     state: &ServerState,
-) -> Result<Arc<Mutex<crate::runtime::InferenceEngine>>, OpenAiHttpError> {
+) -> Result<Arc<crate::runtime::InferenceEngine>, OpenAiHttpError> {
     state.engine().ok_or_else(|| {
         OpenAiHttpError::service_unavailable(
             "no model is loaded; start ferrite-server with --model",

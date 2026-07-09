@@ -1,6 +1,6 @@
 use crate::limits::TokenLimits;
 use crate::runtime::InferenceEngine;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
@@ -9,7 +9,7 @@ const INFERENCE_PERMITS: usize = 1;
 #[derive(Clone, Debug)]
 pub struct ServerState {
     model_id: String,
-    engine: Option<Arc<Mutex<InferenceEngine>>>,
+    engine: Option<Arc<InferenceEngine>>,
     inference_permits: Arc<Semaphore>,
     inference_wait_timeout: Duration,
     api_key: Option<Arc<str>>,
@@ -33,7 +33,7 @@ impl ServerState {
     pub fn with_engine(model_id: String, engine: InferenceEngine) -> Self {
         Self {
             model_id,
-            engine: Some(Arc::new(Mutex::new(engine))),
+            engine: Some(Arc::new(engine)),
             inference_permits: Arc::new(Semaphore::new(INFERENCE_PERMITS)),
             inference_wait_timeout: Duration::ZERO,
             api_key: None,
@@ -62,11 +62,18 @@ impl ServerState {
         self
     }
 
+    /// Sets how many generations may run concurrently. Counts of zero are
+    /// clamped to one so the server can always make progress.
+    pub fn with_max_concurrent_inferences(mut self, permits: usize) -> Self {
+        self.inference_permits = Arc::new(Semaphore::new(permits.max(1)));
+        self
+    }
+
     pub fn model_id(&self) -> &str {
         &self.model_id
     }
 
-    pub fn engine(&self) -> Option<Arc<Mutex<InferenceEngine>>> {
+    pub fn engine(&self) -> Option<Arc<InferenceEngine>> {
         self.engine.clone()
     }
 

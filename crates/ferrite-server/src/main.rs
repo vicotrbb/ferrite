@@ -29,7 +29,8 @@ async fn run() -> Result<(), Box<dyn Error>> {
     .with_token_limits(config.token_limits());
     let state = state
         .with_inference_wait_timeout(config.inference_wait_timeout())
-        .with_prefix_cache_enabled(config.experimental_prefix_cache_enabled());
+        .with_prefix_cache_enabled(config.experimental_prefix_cache_enabled())
+        .with_max_concurrent_inferences(config.max_concurrent_inferences());
     let app = ferrite_server::router(state);
     axum::serve(listener, app).await?;
     Ok(())

@@ -3,11 +3,11 @@ use super::{
     stop_filter::{apply_stop_sequences, StopSequenceFilter},
 };
 use crate::runtime::{GenerationCacheOptions, GenerationControl};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use tokio::sync::OwnedSemaphorePermit;
 
 pub(super) async fn generate_text(
-    engine: Option<Arc<Mutex<crate::runtime::InferenceEngine>>>,
+    engine: Option<Arc<crate::runtime::InferenceEngine>>,
     prompt: String,
     max_tokens: usize,
     stop_sequences: Vec<String>,
@@ -29,7 +29,7 @@ pub(super) async fn generate_text(
 }
 
 pub(super) async fn generate_texts(
-    engine: Option<Arc<Mutex<crate::runtime::InferenceEngine>>>,
+    engine: Option<Arc<crate::runtime::InferenceEngine>>,
     prompts: Vec<String>,
     max_tokens: usize,
     stop_sequences: Vec<String>,
@@ -44,9 +44,6 @@ pub(super) async fn generate_texts(
 
     tokio::task::spawn_blocking(move || {
         let _permit = permit;
-        let engine = engine
-            .lock()
-            .map_err(|_| OpenAiHttpError::internal("inference engine lock is poisoned"))?;
         prompts
             .iter()
             .map(|prompt| {

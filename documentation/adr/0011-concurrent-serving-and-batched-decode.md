@@ -1,6 +1,8 @@
 # ADR 0011: Concurrent serving and batched decode
 
-- Status: proposed (phase 1 in implementation)
+- Status: accepted for phase 1 (implemented, evidence in
+  `documentation/benchmarks/2026-07-09-concurrent-serving-phase1.md`);
+  phase 2 remains proposed
 - Date: 2026-07-09
 
 ## Context
