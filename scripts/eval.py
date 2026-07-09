@@ -475,3 +475,167 @@ def resolve_models(args):
             print(hint, file=sys.stderr)
             raise SystemExit(2)
     return [download_default_model()]
+
+
+def build_report(env, cfg, model_results, tag=None):
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "tag": tag,
+        "env": env,
+        "config": cfg._asdict(),
+        "models": model_results,
+    }
+
+
+def _fmt_bytes(value):
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return "-"
+    return f"{number / (1 << 20):.1f} MiB"
+
+
+def render_markdown(report):
+    env = report["env"]
+    lines = [
+        f"# Ferrite eval — {env.get('timestamp_utc', '?')}",
+        "",
+        f"- host: {env.get('hostname')} — {env.get('cpu')}, "
+        f"{env.get('physical_cores')} cores, {_fmt_bytes(env.get('ram_bytes'))} RAM",
+        f"- os: {env.get('platform')}",
+        f"- commit: {env.get('git_commit')} ({env.get('git_branch')}"
+        f"{', dirty' if env.get('git_dirty') else ''})",
+        f"- rustc: {env.get('rustc_version')}",
+        f"- config: {json.dumps(report['config'])}",
+    ]
+    if report.get("tag"):
+        lines.append(f"- tag: {report['tag']}")
+    for entry in report["models"]:
+        lines += ["", f"## {Path(entry['model_path']).name}", ""]
+        cli = entry.get("cli")
+        if cli:
+            lines += [
+                "| CLI metric | value |",
+                "| --- | --- |",
+                f"| status | {cli.get('status')} |",
+                f"| load | {cli.get('load_seconds', '-')} s |",
+                f"| TTFT (prefill, load excluded) | {cli.get('ttft_prefill_seconds', '-')} s |",
+                f"| decode tok/s (precise, in-process) | {cli.get('decode_tokens_per_second_precise', '-')} |",
+                f"| decode tok/s (streamed wall-clock) | {cli.get('decode_tokens_per_second_streamed', '-')} |",
+                f"| token latency p50 / p95 | {cli.get('token_latency_ms_p50', '-')} / {cli.get('token_latency_ms_p95', '-')} ms |",
+                f"| RSS post-load / peak | {_fmt_bytes(cli.get('rss_post_load_bytes'))} / {_fmt_bytes(cli.get('rss_peak_bytes'))} |",
+                f"| CPU mean / peak (generation) | {cli.get('cpu_mean_percent', '-')} / {cli.get('cpu_peak_percent', '-')} % |",
+                f"| model file / weights / kv cache | {_fmt_bytes(cli.get('model_file_bytes'))} / {_fmt_bytes(cli.get('scalar_weight_bytes'))} / {_fmt_bytes(cli.get('kv_cache_bytes'))} |",
+            ]
+        server = entry.get("server")
+        if server:
+            lines += [
+                "",
+                "| Server metric | value |",
+                "| --- | --- |",
+                f"| status | {server.get('status')} |",
+                f"| TTFT | {server.get('streaming_time_to_first_token_ms', '-')} ms |",
+                f"| streamed tok/s | {server.get('streaming_tokens_per_second', '-')} |",
+                f"| token latency p50 / p95 | {server.get('streaming_token_latency_p50_ms', '-')} / {server.get('streaming_token_latency_p95_ms', '-')} ms |",
+                f"| requests/s | {server.get('requests_per_second', '-')} |",
+                f"| server RSS peak | {_fmt_bytes(server.get('server_rss_peak_bytes'))} |",
+                f"| server CPU mean / peak | {server.get('server_cpu_mean_percent', '-')} / {server.get('server_cpu_peak_percent', '-')} % |",
+            ]
+    lines.append("")
+    return "\n".join(lines)
+
+
+def output_stem(timestamp, model_paths):
+    stem = Path(model_paths[0]).stem.lower().replace(" ", "-")
+    if len(model_paths) > 1:
+        stem += "-multi"
+    return f"{timestamp}-{stem}"
+
+
+def write_outputs(report, stem):
+    EVALS_DIR.mkdir(parents=True, exist_ok=True)
+    json_path = EVALS_DIR / f"{stem}.json"
+    md_path = EVALS_DIR / f"{stem}.md"
+    json_path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    md_path.write_text(render_markdown(report), encoding="utf-8")
+    return json_path, md_path
+
+
+def build_binaries():
+    cmd = ["cargo", "build", "--release", "-p", "ferrite-cli", "-p", "ferrite-server"]
+    print("$ " + " ".join(cmd))
+    proc = subprocess.run(cmd, cwd=REPO_ROOT)
+    if proc.returncode != 0:
+        raise SystemExit(proc.returncode)
+    release = REPO_ROOT / "target" / "release"
+    return {
+        "ferrite": release / "ferrite",
+        "server": release / "ferrite-server",
+        "throughput": release / "ferrite-openai-throughput",
+    }
+
+
+def parse_args(argv):
+    parser = argparse.ArgumentParser(
+        description="Ferrite evaluation harness: tokens/s, TTFT, memory, CPU."
+    )
+    parser.add_argument(
+        "--model", action="append",
+        help="path to a .gguf model (repeatable); default: target/models/*.gguf",
+    )
+    parser.add_argument("--prompt", default=DEFAULT_PROMPT)
+    parser.add_argument("--generate-tokens", type=int, default=64)
+    parser.add_argument("--benchmark-runs", type=int, default=64)
+    parser.add_argument(
+        "--sleep-ms", type=int, default=2000,
+        help="post-load pause used to sample the load-only RSS footprint",
+    )
+    parser.add_argument("--requests", type=int, default=4, help="server phase request count")
+    parser.add_argument("--skip-cli", action="store_true")
+    parser.add_argument("--skip-server", action="store_true")
+    parser.add_argument("--download", action="store_true",
+                        help="download the reference model without asking")
+    parser.add_argument("--no-download", action="store_true",
+                        help="never download; exit 2 if no model is available")
+    parser.add_argument("--tag", default=None,
+                        help="free-form label recorded in the output (e.g. locus-kv)")
+    return parser.parse_args(argv)
+
+
+def main(argv=None):
+    args = parse_args(argv)
+    models = resolve_models(args)
+    bins = build_binaries()
+    env = capture_env()
+    cfg = EvalConfig(
+        prompt=args.prompt,
+        generate_tokens=args.generate_tokens,
+        benchmark_runs=args.benchmark_runs,
+        sleep_ms=args.sleep_ms,
+        requests=args.requests,
+    )
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d-%H%M%S")
+    model_results = []
+    for model_path in models:
+        print(f"\n=== evaluating {model_path.name} ===")
+        entry = {"model_path": str(model_path)}
+        if not args.skip_cli:
+            print("cli phase: generation + benchmark runs ...")
+            entry["cli"] = run_cli_phase(bins["ferrite"], model_path, cfg)
+        if not args.skip_server:
+            print("server phase: ferrite-server + throughput client ...")
+            entry["server"] = run_server_phase(
+                bins["server"], bins["throughput"], model_path, cfg
+            )
+        model_results.append(entry)
+    report = build_report(env, cfg, model_results, tag=args.tag)
+    json_path, md_path = write_outputs(report, output_stem(timestamp, models))
+    print()
+    print(render_markdown(report))
+    print(f"wrote {json_path}")
+    print(f"wrote {md_path}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

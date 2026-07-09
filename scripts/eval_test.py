@@ -105,5 +105,50 @@ class ComputeCliMetricsTest(unittest.TestCase):
         )
 
 
+class OutputStemTest(unittest.TestCase):
+    def test_single_model(self):
+        stem = ev.output_stem(
+            "2026-07-09-120000", [Path("target/models/Qwen2.5 0.5B.gguf")]
+        )
+        self.assertEqual(stem, "2026-07-09-120000-qwen2.5-0.5b")
+
+    def test_multi_model(self):
+        stem = ev.output_stem(
+            "2026-07-09-120000",
+            [Path("a/first.gguf"), Path("b/second.gguf")],
+        )
+        self.assertEqual(stem, "2026-07-09-120000-first-multi")
+
+
+class RenderMarkdownTest(unittest.TestCase):
+    def test_report_renders_cli_and_server_sections(self):
+        report = ev.build_report(
+            env={"timestamp_utc": "2026-07-09T12:00:00Z", "hostname": "mac",
+                 "cpu": "Apple M-test", "physical_cores": 8,
+                 "ram_bytes": 16 << 30, "platform": "macOS", "python": "3.14",
+                 "git_commit": "abc123", "git_branch": "main", "git_dirty": False,
+                 "rustc_version": "rustc 1.x", "logical_cores": 8},
+            cfg=ev.EvalConfig("hi", 64, 64, 2000, 4),
+            model_results=[{
+                "model_path": "target/models/model.gguf",
+                "cli": {"status": "ok", "load_seconds": 1.0,
+                        "ttft_prefill_seconds": 0.5,
+                        "decode_tokens_per_second_precise": 12.3,
+                        "rss_peak_bytes": 1 << 30},
+                "server": {"status": "ok",
+                           "streaming_time_to_first_token_ms": "450",
+                           "streaming_tokens_per_second": "11.5"},
+            }],
+            tag="unit-test",
+        )
+        self.assertEqual(report["schema_version"], ev.SCHEMA_VERSION)
+        markdown = ev.render_markdown(report)
+        self.assertIn("## model.gguf", markdown)
+        self.assertIn("| load | 1.0 s |", markdown)
+        self.assertIn("12.3", markdown)
+        self.assertIn("| TTFT | 450 ms |", markdown)
+        self.assertIn("tag: unit-test", markdown)
+
+
 if __name__ == "__main__":
     unittest.main()
