@@ -208,3 +208,270 @@ def compute_cli_metrics(t_spawn, lines, sleep_ms):
         metrics["token_latency_ms_p95"] = round(percentile(deltas_ms, 95), 1)
         metrics["t_last_stream"] = stream_ts[-1]
     return metrics
+
+
+EvalConfig = namedtuple(
+    "EvalConfig", ["prompt", "generate_tokens", "benchmark_runs", "sleep_ms", "requests"]
+)
+
+
+def run_cli_phase(ferrite_bin, model_path, cfg):
+    """Generation run (wall-clock + ps sampling), then precise benchmark run."""
+    phase = {"status": "ok"}
+    gen_cmd = [
+        str(ferrite_bin),
+        "--model", str(model_path),
+        "--prompt", cfg.prompt,
+        "--sleep-after-load-ms", str(cfg.sleep_ms),
+        "--generate-tokens", str(cfg.generate_tokens),
+        "--stream",
+    ]
+    phase["generation_command"] = " ".join(gen_cmd)
+    run = run_timestamped(gen_cmd)
+    if run.returncode != 0:
+        phase["status"] = "failed"
+        phase["stderr"] = run.stderr[-2000:]
+        return phase
+
+    metrics = compute_cli_metrics(run.t_spawn, run.lines, cfg.sleep_ms)
+    t_sleep = metrics.pop("t_sleep", None)
+    t_gen_start = metrics.pop("t_gen_start", None)
+    t_last_stream = metrics.pop("t_last_stream", None)
+    phase.update(metrics)
+
+    kv = parse_kv_lines(line for _, line in run.lines)
+    for key in (
+        "model_file_bytes",
+        "scalar_weight_bytes",
+        "kv_cache_bytes",
+        "generated_stopped_on_eos",
+    ):
+        if key in kv:
+            phase[key] = kv[key]
+
+    if t_sleep is not None:
+        load_window = aggregate_samples(run.samples, t_sleep, t_gen_start)
+        if "rss_peak_bytes" in load_window:
+            phase["rss_post_load_bytes"] = load_window["rss_peak_bytes"]
+    whole_run = aggregate_samples(run.samples)
+    if "rss_peak_bytes" in whole_run:
+        phase["rss_peak_bytes"] = whole_run["rss_peak_bytes"]
+    if t_gen_start is not None and t_last_stream is not None:
+        gen_window = aggregate_samples(run.samples, t_gen_start, t_last_stream)
+        for key in ("cpu_mean_percent", "cpu_peak_percent"):
+            if key in gen_window:
+                phase[key] = gen_window[key]
+
+    bench_cmd = [
+        str(ferrite_bin),
+        "--model", str(model_path),
+        "--prompt", cfg.prompt,
+        "--benchmark-runs", str(cfg.benchmark_runs),
+    ]
+    phase["benchmark_command"] = " ".join(bench_cmd)
+    bench = run_timestamped(bench_cmd)
+    if bench.returncode == 0:
+        bench_kv = parse_kv_lines(line for _, line in bench.lines)
+        avg_ns = int(bench_kv.get("benchmark_avg_ns", "0"))
+        if avg_ns > 0:
+            phase["benchmark_avg_ns"] = avg_ns
+            phase["decode_tokens_per_second_precise"] = round(1e9 / avg_ns, 2)
+    else:
+        phase["benchmark_error"] = bench.stderr[-500:]
+    return phase
+
+
+def find_free_port():
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        return sock.getsockname()[1]
+
+
+def wait_for_health(port, proc, timeout_s=300):
+    """Poll GET /health until 200, the process dies, or timeout."""
+    deadline = time.monotonic() + timeout_s
+    url = f"http://127.0.0.1:{port}/health"
+    while time.monotonic() < deadline:
+        if proc.poll() is not None:
+            return False
+        try:
+            with urllib.request.urlopen(url, timeout=2) as response:
+                if response.status == 200:
+                    return True
+        except OSError:
+            pass
+        time.sleep(0.5)
+    return False
+
+
+def run_server_phase(server_bin, throughput_bin, model_path, cfg):
+    """Start ferrite-server, drive it with ferrite-openai-throughput, tear down."""
+    phase = {"status": "ok"}
+    port = find_free_port()
+    server_cmd = [
+        str(server_bin),
+        "--model", str(model_path),
+        "--model-id", "eval",
+        "--bind", f"127.0.0.1:{port}",
+        "--api-key", API_KEY,
+        "--default-max-tokens", str(cfg.generate_tokens),
+        "--hard-max-tokens", str(cfg.generate_tokens),
+        "--inference-wait-ms", "120000",
+    ]
+    phase["server_command"] = " ".join(server_cmd)
+    with tempfile.TemporaryFile(mode="w+", encoding="utf-8") as server_log:
+        server = subprocess.Popen(server_cmd, stdout=server_log, stderr=subprocess.STDOUT)
+        sampler = ProcessSampler(server.pid)
+        sampler.start()
+        try:
+            if not wait_for_health(port, server):
+                server_log.seek(0)
+                phase["status"] = "failed"
+                phase["error"] = "server never became healthy"
+                phase["server_log"] = server_log.read()[-2000:]
+                return phase
+            client_cmd = [
+                str(throughput_bin),
+                "--addr", f"127.0.0.1:{port}",
+                "--model", "eval",
+                "--endpoint", "chat-completions",
+                "--prompt", cfg.prompt,
+                "--requests", str(cfg.requests),
+                "--max-tokens", str(cfg.generate_tokens),
+                "--stream",
+                "--stream-usage",
+                "--api-key", API_KEY,
+            ]
+            phase["client_command"] = " ".join(client_cmd)
+            t_requests_start = time.monotonic()
+            client = subprocess.run(client_cmd, capture_output=True, text=True, timeout=1800)
+            t_requests_end = time.monotonic()
+            if client.returncode != 0:
+                phase["status"] = "failed"
+                phase["error"] = (client.stderr or client.stdout)[-2000:]
+                return phase
+            kv = parse_kv_lines(client.stdout.splitlines())
+            for key in (
+                "streaming_time_to_first_token_ms",
+                "streaming_tokens_per_second",
+                "streaming_token_latency_p50_ms",
+                "streaming_token_latency_p95_ms",
+                "streaming_token_events",
+                "requests_per_second",
+                "elapsed_ms",
+                "streaming_usage_prompt_tokens",
+                "streaming_usage_completion_tokens",
+            ):
+                if key in kv:
+                    phase[key] = kv[key]
+            request_window = aggregate_samples(
+                sampler.samples, t_requests_start, t_requests_end
+            )
+            for src, dst in (
+                ("rss_peak_bytes", "server_rss_peak_bytes"),
+                ("cpu_mean_percent", "server_cpu_mean_percent"),
+                ("cpu_peak_percent", "server_cpu_peak_percent"),
+            ):
+                if src in request_window:
+                    phase[dst] = request_window[src]
+            return phase
+        finally:
+            sampler.stop()
+            server.terminate()
+            try:
+                server.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                server.kill()
+                server.wait()
+
+
+def _cmd_output(cmd, cwd=None):
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, cwd=cwd, timeout=30)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return proc.stdout.strip() if proc.returncode == 0 else None
+
+
+def capture_env():
+    env = {
+        "timestamp_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "hostname": socket.gethostname(),
+        "platform": platform.platform(),
+        "python": platform.python_version(),
+        "logical_cores": os.cpu_count(),
+        "git_commit": _cmd_output(["git", "rev-parse", "HEAD"], cwd=REPO_ROOT),
+        "git_branch": _cmd_output(["git", "branch", "--show-current"], cwd=REPO_ROOT),
+        "git_dirty": bool(_cmd_output(["git", "status", "--porcelain"], cwd=REPO_ROOT)),
+        "rustc_version": _cmd_output(["rustc", "--version"]),
+    }
+    if sys.platform == "darwin":
+        env["cpu"] = _cmd_output(["sysctl", "-n", "machdep.cpu.brand_string"])
+        physical = _cmd_output(["sysctl", "-n", "hw.physicalcpu"])
+        env["physical_cores"] = int(physical) if physical else None
+        memsize = _cmd_output(["sysctl", "-n", "hw.memsize"])
+        env["ram_bytes"] = int(memsize) if memsize else None
+    else:
+        try:
+            with open("/proc/cpuinfo", encoding="utf-8") as handle:
+                for line in handle:
+                    if line.startswith("model name"):
+                        env["cpu"] = line.partition(":")[2].strip()
+                        break
+            with open("/proc/meminfo", encoding="utf-8") as handle:
+                for line in handle:
+                    if line.startswith("MemTotal:"):
+                        env["ram_bytes"] = int(line.split()[1]) * 1024
+                        break
+        except OSError:
+            pass
+    return env
+
+
+def download_default_model():
+    MODELS_DIR.mkdir(parents=True, exist_ok=True)
+    target = MODELS_DIR / DEFAULT_MODEL_URL.rsplit("/", 1)[-1]
+    print(f"downloading {DEFAULT_MODEL_URL}")
+    print(f"        -> {target}")
+
+    def report(blocks, block_size, total):
+        done_mb = blocks * block_size / 1e6
+        total_mb = total / 1e6 if total > 0 else float("nan")
+        print(f"\r  {done_mb:8.1f} / {total_mb:.1f} MB", end="", flush=True)
+
+    partial = target.with_suffix(".gguf.part")
+    urllib.request.urlretrieve(DEFAULT_MODEL_URL, partial, reporthook=report)
+    partial.rename(target)
+    print()
+    return target
+
+
+def resolve_models(args):
+    if args.model:
+        models = [Path(m) for m in args.model]
+        missing = [str(m) for m in models if not m.is_file()]
+        if missing:
+            print(f"model file(s) not found: {', '.join(missing)}", file=sys.stderr)
+            raise SystemExit(2)
+        return models
+    found = sorted(MODELS_DIR.glob("*.gguf"))
+    if found:
+        return found
+    hint = (
+        f"No .gguf models found in {MODELS_DIR}.\n"
+        f"Download one manually, e.g.:\n"
+        f"  curl -L -o {MODELS_DIR}/qwen2.5-0.5b-instruct-q4_k_m.gguf \\\n"
+        f"    {DEFAULT_MODEL_URL}"
+    )
+    if args.no_download:
+        print(hint, file=sys.stderr)
+        raise SystemExit(2)
+    if not args.download:
+        answer = input(
+            f"No models in {MODELS_DIR}. Download the ~400MB reference model "
+            "(Qwen2.5-0.5B-Instruct Q4_K_M)? [y/N] "
+        )
+        if answer.strip().lower() not in ("y", "yes"):
+            print(hint, file=sys.stderr)
+            raise SystemExit(2)
+    return [download_default_model()]
