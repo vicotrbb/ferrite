@@ -137,8 +137,8 @@ fn neon_q5_0_row_dot_batch(row_chunk: &[u8], vectors: &[&[f32]], row_out: &mut [
     }
 }
 
-/// Decodes one Q5_0 block once and dots it against every stream's
-/// activation window. Each stream's FMA sequence and per-block
+/// Decodes one `Q5_0` block once and dots it against every stream's
+/// activation window. Each stream's `FMA` sequence and per-block
 /// `horizontal-add × scale` shape match `neon_q5_0_block_dot` exactly, so
 /// per-stream sums stay bit-identical to the single-vector kernel.
 #[target_feature(enable = "neon")]

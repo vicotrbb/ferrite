@@ -1,3 +1,10 @@
+//! In-memory GGUF fixtures used by Ferrite's deterministic tests.
+//!
+//! Fixtures are assembled from source-controlled values at test time. The
+//! crate keeps binary model assets out of Git while exercising the real parser,
+//! tokenizer, loader, and inference boundaries.
+#![deny(missing_docs)]
+
 mod chat_llama;
 mod gguf_writer;
 mod scalar_llama;

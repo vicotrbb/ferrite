@@ -4,6 +4,11 @@
 //! converts supported architecture metadata into typed configuration, and
 //! provides atomic and BPE tokenization from GGUF tokenizer metadata.
 #![deny(missing_docs)]
+#![deny(
+    clippy::doc_markdown,
+    clippy::missing_errors_doc,
+    clippy::return_self_not_must_use
+)]
 
 mod gguf_config;
 

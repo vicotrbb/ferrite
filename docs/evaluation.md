@@ -9,9 +9,12 @@ have passed.
 ```sh
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+cargo test --workspace --all-targets --locked
 cargo test --workspace --all-targets --all-features --locked
 RUSTDOCFLAGS="-D warnings" cargo doc --workspace --all-features --no-deps --locked
+cargo test --workspace --all-features --doc --locked
 python3 scripts/check_docs.py
+python3 scripts/check_repo.py
 python3 scripts/eval_test.py
 cargo audit --deny warnings
 cargo deny --all-features --locked check
@@ -22,6 +25,20 @@ cargo tree --duplicates --locked
 `cargo-audit`, `cargo-deny`, and `cargo-machete` are additional development
 tools. Install each with `cargo install --locked <tool>` if it is not already
 available.
+
+## Cross-architecture compile audit
+
+CI runs strict Clippy and tests natively on Linux x86_64 and macOS aarch64. An
+aarch64 contributor can compile-check x86_64-only kernels before pushing:
+
+```sh
+rustup target add --toolchain 1.96.1 x86_64-unknown-linux-gnu
+cargo clippy --workspace --all-targets --all-features \
+  --target x86_64-unknown-linux-gnu --locked -- -D warnings
+```
+
+This is a compile and lint gate, not an execution test. The Linux CI runner
+executes the x86_64 test binaries on real x86_64 hardware.
 
 ## Test layers
 
@@ -56,7 +73,8 @@ artifact is present and the long-running cost is intentional.
 scripts/eval.sh --help
 ```
 
-The harness builds locked release binaries, runs CLI generation and precise
+The harness builds locked release binaries, records the active Rust flags and
+target directory, runs CLI generation and precise
 decode, optionally runs fixed engine batches, starts the HTTP server, drives a
 streaming throughput client, samples RSS and CPU through `ps`, and writes JSON
 plus Markdown to `scripts/evals/`.

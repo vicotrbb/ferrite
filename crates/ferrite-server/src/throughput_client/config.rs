@@ -360,6 +360,7 @@ fn parse_endpoint(value: OsString) -> Result<OpenAiEndpoint, ClientConfigError> 
     }
 }
 
-fn usage() -> &'static str {
+/// Returns the command-line usage string for the throughput client.
+pub fn usage() -> &'static str {
     "usage: ferrite-openai-throughput [--addr 127.0.0.1:8080] [--endpoint completions|chat-completions] [--model ferrite-local] [--prompt 'hello world'] [--assistant-context TEXT --follow-up TEXT] [--prompt-cache-key KEY] [--prompt-cache-trace] [--stop STOP] [--requests 3] [--concurrency 1] [--max-tokens 1] [--stream] [--stream-usage] [--rss-pid PID] [--rss-idle-ms 2000] [--api-key local-secret]"
 }

@@ -6,6 +6,7 @@ parse results without scraping prose.
 
 ```sh
 target/release/ferrite --help
+target/release/ferrite --version
 ```
 
 ## Required inputs
@@ -103,3 +104,6 @@ kv_cache_bytes
 
 Additional records are mode-specific. The eval harness consumes this output,
 so changing a key is an API change and requires corresponding harness tests.
+
+The server and both operational clients expose the same help and version
+conventions. See [operational tools](benchmark-tools.md) for their contracts.

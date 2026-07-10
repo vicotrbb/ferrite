@@ -617,7 +617,8 @@ fn os_string_to_string(value: OsString) -> Result<String, LongChatGateError> {
         .map_err(|_error| LongChatGateError::new("arguments must be valid UTF-8"))
 }
 
-fn usage() -> &'static str {
+/// Returns the command-line usage string for the long-chat gate.
+pub fn usage() -> &'static str {
     "usage: ferrite-openai-long-chat-gate [--execute] [--error-probe] [--disconnect-probe] [--queue-probe] [--require-probes error,disconnect,queue] [--require-cached-follow-ups] [--addr 127.0.0.1:8080] [--api-key local-secret] [--models MODEL[,MODEL...]] [--require-models MODEL[,MODEL...]] [--prompt TEXT] [--assistant-context TEXT] [--follow-up TEXT] [--follow-ups TEXT[,TEXT...]] [--prompt-cache-key KEY] [--prompt-cache-keys KEY[,KEY...]] [--prompt-cache-trace] [--stop TEXT] [--expect-finish-reason REASON] [--require-finish-sources length,eos,stop_sequence,generation_control] [--probe-max-tokens TOKENS] [--require-token-lengths 256,512,1024] [--generated-context-max-chars CHARS] [--generated-context-max-tokens TOKENS] [--generated-context-state-capsule TEXT] [--generated-context-state-capsule-placement assistant-context|assistant-context-only|follow-up] [--require-generated-response-contains TEXT] [--disconnect-reconnect-timeout-ms 30000] [--rss-pid PID] [--proof-log PATH] [--proof-exit-code PATH] [--token-lengths 256,512,1024] [--turns 4]"
 }
 

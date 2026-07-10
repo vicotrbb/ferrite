@@ -9,6 +9,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
+authors = ["Victor Bona"]
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/vicotrbb/ferrite"
@@ -43,3 +44,9 @@ undocumented_unsafe_blocks = "deny"
 unimplemented = "deny"
 unwrap_used = "deny"
 expect_used = "deny"
+
+[profile.release]
+codegen-units = 1
+lto = "thin"
+panic = "abort"
+strip = "symbols"

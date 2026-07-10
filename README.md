@@ -72,14 +72,20 @@ experimental kernel is faster or compatible on every CPU.
 - [OpenAI API compatibility](docs/openai-api.md)
 - [Models and tensor formats](docs/models.md)
 - [Architecture](docs/architecture.md)
+- [Library API](docs/library-api.md)
+- [Operational tools](docs/benchmark-tools.md)
 - [Evaluation and regression gates](docs/evaluation.md)
 - [Development guide](docs/development.md)
 - [Safety policy](docs/safety.md)
+- [Current limitations](docs/limitations.md)
 - [Troubleshooting](docs/troubleshooting.md)
+- [Release process](docs/releasing.md)
+- [Changelog](CHANGELOG.md)
 
-The `documentation/` tree contains ADRs, benchmark evidence, focused research,
-and historical implementation notes. It is an engineering record, while
-`docs/` is the maintained user and contributor guide.
+Architecture decisions and curated benchmark evidence live beside the guides
+under `docs/`. Raw reproducible eval records remain under `scripts/evals/`.
+Transient plans, session notes, private tool state, and model binaries are not
+repository artifacts.
 
 ## Repository layout
 
@@ -90,17 +96,18 @@ crates/ferrite-cli         local generation, profiling, and benchmarking
 crates/ferrite-server      OpenAI-compatible serving and eval clients
 crates/ferrite-fixtures    generated test fixtures
 docs                       maintained user and contributor documentation
-documentation              ADRs and measured engineering evidence
-research                   original CPU inference research corpus
-scripts                    eval harness and repository checks
+docs/adr                   durable architecture decisions
+docs/benchmarks            curated benchmark protocols and milestone evidence
+scripts                    eval harness, raw eval records, and repository checks
 ```
 
 ## Quality gates
 
 The required local checks are documented in [CONTRIBUTING.md](CONTRIBUTING.md).
-CI runs formatting, strict Clippy, and all workspace tests with all features on
-Linux and macOS. Linux jobs also enforce rustdoc, documentation, eval-harness,
-package, RustSec advisory, license, duplicate-dependency, and source policy.
+CI runs formatting, strict Clippy, default and all-feature tests on Linux and
+macOS, plus a separate Rust 1.96 MSRV check. Linux jobs also enforce rustdoc,
+doctests, documentation, repository hygiene, eval-harness tests, package
+contents, RustSec advisories, licenses, duplicate dependencies, and sources.
 
 ## License
 

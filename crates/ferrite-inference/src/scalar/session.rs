@@ -559,11 +559,16 @@ impl<'a> ScalarLlamaSession<'a> {
 /// batching every weight matvec across the sessions so each weight row is
 /// streamed from memory once per step instead of once per session.
 ///
-/// Per-session arithmetic (norms, biases, RoPE, attention, residuals) and
+/// Per-session arithmetic (norms, biases, `RoPE`, attention, residuals) and
 /// per-stream matvec accumulation order are identical to
 /// [`ScalarLlamaSession::accept_token_id`], so each session's next token
 /// is bit-identical to what a sequential call would produce. Batched
-/// matvecs use default kernel dispatch (no experimental Q8_K routing).
+/// matvecs use default kernel dispatch (no experimental `Q8_K` routing).
+///
+/// # Errors
+///
+/// Returns an error when the batch is empty, lengths or model identities do
+/// not match, a token is out of range, or any session evaluation fails.
 pub fn accept_token_ids_batch(
     sessions: &mut [ScalarLlamaSession<'_>],
     token_ids: &[usize],

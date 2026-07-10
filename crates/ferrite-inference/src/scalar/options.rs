@@ -19,7 +19,7 @@ pub enum Q8KActivationMatvecPolicy {
     /// Use only the default proven kernel path.
     #[default]
     DefaultOnly,
-    /// Enable the parity-scoped experimental Q8_K activation path.
+    /// Enable the parity-scoped experimental `Q8_K` activation path.
     ExperimentalParityScoped,
     /// Enable the experimental residual-Q8 path on supported Arm I8MM hosts.
     ExperimentalResidualI8mm,
@@ -206,7 +206,8 @@ pub struct ScalarExecutionOptions {
 }
 
 impl ScalarExecutionOptions {
-    /// Enables or disables the legacy parity-scoped Q8_K activation policy.
+    /// Enables or disables the legacy parity-scoped `Q8_K` activation policy.
+    #[must_use]
     pub fn with_q8_k_activation_matvec(mut self, enabled: bool) -> Self {
         self.q8_k_activation_matvec_policy = if enabled {
             Q8KActivationMatvecPolicy::ExperimentalParityScoped
@@ -217,6 +218,7 @@ impl ScalarExecutionOptions {
     }
 
     /// Sets the explicit activation matvec policy.
+    #[must_use]
     pub fn with_q8_k_activation_matvec_policy(mut self, policy: Q8KActivationMatvecPolicy) -> Self {
         self.q8_k_activation_matvec_policy = policy;
         self
@@ -227,6 +229,7 @@ impl ScalarExecutionOptions {
     /// # Panics
     ///
     /// Panics when `roles` is empty.
+    #[must_use]
     pub fn with_q8_k_activation_matvec_roles(
         mut self,
         roles: impl IntoIterator<Item = Q8KActivationMatvecRole>,
@@ -236,6 +239,7 @@ impl ScalarExecutionOptions {
     }
 
     /// Enables or disables reference-versus-candidate comparison profiling.
+    #[must_use]
     pub fn with_q8_k_activation_matvec_comparison(mut self, enabled: bool) -> Self {
         self.compare_q8_k_activation_matvec = enabled;
         self
@@ -306,6 +310,7 @@ impl ScalarExecutionOptions {
     }
 
     /// Sets the session KV-cache storage backend.
+    #[must_use]
     pub fn with_kv_backend(mut self, backend: KvBackend) -> Self {
         self.kv_backend = backend;
         self

@@ -26,7 +26,7 @@ from collections import namedtuple
 from datetime import datetime, timezone
 from pathlib import Path
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 REPO_ROOT = Path(__file__).resolve().parent.parent
 MODELS_DIR = REPO_ROOT / "target" / "models"
 EVALS_DIR = REPO_ROOT / "scripts" / "evals"
@@ -493,6 +493,9 @@ def capture_env():
         "git_branch": _cmd_output(["git", "branch", "--show-current"], cwd=REPO_ROOT),
         "git_dirty": bool(_cmd_output(["git", "status", "--porcelain"], cwd=REPO_ROOT)),
         "rustc_version": _cmd_output(["rustc", "--version"]),
+        "cargo_profile": "release",
+        "rustflags": os.environ.get("RUSTFLAGS", ""),
+        "cargo_target_dir": os.environ.get("CARGO_TARGET_DIR", "target"),
     }
     if sys.platform == "darwin":
         env["cpu"] = _cmd_output(["sysctl", "-n", "machdep.cpu.brand_string"])
@@ -595,6 +598,9 @@ def render_markdown(report):
         f"- commit: {env.get('git_commit')} ({env.get('git_branch')}"
         f"{', dirty' if env.get('git_dirty') else ''})",
         f"- rustc: {env.get('rustc_version')}",
+        f"- build: cargo profile {env.get('cargo_profile', 'release')}, "
+        f"RUSTFLAGS={env.get('rustflags') or '<unset>'}, "
+        f"target dir {env.get('cargo_target_dir', 'target')}",
         f"- config: {json.dumps(report['config'])}",
     ]
     if report.get("tag"):

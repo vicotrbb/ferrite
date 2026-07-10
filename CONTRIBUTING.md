@@ -17,9 +17,12 @@ Run the full repository gate:
 ```sh
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+cargo test --workspace --all-targets --locked
 cargo test --workspace --all-targets --all-features --locked
 RUSTDOCFLAGS="-D warnings" cargo doc --workspace --all-features --no-deps --locked
+cargo test --workspace --all-features --doc --locked
 python3 scripts/check_docs.py
+python3 scripts/check_repo.py
 python3 scripts/eval_test.py
 cargo audit --deny warnings
 cargo deny --all-features --locked check

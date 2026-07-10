@@ -10,7 +10,7 @@ mod streaming_usage;
 #[cfg(test)]
 mod tests;
 
-pub use config::{OpenAiEndpoint, ThroughputClientConfig};
+pub use config::{usage, OpenAiEndpoint, ThroughputClientConfig};
 pub use rss::RssSummary;
 pub use streaming_finish::StreamingFinishSummary;
 pub use streaming_metrics::StreamingTimingSummary;

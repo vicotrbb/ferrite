@@ -1,3 +1,5 @@
+//! Long-context lifecycle, cache, cancellation, and queue validation binary.
+
 use ferrite_server::long_chat_gate::{
     format_disconnect_probe_result, format_error_probe_result, format_queue_probe_result,
     format_report, format_run_summary, format_scenario_result, LongChatDisconnectProbeResult,
@@ -7,7 +9,22 @@ use std::io::Write;
 
 #[tokio::main]
 async fn main() {
-    let config = match LongChatGateConfig::parse(std::env::args_os()) {
+    let arguments = std::env::args_os().collect::<Vec<_>>();
+    if let Some(argument) = arguments.get(1) {
+        if argument == "--help" || argument == "-h" {
+            println!("{}", ferrite_server::long_chat_gate::usage());
+            return;
+        }
+        if argument == "--version" || argument == "-V" {
+            println!(
+                "ferrite-openai-long-chat-gate {}",
+                env!("CARGO_PKG_VERSION")
+            );
+            return;
+        }
+    }
+
+    let config = match LongChatGateConfig::parse(arguments) {
         Ok(config) => config,
         Err(error) => {
             eprintln!("{error}");

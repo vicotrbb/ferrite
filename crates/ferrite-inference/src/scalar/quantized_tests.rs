@@ -18,6 +18,42 @@ use super::InferenceError;
 #[cfg(target_arch = "aarch64")]
 use super::ScalarExecutionOptions;
 
+#[cfg(target_arch = "x86_64")]
+fn expected_q4_k_x86_backend() -> Q4KMatVecBackend {
+    if std::arch::is_x86_feature_detected!("avx2") {
+        Q4KMatVecBackend::X86_64Avx2
+    } else {
+        Q4KMatVecBackend::Scalar
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+fn expected_q5_0_x86_backend() -> Q5_0MatVecBackend {
+    if std::arch::is_x86_feature_detected!("avx2") {
+        Q5_0MatVecBackend::X86_64Avx2
+    } else {
+        Q5_0MatVecBackend::Scalar
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+fn expected_q6_k_x86_backend() -> Q6KMatVecBackend {
+    if std::arch::is_x86_feature_detected!("avx2") {
+        Q6KMatVecBackend::X86_64Avx2
+    } else {
+        Q6KMatVecBackend::Scalar
+    }
+}
+
+#[cfg(target_arch = "x86_64")]
+fn expected_q8_0_x86_backend() -> Q8_0MatVecBackend {
+    if std::arch::is_x86_feature_detected!("avx2") {
+        Q8_0MatVecBackend::X86_64Avx2
+    } else {
+        Q8_0MatVecBackend::Scalar
+    }
+}
+
 #[test]
 fn q4_k_mul_vec_accumulates_rows_without_full_row_decodes() -> Result<(), InferenceError> {
     let mut block = Vec::new();
@@ -88,7 +124,7 @@ fn q4_k_matvec_uses_q8_k_backend_when_enabled_on_aarch64() -> Result<(), Inferen
 
 #[test]
 #[cfg(target_arch = "x86_64")]
-fn q4_k_matvec_uses_avx2_backend_on_x86_64() -> Result<(), InferenceError> {
+fn q4_k_matvec_uses_detected_backend_on_x86_64() -> Result<(), InferenceError> {
     let mut block = Vec::new();
     block.extend_from_slice(&0x3c00u16.to_le_bytes());
     block.extend_from_slice(&0u16.to_le_bytes());
@@ -97,7 +133,7 @@ fn q4_k_matvec_uses_avx2_backend_on_x86_64() -> Result<(), InferenceError> {
 
     let output = q4_k_mul_vec_with_backend(&block, 1, 256, &[1.0; 256])?;
 
-    assert_eq!(output.backend, Q4KMatVecBackend::X86_64Avx2);
+    assert_eq!(output.backend, expected_q4_k_x86_backend());
     assert_eq!(output.values, vec![256.0]);
     Ok(())
 }
@@ -115,7 +151,7 @@ fn q4_k_simd_matvec_preserves_parallel_row_order() -> Result<(), InferenceError>
     #[cfg(target_arch = "aarch64")]
     assert_eq!(output.backend, Q4KMatVecBackend::Aarch64Neon);
     #[cfg(target_arch = "x86_64")]
-    assert_eq!(output.backend, Q4KMatVecBackend::X86_64Avx2);
+    assert_eq!(output.backend, expected_q4_k_x86_backend());
     assert_eq!(output.values, vec![256.0, 512.0, 768.0]);
     Ok(())
 }
@@ -225,14 +261,14 @@ fn q6_k_matvec_uses_q8_k_backend_when_enabled_on_aarch64() -> Result<(), Inferen
 
 #[test]
 #[cfg(target_arch = "x86_64")]
-fn q6_k_matvec_uses_avx2_backend_on_x86_64() -> Result<(), InferenceError> {
+fn q6_k_matvec_uses_detected_backend_on_x86_64() -> Result<(), InferenceError> {
     let mut block = vec![0u8; 128 + 64];
     block.extend(vec![1u8; 16]);
     block.extend_from_slice(&0x3c00u16.to_le_bytes());
 
     let output = q6_k_mul_vec_with_backend(&block, 1, 256, &[1.0; 256])?;
 
-    assert_eq!(output.backend, Q6KMatVecBackend::X86_64Avx2);
+    assert_eq!(output.backend, expected_q6_k_x86_backend());
     assert_eq!(output.values, vec![-8192.0]);
     Ok(())
 }
@@ -250,7 +286,7 @@ fn q6_k_simd_matvec_preserves_parallel_row_order() -> Result<(), InferenceError>
     #[cfg(target_arch = "aarch64")]
     assert_eq!(output.backend, Q6KMatVecBackend::Aarch64Neon);
     #[cfg(target_arch = "x86_64")]
-    assert_eq!(output.backend, Q6KMatVecBackend::X86_64Avx2);
+    assert_eq!(output.backend, expected_q6_k_x86_backend());
     assert_eq!(output.values, vec![-8066.0, -8192.0, -8066.0]);
     Ok(())
 }
@@ -324,14 +360,14 @@ fn q8_0_large_moderate_width_matvec_uses_neon_row_parallel() -> Result<(), Infer
 
 #[test]
 #[cfg(target_arch = "x86_64")]
-fn q8_0_matvec_uses_avx2_backend_on_x86_64() -> Result<(), InferenceError> {
+fn q8_0_matvec_uses_detected_backend_on_x86_64() -> Result<(), InferenceError> {
     let mut bytes = Vec::new();
     bytes.extend(q8_0_block_with_value(1));
     bytes.extend(q8_0_block_with_value(-2));
 
     let output = q8_0_mul_vec_with_backend(&bytes, 2, 32, &[1.0; 32])?;
 
-    assert_eq!(output.backend, Q8_0MatVecBackend::X86_64Avx2);
+    assert_eq!(output.backend, expected_q8_0_x86_backend());
     assert_eq!(output.values, vec![32.0, -64.0]);
     Ok(())
 }
@@ -383,14 +419,14 @@ fn q5_0_large_moderate_width_matvec_uses_neon_row_parallel() -> Result<(), Infer
 
 #[test]
 #[cfg(target_arch = "x86_64")]
-fn q5_0_matvec_uses_avx2_backend_on_x86_64() -> Result<(), InferenceError> {
+fn q5_0_matvec_uses_detected_backend_on_x86_64() -> Result<(), InferenceError> {
     let mut bytes = Vec::new();
     bytes.extend(q5_0_block_with_value(1));
     bytes.extend(q5_0_block_with_value(-2));
 
     let output = q5_0_mul_vec_with_backend(&bytes, 2, 32, &[1.0; 32])?;
 
-    assert_eq!(output.backend, Q5_0MatVecBackend::X86_64Avx2);
+    assert_eq!(output.backend, expected_q5_0_x86_backend());
     assert_eq!(output.values, vec![32.0, -64.0]);
     Ok(())
 }

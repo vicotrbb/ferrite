@@ -24,13 +24,13 @@ pub struct Matrix {
 pub enum MatrixStorageKind {
     /// Row-major 32-bit floating-point values.
     F32,
-    /// GGML Q4_K quantized blocks.
+    /// GGML `Q4_K` quantized blocks.
     Q4K,
-    /// GGML Q5_0 quantized blocks.
+    /// GGML `Q5_0` quantized blocks.
     Q5_0,
-    /// GGML Q6_K quantized blocks.
+    /// GGML `Q6_K` quantized blocks.
     Q6K,
-    /// GGML Q8_0 quantized blocks.
+    /// GGML `Q8_0` quantized blocks.
     Q8_0,
 }
 
@@ -204,7 +204,7 @@ impl Matrix {
         Ok(output)
     }
 
-    /// Uses a paired Q5_0 kernel when both matrices have the same shape and
+    /// Uses a paired `Q5_0` kernel when both matrices have the same shape and
     /// execution policy. `None` tells callers to use independent dispatch.
     pub(in crate::scalar) fn mul_vec_pair_with_options(
         &self,
@@ -216,7 +216,7 @@ impl Matrix {
         #[cfg(not(target_arch = "aarch64"))]
         {
             let _ = (other, vector, left_options, right_options);
-            return Ok(None);
+            Ok(None)
         }
         #[cfg(target_arch = "aarch64")]
         {
@@ -251,7 +251,7 @@ impl Matrix {
     }
 
     /// Computes attention Q/K/V together while sharing one residual-Q8
-    /// activation across candidate Q5_0 projections. Returns `None` when
+    /// activation across candidate `Q5_0` projections. Returns `None` when
     /// fewer than two projections can share that work.
     pub(in crate::scalar) fn mul_vec_qkv_with_options(
         &self,
@@ -272,7 +272,7 @@ impl Matrix {
                 key_options,
                 value_options,
             );
-            return Ok(None);
+            Ok(None)
         }
         #[cfg(target_arch = "aarch64")]
         {
@@ -344,7 +344,13 @@ impl Matrix {
     /// Multiplies several activation vectors against this matrix in one
     /// pass. Storage kinds with a batched kernel stream each weight row
     /// once for the whole batch; the rest fall back to per-vector matvecs.
-    /// Every stream's output is bit-identical to `mul_vec` on that vector.
+    /// Every stream's output is bit-identical to [`Self::mul_vec`] on that
+    /// vector.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a vector length mismatch, non-finite input,
+    /// malformed matrix storage, arithmetic overflow, or non-finite output.
     pub fn mul_vec_batch(&self, vectors: &[&[f32]]) -> Result<Vec<Vec<f32>>, InferenceError> {
         for vector in vectors {
             if self.cols != vector.len() {
@@ -375,7 +381,12 @@ impl Matrix {
 
     /// Greedy argmax for several activation vectors in one weight pass
     /// where the storage kind supports it; per-stream results equal
-    /// `argmax_mul_vec` on that vector.
+    /// [`Self::argmax_mul_vec`] on that vector.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an empty matrix, vector length mismatch,
+    /// non-finite input, malformed storage, or non-finite output.
     pub fn argmax_mul_vec_batch(&self, vectors: &[&[f32]]) -> Result<Vec<usize>, InferenceError> {
         for vector in vectors {
             if self.cols != vector.len() {

@@ -103,3 +103,10 @@ address:
 5. Monitor process RSS, latency, errors, and restarts.
 
 Ferrite is not currently a complete internet-facing security boundary.
+
+## Operational validation
+
+Use the built-in throughput client for request-rate, token-latency, usage, and
+RSS measurements. Use the long-chat gate for cancellation, queue recovery,
+cache, finish-source, and multi-turn proofs. Both are documented in
+[operational tools](benchmark-tools.md).

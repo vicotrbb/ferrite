@@ -37,6 +37,8 @@ No sibling checkout is required. The optional Locus backend uses the published
 - Use ADRs for durable architecture decisions.
 - Use benchmark or eval artifacts for measured claims.
 - Do not commit private plans, tool state, scratch reports, or model binaries.
+- Keep ADRs, curated benchmark conclusions, and current engineering research
+  under `docs/`. Use Git history for experiment archaeology.
 
 ## Repository changes
 

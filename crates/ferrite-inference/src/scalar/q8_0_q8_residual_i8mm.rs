@@ -1,4 +1,4 @@
-//! Experimental Q8_0 × two-pass residual-Q8 matvec for FEAT_I8MM CPUs.
+//! Experimental `Q8_0` x two-pass residual-Q8 matvec for `FEAT_I8MM` CPUs.
 #![allow(
     unsafe_code,
     reason = "audited aarch64 SIMD intrinsics are isolated in this kernel module"

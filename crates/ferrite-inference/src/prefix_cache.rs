@@ -115,6 +115,7 @@ impl PrefixCacheKey {
     }
 
     /// Adds a caller-defined cache namespace to the key.
+    #[must_use]
     pub fn with_namespace(mut self, namespace: impl Into<String>) -> Self {
         self.namespace = Some(namespace.into());
         self

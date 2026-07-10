@@ -47,8 +47,8 @@ pub(super) fn neon_q6_k_mul_vec(
     })
 }
 
-/// Batched matvec: streams each Q6_K weight row once per step for the
-/// whole batch (rows stay cache-hot across streams). Per-stream block/FMA
+/// Batched matvec: streams each `Q6_K` weight row once per step for the
+/// whole batch (rows stay cache-hot across streams). Per-stream block/`FMA`
 /// order matches `neon_q6_k_mul_vec` exactly.
 pub(super) fn neon_q6_k_mul_vec_batch(
     bytes: &[u8],

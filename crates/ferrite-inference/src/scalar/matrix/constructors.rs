@@ -43,7 +43,7 @@ impl Matrix {
         })
     }
 
-    /// Creates a Q8_0 matrix from GGML row-major block bytes.
+    /// Creates a `Q8_0` matrix from GGML row-major block bytes.
     ///
     /// # Errors
     ///
@@ -78,7 +78,7 @@ impl Matrix {
         })
     }
 
-    /// Creates a Q5_0 matrix from GGML row-major block bytes.
+    /// Creates a `Q5_0` matrix from GGML row-major block bytes.
     ///
     /// # Errors
     ///
@@ -113,7 +113,7 @@ impl Matrix {
         })
     }
 
-    /// Creates a Q4_K matrix from GGML row-major block bytes.
+    /// Creates a `Q4_K` matrix from GGML row-major block bytes.
     ///
     /// # Errors
     ///
@@ -143,7 +143,7 @@ impl Matrix {
         })
     }
 
-    /// Creates a Q6_K matrix from GGML row-major block bytes.
+    /// Creates a `Q6_K` matrix from GGML row-major block bytes.
     ///
     /// # Errors
     ///

@@ -13,26 +13,32 @@ Start with the path that matches your goal.
 5. [OpenAI API compatibility](openai-api.md), understand supported endpoints,
    request options, response behavior, and errors.
 6. [Models and tensor formats](models.md), choose a compatible GGUF artifact.
-7. [Troubleshooting](troubleshooting.md), diagnose common failures.
+7. [Current limitations](limitations.md), understand the alpha compatibility
+   boundary before deployment.
+8. [Troubleshooting](troubleshooting.md), diagnose common failures.
 
 ## Understand and contribute
 
 - [Architecture](architecture.md)
+- [Library API](library-api.md)
+- [Operational tools](benchmark-tools.md)
 - [Evaluation and regression gates](evaluation.md)
 - [Development guide](development.md)
 - [Safety policy](safety.md)
+- [Release process](releasing.md)
 - [Contributing guide](../CONTRIBUTING.md)
 - [Security policy](../SECURITY.md)
+- [Changelog](../CHANGELOG.md)
 
 ## Engineering evidence
 
-The [`documentation/`](../documentation/README.md) tree is the evidence record:
+- [`adr/`](adr/README.md) contains durable architecture decisions.
+- [`benchmarks/`](benchmarks/README.md) contains curated methods and milestone
+  results.
+- [`engineering/rust-quality.md`](engineering/rust-quality.md) records the
+  primary-source Rust quality baseline used by the repository.
+- [`../scripts/evals/`](../scripts/evals/) contains machine-readable eval
+  records that remain part of performance regression history.
 
-- `adr/` contains durable architecture decisions.
-- `benchmarks/` contains benchmark methods and results.
-- `dev-notes/` contains historical implementation evidence.
-- `research/` contains focused follow-up research.
-- `theories/` contains hypotheses that are not implementation guarantees.
-
-Historical notes can describe superseded behavior. The root README and this
-directory define the maintained user-facing contract.
+Git history retains removed experiments and session notes when archaeology is
+needed. The root README and this directory define the maintained contract.

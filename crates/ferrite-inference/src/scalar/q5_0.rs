@@ -57,9 +57,10 @@ pub(super) fn q5_0_mul_vec(
     Ok(q5_0_mul_vec_with_backend(bytes, rows, cols, vector)?.values)
 }
 
-/// Multiplies two same-shaped Q5_0 matrices by one activation vector while
+/// Multiplies two same-shaped `Q5_0` matrices by one activation vector while
 /// exposing both independent dot products to each worker. Per-matrix block
 /// order is unchanged, so results are bit-identical to two standalone calls.
+#[cfg(target_arch = "aarch64")]
 pub(super) fn q5_0_mul_vec_pair(
     left: &[u8],
     right: &[u8],
@@ -114,6 +115,7 @@ pub(super) fn q5_0_mul_vec_with_backend(
 
 /// Upper bound on how many activation vectors one batched matvec call
 /// serves; larger batches are processed in chunks of this size.
+#[cfg(target_arch = "aarch64")]
 pub(super) const Q5_0_MAX_BATCH: usize = 8;
 
 /// Batched matvec across several activation vectors. Each stream's output
@@ -244,7 +246,7 @@ pub(super) fn q5_0_signed_values(block: &[u8]) -> [i8; Q5_0_BLOCK_VALUES] {
     values
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_arch = "aarch64"))]
 mod tests {
     use super::*;
 

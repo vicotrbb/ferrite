@@ -77,15 +77,24 @@ unsafe fn avx2_q8_0_block_dot(quantized: *const i8, vector: *const f32) -> f32 {
     let mut lanes = _mm256_setzero_ps();
     let mut offset = 0usize;
     while offset < Q8_0_BLOCK_VALUES {
-        let quantized_i8 = unsafe { _mm_loadl_epi64(quantized.add(offset).cast::<__m128i>()) };
+        // SAFETY: the caller provides 32 readable quantized values and 32
+        // readable vector values. `offset` advances in eight-value chunks,
+        // so both loads remain within those ranges.
+        let (quantized_i8, vector_lanes) = unsafe {
+            (
+                _mm_loadl_epi64(quantized.add(offset).cast::<__m128i>()),
+                _mm256_loadu_ps(vector.add(offset)),
+            )
+        };
         let quantized_i32 = _mm256_cvtepi8_epi32(quantized_i8);
         let quantized_f32 = _mm256_cvtepi32_ps(quantized_i32);
-        let vector_lanes = unsafe { _mm256_loadu_ps(vector.add(offset)) };
         lanes = _mm256_add_ps(lanes, _mm256_mul_ps(quantized_f32, vector_lanes));
         offset += 8;
     }
 
     let mut partial = [0.0f32; 8];
+    // SAFETY: `partial` provides eight writable `f32` lanes, and this store
+    // accepts an unaligned destination.
     unsafe { _mm256_storeu_ps(partial.as_mut_ptr(), lanes) };
     partial.iter().sum()
 }

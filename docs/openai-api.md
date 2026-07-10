@@ -18,6 +18,16 @@ being silently ignored.
 Provider-style model IDs can contain slashes. Request model IDs must match the
 configured `--model-id` exactly.
 
+`GET /health` always returns HTTP 200 with the configured model ID and actual
+load readiness:
+
+```json
+{"model":"qwen2.5-0.5b-q4_k_m","ready":true}
+```
+
+A process without a loaded model reports `ready: false`. Generation endpoints
+then return service unavailable rather than pretending the model is ready.
+
 ## Chat completions
 
 Required fields are `model` and a non-empty `messages` array. Ferrite accepts
@@ -74,6 +84,17 @@ methods. Parameter errors identify the relevant field when possible.
 
 Do not depend only on status text. Clients should use the HTTP status and the
 structured error `type`, `message`, and `param` fields.
+
+| Status | Typical meaning |
+| ---: | --- |
+| 400 | malformed JSON, invalid parameter, token limit, or unsupported option |
+| 401 | missing or incorrect bearer token |
+| 404 | unknown route or requested model ID |
+| 405 | method is not allowed for a known route |
+| 429 | inference admission timed out or was unavailable immediately |
+| 500 | unexpected internal generation failure |
+| 501 | recognized operation is not implemented |
+| 503 | no model is loaded or inference is otherwise unavailable |
 
 ## Compatibility test coverage
 

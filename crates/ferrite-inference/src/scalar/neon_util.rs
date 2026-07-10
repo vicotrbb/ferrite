@@ -9,7 +9,7 @@ use std::arch::aarch64::{
     vget_low_s16, vget_low_s8, vgetq_lane_f32, vmovl_s16, vmovl_s8, vreinterpret_f16_u16,
 };
 
-/// Converts an IEEE-754 binary16 scale with AArch64's native widening
+/// Converts an IEEE-754 binary16 scale with `AArch64` native widening
 /// instruction. This avoids repeating scalar exponent/mantissa decoding in
 /// every quantized block-dot kernel.
 #[inline(always)]

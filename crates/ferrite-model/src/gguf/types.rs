@@ -123,45 +123,45 @@ pub enum GgmlType {
     F32 = 0,
     /// IEEE 754 half-precision values.
     F16 = 1,
-    /// GGML Q4_0 quantized blocks.
+    /// GGML `Q4_0` quantized blocks.
     Q4_0 = 2,
-    /// GGML Q4_1 quantized blocks.
+    /// GGML `Q4_1` quantized blocks.
     Q4_1 = 3,
-    /// GGML Q5_0 quantized blocks.
+    /// GGML `Q5_0` quantized blocks.
     Q5_0 = 6,
-    /// GGML Q5_1 quantized blocks.
+    /// GGML `Q5_1` quantized blocks.
     Q5_1 = 7,
-    /// GGML Q8_0 quantized blocks.
+    /// GGML `Q8_0` quantized blocks.
     Q8_0 = 8,
-    /// GGML Q8_1 quantized blocks.
+    /// GGML `Q8_1` quantized blocks.
     Q8_1 = 9,
-    /// GGML Q2_K quantized blocks.
+    /// GGML `Q2_K` quantized blocks.
     Q2K = 10,
-    /// GGML Q3_K quantized blocks.
+    /// GGML `Q3_K` quantized blocks.
     Q3K = 11,
-    /// GGML Q4_K quantized blocks.
+    /// GGML `Q4_K` quantized blocks.
     Q4K = 12,
-    /// GGML Q5_K quantized blocks.
+    /// GGML `Q5_K` quantized blocks.
     Q5K = 13,
-    /// GGML Q6_K quantized blocks.
+    /// GGML `Q6_K` quantized blocks.
     Q6K = 14,
-    /// GGML Q8_K quantized blocks.
+    /// GGML `Q8_K` quantized blocks.
     Q8K = 15,
-    /// GGML IQ2_XXS quantized blocks.
+    /// GGML `IQ2_XXS` quantized blocks.
     IQ2Xxs = 16,
-    /// GGML IQ2_XS quantized blocks.
+    /// GGML `IQ2_XS` quantized blocks.
     IQ2Xs = 17,
-    /// GGML IQ3_XXS quantized blocks.
+    /// GGML `IQ3_XXS` quantized blocks.
     IQ3Xxs = 18,
-    /// GGML IQ1_S quantized blocks.
+    /// GGML `IQ1_S` quantized blocks.
     IQ1S = 19,
-    /// GGML IQ4_NL quantized blocks.
+    /// GGML `IQ4_NL` quantized blocks.
     IQ4Nl = 20,
-    /// GGML IQ3_S quantized blocks.
+    /// GGML `IQ3_S` quantized blocks.
     IQ3S = 21,
-    /// GGML IQ2_S quantized blocks.
+    /// GGML `IQ2_S` quantized blocks.
     IQ2S = 22,
-    /// GGML IQ4_XS quantized blocks.
+    /// GGML `IQ4_XS` quantized blocks.
     IQ4Xs = 23,
     /// Signed 8-bit integers.
     I8 = 24,
@@ -173,15 +173,15 @@ pub enum GgmlType {
     I64 = 27,
     /// IEEE 754 double-precision values.
     F64 = 28,
-    /// GGML IQ1_M quantized blocks.
+    /// GGML `IQ1_M` quantized blocks.
     IQ1M = 29,
     /// Brain floating-point 16-bit values.
     BF16 = 30,
-    /// GGML ternary TQ1_0 quantized blocks.
+    /// GGML ternary `TQ1_0` quantized blocks.
     TQ1_0 = 34,
-    /// GGML ternary TQ2_0 quantized blocks.
+    /// GGML ternary `TQ2_0` quantized blocks.
     TQ2_0 = 35,
-    /// GGML MXFP4 quantized blocks.
+    /// GGML `MXFP4` quantized blocks.
     Mxfp4 = 39,
 }
 

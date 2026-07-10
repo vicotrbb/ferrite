@@ -72,7 +72,8 @@ Cache-enabled requests use the normal path.
 
 ## Durable decisions and evidence
 
-Architecture decisions live under [`documentation/adr/`](../documentation/adr/README.md).
-Measured claims live under `documentation/benchmarks/` or `scripts/evals/`.
+Architecture decisions live under [`docs/adr/`](adr/README.md). Curated
+measured claims live under [`docs/benchmarks/`](benchmarks/README.md), and raw
+eval output lives under `scripts/evals/`.
 Transient implementation plans and private tool state are not repository
 artifacts.

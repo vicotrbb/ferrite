@@ -1,3 +1,5 @@
+//! Entry point for Ferrite's OpenAI-compatible HTTP server.
+
 use ferrite_inference::scalar::{Q8KActivationMatvecPolicy, ScalarExecutionOptions};
 use ferrite_server::{config::ServerConfig, runtime::InferenceEngine, state::ServerState};
 use std::error::Error;
@@ -5,12 +7,15 @@ use std::error::Error;
 #[tokio::main]
 async fn main() {
     let arguments = std::env::args_os().collect::<Vec<_>>();
-    if arguments
-        .get(1)
-        .is_some_and(|argument| argument == "--help" || argument == "-h")
-    {
-        println!("{}", ferrite_server::config::usage());
-        return;
+    if let Some(argument) = arguments.get(1) {
+        if argument == "--help" || argument == "-h" {
+            println!("{}", ferrite_server::config::usage());
+            return;
+        }
+        if argument == "--version" || argument == "-V" {
+            println!("ferrite-server {}", env!("CARGO_PKG_VERSION"));
+            return;
+        }
     }
 
     if let Err(error) = run(arguments).await {

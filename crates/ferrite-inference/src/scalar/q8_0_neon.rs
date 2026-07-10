@@ -20,7 +20,7 @@ const ROW_PARALLEL_MIN_ROWS: usize = 4096;
 const ROW_PARALLEL_MAX_COLS: usize = 2048;
 const BATCH_ROWS_PER_TASK: usize = 128;
 
-/// Batched matvec: streams and widens each Q8_0 weight row once, dotting it
+/// Batched matvec: streams and widens each `Q8_0` weight row once, dotting it
 /// against every activation vector. Per-stream accumulation order matches
 /// `neon_q8_0_row_dot`, so outputs are bit-identical per stream.
 pub(super) fn neon_q8_0_mul_vec_batch(
@@ -114,7 +114,7 @@ fn neon_q8_0_row_dot_batch(row_chunk: &[u8], vectors: &[&[f32]], row_out: &mut [
     }
 }
 
-/// Widens one 32-value Q8_0 quant block into eight exact f32 quads, in the
+/// Widens one 32-value `Q8_0` quant block into eight exact `f32` quads, in the
 /// same lane order `neon_q8_0_block_dot` consumes them.
 #[target_feature(enable = "neon")]
 unsafe fn neon_q8_0_widen_block(quantized: *const i8) -> [float32x4_t; 8] {

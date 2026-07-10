@@ -93,13 +93,21 @@ unsafe fn avx2_f32_block_dot(left: *const f32, right: *const f32) -> f32 {
     let mut lanes = _mm256_setzero_ps();
     let mut offset = 0usize;
     while offset < Q6_K_BLOCK_VALUES {
-        let left_lanes = unsafe { _mm256_loadu_ps(left.add(offset)) };
-        let right_lanes = unsafe { _mm256_loadu_ps(right.add(offset)) };
+        // SAFETY: the caller provides 256 readable values at each pointer,
+        // and `offset` advances in eight-value chunks within that range.
+        let (left_lanes, right_lanes) = unsafe {
+            (
+                _mm256_loadu_ps(left.add(offset)),
+                _mm256_loadu_ps(right.add(offset)),
+            )
+        };
         lanes = _mm256_add_ps(lanes, _mm256_mul_ps(left_lanes, right_lanes));
         offset += 8;
     }
 
     let mut partial = [0.0f32; 8];
+    // SAFETY: `partial` provides eight writable `f32` lanes, and this store
+    // accepts an unaligned destination.
     unsafe { _mm256_storeu_ps(partial.as_mut_ptr(), lanes) };
     partial.iter().sum()
 }

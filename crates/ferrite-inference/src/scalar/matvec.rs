@@ -119,7 +119,7 @@ mod tests {
 
     #[test]
     #[cfg(target_arch = "x86_64")]
-    fn f32_matvec_uses_avx2_backend_on_x86_64() -> Result<(), InferenceError> {
+    fn f32_matvec_uses_detected_backend_on_x86_64() -> Result<(), InferenceError> {
         let output = f32_mul_vec(
             2,
             8,
@@ -130,7 +130,12 @@ mod tests {
             &[1.0, -1.0, 2.0, -2.0, 0.5, -0.5, 1.5, -1.5],
         )?;
 
-        assert_eq!(output.backend, F32MatVecBackend::X86_64Avx2);
+        let expected_backend = if std::arch::is_x86_feature_detected!("avx2") {
+            F32MatVecBackend::X86_64Avx2
+        } else {
+            F32MatVecBackend::Scalar
+        };
+        assert_eq!(output.backend, expected_backend);
         assert_close(output.values[0], -1.0);
         assert_close(output.values[1], 0.75);
         Ok(())
@@ -229,14 +234,23 @@ mod x86_64 {
         let mut lanes = _mm256_setzero_ps();
         let mut index = 0usize;
         while index < len {
-            let left_lanes = _mm256_loadu_ps(left.add(index));
-            let right_lanes = _mm256_loadu_ps(right.add(index));
+            // SAFETY: the caller guarantees that both pointers address at
+            // least `len` values, and the loop advances in eight-value
+            // chunks. Unaligned loads are valid for these intrinsics.
+            let (left_lanes, right_lanes) = unsafe {
+                (
+                    _mm256_loadu_ps(left.add(index)),
+                    _mm256_loadu_ps(right.add(index)),
+                )
+            };
             lanes = _mm256_add_ps(lanes, _mm256_mul_ps(left_lanes, right_lanes));
             index += 8;
         }
 
         let mut partial = [0.0f32; 8];
-        _mm256_storeu_ps(partial.as_mut_ptr(), lanes);
+        // SAFETY: `partial` contains exactly eight writable `f32` lanes, and
+        // the unaligned store does not require a stronger alignment.
+        unsafe { _mm256_storeu_ps(partial.as_mut_ptr(), lanes) };
         partial.iter().sum()
     }
 }

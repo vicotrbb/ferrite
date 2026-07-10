@@ -9,26 +9,38 @@ use crate::scalar_llama_tensors::{
     matrix_dims, q4_k_scalar_tensors, q5_0_scalar_tensors, q6_k_scalar_tensors, q8_scalar_tensors,
 };
 
+/// Builds the minimal dense F32 Llama GGUF fixture.
+#[must_use]
 pub fn scalar_llama_f32_gguf_fixture() -> Vec<u8> {
     scalar_llama_gguf_fixture(GGML_TYPE_F32, true, None)
 }
 
+/// Builds the dense F32 fixture with an explicit tokenizer EOS token ID.
+#[must_use]
 pub fn scalar_llama_f32_gguf_fixture_with_eos_token_id(eos_token_id: u64) -> Vec<u8> {
     scalar_llama_gguf_fixture(GGML_TYPE_F32, true, Some(eos_token_id))
 }
 
+/// Builds an F32 fixture whose output projection shares token embeddings.
+#[must_use]
 pub fn scalar_llama_tied_output_f32_gguf_fixture() -> Vec<u8> {
     scalar_llama_gguf_fixture(GGML_TYPE_F32, false, None)
 }
 
+/// Builds the minimal dense F16 Llama GGUF fixture.
+#[must_use]
 pub fn scalar_llama_f16_gguf_fixture() -> Vec<u8> {
     scalar_llama_gguf_fixture(GGML_TYPE_F16, true, None)
 }
 
+/// Builds the minimal dense BF16 Llama GGUF fixture.
+#[must_use]
 pub fn scalar_llama_bf16_gguf_fixture() -> Vec<u8> {
     scalar_llama_gguf_fixture(GGML_TYPE_BF16, true, None)
 }
 
+/// Builds the minimal quantized Q8_0 Llama GGUF fixture.
+#[must_use]
 pub fn scalar_llama_q8_0_gguf_fixture() -> Vec<u8> {
     let alignment = 64u64;
     let mut tensors = q8_scalar_tensors();
@@ -75,6 +87,8 @@ pub fn scalar_llama_q8_0_gguf_fixture() -> Vec<u8> {
     bytes
 }
 
+/// Builds the minimal quantized Q5_0 Llama GGUF fixture.
+#[must_use]
 pub fn scalar_llama_q5_0_gguf_fixture() -> Vec<u8> {
     let alignment = 64u64;
     let mut tensors = q5_0_scalar_tensors();
@@ -121,6 +135,8 @@ pub fn scalar_llama_q5_0_gguf_fixture() -> Vec<u8> {
     bytes
 }
 
+/// Builds the minimal quantized Q4_K Llama GGUF fixture.
+#[must_use]
 pub fn scalar_llama_q4_k_gguf_fixture() -> Vec<u8> {
     let alignment = 64u64;
     let mut tensors = q4_k_scalar_tensors();
@@ -171,6 +187,8 @@ pub fn scalar_llama_q4_k_gguf_fixture() -> Vec<u8> {
     bytes
 }
 
+/// Builds the minimal quantized Q6_K Llama GGUF fixture.
+#[must_use]
 pub fn scalar_llama_q6_k_gguf_fixture() -> Vec<u8> {
     let alignment = 64u64;
     let mut tensors = q6_k_scalar_tensors();

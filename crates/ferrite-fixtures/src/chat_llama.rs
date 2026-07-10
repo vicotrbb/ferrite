@@ -3,10 +3,14 @@ use crate::gguf_writer::{
     push_tensor_info_with_type, push_u32, push_u64, F32TensorFixture, GGML_TYPE_F32,
 };
 
+/// Builds a small F32 Llama GGUF fixture with chat-role tokens.
+#[must_use]
 pub fn scalar_llama_chat_f32_gguf_fixture() -> Vec<u8> {
     scalar_llama_chat_gguf_fixture(None)
 }
 
+/// Builds the chat fixture with an explicit tokenizer EOS token ID.
+#[must_use]
 pub fn scalar_llama_chat_f32_gguf_fixture_with_eos_token_id(eos_token_id: u64) -> Vec<u8> {
     scalar_llama_chat_gguf_fixture(Some(eos_token_id))
 }

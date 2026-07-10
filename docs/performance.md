@@ -20,6 +20,11 @@ Build the locked release graph:
 cargo build --release --locked -p ferrite-cli -p ferrite-server
 ```
 
+Ferrite's release profile uses optimization level 3, ThinLTO, one codegen unit,
+panic abort, and stripped symbols. This profile reduced the measured CLI binary
+from 1.4 MiB to 795 KiB while retaining the exact benchmark token trace. Its
+interleaved throughput comparison remained within normal run-to-run noise.
+
 Do not use debug binaries for performance decisions. Do not compare runs from
 different prompts, token counts, models, quantizations, build flags, or thermal
 states as if they were equivalent.
@@ -68,12 +73,12 @@ target/release/ferrite \
   --experimental-residual-q8-activation-matvec
 ```
 
-The accepted Apple M5 Pro gate on 2026-07-10 reached 103.27 precise decode
-tokens per second and 106.14 streamed tokens per second on Qwen2.5 0.5B
+The accepted Apple M5 Pro gate on 2026-07-10 reached 105.54 precise decode
+tokens per second and 106.17 streamed tokens per second on Qwen2.5 0.5B
 Q4_K_M, with seven workers. A separate 512-token run produced the same exact
 token-trace hash for the default and residual policies. This is evidence for
 that machine and artifact, not a universal guarantee. See the
-[complete performance gate](../documentation/benchmarks/2026-07-10-oss-quality-hardening.md).
+[complete performance gate](benchmarks/2026-07-10-oss-quality-hardening.md).
 
 The residual path cannot be combined with experimental continuous batching.
 Ferrite rejects the combination instead of silently selecting another policy.
@@ -96,8 +101,8 @@ target/release/ferrite-server \
 
 Batching usually raises aggregate throughput while reducing each stream's
 throughput and increasing time to first token. The accepted four-stream server
-gate reached 91.11 aggregate completion tokens per second with token-ID parity.
-The same eval reached 108.51, 134.46, and 159.75 aggregate tokens per second in
+gate reached 92.24 aggregate completion tokens per second with token-ID parity.
+The same eval reached 110.03, 138.81, and 169.47 aggregate tokens per second in
 the two, four, and eight-stream engine batches.
 
 ## 6. Run the complete eval harness
@@ -131,7 +136,8 @@ Keep a performance change only when all of these conditions hold:
 5. Memory, TTFT, per-stream latency, and aggregate throughput regressions are
    measured and explicitly accepted or rejected.
 
-`RUSTFLAGS="-C target-cpu=native"` may improve local binaries, but makes them
-specific to the build CPU. Treat it as a separate experiment, never as the
-portable release default, and retain it only after a comparable eval proves a
+`RUSTFLAGS="-C target-cpu=native"` makes a binary specific to the build CPU.
+The 2026-07-10 Apple M5 Pro comparison did not show a reliable improvement over
+the portable ThinLTO build, so it is not part of the golden path. Treat it as a
+separate experiment and retain it only when a comparable local eval proves a
 benefit.

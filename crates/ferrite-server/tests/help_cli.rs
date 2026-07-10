@@ -15,3 +15,19 @@ fn short_help_exits_successfully_without_starting_the_server(
     assert!(stdout.contains("--max-concurrent-inferences 1"));
     Ok(())
 }
+
+#[test]
+fn version_exits_successfully_without_starting_the_server() -> Result<(), Box<dyn std::error::Error>>
+{
+    let output = Command::new(env!("CARGO_BIN_EXE_ferrite-server"))
+        .arg("-V")
+        .output()?;
+
+    assert!(output.status.success());
+    assert!(output.stderr.is_empty());
+    assert_eq!(
+        String::from_utf8(output.stdout)?,
+        format!("ferrite-server {}\n", env!("CARGO_PKG_VERSION"))
+    );
+    Ok(())
+}
