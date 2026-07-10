@@ -9,6 +9,27 @@ Ferrite is currently alpha software. The supported surface is deliberately
 small and well tested, but model coverage and sampling features are not yet
 complete.
 
+## Install
+
+Ferrite's supported user installs are versioned release archives and the
+official server image. Do not use `cargo install ferrite`: that crates.io name
+belongs to an unrelated project.
+
+Download the archive for your platform from the
+[GitHub Releases page](https://github.com/vicotrbb/ferrite/releases), verify it
+against the release's `SHA256SUMS` file, and then verify its provenance:
+
+```sh
+gh release verify-asset v<version> ferrite-v<version>-<target>.tar.gz \
+  --repo vicotrbb/ferrite
+gh attestation verify ferrite-v<version>-<target>.tar.gz \
+  --repo vicotrbb/ferrite
+```
+
+The initial supported archive targets are macOS arm64 and statically linked
+Linux x86_64. See [installation and verification](docs/install.md) for
+extraction, container, and model-integrity instructions.
+
 ## Highlights
 
 - Llama and Qwen2 model architectures, including Qwen2.5 GGUF artifacts.
@@ -111,4 +132,4 @@ contents, RustSec advisories, licenses, duplicate dependencies, and sources.
 
 ## License
 
-Ferrite is available under the [MIT License](LICENSE).
+Ferrite is available under the [Apache License 2.0](LICENSE).

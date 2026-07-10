@@ -5,6 +5,10 @@ versioning for published crates while it remains in the `0.x` series.
 
 ## Unreleased
 
+No unreleased changes.
+
+## 0.1.0 - 2026-07-10
+
 ### Added
 
 - Complete user, operator, contributor, library, evaluation, safety, and
@@ -12,6 +16,12 @@ versioning for published crates while it remains in the `0.x` series.
 - Reproducible Rust toolchain, strict lint, dependency policy, package, MSRV,
   repository hygiene, and cross-platform CI gates.
 - Successful help and version commands for every shipped executable.
+- Versioned, reproducible native release archives for macOS arm64 and Linux
+  x86_64, with SHA-256 checksums, SPDX SBOMs, and GitHub build attestations.
+- An official non-root OCI server image with multi-architecture Linux support,
+  image provenance, and SBOM attestations.
+- Automated tag-driven release publication, including trusted crates.io
+  publishing once the registry trust relationship is configured.
 
 ### Changed
 
@@ -26,7 +36,3 @@ versioning for published crates while it remains in the `0.x` series.
 
 - Transient plans, session logs, speculative theory files, superseded research
   roadmaps, private tool state, and redundant benchmark scratch output.
-
-## 0.1.0
-
-Initial alpha development version. Not yet published.

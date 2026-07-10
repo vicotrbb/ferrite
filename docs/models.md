@@ -72,4 +72,4 @@ Before using another artifact:
 Model binaries are not committed to Ferrite. Store local artifacts under
 `target/models/` or provide an explicit path. Review the model license,
 training terms, redistribution rights, and prompt-data policy separately from
-Ferrite's MIT license.
+Ferrite's Apache License 2.0.
