@@ -14,6 +14,10 @@ generation, and starts the OpenAI-compatible server.
   0.5B Q4_K_M artifact is about 469 MiB on disk and used about 1.0 GiB peak RSS
   in the recorded Apple M5 Pro eval. Other models can require much more.
 
+For a versioned binary install, see [installation and verification](install.md)
+first. Building from source remains the right path for development and for
+experimental feature combinations.
+
 ## Build
 
 ```sh

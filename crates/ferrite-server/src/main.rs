@@ -13,7 +13,7 @@ async fn main() {
             return;
         }
         if argument == "--version" || argument == "-V" {
-            println!("ferrite-server {}", env!("CARGO_PKG_VERSION"));
+            println!("{}", version_output("ferrite-server"));
             return;
         }
     }
@@ -21,6 +21,14 @@ async fn main() {
     if let Err(error) = run(arguments).await {
         eprintln!("{error}");
         std::process::exit(1);
+    }
+}
+
+fn version_output(binary: &str) -> String {
+    let version = env!("CARGO_PKG_VERSION");
+    match option_env!("FERRITE_BUILD_SHA") {
+        Some(revision) => format!("{binary} {version} ({revision})"),
+        None => format!("{binary} {version}"),
     }
 }
 

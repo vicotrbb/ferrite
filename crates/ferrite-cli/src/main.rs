@@ -13,7 +13,7 @@ fn main() {
             return;
         }
         if argument == "--version" || argument == "-V" {
-            println!("ferrite {}", env!("CARGO_PKG_VERSION"));
+            println!("{}", version_output("ferrite"));
             return;
         }
     }
@@ -21,5 +21,13 @@ fn main() {
     if let Err(error) = run::run(arguments) {
         eprintln!("{error}");
         std::process::exit(1);
+    }
+}
+
+fn version_output(binary: &str) -> String {
+    let version = env!("CARGO_PKG_VERSION");
+    match option_env!("FERRITE_BUILD_SHA") {
+        Some(revision) => format!("{binary} {version} ({revision})"),
+        None => format!("{binary} {version}"),
     }
 }

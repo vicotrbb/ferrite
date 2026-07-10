@@ -1,0 +1,362 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  preflight:
+    name: Release preflight
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.value }}
+      revision: ${{ steps.version.outputs.revision }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@a75363d06101555fc97c6c7e1e65670b99104d98 # 1.96.1
+      - name: Verify release tag and metadata
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          version="${tag#v}"
+          git fetch --force origin main
+          python3 scripts/release_preflight.py \
+            --version "$version" \
+            --require-tag \
+            --require-main
+          revision="$(git rev-parse HEAD)"
+          printf 'value=%s\n' "$version" >> "$GITHUB_OUTPUT"
+          printf 'revision=%s\n' "$revision" >> "$GITHUB_OUTPUT"
+      - name: Package public crates
+        run: |
+          cargo package -p ferrite-model --locked
+          cargo package -p ferrite-inference --locked --list
+
+  native-archives:
+    name: Native archive (${{ matrix.target }})
+    needs: preflight
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      attestations: write
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-musl
+            static-linux: true
+          - os: macos-15
+            target: aarch64-apple-darwin
+            static-linux: false
+    env:
+      FERRITE_BUILD_SHA: ${{ needs.preflight.outputs.revision }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@a75363d06101555fc97c6c7e1e65670b99104d98 # 1.96.1
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          key: release-${{ matrix.target }}
+      - name: Install the static Linux target
+        if: matrix.static-linux
+        shell: bash
+        run: |
+          rustup target add x86_64-unknown-linux-musl
+          sudo apt-get update
+          sudo apt-get install --yes musl-tools
+      - name: Build and smoke test public binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --release --locked --target "${{ matrix.target }}" -p ferrite-cli --bin ferrite
+          cargo build --release --locked --target "${{ matrix.target }}" -p ferrite-server --bin ferrite-server
+          binary_dir="target/${{ matrix.target }}/release"
+          test "$("$binary_dir/ferrite" --version)" = "ferrite ${{ needs.preflight.outputs.version }} (${{ needs.preflight.outputs.revision }})"
+          test "$("$binary_dir/ferrite-server" --version)" = "ferrite-server ${{ needs.preflight.outputs.version }} (${{ needs.preflight.outputs.revision }})"
+      - name: Package deterministic archive
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_date_epoch="$(git show -s --format=%ct "${{ needs.preflight.outputs.revision }}")"
+          export SOURCE_DATE_EPOCH="$source_date_epoch"
+          python3 scripts/package_release.py \
+            --version "${{ needs.preflight.outputs.version }}" \
+            --target "${{ matrix.target }}" \
+            --ferrite "target/${{ matrix.target }}/release/ferrite" \
+            --server "target/${{ matrix.target }}/release/ferrite-server" \
+            --output-dir dist
+          archive="ferrite-v${{ needs.preflight.outputs.version }}-${{ matrix.target }}.tar.gz"
+          printf 'archive=%s\n' "$archive" >> "$GITHUB_OUTPUT"
+          printf 'sbom=%s.spdx.json\n' "$archive" >> "$GITHUB_OUTPUT"
+      - name: Generate archive SPDX SBOM
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        with:
+          file: dist/${{ steps.package.outputs.archive }}
+          format: spdx-json
+          output-file: dist/${{ steps.package.outputs.sbom }}
+          upload-artifact: false
+          upload-release-assets: false
+      - name: Attest archive provenance
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4
+        with:
+          subject-path: dist/${{ steps.package.outputs.archive }}
+      - name: Attest archive SBOM
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4
+        with:
+          subject-path: dist/${{ steps.package.outputs.archive }}
+          sbom-path: dist/${{ steps.package.outputs.sbom }}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: native-${{ matrix.target }}
+          path: dist/
+          if-no-files-found: error
+
+  container-image:
+    name: Container image
+    needs: preflight
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and publish image
+        id: build
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: |
+            FERRITE_VERSION=${{ needs.preflight.outputs.version }}
+            FERRITE_BUILD_SHA=${{ needs.preflight.outputs.revision }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.ref_name }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.preflight.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          labels: |
+            org.opencontainers.image.created=${{ github.event.repository.updated_at }}
+            org.opencontainers.image.revision=${{ needs.preflight.outputs.revision }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.version=${{ needs.preflight.outputs.version }}
+          provenance: mode=max
+          sbom: true
+      - name: Smoke test published Linux image
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="${REGISTRY}/${IMAGE_NAME}@${{ steps.build.outputs.digest }}"
+          docker pull "$image"
+          test "$(docker run --rm --entrypoint /usr/local/bin/ferrite-server "$image" --version)" = "ferrite-server ${{ needs.preflight.outputs.version }} (${{ needs.preflight.outputs.revision }})"
+      - name: Attest container image provenance
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          subject-version: ${{ needs.preflight.outputs.version }}
+          push-to-registry: true
+      - name: Generate image SPDX SBOM
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        with:
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+          format: spdx-json
+          output-file: ferrite-image-${{ needs.preflight.outputs.version }}.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+      - name: Attest container image SBOM
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          sbom-path: ferrite-image-${{ needs.preflight.outputs.version }}.spdx.json
+          push-to-registry: true
+      - name: Record immutable image reference
+        shell: bash
+        run: |
+          printf '%s@%s\n' "${REGISTRY}/${IMAGE_NAME}" "${{ steps.build.outputs.digest }}" > image-digest.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: image-digest
+          path: |
+            image-digest.txt
+            ferrite-image-${{ needs.preflight.outputs.version }}.spdx.json
+          if-no-files-found: error
+
+  publish-crates:
+    name: Publish Rust libraries
+    needs: preflight
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: dtolnay/rust-toolchain@a75363d06101555fc97c6c7e1e65670b99104d98 # 1.96.1
+      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          key: release-crates
+      - name: Check registry publication state
+        id: registry
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ needs.preflight.outputs.version }}"
+          model="https://crates.io/api/v1/crates/ferrite-model/${version}"
+          inference="https://crates.io/api/v1/crates/ferrite-inference/${version}"
+          model_package="https://crates.io/api/v1/crates/ferrite-model"
+          inference_package="https://crates.io/api/v1/crates/ferrite-inference"
+          user_agent="ferrite-release/${version} (+https://github.com/vicotrbb/ferrite)"
+          model_status=$(curl --silent --output /dev/null --write-out '%{http_code}' --user-agent "$user_agent" "$model")
+          inference_status=$(curl --silent --output /dev/null --write-out '%{http_code}' --user-agent "$user_agent" "$inference")
+          case "$model_status" in
+            200) model_state=present ;;
+            404) model_state=absent ;;
+            *) printf 'unexpected ferrite-model registry response: %s\n' "$model_status" >&2; exit 1 ;;
+          esac
+          case "$inference_status" in
+            200) inference_state=present ;;
+            404) inference_state=absent ;;
+            *) printf 'unexpected ferrite-inference registry response: %s\n' "$inference_status" >&2; exit 1 ;;
+          esac
+          if [ "$model_state" != "$inference_state" ]; then
+            printf 'release version has a partial crates.io publication\n' >&2
+            exit 1
+          fi
+          model_package_status=$(curl --silent --output /dev/null --write-out '%{http_code}' --user-agent "$user_agent" "$model_package")
+          inference_package_status=$(curl --silent --output /dev/null --write-out '%{http_code}' --user-agent "$user_agent" "$inference_package")
+          if [ "$model_package_status" != "$inference_package_status" ]; then
+            printf 'library crates have inconsistent crates.io history\n' >&2
+            exit 1
+          fi
+          case "$model_package_status" in
+            200) initial=false ;;
+            404) initial=true ;;
+            *) printf 'unexpected library registry response: %s\n' "$model_package_status" >&2; exit 1 ;;
+          esac
+          printf 'publish=%s\n' "$([ "$model_state" = absent ] && printf true || printf false)" >> "$GITHUB_OUTPUT"
+          printf 'initial=%s\n' "$initial" >> "$GITHUB_OUTPUT"
+      - name: Verify library packages
+        run: |
+          cargo package -p ferrite-model --locked
+          cargo package -p ferrite-inference --locked --list
+      - name: Install semantic-version checker
+        if: steps.registry.outputs.publish == 'true' && steps.registry.outputs.initial == 'false'
+        run: cargo install --locked cargo-semver-checks --version 0.48.0
+      - name: Check public library API compatibility
+        if: steps.registry.outputs.publish == 'true' && steps.registry.outputs.initial == 'false'
+        run: |
+          cargo semver-checks check-release -p ferrite-model --all-features
+          cargo semver-checks check-release -p ferrite-inference --all-features
+      - name: Authenticate with crates.io trusted publishing
+        id: crates_io_auth
+        if: steps.registry.outputs.publish == 'true'
+        uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18 # v1
+      - name: Publish in dependency order
+        if: steps.registry.outputs.publish == 'true'
+        shell: bash
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.crates_io_auth.outputs.token }}
+        run: |
+          set -euo pipefail
+          version="${{ needs.preflight.outputs.version }}"
+          user_agent="ferrite-release/${version} (+https://github.com/vicotrbb/ferrite)"
+          cargo publish -p ferrite-model --locked
+          for attempt in $(seq 1 30); do
+            status=$(curl --silent --output /dev/null --write-out '%{http_code}' --user-agent "$user_agent" "https://crates.io/api/v1/crates/ferrite-model/${version}")
+            if [ "$status" = 200 ]; then
+              break
+            fi
+            if [ "$status" != 404 ]; then
+              printf 'unexpected ferrite-model registry response: %s\n' "$status" >&2
+              exit 1
+            fi
+            if [ "$attempt" -eq 30 ]; then
+              printf 'ferrite-model %s did not appear in crates.io in time\n' "$version" >&2
+              exit 1
+            fi
+            sleep 10
+          done
+          cargo publish -p ferrite-inference --locked
+
+  github-release:
+    name: Publish immutable GitHub Release
+    needs: [preflight, native-archives, container-image, publish-crates]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: native-*
+          path: dist
+          merge-multiple: true
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: image-digest
+          path: dist
+      - name: Generate checksums and release notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          (
+            cd dist
+            sha256sum -- ./*.tar.gz > SHA256SUMS
+          )
+          python3 scripts/release_notes.py \
+            --version "${{ needs.preflight.outputs.version }}" \
+            --output dist/RELEASE_NOTES.md
+      - name: Create draft with all release assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            printf 'release %s already exists; immutable assets must not be replaced\n' "$tag" >&2
+            exit 1
+          fi
+          assets=(./dist/*.tar.gz ./dist/*.spdx.json ./dist/SHA256SUMS ./dist/image-digest.txt)
+          gh release create "$tag" "${assets[@]}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --draft \
+            --title "$tag" \
+            --notes-file dist/RELEASE_NOTES.md \
+            --verify-tag
+      - name: Publish the immutable release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false

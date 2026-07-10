@@ -5,17 +5,19 @@ Start with the path that matches your goal.
 
 ## Run Ferrite
 
-1. [Getting started](getting-started.md), build Ferrite and run a first model.
-2. [Performance golden path](performance.md), use the fastest validated path
+1. [Installation and verification](install.md), install a release archive or
+   the official server image and verify its origin.
+2. [Getting started](getting-started.md), build Ferrite and run a first model.
+3. [Performance golden path](performance.md), use the fastest validated path
    for the current machine without sacrificing reproducibility.
-3. [Command-line interface](cli.md), generate, stream, profile, and benchmark.
-4. [HTTP server](server.md), configure and operate the local server.
-5. [OpenAI API compatibility](openai-api.md), understand supported endpoints,
+4. [Command-line interface](cli.md), generate, stream, profile, and benchmark.
+5. [HTTP server](server.md), configure and operate the local server.
+6. [OpenAI API compatibility](openai-api.md), understand supported endpoints,
    request options, response behavior, and errors.
-6. [Models and tensor formats](models.md), choose a compatible GGUF artifact.
-7. [Current limitations](limitations.md), understand the alpha compatibility
+7. [Models and tensor formats](models.md), choose a compatible GGUF artifact.
+8. [Current limitations](limitations.md), understand the alpha compatibility
    boundary before deployment.
-8. [Troubleshooting](troubleshooting.md), diagnose common failures.
+9. [Troubleshooting](troubleshooting.md), diagnose common failures.
 
 ## Understand and contribute
 

@@ -1,0 +1,13 @@
+.git
+.github
+target
+debug
+__pycache__
+**/__pycache__
+scripts/evals
+documentation
+research
+*.gguf
+*.bin
+*.npy
+*.npz

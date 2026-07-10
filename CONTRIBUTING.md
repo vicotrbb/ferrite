@@ -66,4 +66,4 @@ performance impact. Keep commits reviewable and use clear imperative subjects,
 for example `fix(model): reject duplicate tensor names`.
 
 By contributing, you agree that your contribution is licensed under Ferrite's
-MIT License.
+Apache License 2.0.
