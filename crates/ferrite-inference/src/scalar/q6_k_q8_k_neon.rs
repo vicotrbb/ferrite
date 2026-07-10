@@ -1,4 +1,7 @@
-#![allow(unsafe_code)]
+#![allow(
+    unsafe_code,
+    reason = "audited aarch64 SIMD intrinsics are isolated in this kernel module"
+)]
 
 use super::{
     neon_util::native_f16_bits_to_f32,
@@ -97,6 +100,8 @@ unsafe fn neon_q6_k_q8_k_block_dot_unchecked(block: &[u8], activation: &BlockQ8K
     let low_bits = &block[0..128];
     let high_bits = &block[128..192];
     let scales = &block[192..208];
+    // SAFETY: NEON is enabled and the caller validated the complete Q6_K
+    // block, including the final two-byte half-precision scale.
     let super_scale =
         unsafe { native_f16_bits_to_f32(u16::from_le_bytes([block[208], block[209]])) };
     let mut weighted_sum = 0i32;
@@ -110,61 +115,66 @@ unsafe fn neon_q6_k_q8_k_block_dot_unchecked(block: &[u8], activation: &BlockQ8K
 
         for group_half in 0..2 {
             let index_base = group_half * 16;
-            let scale_index = scale_base + group_half;
-            weighted_sum += i32::from(scales[scale_index] as i8)
-                * q6_group_dot(
-                    low_bits,
-                    high_bits,
-                    low_base,
-                    high_base,
-                    index_base,
-                    Q6LaneGroup::Q1,
-                    activation.qs.as_ptr().add(value_base + index_base),
-                );
-            correction_sum += i32::from(scales[scale_index] as i8)
-                * i32::from(activation.bsums[(value_base + index_base) / 16]);
+            // SAFETY: every pointer addresses a 16-value window inside the
+            // fixed 256-value activation block. The four offsets cover the
+            // Q6 lane groups for this half without crossing the block.
+            unsafe {
+                let scale_index = scale_base + group_half;
+                weighted_sum += i32::from(scales[scale_index] as i8)
+                    * q6_group_dot(
+                        low_bits,
+                        high_bits,
+                        low_base,
+                        high_base,
+                        index_base,
+                        Q6LaneGroup::Q1,
+                        activation.qs.as_ptr().add(value_base + index_base),
+                    );
+                correction_sum += i32::from(scales[scale_index] as i8)
+                    * i32::from(activation.bsums[(value_base + index_base) / 16]);
 
-            let scale_index = scale_base + group_half + 2;
-            weighted_sum += i32::from(scales[scale_index] as i8)
-                * q6_group_dot(
-                    low_bits,
-                    high_bits,
-                    low_base,
-                    high_base,
-                    index_base,
-                    Q6LaneGroup::Q2,
-                    activation.qs.as_ptr().add(value_base + index_base + 32),
-                );
-            correction_sum += i32::from(scales[scale_index] as i8)
-                * i32::from(activation.bsums[(value_base + index_base + 32) / 16]);
+                let scale_index = scale_base + group_half + 2;
+                weighted_sum += i32::from(scales[scale_index] as i8)
+                    * q6_group_dot(
+                        low_bits,
+                        high_bits,
+                        low_base,
+                        high_base,
+                        index_base,
+                        Q6LaneGroup::Q2,
+                        activation.qs.as_ptr().add(value_base + index_base + 32),
+                    );
+                correction_sum += i32::from(scales[scale_index] as i8)
+                    * i32::from(activation.bsums[(value_base + index_base + 32) / 16]);
 
-            let scale_index = scale_base + group_half + 4;
-            weighted_sum += i32::from(scales[scale_index] as i8)
-                * q6_group_dot(
-                    low_bits,
-                    high_bits,
-                    low_base,
-                    high_base,
-                    index_base,
-                    Q6LaneGroup::Q3,
-                    activation.qs.as_ptr().add(value_base + index_base + 64),
-                );
-            correction_sum += i32::from(scales[scale_index] as i8)
-                * i32::from(activation.bsums[(value_base + index_base + 64) / 16]);
+                let scale_index = scale_base + group_half + 4;
+                weighted_sum += i32::from(scales[scale_index] as i8)
+                    * q6_group_dot(
+                        low_bits,
+                        high_bits,
+                        low_base,
+                        high_base,
+                        index_base,
+                        Q6LaneGroup::Q3,
+                        activation.qs.as_ptr().add(value_base + index_base + 64),
+                    );
+                correction_sum += i32::from(scales[scale_index] as i8)
+                    * i32::from(activation.bsums[(value_base + index_base + 64) / 16]);
 
-            let scale_index = scale_base + group_half + 6;
-            weighted_sum += i32::from(scales[scale_index] as i8)
-                * q6_group_dot(
-                    low_bits,
-                    high_bits,
-                    low_base,
-                    high_base,
-                    index_base,
-                    Q6LaneGroup::Q4,
-                    activation.qs.as_ptr().add(value_base + index_base + 96),
-                );
-            correction_sum += i32::from(scales[scale_index] as i8)
-                * i32::from(activation.bsums[(value_base + index_base + 96) / 16]);
+                let scale_index = scale_base + group_half + 6;
+                weighted_sum += i32::from(scales[scale_index] as i8)
+                    * q6_group_dot(
+                        low_bits,
+                        high_bits,
+                        low_base,
+                        high_base,
+                        index_base,
+                        Q6LaneGroup::Q4,
+                        activation.qs.as_ptr().add(value_base + index_base + 96),
+                    );
+                correction_sum += i32::from(scales[scale_index] as i8)
+                    * i32::from(activation.bsums[(value_base + index_base + 96) / 16]);
+            }
         }
     }
 
@@ -202,9 +212,13 @@ unsafe fn q6_group_dot(
         *target = raw as i8;
     }
 
-    let q6_lanes = vld1q_s8(q6.as_ptr());
-    let q8_lanes = vld1q_s8(q8);
-    vaddvq_s32(dot_i8x16(q6_lanes, q8_lanes))
+    // SAFETY: `q6` is a local 16-value array, and the caller guarantees that
+    // `q8` addresses a readable 16-value activation window. NEON is enabled.
+    unsafe {
+        let q6_lanes = vld1q_s8(q6.as_ptr());
+        let q8_lanes = vld1q_s8(q8);
+        vaddvq_s32(dot_i8x16(q6_lanes, q8_lanes))
+    }
 }
 
 #[target_feature(enable = "neon")]

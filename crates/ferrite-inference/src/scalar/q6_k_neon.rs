@@ -1,4 +1,7 @@
-#![allow(unsafe_code)]
+#![allow(
+    unsafe_code,
+    reason = "audited aarch64 SIMD intrinsics are isolated in this kernel module"
+)]
 
 use super::{
     neon_util::{native_f16_bits_to_f32, widen_s8_lanes},
@@ -143,6 +146,8 @@ pub(super) unsafe fn neon_q6_k_block_dot(
     let low_bits = &block[0..128];
     let high_bits = &block[128..192];
     let scales = &block[192..208];
+    // SAFETY: NEON is enabled and the validated Q6_K block stores its
+    // half-precision super-scale in the final two bytes.
     let super_scale =
         unsafe { native_f16_bits_to_f32(u16::from_le_bytes([block[208], block[209]])) };
     let mut lanes = vdupq_n_f32(0.0);
@@ -237,6 +242,8 @@ mod tests {
             .map(|index| (index % 13) as f32 - 6.0)
             .collect::<Vec<_>>();
 
+        // SAFETY: the test provides one complete Q6_K block and a matching
+        // 256-value activation on an aarch64 target with baseline NEON.
         let actual = unsafe { neon_q6_k_block_dot(&block, &vector)? };
         let expected = decode_q6_k_values(&block, Q6_K_BLOCK_VALUES)?
             .iter()

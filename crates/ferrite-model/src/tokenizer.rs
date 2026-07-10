@@ -4,6 +4,10 @@ use crate::gguf::{GgufError, GgufFile, MetadataValue, MetadataValueType};
 use std::fmt;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+/// A tokenizer constructed from a GGUF tokenizer metadata table.
+///
+/// Tokenizers with merge metadata use byte-pair encoding. Tokenizers without
+/// merges use deterministic longest-prefix atomic token matching.
 pub struct GgufTokenizer {
     model: TokenizerModel,
     tokens: Vec<String>,
@@ -14,6 +18,12 @@ pub struct GgufTokenizer {
 }
 
 impl GgufTokenizer {
+    /// Builds a tokenizer from validated GGUF metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when required tokenizer metadata is missing, has the
+    /// wrong type, contains inconsistent lengths, or has invalid BPE merges.
     pub fn from_gguf(file: &GgufFile) -> Result<Self, TokenizerError> {
         let model = match metadata_string(file, "tokenizer.ggml.model")? {
             "llama" => TokenizerModel::Llama,
@@ -51,30 +61,42 @@ impl GgufTokenizer {
         })
     }
 
+    /// Returns the tokenizer model identifier.
     pub fn model(&self) -> TokenizerModel {
         self.model.clone()
     }
 
+    /// Returns the vocabulary size.
     pub fn len(&self) -> usize {
         self.tokens.len()
     }
 
+    /// Returns `true` when the vocabulary contains no tokens.
     pub fn is_empty(&self) -> bool {
         self.tokens.is_empty()
     }
 
+    /// Returns the token text for `id`, or `None` when the ID is out of range.
     pub fn token(&self, id: usize) -> Option<&str> {
         self.tokens.get(id).map(String::as_str)
     }
 
+    /// Returns the GGUF token classification for `id`.
     pub fn token_type(&self, id: usize) -> Option<TokenType> {
         self.token_types.get(id).copied()
     }
 
+    /// Returns the configured end-of-sequence token ID, when present.
     pub fn eos_token_id(&self) -> Option<usize> {
         self.eos_token_id
     }
 
+    /// Decodes token IDs to UTF-8 text.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an ID is out of range or BPE byte tokens do not
+    /// form valid UTF-8.
     pub fn decode(&self, ids: &[usize]) -> Result<String, TokenizerError> {
         if !self.merges.is_empty() {
             return bpe::decode(ids, &self.tokens);
@@ -91,6 +113,15 @@ impl GgufTokenizer {
         Ok(output)
     }
 
+    /// Decodes token IDs when they form complete UTF-8.
+    ///
+    /// Returns `Ok(None)` when another token may complete a partial UTF-8 byte
+    /// sequence.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid token IDs or decoding failures other than
+    /// an incomplete UTF-8 suffix.
     pub fn decode_if_complete(&self, ids: &[usize]) -> Result<Option<String>, TokenizerError> {
         match self.decode(ids) {
             Ok(text) => Ok(Some(text)),
@@ -99,10 +130,23 @@ impl GgufTokenizer {
         }
     }
 
+    /// Encodes text with longest-prefix atomic token matching.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no vocabulary token matches the remaining input.
     pub fn encode_atomic(&self, input: &str) -> Result<Vec<usize>, TokenizerError> {
         self.encode_atomic_with_cancellation(input, || TokenizationControl::Continue)
     }
 
+    /// Encodes atomically while polling a caller-provided cancellation hook.
+    ///
+    /// The hook is called before work begins and before every token match.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when cancellation is requested or no vocabulary token
+    /// matches the remaining input.
     pub fn encode_atomic_with_cancellation(
         &self,
         input: &str,
@@ -129,10 +173,25 @@ impl GgufTokenizer {
         Ok(output)
     }
 
+    /// Encodes text with the tokenizer's configured algorithm.
+    ///
+    /// GGUF tokenizers with merge metadata use BPE, while tokenizers without
+    /// merges use atomic longest-prefix matching.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the input cannot be represented by the vocabulary
+    /// or the tokenizer metadata is invalid.
     pub fn encode(&self, input: &str) -> Result<Vec<usize>, TokenizerError> {
         self.encode_with_cancellation(input, || TokenizationControl::Continue)
     }
 
+    /// Encodes with the configured algorithm and cancellation polling.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when cancellation is requested, the input cannot be
+    /// represented, or required tokenizer metadata is unavailable.
     pub fn encode_with_cancellation(
         &self,
         input: &str,
@@ -145,10 +204,22 @@ impl GgufTokenizer {
         }
     }
 
+    /// Encodes text using byte-pair encoding metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when merge metadata is absent or the input cannot be
+    /// represented by the BPE vocabulary.
     pub fn encode_bpe(&self, input: &str) -> Result<Vec<usize>, TokenizerError> {
         self.encode_bpe_with_cancellation(input, || TokenizationControl::Continue)
     }
 
+    /// Encodes with BPE while polling a caller-provided cancellation hook.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when cancellation is requested, merge metadata is
+    /// absent, or the input cannot be represented by the BPE vocabulary.
     pub fn encode_bpe_with_cancellation(
         &self,
         input: &str,
@@ -176,25 +247,39 @@ impl GgufTokenizer {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+/// The tokenizer model name declared by GGUF metadata.
 pub enum TokenizerModel {
+    /// The `llama` tokenizer model.
     Llama,
+    /// Any tokenizer model identifier that Ferrite does not classify specially.
     Other(String),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// A token classification from `tokenizer.ggml.token_type` metadata.
 pub enum TokenType {
+    /// A normal vocabulary token.
     Normal,
+    /// The tokenizer's unknown-token marker.
     Unknown,
+    /// A control token.
     Control,
+    /// A user-defined token.
     UserDefined,
+    /// A vocabulary entry reserved as unused.
     Unused,
+    /// A token representing a raw byte.
     Byte,
+    /// An unrecognized GGUF token-type code.
     Other(i32),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// The result requested by a tokenization cancellation hook.
 pub enum TokenizationControl {
+    /// Continue tokenization.
     Continue,
+    /// Stop tokenization and return an error.
     Cancel,
 }
 
@@ -213,6 +298,7 @@ impl TokenType {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+/// An error produced while building, encoding with, or decoding a tokenizer.
 pub struct TokenizerError {
     message: String,
     kind: TokenizerErrorKind,
@@ -243,6 +329,8 @@ impl TokenizerError {
         }
     }
 
+    /// Returns `true` when decoding ended with a potentially completable UTF-8
+    /// byte sequence.
     pub fn is_incomplete_utf8(&self) -> bool {
         self.kind == TokenizerErrorKind::IncompleteUtf8
     }
@@ -340,5 +428,5 @@ fn metadata_optional_usize(file: &GgufFile, key: &str) -> Result<Option<usize>, 
     };
     usize::try_from(value)
         .map(Some)
-        .map_err(|_| TokenizerError::new(format!("{key} value {value} does not fit usize")))
+        .map_err(|_error| TokenizerError::new(format!("{key} value {value} does not fit usize")))
 }

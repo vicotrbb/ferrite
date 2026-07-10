@@ -1,4 +1,4 @@
-# Document 9: Rust for LLM Inference — Ecosystem Readiness, Crate Landscape, and Gap Analysis
+# Document 9: Rust for LLM Inference, Ecosystem Readiness, Crate Landscape, and Gap Analysis
 
 **Research Program:** CPU-Native LLM Inference Runtime  
 **Target Spec:** 9B parameter model, 2 vCPUs, 6 GB RAM, 2–5 tok/s  
@@ -9,9 +9,9 @@
 
 ## 1. Introduction
 
-This document provides the definitive map of the Rust ecosystem for building a CPU-native LLM inference runtime. **The strategic decision is to build everything from scratch** with zero third-party crate dependencies (except `libc` for syscall bindings). This document catalogs what exists in the ecosystem as **reference implementations and study material** — not as dependencies. Every component listed below should be studied for design ideas and algorithms, then re-implemented independently.
+This document provides the definitive map of the Rust ecosystem for building a CPU-native LLM inference runtime. **The strategic decision is to build everything from scratch** with zero third-party crate dependencies (except `libc` for syscall bindings). This document catalogs what exists in the ecosystem as **reference implementations and study material**, not as dependencies. Every component listed below should be studied for design ideas and algorithms, then re-implemented independently.
 
-**The implementation language is Rust (decided).** The only external crate is `libc`. Everything else — HTTP server, JSON parser, tokenizer, SIMD kernels, memory management, config parser — is written from scratch.
+**The implementation language is Rust (decided).** The only external crate is `libc`. Everything else, HTTP server, JSON parser, tokenizer, SIMD kernels, memory management, config parser, is written from scratch.
 
 ---
 
@@ -27,30 +27,30 @@ This document provides the definitive map of the Rust ecosystem for building a C
 **Architecture:**
 
 ```
-candle-core          — Tensor operations, backends, quantization
-├── cpu_backend/     — NdArray-based CPU implementation
-│   ├── mod.rs       — Dispatch, tensor ops
-│   ├── ops.rs       — Element-wise, reduction ops
-│   └── avx.rs       — AVX2-accelerated kernels (limited)
-├── quantized/       — QTensor, supported quantization types
-│   ├── gguf.rs      — GGUF format support
-│   └── k_quants.rs  — K-quant implementations
-└── dtype.rs         — Type system (F16, BF16, Q4_0, etc.)
+candle-core, Tensor operations, backends, quantization
+├── cpu_backend/, NdArray-based CPU implementation
+│   ├── mod.rs, Dispatch, tensor ops
+│   ├── ops.rs, Element-wise, reduction ops
+│   └── avx.rs, AVX2-accelerated kernels (limited)
+├── quantized/, QTensor, supported quantization types
+│   ├── gguf.rs, GGUF format support
+│   └── k_quants.rs, K-quant implementations
+└── dtype.rs, Type system (F16, BF16, Q4_0, etc.)
 
-candle-nn            — Neural network layers
-├── linear.rs        — Linear (dense) layer + QLinear (quantized)
-├── embedding.rs     — Embedding lookup
-├── rotary_emb.rs    — RoPE implementation
-├── rms_norm.rs      — RMSNorm
-└── attention.rs     — Scaled dot-product attention
+candle-nn, Neural network layers
+├── linear.rs, Linear (dense) layer + QLinear (quantized)
+├── embedding.rs, Embedding lookup
+├── rotary_emb.rs, RoPE implementation
+├── rms_norm.rs, RMSNorm
+└── attention.rs, Scaled dot-product attention
 
-candle-transformers  — Model implementations
+candle-transformers, Model implementations
 ├── models/
-│   ├── llama.rs     — Llama 2/3
-│   ├── qwen2.rs     — Qwen2/2.5
-│   ├── gemma.rs     — Gemma 1/2
-│   ├── mistral.rs   — Mistral
-│   ├── phi.rs       — Phi-2/3
+│   ├── llama.rs, Llama 2/3
+│   ├── qwen2.rs, Qwen2/2.5
+│   ├── gemma.rs, Gemma 1/2
+│   ├── mistral.rs, Mistral
+│   ├── phi.rs, Phi-2/3
 │   └── ...
 ```
 
@@ -58,13 +58,13 @@ candle-transformers  — Model implementations
 
 | Component | Reuse? | Rationale |
 |-----------|--------|-----------|
-| Model architectures (models/) | **YES** — Adapt | Working implementations of Llama, Qwen2, Gemma, Phi in Rust. Copy and modify for our runtime. |
-| `candle_nn::rotary_emb` | **YES** — Adapt | Correct RoPE implementation |
-| `candle_nn::rms_norm` | **YES** — Adapt | Simple, correct |
+| Model architectures (models/) | **YES**, Adapt | Working implementations of Llama, Qwen2, Gemma, Phi in Rust. Copy and modify for our runtime. |
+| `candle_nn::rotary_emb` | **YES**, Adapt | Correct RoPE implementation |
+| `candle_nn::rms_norm` | **YES**, Adapt | Simple, correct |
 | GGUF parser (`quantized/gguf.rs`) | **MAYBE** | Basic but works; consider `gguf` crate or custom for alignment control |
-| QTensor + quantization types | **NO** — Replace | Candle's quantized types wrap ggml's C code via FFI or use suboptimal Rust implementations |
-| CPU backend (`cpu_backend/`) | **NO** — Replace | Uses ndarray (generic BLAS), not SIMD-optimized for quantized types |
-| Tensor storage model | **NO** — Replace | Arc<RwLock<>> overhead too high for inference; need zero-copy mmap access |
+| QTensor + quantization types | **NO**, Replace | Candle's quantized types wrap ggml's C code via FFI or use suboptimal Rust implementations |
+| CPU backend (`cpu_backend/`) | **NO**, Replace | Uses ndarray (generic BLAS), not SIMD-optimized for quantized types |
+| Tensor storage model | **NO**, Replace | Arc<RwLock<>> overhead too high for inference; need zero-copy mmap access |
 
 **Candle's CPU backend performance analysis:**
 
@@ -72,7 +72,7 @@ The `cpu_backend` module uses `ndarray` for dense operations and custom (limited
 
 1. **AVX2 coverage:** Only Q4_0, Q8_0, and F32 dot products have AVX2 paths. Q4_K_M and other k-quants fall back to scalar on Candle's native backend (or use C ffi to ggml).
 2. **No AVX-512:** No AVX-512 specific kernels at all.
-3. **Memory model:** Tensors are `Arc<RwLock<CpuStorage>>` — reference counted, write-locked, heap-allocated. This adds overhead per operation.
+3. **Memory model:** Tensors are `Arc<RwLock<CpuStorage>>`, reference counted, write-locked, heap-allocated. This adds overhead per operation.
 4. **No mmap:** All weights loaded into `Vec<u8>` memory. No streaming capability.
 
 **Estimated performance gap vs our target:**
@@ -83,10 +83,10 @@ The `cpu_backend` module uses `ndarray` for dense operations and custom (limited
 **Key files to study:**
 
 ```
-candle-core/src/quantized/k_quants.rs  — K-quant reference implementations (Rust)
-candle-core/src/cpu_backend/mod.rs     — Compute dispatch logic
-candle-transformers/src/models/llama.rs — Complete Llama model (correctness reference)
-candle-transformers/src/models/qwen2.rs — Qwen2 model
+candle-core/src/quantized/k_quants.rs, K-quant reference implementations (Rust)
+candle-core/src/cpu_backend/mod.rs, Compute dispatch logic
+candle-transformers/src/models/llama.rs, Complete Llama model (correctness reference)
+candle-transformers/src/models/qwen2.rs, Qwen2 model
 ```
 
 ### 2.2 burn
@@ -123,24 +123,24 @@ candle-transformers/src/models/qwen2.rs — Qwen2 model
 - Supports: Llama, Mistral, Mixtral, Phi, Qwen2, Gemma, ChatML
 - GGUF loading support
 - LoRA adapter hot-swapping
-- ISQ (In-Situ Quantization) — quantize FP16→INT4 at load time
+- ISQ (In-Situ Quantization), quantize FP16→INT4 at load time
 
 **What to reuse:**
 
 | Component | Reuse? | Rationale |
 |-----------|--------|-----------|
-| API server (axum-based) | **YES** — Adapt | Production-quality implementation of OpenAI-compatible streaming API |
+| API server (axum-based) | **YES**, Adapt | Production-quality implementation of OpenAI-compatible streaming API |
 | Continuous batching scheduler | **MAYBE** | Good design but overkill for 2-thread batch-1; simpler to build our own FIFO |
-| ISQ (In-Situ Quantization) | **YES** — Study and adapt | Load FP16, quantize to INT4 on first use — useful for models without GGUF |
-| PagedAttention Rust impl | **NO** — Study only | Wrong for CPU (see Doc 5), but the Rust code is instructive |
+| ISQ (In-Situ Quantization) | **YES**, Study and adapt | Load FP16, quantize to INT4 on first use, useful for models without GGUF |
+| PagedAttention Rust impl | **NO**, Study only | Wrong for CPU (see Doc 5), but the Rust code is instructive |
 | Chat template handling | **YES** | Correct Jinja template implementation |
 
 **Key files:**
 ```
-mistral.rs/src/pipeline/     — Model loading pipeline (GGUF support)
-mistral.rs/src/scheduler.rs  — Batching scheduler
-mistral.rs/src/server.rs     — axum HTTP server
-mistral.rs/src/engine.rs     — Inference engine loop
+mistral.rs/src/pipeline/, Model loading pipeline (GGUF support)
+mistral.rs/src/scheduler.rs, Batching scheduler
+mistral.rs/src/server.rs, axum HTTP server
+mistral.rs/src/engine.rs, Inference engine loop
 ```
 
 ### 2.4 llama-cpp-rs (FFI wrapper)
@@ -165,7 +165,7 @@ pub struct LlamaSession { inner: *mut sys::llama_context }
 **FFI overhead analysis:**
 - Cross-boundary call: ~100ns–1μs (function call + ABI transition)
 - Per-token inference involves ~50-100 FFI calls: ~10-100μs overhead total
-- At 4 tok/s (250ms per token): **FFI overhead is 0.004-0.04% of total time** — negligible
+- At 4 tok/s (250ms per token): **FFI overhead is 0.004-0.04% of total time**, negligible
 - Memory copying between Rust vec and C pointer: avoidable with shared buffers
 
 **Assessment:** Viable for a "quick start" MVP that delegates to llama.cpp's C backend. However, it prevents:
@@ -204,18 +204,18 @@ All kernels are built from scratch using `core::arch` (part of Rust's standard l
 **Module:** `std::arch::x86_64` (stable since Rust 1.27, extended through present)
 
 **Coverage for AVX2:**
-- `_mm256_load_si256`, `_mm256_loadu_si256` — Load 256-bit vectors
-- `_mm256_add_epi32`, `_mm256_mullo_epi16` — Integer arithmetic
-- `_mm256_maddubs_epi16` — **Critical:** unsigned 8-bit × signed 8-bit → 16-bit multiply-add
-- `_mm256_madd_epi16` — **Critical:** signed 16-bit × signed 16-bit → 32-bit multiply-add
-- `_mm256_and_si256`, `_mm256_srli_epi16` — Bit manipulation for nibble extraction
-- `_mm256_fmadd_ps` — Fused multiply-add for FP32 accumulators
-- `_mm256_hadd_ps`, shuffle sequences — Horizontal sum
+- `_mm256_load_si256`, `_mm256_loadu_si256`, Load 256-bit vectors
+- `_mm256_add_epi32`, `_mm256_mullo_epi16`, Integer arithmetic
+- `_mm256_maddubs_epi16`, **Critical:** unsigned 8-bit × signed 8-bit → 16-bit multiply-add
+- `_mm256_madd_epi16`, **Critical:** signed 16-bit × signed 16-bit → 32-bit multiply-add
+- `_mm256_and_si256`, `_mm256_srli_epi16`, Bit manipulation for nibble extraction
+- `_mm256_fmadd_ps`, Fused multiply-add for FP32 accumulators
+- `_mm256_hadd_ps`, shuffle sequences, Horizontal sum
 
 **Coverage for AVX-512:**
-- `_mm512_load_si512` — 512-bit loads
-- `_mm512_dpbusd_epi32` — **VPDPBUSD:** unsigned×signed dot product with accumulate (VNNI)
-- `_mm512_cvtepi16_epi32` — Widening conversion
+- `_mm512_load_si512`, 512-bit loads
+- `_mm512_dpbusd_epi32`, **VPDPBUSD:** unsigned×signed dot product with accumulate (VNNI)
+- `_mm512_cvtepi16_epi32`, Widening conversion
 - Full AVX-512 coverage available since Rust 1.72+
 
 **Ergonomic issues:**
@@ -300,8 +300,8 @@ Pure-Rust high-performance matrix multiplication. Uses hand-written SIMD kernels
 Rust wrapper for mmap system calls.
 
 **Relevant features:**
-- `MmapOptions::new().populate()` — MAP_POPULATE equivalent
-- `MmapOptions::new().map_raw()` — Returns `MmapRaw` (no auto-deref, explicit pointer access)
+- `MmapOptions::new().populate()`, MAP_POPULATE equivalent
+- `MmapOptions::new().map_raw()`, Returns `MmapRaw` (no auto-deref, explicit pointer access)
 - Cross-platform (Unix mmap, Windows CreateFileMapping)
 - `MmapMut` for writable mappings (needed for KV cache files, if disk-backed)
 
@@ -342,7 +342,7 @@ unsafe {
 - `crossbeam` provides the primitives we likely need (channels, scoped threads)
 - For our use case: **direct thread spawning with `std::thread` + `crossbeam-channel`** is simplest
 
-**Our build approach:** Implement a custom 2-thread pool with `std::thread::spawn` and `std::sync::atomic` channels. Study `crossbeam`'s lock-free queue design for the work-stealing pattern, but our fixed 2-thread pool is simpler — no work-stealing needed. Total: ~200 lines.
+**Our build approach:** Implement a custom 2-thread pool with `std::thread::spawn` and `std::sync::atomic` channels. Study `crossbeam`'s lock-free queue design for the work-stealing pattern, but our fixed 2-thread pool is simpler, no work-stealing needed. Total: ~200 lines.
 
 ### 3.8 Synchronization: `parking_lot`
 
@@ -350,13 +350,13 @@ unsafe {
 **Version:** 0.12+  
 
 Drop-in replacements for `std::sync` primitives with better performance:
-- `Mutex` — Futex-based on Linux, no poisoning
-- `RwLock` — Fair, efficient
-- `Condvar` — Low-overhead signaling
+- `Mutex`, Futex-based on Linux, no poisoning
+- `RwLock`, Fair, efficient
+- `Condvar`, Low-overhead signaling
 
 **For 2-thread LLM inference:** Lock contention is minimal (1-2 threads accessing shared KV cache). `parking_lot`'s futex-based `Mutex` avoids spinning in the rare contention case.
 
-**Our build approach:** Implement a custom futex-based mutex using `libc::syscall(SYS_futex, ...)` — ~80 lines of unsafe Rust. The parking_lot source code is an excellent reference for the futex wait/wake pattern. For our 2-thread case, even `std::sync::Mutex` is sufficient.
+**Our build approach:** Implement a custom futex-based mutex using `libc::syscall(SYS_futex, ...)`, ~80 lines of unsafe Rust. The parking_lot source code is an excellent reference for the futex wait/wake pattern. For our 2-thread case, even `std::sync::Mutex` is sufficient.
 
 ### 3.9 GGUF Parsing: `gguf` crate
 
@@ -364,9 +364,9 @@ Drop-in replacements for `std::sync` primitives with better performance:
 **Version:** 0.6+ (varies; ecosystem fragmented)
 
 **Current state:** Multiple GGUF crates exist, none is definitively production-grade:
-- `gguf` — Basic reader, handles most common quant types
-- `candle-core::quantized::gguf` — Candle's bundled GGUF reader
-- `llm` (archived) — Had its own GGUF reader
+- `gguf`, Basic reader, handles most common quant types
+- `candle-core::quantized::gguf`, Candle's bundled GGUF reader
+- `llm` (archived), Had its own GGUF reader
 
 **Assessment:**
 - Basic header and metadata parsing: ✅ works
@@ -414,7 +414,7 @@ Custom reader ensures 64-byte alignment for tensor data (critical for our AVX2 l
 - Task spawning, channels, timers
 
 **Assessment for compute-bound inference:**
-- Inference itself is **not async** — it's blocking compute
+- Inference itself is **not async**, it's blocking compute
 - Use `tokio::task::spawn_blocking` for inference execution
 - axum handles HTTP/SSE on the async runtime
 - Inference runs on dedicated thread pool, results sent via channel
@@ -432,10 +432,10 @@ async fn chat_handler(state: State<Runtime>, request: Json<ChatRequest>) -> Sse<
 }
 ```
 
-**Our build approach:** Build a custom HTTP/1.1 server (~600 lines) using `std::net::TcpListener` with a thread-per-connection model. No async runtime needed — inference is blocking compute anyway. The axum/tokio pattern above shows what the same thing looks like with dependencies; our version is simpler:
+**Our build approach:** Build a custom HTTP/1.1 server (~600 lines) using `std::net::TcpListener` with a thread-per-connection model. No async runtime needed, inference is blocking compute anyway. The axum/tokio pattern above shows what the same thing looks like with dependencies; our version is simpler:
 
 ```rust
-// Our approach — no async, no framework
+// Our approach, no async, no framework
 for stream in listener.incoming() {
     std::thread::spawn(move || {
         let req = parse_http_request(&stream);
@@ -454,10 +454,10 @@ for stream in listener.incoming() {
 
 With the zero-dependency approach, **we have no FFI to external C libraries.** The only `extern "C"` calls are to POSIX syscalls via the `libc` crate:
 
-- `libc::mmap()` / `libc::munmap()` — memory-mapped file I/O
-- `libc::madvise()` — memory hints (MADV_SEQUENTIAL, MADV_DONTNEED)
-- `libc::sched_getaffinity()` — CPU topology detection  
-- `libc::mlock()` — optional page pinning
+- `libc::mmap()` / `libc::munmap()`, memory-mapped file I/O
+- `libc::madvise()`, memory hints (MADV_SEQUENTIAL, MADV_DONTNEED)
+- `libc::sched_getaffinity()`, CPU topology detection
+- `libc::mlock()`, optional page pinning
 
 All compute kernels (matmul, attention, norm, activations) are pure Rust with `core::arch` SIMD intrinsics. No oneDNN, no OpenBLAS, no ggml C bindings. This eliminates the FFI overhead, build complexity, and unsafe-FFI-boundary audit entirely (except for the ~10 POSIX syscall wrappers).
 
@@ -557,7 +557,7 @@ This is an audit-feasible surface area. A security audit of ~850 lines of unsafe
 For `core::arch` intrinsics:
 - Rust uses LLVM backend (same as Clang)
 - Intrinsic functions compile to identical machine instructions
-- Auto-vectorization (not relevant here — we use explicit intrinsics) may differ
+- Auto-vectorization (not relevant here, we use explicit intrinsics) may differ
 - `-C target-cpu=native` flag enables full AVX2/AVX-512 codegen
 
 **Build flags for maximum performance:**
@@ -707,7 +707,7 @@ neon = []           # ARM
 # cargo build --features avx512 --target x86_64-unknown-linux-gnu
 
 [dependencies]
-# Zero external dependencies — only workspace crates
+# Zero external dependencies, only workspace crates
 ```
 
 In kernel code:
@@ -770,7 +770,7 @@ bench:
 | Component | Build or Crate? | Choice | Rationale |
 |-----------|----------------|--------|-----------|
 | Q4_K_M matmul kernel | **FROM SCRATCH** | Custom SIMD (AVX2/AVX-512 + NEON + scalar) | The critical hot path. Cache-optimal layout, no generic overhead. |
-| Q8_0 / other quant matmul | **FROM SCRATCH** | Custom SIMD dispatch per quant type | Same — tight loop, must minimize memory access. |
+| Q8_0 / other quant matmul | **FROM SCRATCH** | Custom SIMD dispatch per quant type | Same, tight loop, must minimize memory access. |
 | Streaming weight executor | **FROM SCRATCH** | Custom mmap + madvise lifecycle | No crate does this. Core differentiator. |
 | KV cache manager | **FROM SCRATCH** | Contiguous + sliding window + INT8 | Tightly coupled to kernel layout. |
 | Memory budget / pressure monitor | **FROM SCRATCH** | `/proc/meminfo`, RSS tracking | Lightweight, no framework needed. |
@@ -806,11 +806,11 @@ bench:
 
 | Area | C++ State | Rust State | Gap Impact |
 |------|-----------|-----------|-----------|
-| Quantized matmul kernels | Highly optimized (llama.cpp, oneDNN) | Candle (60-70% of C++) | MEDIUM — must build custom |
-| Graph-based execution | C++ frameworks (GGML compute graph) | No equivalent | LOW — we don't need compute graph for batch-1 |
-| Memory-mapped tensor I/O | llama.cpp, PyTorch mmap | `memmap2` + custom | LOW — we have the primitives |
-| Distributed inference | TensorRT-LLM, DeepSpeed | None | N/A — single-node target |
-| Model zoo/converters | HuggingFace Python | `candle-transformers` models | LOW — sufficient models available |
+| Quantized matmul kernels | Highly optimized (llama.cpp, oneDNN) | Candle (60-70% of C++) | MEDIUM, must build custom |
+| Graph-based execution | C++ frameworks (GGML compute graph) | No equivalent | LOW, we don't need compute graph for batch-1 |
+| Memory-mapped tensor I/O | llama.cpp, PyTorch mmap | `memmap2` + custom | LOW, we have the primitives |
+| Distributed inference | TensorRT-LLM, DeepSpeed | None | N/A, single-node target |
+| Model zoo/converters | HuggingFace Python | `candle-transformers` models | LOW, sufficient models available |
 
 ---
 
@@ -820,23 +820,23 @@ bench:
 
 **Candle (candle-core):**
 ```
-candle-core/src/quantized/k_quants.rs:fn vec_dot_q4k — K-quant dot product (reference)
-candle-core/src/quantized/gguf.rs:struct Content — GGUF loading
-candle-transformers/src/models/llama.rs:impl Llama — Complete Llama forward pass
+candle-core/src/quantized/k_quants.rs:fn vec_dot_q4k, K-quant dot product (reference)
+candle-core/src/quantized/gguf.rs:struct Content, GGUF loading
+candle-transformers/src/models/llama.rs:impl Llama, Complete Llama forward pass
 ```
 
 **mistral.rs:**
 ```
-mistral.rs/src/scheduler/mod.rs — Continuous batching scheduler
-mistral.rs/src/engine/mod.rs — Token generation loop
-mistral.rs/src/pipeline/gguf.rs — GGUF loading
+mistral.rs/src/scheduler/mod.rs, Continuous batching scheduler
+mistral.rs/src/engine/mod.rs, Token generation loop
+mistral.rs/src/pipeline/gguf.rs, GGUF loading
 ```
 
 **llama.cpp (C reference):**
 ```
-ggml/src/ggml-quants.c:ggml_vec_dot_q4_K — The gold standard Q4_K_M dot product
-ggml/src/ggml.c:ggml_graph_compute — Thread pool + task dispatch
-src/llama.cpp:llama_decode_internal — Full forward pass orchestration
+ggml/src/ggml-quants.c:ggml_vec_dot_q4_K, The gold standard Q4_K_M dot product
+ggml/src/ggml.c:ggml_graph_compute, Thread pool + task dispatch
+src/llama.cpp:llama_decode_internal, Full forward pass orchestration
 ```
 
 ### 10.2 Code to Port (Priority Order)
@@ -853,7 +853,7 @@ src/llama.cpp:llama_decode_internal — Full forward pass orchestration
 
 ### 11.1 Crate Dependencies (Final List)
 
-**Inference core — everything from scratch using `core::arch` + `libc`:**
+**Inference core, everything from scratch using `core::arch` + `libc`:**
 ```rust
 // No crates needed for the inference engine core
 // Only standard library: std, core, core::arch (SIMD), libc (syscalls)
@@ -862,10 +862,10 @@ src/llama.cpp:llama_decode_internal — Full forward pass orchestration
 **Infrastructure dependencies:**
 ```toml
 [dependencies]
-# Inference core — NO external crates
+# Inference core, NO external crates
 # (uses core::arch, std, libc which is a sys crate)
 
-# Infrastructure — standard production crates
+# Infrastructure, standard production crates
 axum = { version = "0.7", features = ["tokio"] }
 tokio = { version = "1", features = ["full"] }
 tokio-stream = "0.1"
@@ -883,29 +883,29 @@ half = { version = "2", features = ["serde"] }  # f16 type (optional, can build 
 - `axum`, `tokio`, `serde`, `clap`, `toml`, `tracing` → standard infrastructure, not inference-related
 - `memmap2` → convenience wrapper around `libc::mmap`, can replace with custom in ~100 lines
 - `half` → convenience f16 type, can replace with custom in ~200 lines
-- **The inference core has zero external crate dependencies** — only `std`, `core::arch`, and `libc` (POSIX syscalls)
+- **The inference core has zero external crate dependencies**, only `std`, `core::arch`, and `libc` (POSIX syscalls)
 
 ### 11.2 Ecosystem Study Score (Reference Implementations)
 
 | Category | Available to Study | Quality | Our Build Effort |
 |----------|-------------------|---------|-----------------|
-| SIMD intrinsics | `core::arch` (std) | Excellent | Medium — verbose but complete |
-| Memory management patterns | `memmap2`, `bumpalo` sources | Excellent | Low — simple wrappers |
-| Tokenization algorithms | HuggingFace `tokenizers` source | Excellent | Medium — BPE is well-documented |
-| HTTP protocol | `tiny-http`, `hyper` sources | Good | Medium — HTTP/1.1 spec is complex |
-| Quantization kernels | llama.cpp `ggml-quants.c` | Gold standard | High — port to Rust SIMD |
-| Model implementations | Candle `candle-transformers` | Good | Medium — adapt Rust patterns |
-| GGUF parsing | `gguf` crate, Candle | Functional | Low — binary format, well-specified |
-| KV cache management | llama.cpp source | Partial | Medium — design our own layout |
-| JSON parsing | `serde_json` source | Excellent | Medium — only need OpenAI schema subset |
+| SIMD intrinsics | `core::arch` (std) | Excellent | Medium, verbose but complete |
+| Memory management patterns | `memmap2`, `bumpalo` sources | Excellent | Low, simple wrappers |
+| Tokenization algorithms | HuggingFace `tokenizers` source | Excellent | Medium, BPE is well-documented |
+| HTTP protocol | `tiny-http`, `hyper` sources | Good | Medium, HTTP/1.1 spec is complex |
+| Quantization kernels | llama.cpp `ggml-quants.c` | Gold standard | High, port to Rust SIMD |
+| Model implementations | Candle `candle-transformers` | Good | Medium, adapt Rust patterns |
+| GGUF parsing | `gguf` crate, Candle | Functional | Low, binary format, well-specified |
+| KV cache management | llama.cpp source | Partial | Medium, design our own layout |
+| JSON parsing | `serde_json` source | Excellent | Medium, only need OpenAI schema subset |
 
 ### 11.3 Critical Path Modules to Build First
 
-1. **`crates/kernels`** (Weeks 1–5): SIMD dot product, attention, norm, activation — the performance core
+1. **`crates/kernels`** (Weeks 1–5): SIMD dot product, attention, norm, activation, the performance core
 2. **`crates/memory`** (Weeks 3–5): mmap wrapper, arena allocator, KV cache manager
 3. **`crates/model`** (Weeks 1–4): GGUF parser + Llama/Qwen2/Gemma2 forward pass implementations
 4. **`crates/tokenizer`** (Weeks 1–2): BPE tokenizer with HuggingFace vocab loading
-5. **`crates/net` + `json`** (Week 7+): HTTP/1.1 + SSE + JSON parser — not on critical path
+5. **`crates/net` + `json`** (Week 7+): HTTP/1.1 + SSE + JSON parser, not on critical path
 
 ---
 
@@ -922,11 +922,11 @@ half = { version = "2", features = ["serde"] }  # f16 type (optional, can build 
 | Sampler / decoding | From scratch | ~300 |
 | Memory budget / topology | From scratch | ~200 |
 | Total inference core | **From scratch** | **~3,500–4,500** |
-| HTTP API (axum) | Crate | — |
-| JSON (serde) | Crate | — |
-| CLI (clap) | Crate | — |
-| Config (toml) | Crate | — |
-| Logging (tracing) | Crate | — |
+| HTTP API (axum) | Crate |, |
+| JSON (serde) | Crate |, |
+| CLI (clap) | Crate |, |
+| Config (toml) | Crate |, |
+| Logging (tracing) | Crate |, |
 | **Total custom codebase** | | **~4,000–5,000 lines** |
 
 **Key takeaways:**
@@ -938,4 +938,4 @@ half = { version = "2", features = ["serde"] }  # f16 type (optional, can build 
 
 ---
 
-*This completes the 9-document research knowledge base. The implementation agent should read all documents in order and begin with Phase 1 (proof of concept) as described in Document 8. Every component is built from scratch — no dependencies except `libc`.*
+*This completes the 9-document research knowledge base. The implementation agent should read all documents in order and begin with Phase 1 (proof of concept) as described in Document 8. Every component is built from scratch, no dependencies except `libc`.*

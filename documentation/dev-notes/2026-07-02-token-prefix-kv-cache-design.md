@@ -14,7 +14,7 @@ requires token-level prefix identity before reuse.
 
 ## Evidence Read
 
-- `documentation/engineering/ferrite-goal-prompt.md`
+- `documentation/engineering/ferrite-operating-model.md`
 - `documentation/engineering/ferrite-operating-model.md`
 - `documentation/adr/README.md`
 - `documentation/adr/0003-scalar-reference-inference-boundary.md`

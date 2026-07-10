@@ -11,12 +11,35 @@ resolver = "2"
 [workspace.package]
 edition = "2021"
 license = "MIT"
-repository = "https://github.com/victorbona/ferrite"
+repository = "https://github.com/vicotrbb/ferrite"
+rust-version = "1.96"
+
+[workspace.dependencies]
+ferrite-fixtures = { version = "0.1.0", path = "crates/ferrite-fixtures" }
+ferrite-inference = { version = "0.1.0", path = "crates/ferrite-inference" }
+ferrite-model = { version = "0.1.0", path = "crates/ferrite-model" }
 
 [workspace.lints.rust]
 unsafe_code = "deny"
+unsafe_op_in_unsafe_fn = "deny"
 
 [workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+cargo = { level = "deny", priority = -1 }
+allow_attributes_without_reason = "deny"
+collection_is_never_read = "deny"
+dbg_macro = "deny"
+inefficient_to_string = "deny"
+large_futures = "deny"
+large_stack_arrays = "deny"
+map_err_ignore = "deny"
+mem_forget = "deny"
+needless_collect = "deny"
 panic = "deny"
+rc_buffer = "deny"
+redundant_clone = "deny"
+todo = "deny"
+undocumented_unsafe_blocks = "deny"
+unimplemented = "deny"
 unwrap_used = "deny"
 expect_used = "deny"

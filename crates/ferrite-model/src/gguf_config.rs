@@ -1,6 +1,10 @@
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// A model architecture supported by Ferrite's GGUF configuration parser.
 pub enum ModelArchitecture {
+    /// The Llama transformer family.
     Llama,
+    /// The Qwen2 transformer family, including Qwen2.5 models that use this
+    /// GGUF architecture identifier.
     Qwen2,
 }
 
@@ -26,30 +30,51 @@ impl ModelArchitecture {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+/// Validated transformer configuration selected by architecture.
 pub enum ModelConfig {
+    /// A Llama-family model configuration.
     Llama(TransformerConfig),
+    /// A Qwen2-family model configuration.
     Qwen2(TransformerConfig),
 }
 
 #[derive(Clone, Debug, PartialEq)]
+/// Architecture-independent transformer dimensions read from GGUF metadata.
 pub struct TransformerConfig {
+    /// The model architecture that determined the metadata prefix and defaults.
     pub architecture: ModelArchitecture,
+    /// The maximum model context length in tokens.
     pub context_length: u64,
+    /// The hidden-state width.
     pub embedding_length: u64,
+    /// The number of transformer blocks.
     pub block_count: u64,
+    /// The feed-forward network width.
     pub feed_forward_length: u64,
+    /// The number of query attention heads.
     pub attention_head_count: u64,
+    /// The number of key and value attention heads.
     pub attention_head_count_kv: u64,
+    /// The key dimension for each attention head.
     pub key_length: u64,
+    /// The value dimension for each attention head.
     pub value_length: u64,
+    /// The RMS normalization epsilon, when the GGUF metadata specifies one.
     pub attention_layer_norm_rms_epsilon: Option<f32>,
+    /// The number of key dimensions transformed by rotary position encoding.
     pub rope_dimension_count: u64,
+    /// The rotary position encoding frequency base, when explicitly specified.
     pub rope_freq_base: Option<f32>,
 }
 
+/// Backward-compatible name for a Llama transformer configuration.
 pub type LlamaConfig = TransformerConfig;
 
 impl TransformerConfig {
+    /// Returns the grouped-query attention ratio when the head layout is valid.
+    ///
+    /// A result of `None` means the key/value head count is zero or does not
+    /// divide the query head count evenly.
     pub fn gqa_ratio(&self) -> Option<u64> {
         if self.attention_head_count_kv == 0 {
             return None;

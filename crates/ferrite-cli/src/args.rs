@@ -352,7 +352,7 @@ fn next_value(
 fn os_string_to_string(value: OsString) -> Result<String, Box<dyn Error>> {
     value
         .into_string()
-        .map_err(|_| io::Error::other("prompt must be valid UTF-8").into())
+        .map_err(|_error| io::Error::other("prompt must be valid UTF-8").into())
 }
 
 fn parse_usize(value: OsString, flag: &str) -> Result<usize, Box<dyn Error>> {
@@ -398,8 +398,8 @@ fn parse_token_ids(value: OsString) -> Result<Vec<usize>, Box<dyn Error>> {
     Ok(token_ids)
 }
 
-fn usage() -> &'static str {
-    "usage: ferrite --model <path.gguf> (--prompt <text> | --prompt-token-ids <id[,id...]>) [--expect-token-id <id>] [--top-logits <count>] [--profile-next-token] [--generate-tokens <count>] [--expect-generated-token-ids <id[,id...]>] [--stream] [--benchmark-runs <count>] [--benchmark-tokenization-runs <count>] [--profile-benchmark-token] [--sleep-after-load-ms <ms>] [--experimental-q8-k-activation-matvec | --experimental-residual-q8-activation-matvec] [--experimental-q8-k-activation-roles <role[,role...]>] [--compare-q8-k-activation-matvec] [--kv-backend <vec|locus>] [--kv-tokens-per-block <count>] [--kv-max-tokens <count>]"
+pub(crate) fn usage() -> &'static str {
+    "usage: ferrite --model <path.gguf> (--prompt <text> | --prompt-token-ids <id[,id...]>) [--threads <count>] [--expect-token-id <id>] [--top-logits <count>] [--profile-next-token] [--generate-tokens <count>] [--expect-generated-token-ids <id[,id...]>] [--stream] [--benchmark-runs <count>] [--benchmark-batch-streams <count>] [--benchmark-tokenization-runs <count>] [--profile-benchmark-token] [--sleep-after-load-ms <ms>] [--experimental-q8-k-activation-matvec | --experimental-residual-q8-activation-matvec] [--experimental-q8-k-activation-roles <role[,role...]>] [--compare-q8-k-activation-matvec] [--kv-backend <vec|locus>] [--kv-tokens-per-block <count>] [--kv-max-tokens <count>]"
 }
 
 #[cfg(test)]

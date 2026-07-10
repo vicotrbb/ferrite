@@ -1,4 +1,10 @@
-#![cfg_attr(target_arch = "aarch64", allow(unsafe_code))]
+#![cfg_attr(
+    target_arch = "aarch64",
+    allow(
+        unsafe_code,
+        reason = "audited aarch64 SIMD intrinsics are isolated in this quantizer module"
+    )
+)]
 
 use super::InferenceError;
 
@@ -111,6 +117,8 @@ fn quantize_scalar(values: &[f32], inverse_scale: f32, qs: &mut [i8; Q8_K_BLOCK_
 #[cfg(target_arch = "aarch64")]
 #[target_feature(enable = "neon")]
 unsafe fn quantize_neon(values: &[f32], inverse_scale: f32, qs: &mut [i8; Q8_K_BLOCK_VALUES]) {
+    // SAFETY: callers provide exactly 256 input and output values, and the
+    // loop advances in eight-value chunks while NEON is enabled.
     unsafe {
         let inverse = vdupq_n_f32(inverse_scale);
         let minimum = vdupq_n_f32(-127.0);

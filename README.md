@@ -1,178 +1,107 @@
-# Project Ferrite
+# Ferrite
 
-Ferrite is a CPU native LLM inference engine made in Rust.
+Ferrite is a CPU-native large language model inference engine written in Rust.
+It loads GGUF models, runs quantized inference with architecture-specific SIMD
+kernels, and exposes both a command-line interface and an OpenAI-compatible
+HTTP server.
 
-## OpenAI-Compatible Server
+Ferrite is currently alpha software. The supported surface is deliberately
+small and well tested, but model coverage and sampling features are not yet
+complete.
 
-Ferrite includes a local OpenAI-compatible HTTP server:
+## Highlights
 
-```sh
-cargo run --release -p ferrite-server -- \
-  --model target/models/model.gguf \
-  --model-id ferrite-local \
-  --bind 127.0.0.1:8080 \
-  --api-key local-secret \
-  --default-max-tokens 16 \
-  --hard-max-tokens 256 \
-  --inference-wait-ms 30000
-```
+- Llama and Qwen2 model architectures, including Qwen2.5 GGUF artifacts.
+- F32, F16, BF16, Q4_K, Q5_0, Q6_K, and Q8_0 tensor loading.
+- NEON, Arm I8MM, and x86_64 AVX2 kernels with portable fallbacks.
+- Greedy text generation, token streaming, profiling, and reproducible evals.
+- OpenAI-compatible models, completions, and chat-completions endpoints.
+- Optional prompt-prefix caching and experimental continuous batching.
+- No model or binary test assets committed to the repository. Test GGUF data
+  is generated in memory, and real-model tests use local artifacts explicitly.
 
-Initial endpoints:
+## Quick start
 
-- `GET /health`
-- `GET /v1/models`
-- `GET /v1/models/{model}`
-- `POST /v1/completions`
-- `POST /v1/chat/completions`
-
-Example with the locally proven Qwen2.5-1.5B Q8_0 artifact:
+Install Rust 1.96.1 through [rustup](https://rustup.rs/), then build the release
+binaries:
 
 ```sh
-cargo run --release -p ferrite-server -- \
-  --model target/models/qwen2.5-1.5b-instruct-q8_0.gguf \
-  --model-id qwen2.5-1.5b-q8_0 \
-  --bind 127.0.0.1:8080 \
-  --api-key local-secret \
-  --default-max-tokens 1 \
-  --hard-max-tokens 16 \
-  --inference-wait-ms 30000
+git clone https://github.com/vicotrbb/ferrite.git
+cd ferrite
+cargo build --release --locked -p ferrite-cli -p ferrite-server
 ```
 
-Readiness and model catalog checks:
-
-```sh
-curl http://127.0.0.1:8080/health
-
-curl http://127.0.0.1:8080/v1/models \
-  -H 'authorization: Bearer local-secret'
-
-curl http://127.0.0.1:8080/v1/models/ferrite-local \
-  -H 'authorization: Bearer local-secret'
-```
-
-Model IDs may use provider-style names with slashes, matching common OpenAI
-client and Hugging Face workflows:
-
-```sh
-cargo run --release -p ferrite-server -- \
-  --model target/models/Qwen2.5-0.5B-Instruct-Q4_K_M.gguf \
-  --model-id Qwen/Qwen2.5-0.5B-Instruct-Q4_K_M \
-  --bind 127.0.0.1:8080 \
-  --api-key local-secret
-
-curl 'http://127.0.0.1:8080/v1/models/Qwen/Qwen2.5-0.5B-Instruct-Q4_K_M' \
-  -H 'authorization: Bearer local-secret'
-```
-
-Example completion request:
-
-```sh
-curl http://127.0.0.1:8080/v1/completions \
-  -H 'content-type: application/json' \
-  -H 'authorization: Bearer local-secret' \
-  -d '{"model":"ferrite-local","prompt":"hello world","max_tokens":16}'
-```
-
-Example chat request:
-
-```sh
-curl http://127.0.0.1:8080/v1/chat/completions \
-  -H 'content-type: application/json' \
-  -H 'authorization: Bearer local-secret' \
-  -d '{"model":"ferrite-local","messages":[{"role":"user","content":"hello world"}],"max_completion_tokens":16}'
-```
-
-Point OpenAI-compatible clients at `http://127.0.0.1:8080/v1` as the base URL.
-The server supports non-streaming text generation and OpenAI-style SSE streams.
-Ferrite has live regression tests using the `async-openai` client configured
-with a Ferrite base URL for model catalog, legacy completions, chat
-completions, SSE streams, and bearer-token auth.
-Ferrite returns CORS headers for `/v1/*` responses and unauthenticated CORS
-preflight responses for supported OpenAI-compatible endpoints so local browser
-clients can call the API.
-`--api-key` is optional; when set, `/v1/*` endpoints require
-`Authorization: Bearer <api-key>`, while `/health` remains open for local
-readiness checks. `/health` returns `ready: false` until a model is loaded.
-`--default-max-tokens` controls requests that omit `max_tokens` or
-`max_completion_tokens`; `--hard-max-tokens` caps every generation request.
-`--inference-wait-ms` controls how long an overlapping generation request waits
-for the single inference permit before Ferrite returns an OpenAI-shaped
-`429 rate_limit_error`. The default is `0`, which preserves immediate
-backpressure. Ferrite does not yet execute multiple model generations in
-parallel.
-
-`--experimental-prefix-cache` enables explicit prompt-cache namespaces for
-OpenAI-compatible requests. When enabled, repeated
-`POST /v1/chat/completions` and `POST /v1/completions` calls with the same
-`prompt_cache_key` can report reused prompt tokens in
-`usage.prompt_tokens_details.cached_tokens`. Without the flag,
-`prompt_cache_key` is accepted as compatibility metadata but does not enable
-cross-request prefix-cache reuse.
-
-Streaming responses send token chunks as generation progresses:
-
-```sh
-curl -N http://127.0.0.1:8080/v1/chat/completions \
-  -H 'content-type: application/json' \
-  -H 'authorization: Bearer local-secret' \
-  -d '{"model":"ferrite-local","messages":[{"role":"user","content":"hello world"}],"max_completion_tokens":16,"stream":true,"stream_options":{"include_usage":true}}'
-```
-
-When `stream_options.include_usage` is true, Ferrite emits a final usage chunk
-before `data: [DONE]`.
-
-Release-oriented HTTP throughput checks should run the server and benchmark
-client as separate release binaries:
-
-```sh
-cargo build --release -p ferrite-server
-
-target/release/ferrite-server \
-  --model target/models/qwen2.5-1.5b-instruct-q8_0.gguf \
-  --model-id qwen2.5-1.5b-q8_0 \
-  --bind 127.0.0.1:8080 \
-  --api-key local-secret \
-  --default-max-tokens 1 \
-  --hard-max-tokens 16 \
-  --inference-wait-ms 30000
-
-target/release/ferrite-openai-throughput \
-  --addr 127.0.0.1:8080 \
-  --endpoint completions \
-  --model qwen2.5-1.5b-q8_0 \
-  --prompt 'hello world' \
-  --requests 3 \
-  --concurrency 1 \
-  --max-tokens 1 \
-  --api-key local-secret
-```
-
-Use `--endpoint chat-completions` to measure
-`POST /v1/chat/completions` with the prompt wrapped as a single user message.
-Use `--stream` to measure OpenAI-style SSE streams for either endpoint. The
-client prints endpoint-specific request counters:
-`openai_http_completion_requests`, `openai_http_chat_completion_requests`,
-`openai_http_streaming_completion_requests`, or
-`openai_http_streaming_chat_completion_requests`, plus `elapsed_ms` and
-`requests_per_second`. Record throughput claims under
-`documentation/benchmarks/` with the exact server/client commands, model, host,
-build mode, endpoint, stream mode, request count, concurrency, prompt, and
-generated-token count.
-
-## CLI Memory Sampling
-
-For memory probes, the `ferrite` CLI can pause after loading the model and
-dropping the raw GGUF byte buffer:
+Place a supported GGUF model under `target/models/`, then run a completion:
 
 ```sh
 target/release/ferrite \
-  --model target/models/model.gguf \
-  --prompt 'hello world' \
-  --sleep-after-load-ms 5000 \
-  --generate-tokens 1
+  --model target/models/qwen2.5-0.5b-instruct-q4_k_m.gguf \
+  --prompt 'Write one sentence about Rust.' \
+  --generate-tokens 32 \
+  --stream
 ```
 
-The CLI prints `sleep_after_load_ms=<ms>` and flushes stdout before sleeping,
-so an external sampler can collect current RSS with `ps -o rss= -p "$pid"`.
-Use `/usr/bin/time -l` separately for peak RSS; wrapping the command with
-`time` changes which process `$!` points at in shell scripts.
+Or start the HTTP server:
+
+```sh
+target/release/ferrite-server \
+  --model target/models/qwen2.5-0.5b-instruct-q4_k_m.gguf \
+  --model-id qwen2.5-0.5b-q4_k_m \
+  --bind 127.0.0.1:8080 \
+  --api-key local-secret
+```
+
+```sh
+curl http://127.0.0.1:8080/v1/chat/completions \
+  -H 'authorization: Bearer local-secret' \
+  -H 'content-type: application/json' \
+  -d '{"model":"qwen2.5-0.5b-q4_k_m","messages":[{"role":"user","content":"Hello"}],"max_completion_tokens":32}'
+```
+
+For the measured, machine-specific fast path, follow the
+[performance golden path](docs/performance.md). Do not assume that an
+experimental kernel is faster or compatible on every CPU.
+
+## Documentation
+
+- [Documentation index](docs/README.md)
+- [Getting started](docs/getting-started.md)
+- [Performance golden path](docs/performance.md)
+- [Command-line interface](docs/cli.md)
+- [HTTP server](docs/server.md)
+- [OpenAI API compatibility](docs/openai-api.md)
+- [Models and tensor formats](docs/models.md)
+- [Architecture](docs/architecture.md)
+- [Evaluation and regression gates](docs/evaluation.md)
+- [Development guide](docs/development.md)
+- [Safety policy](docs/safety.md)
+- [Troubleshooting](docs/troubleshooting.md)
+
+The `documentation/` tree contains ADRs, benchmark evidence, focused research,
+and historical implementation notes. It is an engineering record, while
+`docs/` is the maintained user and contributor guide.
+
+## Repository layout
+
+```text
+crates/ferrite-model       GGUF parsing and tokenization
+crates/ferrite-inference   model loading, sessions, cache, and CPU kernels
+crates/ferrite-cli         local generation, profiling, and benchmarking
+crates/ferrite-server      OpenAI-compatible serving and eval clients
+crates/ferrite-fixtures    generated test fixtures
+docs                       maintained user and contributor documentation
+documentation              ADRs and measured engineering evidence
+research                   original CPU inference research corpus
+scripts                    eval harness and repository checks
+```
+
+## Quality gates
+
+The required local checks are documented in [CONTRIBUTING.md](CONTRIBUTING.md).
+CI runs formatting, strict Clippy, and all workspace tests with all features on
+Linux and macOS. Linux jobs also enforce rustdoc, documentation, eval-harness,
+package, RustSec advisory, license, duplicate-dependency, and source policy.
+
+## License
+
+Ferrite is available under the [MIT License](LICENSE).

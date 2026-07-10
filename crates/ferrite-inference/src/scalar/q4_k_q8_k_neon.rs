@@ -1,4 +1,7 @@
-#![allow(unsafe_code)]
+#![allow(
+    unsafe_code,
+    reason = "audited aarch64 SIMD intrinsics are isolated in this kernel module"
+)]
 
 use super::{
     neon_util::native_f16_bits_to_f32,
@@ -94,8 +97,14 @@ pub(in crate::scalar) fn neon_q4_k_q8_k_block_dot(
 
 #[target_feature(enable = "neon")]
 unsafe fn neon_q4_k_q8_k_block_dot_unchecked(block: &[u8], activation: &BlockQ8K) -> f32 {
-    let d = unsafe { native_f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]])) };
-    let dmin = unsafe { native_f16_bits_to_f32(u16::from_le_bytes([block[2], block[3]])) };
+    // SAFETY: NEON is enabled on this function and the caller validated the
+    // complete Q4_K block before reaching this unchecked kernel.
+    let (d, dmin) = unsafe {
+        (
+            native_f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]])),
+            native_f16_bits_to_f32(u16::from_le_bytes([block[2], block[3]])),
+        )
+    };
     let scales = &block[4..16];
     let quants = &block[16..];
     let mask = vdupq_n_u8(0x0f);
@@ -108,10 +117,17 @@ unsafe fn neon_q4_k_q8_k_block_dot_unchecked(block: &[u8], activation: &BlockQ8K
         let (scale_low, min_low) = q4_k_scale_min(scale_index, scales);
         let (scale_high, min_high) = q4_k_scale_min(scale_index + 1, scales);
 
-        let q8_low = activation.qs.as_ptr().add(activation_offset);
-        let q8_high = activation.qs.as_ptr().add(activation_offset + 32);
-        let low_dot = q4_nibble_dot_32(quant_chunk.as_ptr(), q8_low, mask, Q4Nibble::Low);
-        let high_dot = q4_nibble_dot_32(quant_chunk.as_ptr(), q8_high, mask, Q4Nibble::High);
+        // SAFETY: each quant chunk contains 32 bytes, the two activation
+        // windows contain 32 values each, and `activation_offset` advances by
+        // 64 through the fixed 256-value activation block.
+        let (low_dot, high_dot) = unsafe {
+            let q8_low = activation.qs.as_ptr().add(activation_offset);
+            let q8_high = activation.qs.as_ptr().add(activation_offset + 32);
+            (
+                q4_nibble_dot_32(quant_chunk.as_ptr(), q8_low, mask, Q4Nibble::Low),
+                q4_nibble_dot_32(quant_chunk.as_ptr(), q8_high, mask, Q4Nibble::High),
+            )
+        };
 
         weighted_sum += i32::from(scale_low) * low_dot + i32::from(scale_high) * high_dot;
         min_sum += i32::from(min_low)
@@ -141,14 +157,18 @@ unsafe fn q4_nibble_dot_32(
     mask: uint8x16_t,
     nibble: Q4Nibble,
 ) -> i32 {
-    let q4_a = vld1q_u8(q4);
-    let q4_b = vld1q_u8(q4.add(16));
-    let q4_a = q4_nibble_lanes(q4_a, mask, nibble);
-    let q4_b = q4_nibble_lanes(q4_b, mask, nibble);
-    let q8_a = vld1q_s8(q8);
-    let q8_b = vld1q_s8(q8.add(16));
+    // SAFETY: the caller provides readable 32-value Q4 and Q8 windows. NEON
+    // is enabled on this function, so the target-feature helpers are valid.
+    unsafe {
+        let q4_a = vld1q_u8(q4);
+        let q4_b = vld1q_u8(q4.add(16));
+        let q4_a = q4_nibble_lanes(q4_a, mask, nibble);
+        let q4_b = q4_nibble_lanes(q4_b, mask, nibble);
+        let q8_a = vld1q_s8(q8);
+        let q8_b = vld1q_s8(q8.add(16));
 
-    vaddvq_s32(vaddq_s32(dot_i8x16(q4_a, q8_a), dot_i8x16(q4_b, q8_b)))
+        vaddvq_s32(vaddq_s32(dot_i8x16(q4_a, q8_a), dot_i8x16(q4_b, q8_b)))
+    }
 }
 
 #[target_feature(enable = "neon")]

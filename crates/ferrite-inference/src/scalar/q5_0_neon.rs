@@ -1,4 +1,7 @@
-#![allow(unsafe_code)]
+#![allow(
+    unsafe_code,
+    reason = "audited aarch64 SIMD intrinsics are isolated in this kernel module"
+)]
 
 use super::{
     neon_util::{native_f16_bits_to_f32, widen_s8_lanes},
@@ -145,6 +148,8 @@ unsafe fn neon_q5_0_block_dot_batch(
     col_base: usize,
     row_out: &mut [f32],
 ) {
+    // SAFETY: NEON is enabled on this function and callers provide a complete
+    // Q5_0 block whose first two bytes hold the half-precision scale.
     let scale = unsafe { native_f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]])) };
     let quants = &block[6..];
 
@@ -304,6 +309,8 @@ const fn build_q5_sign_offsets() -> [[u8; 8]; 256] {
 /// 2 KiB table remains L1-resident and lets one signed add finish each half.
 #[inline(always)]
 pub(super) unsafe fn q5_signed_offsets(block: &[u8]) -> (uint8x16_t, uint8x16_t) {
+    // SAFETY: callers provide a complete Q5_0 block, so bytes 2 through 5
+    // select four valid 8-lane lookup rows from the fixed table.
     unsafe {
         let low = vcombine_u8(
             vld1_u8(Q5_SIGN_OFFSETS[block[2] as usize].as_ptr()),
@@ -319,6 +326,7 @@ pub(super) unsafe fn q5_signed_offsets(block: &[u8]) -> (uint8x16_t, uint8x16_t)
 
 #[target_feature(enable = "neon")]
 pub(super) unsafe fn neon_q5_0_block_dot(block: &[u8], vector: &[f32]) -> f32 {
+    // SAFETY: NEON is enabled and callers provide a complete Q5_0 block.
     let scale = unsafe { native_f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]])) };
     let quants = &block[6..];
 
@@ -378,6 +386,8 @@ mod tests {
             .map(|index| (index % 9) as f32 - 4.0)
             .collect::<Vec<_>>();
 
+        // SAFETY: the test provides a complete Q5_0 block and matching
+        // 32-value activation on an aarch64 target with baseline NEON.
         let actual = unsafe { neon_q5_0_block_dot(&block, &vector) };
         let expected = decode_q5_0_row(&block, Q5_0_BLOCK_VALUES)?
             .iter()
@@ -405,8 +415,11 @@ mod tests {
         let references = vectors.iter().map(Vec::as_slice).collect::<Vec<_>>();
         let mut actual = vec![0.0; references.len()];
 
+        // SAFETY: every test vector has one complete Q5_0 activation window,
+        // and the output has one slot per input stream.
         unsafe { neon_q5_0_block_dot_batch(&block, &references, 0, &mut actual) };
         for (index, vector) in references.iter().enumerate() {
+            // SAFETY: each reference is a complete 32-value activation.
             let expected = unsafe { neon_q5_0_block_dot(&block, vector) };
             assert_eq!(actual[index].to_bits(), expected.to_bits());
         }
@@ -431,6 +444,8 @@ mod tests {
             let mut block = patterned_q5_0_block();
             block[2..6].copy_from_slice(&high_bits.to_le_bytes());
 
+            // SAFETY: each modified input remains a complete Q5_0 block and
+            // the activation retains its validated 32-value length.
             let actual = unsafe { neon_q5_0_block_dot(&block, &vector) };
             let expected = decode_q5_0_row(&block, Q5_0_BLOCK_VALUES)?
                 .iter()

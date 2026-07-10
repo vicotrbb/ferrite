@@ -124,8 +124,7 @@ fn prefix_cache_key_includes_execution_request_shape_and_namespace() {
     );
     assert_ne!(
         key,
-        PrefixCacheKey::new(fingerprints.clone(), prefix.clone())
-            .with_namespace("tenant-b:prompt-1")
+        PrefixCacheKey::new(fingerprints.clone(), prefix).with_namespace("tenant-b:prompt-1")
     );
     assert_ne!(
         key,
@@ -210,7 +209,7 @@ fn prefix_cache_store_finds_longest_compatible_token_prefix() {
     let different_namespace = prefix_cache_entry_with_tokens("tenant-b", [10, 20, 30, 40], 100, 3);
     let query = prefix_cache_key_with_tokens("tenant-a", [10, 20, 30, 40, 50]);
 
-    assert!(store.insert(short.clone()).is_empty());
+    assert!(store.insert(short).is_empty());
     assert!(store.insert(long.clone()).is_empty());
     assert!(store.insert(different_namespace).is_empty());
 

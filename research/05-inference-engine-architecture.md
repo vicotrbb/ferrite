@@ -1,4 +1,4 @@
-# Document 5: Runtime Architecture — Scheduling, Batching, and Request Handling
+# Document 5: Runtime Architecture, Scheduling, Batching, and Request Handling
 
 **Research Program:** CPU-Native LLM Inference Runtime  
 **Target Spec:** 9B parameter model, 2 vCPUs, 6 GB RAM, 2–5 tok/s  
@@ -11,7 +11,7 @@
 
 This document proposes the complete runtime architecture for our CPU-native LLM inference engine. It covers component boundaries, the Rust crate ecosystem decisions, continuous batching applicability, KV cache management, speculative decoding, prompt caching, and the HTTP API layer.
 
-**Zero-dependency philosophy: everything is built from scratch.** No third-party crates except `libc` for syscall wrappers (`mmap`, `madvise`, `sched_getaffinity`). Every component — HTTP server, tokenizer, thread pool, memory allocator, SIMD kernels, JSON parser — is custom-implemented. This gives:
+**Zero-dependency philosophy: everything is built from scratch.** No third-party crates except `libc` for syscall wrappers (`mmap`, `madvise`, `sched_getaffinity`). Every component, HTTP server, tokenizer, thread pool, memory allocator, SIMD kernels, JSON parser, is custom-implemented. This gives:
 1. Total control over every allocation and cache line
 2. Zero supply chain risk
 3. Maximum optimization surface (no opaque crate behavior)
@@ -160,7 +160,7 @@ For Llama-3.1-8B Q4_K_M, one token generation involves:
 | Per-layer: Q projection | 8 MB | 8 KB | 4096² × 4.625/8 |
 | Per-layer: K projection | 1 MB | 32 B | GQA: 8 KV heads |
 | Per-layer: V projection | 1 MB | 32 B | GQA: 8 KV heads |
-| Per-layer: KV cache update | — | 64 B | Append K, V for current token |
+| Per-layer: KV cache update |, | 64 B | Append K, V for current token |
 | Per-layer: Attention | 512 KB | 8 KB | Read full K,V from cache |
 | Per-layer: O projection | 8 MB | 8 KB | |
 | Per-layer: FFN gate+up | 45 MB | 22 KB | 11008 × 4096 × 2 |
@@ -180,10 +180,10 @@ This confirms the memory-bandwidth-bound nature: ~3.7 GB reads per token.
 
 | Component | Approach | Why |
 |-----------|----------|-----|
-| SIMD matmul kernels | **FROM SCRATCH** (core::arch) | The hot path — maximum control, cache-optimal |
+| SIMD matmul kernels | **FROM SCRATCH** (core::arch) | The hot path, maximum control, cache-optimal |
 | Quantization formats | **FROM SCRATCH** | Custom CQR-4 format optimized for streaming |
 | KV cache manager | **FROM SCRATCH** | Novel streaming + eviction design |
-| Weight memory manager | **FROM SCRATCH** | mmap streaming with madvise — no crate does this |
+| Weight memory manager | **FROM SCRATCH** | mmap streaming with madvise, no crate does this |
 | Model execution loop | **FROM SCRATCH** | Layer-by-layer streaming design |
 | Sampling / decoding | **FROM SCRATCH** | Tightly integrated with execution |
 | BPE tokenizer | **FROM SCRATCH** or `tokenizers` crate | Either works, not a bottleneck |
@@ -348,7 +348,7 @@ impl KVCache {
 }
 ```
 
-**Memory benefit:** With sliding window of 4096, the KV cache only needs to store the last 4096 tokens' K and V — regardless of total conversation length. This saves ~50% memory for long conversations.
+**Memory benefit:** With sliding window of 4096, the KV cache only needs to store the last 4096 tokens' K and V, regardless of total conversation length. This saves ~50% memory for long conversations.
 
 **Circular buffer implementation for sliding window:**
 ```rust
@@ -420,7 +420,7 @@ Hmm. Let me reconsider. On CPU, batched forward pass for K tokens:
 - On memory-bound workload: batch-4 costs ~same time as batch-1 (memory BW dominates)
 
 **Key insight for CPU:** Speculative decoding is MORE effective on CPU than GPU because:
-1. The target model's forward pass is memory-bound — batch-1 and batch-4 take similar wall time
+1. The target model's forward pass is memory-bound, batch-1 and batch-4 take similar wall time
 2. The draft model runs at ~30 tok/s (fast)
 3. Acceptance rate: ~70-85% for aligned draft/target models (same architecture family)
 
@@ -512,7 +512,7 @@ impl PrefixCache {
 
 ### 9.1 Custom BPE Tokenizer
 
-We build our own BPE (Byte-Pair Encoding) tokenizer rather than depending on the `tokenizers` crate. This is straightforward — BPE is a well-understood algorithm (~500 lines of Rust).
+We build our own BPE (Byte-Pair Encoding) tokenizer rather than depending on the `tokenizers` crate. This is straightforward, BPE is a well-understood algorithm (~500 lines of Rust).
 
 **Design:**
 ```rust
@@ -524,7 +524,7 @@ pub struct BpeTokenizer {
 }
 
 impl BpeTokenizer {
-    /// Load from tokenizer.json (HuggingFace format) — parsed by our custom JSON parser
+    /// Load from tokenizer.json (HuggingFace format), parsed by our custom JSON parser
     pub fn load(tokenizer_json: &[u8]) -> Self { ... }
 
     /// Encode text → token IDs
@@ -755,4 +755,4 @@ async fn main() {
 
 ---
 
-*Next: Document 6 covers target model architectures in detail — Qwen2.5, Gemma-2, Llama-3.1, Phi, and BitNet models with compatibility matrices.*
+*Next: Document 6 covers target model architectures in detail, Qwen2.5, Gemma-2, Llama-3.1, Phi, and BitNet models with compatibility matrices.*

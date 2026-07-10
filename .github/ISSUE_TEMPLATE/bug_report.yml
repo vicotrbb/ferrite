@@ -1,0 +1,36 @@
+name: Bug report
+description: Report incorrect behavior, a crash, or a compatibility problem
+title: "bug: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for helping improve Ferrite. Please remove secrets and private model paths from logs.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Include the command or request, model family, GGUF quantization, and smallest reproducing prompt.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include Ferrite commit, OS, architecture, CPU, Rust version, and available memory.
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Relevant output
+      description: Include the complete error and any relevant logs.
+      render: text

@@ -35,7 +35,7 @@ Based on the research across Documents 1–7 and 9, the following architecture i
 - Fits 6 GB with 4096-token context (FP16 KV) or 8192 (INT8 KV)
 - Standard architecture (no exotic features)
 - Massive community support and GGUF model availability
-- 4:1 GQA ratio — reasonable KV cache
+- 4:1 GQA ratio, reasonable KV cache
 
 **Secondary:** Qwen2.5-7B (more memory headroom, 7:1 GQA)
 **Stretch:** Gemma-2-9B (highest quality but tight fit, requires INT8 KV)
@@ -92,17 +92,17 @@ Based on the research across Documents 1–7 and 9, the following architecture i
 8. CLI tool: `cargo run -- generate <model.gguf> --prompt "Hello"`
 
 **Technical notes:**
-- `libc` crate is the ONLY external dependency — raw `mmap`, `munmap`, `madvise` calls
+- `libc` crate is the ONLY external dependency, raw `mmap`, `munmap`, `madvise` calls
 - Custom f16 struct: wrapping `u16` with `to_f32()`/`from_f32()` using bit manipulation
 - Custom `cast_slice::<T>(bytes: &[u8]) -> &[T]` for zero-copy tensor access
 - Tokenizer parses HuggingFace `tokenizer.json` using our custom JSON parser
-- No performance optimization — correctness first
+- No performance optimization, correctness first
 
 **Build vs reuse:**
 - GGUF parser: from scratch (alignment-sensitive, tied to streaming design)
 - Model architectures: from scratch (tightly coupled to our memory layout)
 - Tokenizer: `tokenizers` crate or from scratch (either works, not a bottleneck)
-- HTTP API: `axum` + `serde` (Phase 5 — not blocking)
+- HTTP API: `axum` + `serde` (Phase 5, not blocking)
 
 **Success criteria:**
 - Output matches llama.cpp reference output for the same model + seed
@@ -112,7 +112,7 @@ Based on the research across Documents 1–7 and 9, the following architecture i
 - `libc`: syscall bindings (mmap, madvise, sched_getaffinity)
 - `memmap2`: mmap convenience (optional, can use raw libc)
 - `half`: f16 type (optional, can build custom)
-- Rust `std` and `core::arch` — SIMD intrinsics are in the standard library
+- Rust `std` and `core::arch`, SIMD intrinsics are in the standard library
 
 ### Phase 2: Optimized Kernels (3 weeks)
 
@@ -228,12 +228,12 @@ compatibility contract and server module boundaries.
 **Goal:** Run unquantized 9B FP16 models on 5 GB RAM via mmap streaming from NVMe disk. This is the killer differentiator.
 
 **Deliverables:**
-1. **Streaming executor** — Layer-by-layer forward pass with `madvise(DONTNEED)` after each layer
-2. **Intelligent readahead** — Prefetch next layer weights from disk while computing current layer
-3. **`MADV_SEQUENTIAL` hints** — Optimize kernel readahead pattern for sequential layer access
-4. **Hybrid mode** — Auto-select quantized (fast) vs streaming FP16 (quality) based on RAM and request
-5. **Partial resident caching** — Keep embedding/lm_head + frequently accessed small layers pinned
-6. **Disk speed benchmarking** — Auto-detect SSD vs HDD, adjust streaming parameters
+1. **Streaming executor**, Layer-by-layer forward pass with `madvise(DONTNEED)` after each layer
+2. **Intelligent readahead**, Prefetch next layer weights from disk while computing current layer
+3. **`MADV_SEQUENTIAL` hints**, Optimize kernel readahead pattern for sequential layer access
+4. **Hybrid mode**, Auto-select quantized (fast) vs streaming FP16 (quality) based on RAM and request
+5. **Partial resident caching**, Keep embedding/lm_head + frequently accessed small layers pinned
+6. **Disk speed benchmarking**, Auto-detect SSD vs HDD, adjust streaming parameters
 
 **Success criteria:**
 - Unquantized Llama-3.1-8B FP16 generates tokens on 5 GB RAM machine
@@ -241,18 +241,18 @@ compatibility contract and server module boundaries.
 - Prefill throughput ≥50 tok/s after initial weight load
 - No OOM kills, graceful degradation on slow disk
 
-**Why this works:** The model file is mmap'd into virtual memory (16 GB virtual, 0 physical). Each layer (~500 MB FP16) is page-faulted from SSD as needed, computed, then released via `madvise(DONTNEED)`. Peak physical RAM: ~1.3 GB (current layer + KV cache + overhead). The SSD acts as extended memory — essentially a "memory tier between RAM and network storage."
+**Why this works:** The model file is mmap'd into virtual memory (16 GB virtual, 0 physical). Each layer (~500 MB FP16) is page-faulted from SSD as needed, computed, then released via `madvise(DONTNEED)`. Peak physical RAM: ~1.3 GB (current layer + KV cache + overhead). The SSD acts as extended memory, essentially a "memory tier between RAM and network storage."
 
 ### Phase 7: Advanced Features (2 weeks)
 
 **Goal:** Optional performance and UX enhancements.
 
 **Deliverables:**
-1. **INT8 KV cache** — Quantize KV cache entries to INT8 (half memory, ~0.2 ppl loss)
-2. **Prefix caching** — Cache system prompt KV for multi-turn speedup
-3. **Speculative decoding** — Optional draft model (Qwen2.5-0.5B) for throughput boost
-4. **AVX-512 VNNI kernels** — When available, 30-50% per-core speedup
-5. **Memory pressure handling** — Dynamic context reduction when RAM is tight
+1. **INT8 KV cache**, Quantize KV cache entries to INT8 (half memory, ~0.2 ppl loss)
+2. **Prefix caching**, Cache system prompt KV for multi-turn speedup
+3. **Speculative decoding**, Optional draft model (Qwen2.5-0.5B) for throughput boost
+4. **AVX-512 VNNI kernels**, When available, 30-50% per-core speedup
+5. **Memory pressure handling**, Dynamic context reduction when RAM is tight
 
 **Success criteria:**
 - INT8 KV cache: no quality regression >0.5 ppl on standard benchmarks
@@ -299,7 +299,7 @@ From Document 7 analysis:
 - llama.cpp achieves: 3.5–5.2 tok/s on similar hardware
 - Our target: 3.5–5.0 tok/s (matching llama.cpp baseline)
 
-**Conclusion:** 2 vCPU IS viable for interactive use (>2 tok/s) on properly provisioned cloud VMs (non-burstable, local SSD, AVX2+). The physics bound is memory bandwidth, not compute — and cloud VM memory bandwidth (~20-30 GB/s) is sufficient.
+**Conclusion:** 2 vCPU IS viable for interactive use (>2 tok/s) on properly provisioned cloud VMs (non-burstable, local SSD, AVX2+). The physics bound is memory bandwidth, not compute, and cloud VM memory bandwidth (~20-30 GB/s) is sufficient.
 
 **Risk:** Burstable instances (t3, e2-micro) or noisy neighbor scenarios can drop below 2 tok/s. The runtime should detect and report this condition.
 
@@ -308,7 +308,7 @@ From Document 7 analysis:
 **Status: PARTIALLY RESOLVED**
 
 From Document 3 analysis:
-- Current best: Q4_K_M (GGUF) with super-block scales — already well-optimized
+- Current best: Q4_K_M (GGUF) with super-block scales, already well-optimized
 - Proposed CQR-4 format: 64-byte aligned blocks, optimized for AVX2 sequential access
 - Potential improvement: 64-byte alignment + precomputed weight ordering for stride-1 access → 5-10% bandwidth improvement over GGUF
 
@@ -332,7 +332,7 @@ Solutions identified:
 
 On 2 hyperthreads sharing 1 physical core:
 - 1 thread outperforms 2 threads for SIMD workloads (resource contention)
-- Memory bandwidth is shared — no benefit from 2 threads for memory-bound work
+- Memory bandwidth is shared, no benefit from 2 threads for memory-bound work
 - Distinct optimization: **always use 1 thread on hyperthreaded single-core VMs**
 
 This is already captured in our topology-adaptive threading design.

@@ -9,7 +9,7 @@ use the same `prompt_cache_key` cache namespace mechanism already available on
 `/v1/chat/completions`.
 
 This keeps the local OpenAI-compatible HTTP surface closer to the required
-service milestone in `documentation/engineering/ferrite-goal-prompt.md`:
+service milestone in `documentation/adr/0008-openai-compatible-http-api.md`:
 common local clients can target both completion surfaces while Ferrite still
 owns the inference runtime and cache behavior.
 

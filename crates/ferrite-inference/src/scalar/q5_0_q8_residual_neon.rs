@@ -1,5 +1,8 @@
 //! Experimental Q5_0 × two-pass residual-Q8 matvec for FEAT_DotProd CPUs.
-#![allow(unsafe_code)]
+#![allow(
+    unsafe_code,
+    reason = "audited aarch64 SIMD intrinsics are isolated in this kernel module"
+)]
 
 use super::{
     neon_util::native_f16_bits_to_f32,
@@ -280,8 +283,12 @@ unsafe fn decode_q5_weights(weights: &[u8]) -> (int8x16_t, int8x16_t) {
 
 #[target_feature(enable = "dotprod")]
 unsafe fn block_dot(weights: &[u8], activation: &BlockQ8Residual) -> f32 {
+    // SAFETY: FEAT_DotProd implies NEON, and callers provide a complete Q5_0
+    // block whose first two bytes contain the half-precision scale.
     let weight_scale =
         unsafe { native_f16_bits_to_f32(u16::from_le_bytes([weights[0], weights[1]])) };
+    // SAFETY: the weight and activation block layouts were validated by the
+    // dispatch path, and FEAT_DotProd is enabled on this function.
     unsafe {
         let packed = vld1q_u8(weights.as_ptr().add(6));
         let low_nibbles = vandq_u8(packed, vdupq_n_u8(0x0f));
@@ -313,6 +320,8 @@ unsafe fn block_dot(weights: &[u8], activation: &BlockQ8Residual) -> f32 {
 
 #[inline(always)]
 unsafe fn dot_i8x16(mut sum: int32x4_t, left: int8x16_t, right: int8x16_t) -> int32x4_t {
+    // SAFETY: callers enter only after FEAT_DotProd detection, and the
+    // assembly touches registers only, with no memory or stack effects.
     unsafe {
         asm!(
             "sdot {sum:v}.4s, {left:v}.16b, {right:v}.16b",
@@ -327,6 +336,8 @@ unsafe fn dot_i8x16(mut sum: int32x4_t, left: int8x16_t, right: int8x16_t) -> in
 
 #[inline(always)]
 unsafe fn matrix_dot_i8x16(mut sum: int32x4_t, rows: int8x16_t, columns: int8x16_t) -> int32x4_t {
+    // SAFETY: callers enter only after FEAT_I8MM detection, and the assembly
+    // touches registers only, with no memory or stack effects.
     unsafe {
         asm!(
             "smmla {sum:v}.4s, {rows:v}.16b, {columns:v}.16b",
@@ -371,6 +382,8 @@ mod tests {
             })
             .sum::<f32>();
 
+        // SAFETY: the test inputs are complete Q5_0 and residual activation
+        // blocks, and this aarch64 test runs only when the kernel is compiled.
         let actual = unsafe { block_dot(&weights, &activation) };
         assert!(
             (actual - expected).abs() < 0.001,
@@ -412,12 +425,16 @@ mod tests {
             .next()
             .ok_or_else(|| InferenceError::new("missing residual Q8 block"))?;
 
+        // SAFETY: FEAT_I8MM is checked above, and all inputs are complete
+        // Q5_0 and residual activation blocks.
         let expected = unsafe {
             (
                 block_dot(&left, &activation),
                 block_dot(&right, &activation),
             )
         };
+        // SAFETY: the same feature and layout guarantees apply to the paired
+        // I8MM kernel under comparison.
         let actual = unsafe { block_dot_pair_i8mm(&left, &right, &activation) };
         assert_eq!(actual, expected);
         Ok(())

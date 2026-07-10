@@ -1,4 +1,4 @@
-# Document 3: Quantization — Formats, Algorithms, and Quality Tradeoffs
+# Document 3: Quantization, Formats, Algorithms, and Quality Tradeoffs
 
 **Research Program:** CPU-Native LLM Inference Runtime  
 **Target Spec:** 9B parameter model, 2 vCPUs, 6 GB RAM, 2–5 tok/s  
@@ -9,7 +9,7 @@
 
 ## 1. Introduction
 
-Quantization is the single most important technology enabling LLM inference on 6 GB RAM. Without it, a 9B parameter model requires 18 GB (FP16) or 36 GB (FP32) — far beyond budget. With 4-bit quantization, the same model fits in ~5 GB.
+Quantization is the single most important technology enabling LLM inference on 6 GB RAM. Without it, a 9B parameter model requires 18 GB (FP16) or 36 GB (FP32), far beyond budget. With 4-bit quantization, the same model fits in ~5 GB.
 
 This document surveys the complete quantization landscape, evaluates quality vs. compression tradeoffs for 9B-class models, proposes a custom format optimized for 2-vCPU CPU targets, and assesses the viability of extreme (2-bit) quantization.
 
@@ -89,7 +89,7 @@ GGUF defines quantization types with specific bit layouts. Each type groups weig
 4. This compensates for quantization error by adjusting unquantized weights
 
 **Key parameters:**
-- Group size: 128 (default) — scales shared across 128 weights
+- Group size: 128 (default), scales shared across 128 weights
 - Bits: 2, 3, 4, 8 (4-bit is the sweet spot)
 - Calibration data: ~128 samples from WikiText-2 or C4
 
@@ -104,7 +104,7 @@ w_i = q_i × scale                  (symmetric)
 - Runtime: simple dequantize + matmul (same as RTN)
 - Quality: 10–30% lower perplexity increase than RTN at 4-bit
 
-**For CPU inference:** GPTQ weights are stored as {quantized_int, scale, zero_point} triples. At runtime, dequantization is identical to GGUF Q4_0 — the format difference is only in how scales were computed (calibrated vs. RTN).
+**For CPU inference:** GPTQ weights are stored as {quantized_int, scale, zero_point} triples. At runtime, dequantization is identical to GGUF Q4_0, the format difference is only in how scales were computed (calibrated vs. RTN).
 
 ### 2.3 AWQ (Activation-Aware Weight Quantization)
 
@@ -141,13 +141,13 @@ The scaling is absorbed into the input, so runtime cost is just RTN dequant + ma
 
 **Quality at 2-bit:** Significantly better than RTN or GPTQ at 2-bit. Perplexity on Llama-2-7B: ~8.5 (vs baseline 5.47, RTN-2bit ~20+).
 
-**Runtime cost:** Higher than RTN — requires Hadamard transform on the fly, plus codebook lookup per weight.
+**Runtime cost:** Higher than RTN, requires Hadamard transform on the fly, plus codebook lookup per weight.
 
 #### AQLM (Egiazarian et al., 2024)
 **Paper:** "AQLM: Additive Quantization for Extreme LLM Compression" (arXiv:2401.06118)
 
 **Approach:**
-1. Residual vector quantization — each weight is approximated as sum of 2-4 codebook entries
+1. Residual vector quantization, each weight is approximated as sum of 2-4 codebook entries
 2. Multiple codebooks with beam search for optimal encoding
 3. Group-wise quantization with shared codebooks
 
@@ -181,7 +181,7 @@ The scaling is absorbed into the input, so runtime cost is just RTN dequant + ma
 - 3% at FP16: 9B × 0.03 × 2 bytes = 0.54 GB
 - **Total: 4.91 GB** (essentially same as pure INT4)
 
-**Quality:** Dramatically better than uniform INT4 — approaches FP16 quality. Perplexity on Llama-2-7B at 4-bit SpQR: ~5.7 (vs 5.47 baseline, ~8 for uniform INT4 RTN).
+**Quality:** Dramatically better than uniform INT4, approaches FP16 quality. Perplexity on Llama-2-7B at 4-bit SpQR: ~5.7 (vs 5.47 baseline, ~8 for uniform INT4 RTN).
 
 ### 2.6 OpenVINO INT4 / Neural Compressor
 
@@ -209,16 +209,16 @@ These levels are optimal for normally-distributed weights (which pretrained LLM 
 #### BitNet b1.58 (Wang et al., 2024)
 **Paper:** "The Era of 1-bit LLMs: All Large Language Models are in 1.58 Bits" (arXiv:2402.17764)
 
-**Concept:** Train models from scratch with ternary weights {-1, 0, +1}. No quantization needed — the model IS 1.58-bit.
+**Concept:** Train models from scratch with ternary weights {-1, 0, +1}. No quantization needed, the model IS 1.58-bit.
 
 **Runtime implications:**
-- **No dequantization step** — weights are already ±1 or 0
+- **No dequantization step**, weights are already ±1 or 0
 - Matmul becomes: additions, subtractions, and masking (no multiplication!)
 - Each ternary weight: ~1.58 bits stored (log₂(3) ≈ 1.585)
 - 9B ternary params: 9B × 1.585/8 = ~1.78 GB
 
 **Available models:**
-- BitNet-1B (1.3B params) — released by Microsoft
+- BitNet-1B (1.3B params), released by Microsoft
 - [UNVERIFIED] BitNet-3B in development
 - No 9B-class BitNet model publicly available as of June 2025
 
@@ -245,7 +245,7 @@ Based on published results and llama.cpp community measurements:
 
 | Quantization | WikiText-2 PPL | Δ from FP16 | MMLU Acc | Source |
 |-------------|----------------|-------------|----------|--------|
-| FP16 | 6.14 | — | 66.7% | Meta paper |
+| FP16 | 6.14 |, | 66.7% | Meta paper |
 | Q8_0 | 6.16 | +0.02 | ~66.5% | llama.cpp |
 | Q6_K | 6.18 | +0.04 | ~66.3% | llama.cpp |
 | Q5_K_M | 6.21 | +0.07 | ~66.0% | llama.cpp |
@@ -315,7 +315,7 @@ Based on the memory and compute analysis, our ideal format needs:
 2. **Per-sub-block scales:** For quality, similar to Q4_K_M super-block structure
 3. **mmap-friendly alignment:** Tensor data starts aligned to 64 bytes (cache-line boundary)
 4. **Fused dequant+matmul:** Format designed so dequantization can be interleaved with dot product computation
-5. **Header metadata:** Model architecture, dimensions, scales — all in fixed-offset header for zero-parse loading
+5. **Header metadata:** Model architecture, dimensions, scales, all in fixed-offset header for zero-parse loading
 
 ### 4.2 Proposed Format: CQR (CPU-Optimized Quantized Representation)
 
@@ -370,7 +370,7 @@ Each group of 128 weights:
 Effective bits: 146 × 8 / 128 = 9.125 bits per weight...
 ```
 
-Wait — let me recalculate. The formula should be:
+Wait, let me recalculate. The formula should be:
 - Group scale: 2 bytes (FP16)
 - Per sub-block: delta(1B) + min(1B) + 16B = 18 bytes × 8 = 144 bytes
 - Total: 2 + 144 = 146 bytes per 128 weights
@@ -480,9 +480,9 @@ fn cqr4_dot_block(block: &Cqr4Block, x: &[f16; 256]) -> f32 {
 
 **Recommendation: Support BOTH**
 
-1. **Primary format: GGUF** — Vast ecosystem of pre-quantized models, community support, interoperability. Parse GGUF header, extract quantized tensors, convert on-the-fly to CQR internal representation (or use directly if alignment permits).
+1. **Primary format: GGUF**, Vast ecosystem of pre-quantized models, community support, interoperability. Parse GGUF header, extract quantized tensors, convert on-the-fly to CQR internal representation (or use directly if alignment permits).
 
-2. **Optimized format: CQR** — For models we pre-process for maximum throughput. Convert GGUF → CQR offline, gaining:
+2. **Optimized format: CQR**, For models we pre-process for maximum throughput. Convert GGUF → CQR offline, gaining:
    - Better alignment (64-byte vs 32-byte)
    - Reorganized weight layout for cache-optimal access
    - Pre-computed optimization hints (importance scores baked into scales)
@@ -499,7 +499,7 @@ GGUF file → Parse → Reorganize weights → Write CQR file
 
 ## 5. Calibration-Free vs Calibration-Required
 
-### 5.1 RTN (Round-To-Nearest) — Calibration-Free
+### 5.1 RTN (Round-To-Nearest), Calibration-Free
 
 **Method:** For each weight `w`, quantize as:
 ```
@@ -526,7 +526,7 @@ Computed per-block (32 or 256 weights). No calibration data needed.
 - Still significantly better than pure RTN at 4-bit
 
 **For our runtime's conversion pipeline:**
-1. User provides GGUF Q4_K_M file (pre-quantized by community — no calibration needed for loading)
+1. User provides GGUF Q4_K_M file (pre-quantized by community, no calibration needed for loading)
 2. Optionally, offline optimization step: load FP16 model, apply GPTQ-lite with 100 samples, export as CQR
 3. CQR format includes optimized scales from calibration
 
@@ -535,7 +535,7 @@ Computed per-block (32 or 256 weights). No calibration data needed.
 - Achieving maximum quality at 3-bit or 2-bit (calibration is essential below 4-bit)
 - Production deployment where 0.1 PPL matters
 
-### 5.3 imatrix (Importance Matrix) — Lightweight Calibration
+### 5.3 imatrix (Importance Matrix), Lightweight Calibration
 
 llama.cpp's imatrix approach is a middle ground:
 1. Run a small calibration set (~100 samples) through the model
@@ -572,7 +572,7 @@ llama.cpp's imatrix approach is a middle ground:
 - Code generation: unusable (<20% HumanEval)
 - **Verdict: NOT recommended for production at 2-bit**
 
-### 6.2 BitNet b1.58 — The Future?
+### 6.2 BitNet b1.58, The Future?
 
 **If a 9B BitNet model were available:**
 
@@ -629,7 +629,7 @@ where x is the sign bits of the input vector. This eliminates multiplication ent
 2. **Quality target: Q4_K_M minimum**
    - This is the quality floor for acceptable interactive use
    - At ~4.9 GB for Llama-3.1-8B, fits within 6 GB budget
-   - Support Q5_K_M as premium option (better quality, 5.8 GB — tight fit)
+   - Support Q5_K_M as premium option (better quality, 5.8 GB, tight fit)
 
 3. **Calibration: RTN by default, imatrix optional**
    - No calibration required for basic model loading

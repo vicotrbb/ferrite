@@ -14,18 +14,30 @@ const GGUF_VERSION: u32 = 3;
 const DEFAULT_ALIGNMENT: u64 = 32;
 
 #[derive(Clone, Debug, PartialEq)]
+/// A validated view of one GGUF v3 file.
 pub struct GgufFile {
+    /// The GGUF format version, currently always `3` after successful parsing.
     pub version: u32,
+    /// The byte alignment used by the tensor data section.
     pub alignment: u64,
+    /// Metadata values keyed by their GGUF names.
     pub metadata: BTreeMap<String, MetadataValue>,
+    /// Tensor descriptors in file order.
     pub tensors: Vec<TensorInfo>,
 }
 
 impl GgufFile {
+    /// Finds a tensor descriptor by its exact GGUF name.
     pub fn tensor(&self, name: &str) -> Option<&TensorInfo> {
         self.tensors.iter().find(|tensor| tensor.name == name)
     }
 
+    /// Builds a validated configuration for the architecture named in metadata.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the architecture is unsupported, required metadata
+    /// is absent or has the wrong type, or transformer dimensions are invalid.
     pub fn model_config(&self) -> Result<ModelConfig, GgufError> {
         let architecture = self.model_architecture()?;
         let config = self.transformer_config(architecture)?;
@@ -36,6 +48,12 @@ impl GgufFile {
         }
     }
 
+    /// Builds a validated Llama configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the file is not a Llama model or its required
+    /// configuration metadata is missing or invalid.
     pub fn llama_config(&self) -> Result<LlamaConfig, GgufError> {
         let architecture = self.model_architecture()?;
         if architecture != ModelArchitecture::Llama {
@@ -155,15 +173,22 @@ impl GgufFile {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+/// The storage description and validated byte range of one GGUF tensor.
 pub struct TensorInfo {
+    /// The exact tensor name stored in the GGUF directory.
     pub name: String,
+    /// Tensor dimensions in GGUF order.
     pub dimensions: Vec<u64>,
+    /// The GGML element or quantization type.
     pub ty: GgmlType,
+    /// The tensor's byte offset relative to the tensor data section.
     pub relative_offset: u64,
+    /// The absolute half-open byte range within the source file.
     pub data_range: Range<usize>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+/// An error produced while parsing or validating GGUF data.
 pub struct GgufError {
     message: String,
 }
@@ -184,6 +209,16 @@ impl fmt::Display for GgufError {
 
 impl std::error::Error for GgufError {}
 
+/// Parses and validates a complete GGUF v3 byte slice.
+///
+/// The parser validates the header, metadata keys and types, tensor names,
+/// alignment, dimensions, storage sizes, arithmetic overflow, and every tensor
+/// byte range before returning a [`GgufFile`].
+///
+/// # Errors
+///
+/// Returns an error for malformed input, unsupported versions or value types,
+/// invalid metadata, unsupported tensor sizing, or out-of-bounds tensor data.
 pub fn parse_gguf(bytes: &[u8]) -> Result<GgufFile, GgufError> {
     let mut reader = Reader::new(bytes);
 
@@ -228,11 +263,12 @@ pub fn parse_gguf(bytes: &[u8]) -> Result<GgufFile, GgufError> {
     }
 
     let data_start = align_offset(
-        u64::try_from(reader.position()).map_err(|_| GgufError::new("reader position overflow"))?,
+        u64::try_from(reader.position())
+            .map_err(|_error| GgufError::new("reader position overflow"))?,
         alignment,
     )?;
     let file_len =
-        u64::try_from(bytes.len()).map_err(|_| GgufError::new("file length overflow"))?;
+        u64::try_from(bytes.len()).map_err(|_error| GgufError::new("file length overflow"))?;
     if data_start > file_len && !raw_tensors.is_empty() {
         return Err(GgufError::new("tensor data start is past end of file"));
     }
@@ -409,5 +445,6 @@ fn validate_metadata_key(key: &str) -> Result<(), GgufError> {
 }
 
 pub(super) fn usize_from_u64(value: u64, context: &str) -> Result<usize, GgufError> {
-    usize::try_from(value).map_err(|_| GgufError::new(format!("{context} does not fit in usize")))
+    usize::try_from(value)
+        .map_err(|_error| GgufError::new(format!("{context} does not fit in usize")))
 }

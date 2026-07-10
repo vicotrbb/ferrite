@@ -8,7 +8,7 @@ ranges, and a Llama configuration from an in-memory GGUF byte fixture.
 
 ## Baseline Read
 
-- `documentation/engineering/ferrite-goal-prompt.md`
+- `documentation/engineering/ferrite-operating-model.md`
 - `documentation/engineering/ferrite-operating-model.md`
 - `documentation/adr/0001-documentation-and-iteration-model.md`
 - `research/11-testing-model-registry.md`

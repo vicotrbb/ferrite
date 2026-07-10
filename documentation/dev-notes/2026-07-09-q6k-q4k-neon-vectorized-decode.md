@@ -39,10 +39,9 @@ kernels, which after slices A+B were the largest per-token cost
   per token (~64.5 → ~69.5 tok/s).
 - Interleaved A/B vs the slice-B head (3 rounds, alternating builds in
   the same thermal window): 17.12/17.81/18.16 ms (B) vs
-  16.02/16.59/16.18 ms (C) — slice C faster in every round by 6–9%.
+  16.02/16.59/16.18 ms (C), slice C faster in every round by 6–9%.
 - Official eval `2026-07-09-195002` (tag
-  `q6k-q4k-neon-vectorized-decode`): 61.29 tok/s precise, p50 16.3 ms —
-  statistically flat vs slice B's 62.06 record because the eval windows
+  `q6k-q4k-neon-vectorized-decode`): 61.29 tok/s precise, p50 16.3 ms,   statistically flat vs slice B's 62.06 record because the eval windows
   differ thermally; the interleaved A/B above is the controlled
   comparison and is what this slice's acceptance rests on. Two earlier
   eval attempts for this slice were DISCARDED as contaminated: one ran

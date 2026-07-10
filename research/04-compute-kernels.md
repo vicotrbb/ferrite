@@ -1,4 +1,4 @@
-# Document 4: CPU Compute Kernels — SIMD, Threading, and Throughput
+# Document 4: CPU Compute Kernels, SIMD, Threading, and Throughput
 
 **Research Program:** CPU-Native LLM Inference Runtime  
 **Target Spec:** 9B parameter model, 2 vCPUs, 6 GB RAM, 2–5 tok/s  
@@ -26,17 +26,17 @@ LLM inference on CPU is fundamentally a **memory-bandwidth-bound** workload. The
 | AVX2 | 256-bit | 32 ops/cycle (vpmaddubsw) | 8 ops/cycle | Packed 2/byte | Post-2013 |
 | AVX-512F | 512-bit | 64 ops/cycle | 16 ops/cycle | Packed 2/byte | Xeon Scalable |
 | AVX-512 VNNI | 512-bit | 128 INT8 ops/cycle (vpdpbusd) | 16 ops/cycle | Native via packing | Ice Lake+ (2019+) |
-| AVX-512 BF16 | 512-bit | — | 32 BF16 ops/cycle | — | Cooper Lake+ |
-| AMX (tmul) | 1024-bit tiles | 1024 INT8 ops/cycle | — | Native | Sapphire Rapids (2023+) |
+| AVX-512 BF16 | 512-bit |, | 32 BF16 ops/cycle |, | Cooper Lake+ |
+| AMX (tmul) | 1024-bit tiles | 1024 INT8 ops/cycle |, | Native | Sapphire Rapids (2023+) |
 
 **Which matters for our runtime:**
 
 Cloud VMs with 2 vCPUs are almost always **AVX2-capable** (nearly all x86 CPUs since 2013). AVX-512 is increasingly available on newer VMs (Intel Ice Lake/Ice Lake+ and AMD Zen 4+). AMX is rare on cloud VMs.
 
 **Priority for kernel development:**
-1. **AVX2** — Target baseline. Covers ~95% of cloud VMs.
-2. **AVX-512 VNNI** — Performance upgrade path. Available on newer Intel/AMD VMs.
-3. **AVX2 + FMA3** — For FP32/FP16 activation compute.
+1. **AVX2**, Target baseline. Covers ~95% of cloud VMs.
+2. **AVX-512 VNNI**, Performance upgrade path. Available on newer Intel/AMD VMs.
+3. **AVX2 + FMA3**, For FP32/FP16 activation compute.
 
 ### 2.2 AVX2: The Workhorse for Quantized Inference
 
@@ -90,7 +90,7 @@ But this ignores memory bandwidth (the real bottleneck). Let's analyze that next
 
 ### 2.3 AVX-512 VNNI
 
-For newer CPUs, AVX-512 VNNI provides `vpdpbusd` — a fused unsigned×signed dot product with accumulator:
+For newer CPUs, AVX-512 VNNI provides `vpdpbusd`, a fused unsigned×signed dot product with accumulator:
 
 ```asm
 ; VPDPBUSD: Unsigned INT8 × Signed INT8 → accumulate into INT32
@@ -102,7 +102,7 @@ vpdpbusd zmm_acc, zmm_weights_u8, zmm_input_i8
 - At 2.5 GHz: 64 × 2.5G = 160 billion ops/second
 - For 9B INT4 params (read as 4.5 GB): memory-limited anyway
 
-**Key advantage:** Single instruction for the entire dot product inner loop — reduces instruction count by 3-4× vs AVX2. This is significant at 2 vCPUs where instruction decoder throughput is limited.
+**Key advantage:** Single instruction for the entire dot product inner loop, reduces instruction count by 3-4× vs AVX2. This is significant at 2 vCPUs where instruction decoder throughput is limited.
 
 ### 2.4 ARM NEON and SVE
 
@@ -180,7 +180,7 @@ For 3.74 GB weight reads per token (Llama-3.1-8B Q4_K_M):
 | 25 GB/s | 150 ms | 6.7 |
 | 30 GB/s | 125 ms | 8.0 |
 
-**Critical finding:** The theoretical ceiling for Llama-3.1-8B Q4_K_M on 2 vCPUs is **4–8 tok/s**, depending on memory bandwidth. This is above the 2–5 tok/s target — confirming the spec is achievable.
+**Critical finding:** The theoretical ceiling for Llama-3.1-8B Q4_K_M on 2 vCPUs is **4–8 tok/s**, depending on memory bandwidth. This is above the 2–5 tok/s target, confirming the spec is achievable.
 
 **However:** This is the theoretical maximum. Real throughput is reduced by:
 1. KV cache reads/writes (~50-200 MB per token)
@@ -210,7 +210,7 @@ Pre-decompress entire weight matrix to FP16 → Read FP16 → Dot product
 - Would reduce throughput to ~1–2 tok/s on 2 vCPU
 - Also requires 12.9 GB RAM just for working copy (impossible at 6 GB)
 
-**Option C: Hybrid — dequantize to FP16 in L1 cache only**
+**Option C: Hybrid, dequantize to FP16 in L1 cache only**
 ```
 Read Q4 block → Dequantize to FP16 in registers → Immediate dot product → Discard FP16
 ```
@@ -218,7 +218,7 @@ Read Q4 block → Dequantize to FP16 in registers → Immediate dot product → 
 - FP16 values never leave registers → no L1/L2 pollution
 - Total L1 footprint: only the INPUT vector + accumulator
 
-### 3.4 llama.cpp ggml_vec_dot_q4_0 — Detailed Dissection
+### 3.4 llama.cpp ggml_vec_dot_q4_0, Detailed Dissection
 
 Source: `ggml/src/ggml-quants.c`, function `ggml_vec_dot_q4_0`
 
@@ -266,10 +266,10 @@ void ggml_vec_dot_q4_0(int n, float * restrict s, size_t bs,
 ```
 
 **Key observations:**
-1. **Input is pre-quantized to INT8** — the input vector is quantized before the dot product loop. This enables `vpmaddubsw` (unsigned×signed INT8 dot product).
-2. **FP32 accumulator** — partial sums in FP32 to avoid overflow. Final scale multiplication in FP32.
-3. **Block-parallel processing** — each block is independent, enabling vectorization across blocks.
-4. **No K-quant super-block support in Q4_0** — simpler kernel (just one scale per 32 weights). Q4_K_M has more complex scale handling.
+1. **Input is pre-quantized to INT8**, the input vector is quantized before the dot product loop. This enables `vpmaddubsw` (unsigned×signed INT8 dot product).
+2. **FP32 accumulator**, partial sums in FP32 to avoid overflow. Final scale multiplication in FP32.
+3. **Block-parallel processing**, each block is independent, enabling vectorization across blocks.
+4. **No K-quant super-block support in Q4_0**, simpler kernel (just one scale per 32 weights). Q4_K_M has more complex scale handling.
 
 **What we improve:**
 1. **Use AVX-512 VNNI** when available (single `vpdpbusd` instruction)
@@ -317,13 +317,13 @@ This confirms: optimizing compute (more SIMD, better kernels) alone won't help b
 | L1d | 32–48 KB | ~1 ns | ~100 GB/s | ~1 quant block + input vector |
 | L2 | 256 KB–1 MB | ~4 ns | ~50 GB/s | A few quant blocks |
 | L3 | 4–64 MB (shared) | ~12 ns | ~25-40 GB/s (shared) | Small layers (~80 MB won't fit) |
-| Main memory | — | ~50–80 ns | ~25–50 GB/s | Everything |
+| Main memory |, | ~50–80 ns | ~25–50 GB/s | Everything |
 
 **Implication for 9B model:**
 - No layer's weights fit entirely in L3 (80+ MB per layer vs ~32 MB typical L3 share per core)
 - Sequential access pattern exploits hardware prefetcher (L2 → L1 streaming)
 - KV cache should be kept hot in L3 for frequent attention reads
-- Input activation vector (4096 × 2 bytes = 8 KB) fits in L1 — reused across all weight matmuls
+- Input activation vector (4096 × 2 bytes = 8 KB) fits in L1, reused across all weight matmuls
 
 ### 4.3 Strategies for Staying in Cache
 
@@ -451,7 +451,7 @@ fn parallel_matmul(pool: &ThreadPool, w: &WeightMatrix, x: &[f16], out: &mut [f1
         pool.spawn(move || matmul_rows(w, x, &mut out[mid..], mid, w.rows()));
         pool.join();
     } else {
-        // Single thread — avoids hyperthreading contention
+        // Single thread, avoids hyperthreading contention
         matmul_rows(w, x, out, 0, w.rows());
     }
 }
@@ -533,7 +533,7 @@ For 2 vCPU VMs:
 
 **Metrics to capture:**
 - Tokens/second (harmonic mean of 1/latency)
-- Time to first token (TTFT — prefill time for prompt)
+- Time to first token (TTFT, prefill time for prompt)
 - Peak RSS (maximum resident set size)
 - Memory bandwidth utilization (via `perf mem` or PMU counters)
 
@@ -568,37 +568,37 @@ Based on gathered data and bandwidth analysis:
 
 ### 8.1 Kernel Development Priority
 
-1. **Q4_K_M × INT8 dot product (AVX2)** — The critical path for 90% of inference time
-2. **FP16 RoPE apply** — Apply rotary position embeddings to Q and K
-3. **LayerNorm / RMSNorm** — Per-vector normalization (compute-bound, not memory-bound)
-4. **Softmax** — Normalization over attention scores
-5. **SiLU/GeLU activation** — For FFN (element-wise, trivially parallel)
-6. **KV cache read/write** — Simple memory copies with stride
+1. **Q4_K_M × INT8 dot product (AVX2)**, The critical path for 90% of inference time
+2. **FP16 RoPE apply**, Apply rotary position embeddings to Q and K
+3. **LayerNorm / RMSNorm**, Per-vector normalization (compute-bound, not memory-bound)
+4. **Softmax**, Normalization over attention scores
+5. **SiLU/GeLU activation**, For FFN (element-wise, trivially parallel)
+6. **KV cache read/write**, Simple memory copies with stride
 
 ### 8.2 Optimization Priorities (in order of impact)
 
-1. **AVX2 SIMD kernels** — Without these, scalar code would give ~0.5 tok/s (unusable)
-2. **Sequential memory access pattern** — Weight layout must enable stride-1 reads
-3. **Prefetching** — `_mm_prefetch` for next weight block during current computation
-4. **Thread topology detection** — 1 thread vs 2 based on physical core count
-5. **Kernel fusion** — Combine dequant+matmul+bias in single pass
-6. **AVX-512 VNNI** — When available, 30–50% speedup per core
+1. **AVX2 SIMD kernels**, Without these, scalar code would give ~0.5 tok/s (unusable)
+2. **Sequential memory access pattern**, Weight layout must enable stride-1 reads
+3. **Prefetching**, `_mm_prefetch` for next weight block during current computation
+4. **Thread topology detection**, 1 thread vs 2 based on physical core count
+5. **Kernel fusion**, Combine dequant+matmul+bias in single pass
+6. **AVX-512 VNNI**, When available, 30–50% speedup per core
 
 ### 8.3 What to Build First
 
 ```rust
 // Kernel crate structure:
 // kernels/
-//   q4k_matmul.rs    — Q4_K_M × input vector dot product (AVX2 + scalar fallback)
-//   attention.rs      — Scaled dot-product attention with KV cache access
-//   rope.rs           — Rotary position embedding application
-//   norm.rs           — RMSNorm implementation
-//   activation.rs     — SiLU/GeLU element-wise
-//   common.rs         — Shared SIMD types and helpers
+//   q4k_matmul.rs, Q4_K_M × input vector dot product (AVX2 + scalar fallback)
+//   attention.rs, Scaled dot-product attention with KV cache access
+//   rope.rs, Rotary position embedding application
+//   norm.rs, RMSNorm implementation
+//   activation.rs, SiLU/GeLU element-wise
+//   common.rs, Shared SIMD types and helpers
 ```
 
-Start with `q4k_matmul.rs` — implement scalar reference, then AVX2 intrinsics, benchmark, validate against llama.cpp reference.
+Start with `q4k_matmul.rs`, implement scalar reference, then AVX2 intrinsics, benchmark, validate against llama.cpp reference.
 
 ---
 
-*Next: Document 5 (Inference Engine Architecture) covers the runtime scheduling, batching, and request handling layer — the software architecture that orchestrates these kernels.*
+*Next: Document 5 (Inference Engine Architecture) covers the runtime scheduling, batching, and request handling layer, the software architecture that orchestrates these kernels.*

@@ -170,6 +170,10 @@ mod tests {
         Ok(())
     }
 
+    #[allow(
+        clippy::needless_collect,
+        reason = "the test oracle deliberately retains an independent allocating formulation"
+    )]
     fn reference_attention(
         config: &ScalarLlamaConfig,
         query: &[f32],

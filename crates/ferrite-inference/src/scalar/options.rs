@@ -14,14 +14,19 @@ pub enum KvBackend {
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// Selects the activation quantization policy used by eligible matvec kernels.
 pub enum Q8KActivationMatvecPolicy {
+    /// Use only the default proven kernel path.
     #[default]
     DefaultOnly,
+    /// Enable the parity-scoped experimental Q8_K activation path.
     ExperimentalParityScoped,
+    /// Enable the experimental residual-Q8 path on supported Arm I8MM hosts.
     ExperimentalResidualI8mm,
 }
 
 impl Q8KActivationMatvecPolicy {
+    /// Returns the stable command-line and diagnostic label for the policy.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::DefaultOnly => "default_only",
@@ -32,14 +37,23 @@ impl Q8KActivationMatvecPolicy {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// A transformer projection that can be selected for activation experiments.
 pub enum Q8KActivationMatvecRole {
+    /// Attention query projection.
     QProj,
+    /// Attention key projection.
     KProj,
+    /// Attention value projection.
     VProj,
+    /// Attention output projection.
     OProj,
+    /// Feed-forward gate projection.
     FfnGate,
+    /// Feed-forward up projection.
     FfnUp,
+    /// Feed-forward down projection.
     FfnDown,
+    /// Vocabulary output projection.
     Output,
 }
 
@@ -55,6 +69,7 @@ impl Q8KActivationMatvecRole {
         Self::Output,
     ];
 
+    /// Returns the stable command-line label for this projection role.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::QProj => "q_proj",
@@ -68,6 +83,11 @@ impl Q8KActivationMatvecRole {
         }
     }
 
+    /// Parses one stable projection-role label.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `value` is not a recognized role label.
     pub fn parse(value: &str) -> Result<Self, String> {
         match value {
             "q_proj" => Ok(Self::QProj),
@@ -82,6 +102,12 @@ impl Q8KActivationMatvecRole {
         }
     }
 
+    /// Parses a comma-separated role list or the `all` alias.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an empty list, unknown or duplicate roles, empty
+    /// items, or combining `all` with another role.
     pub fn parse_list(value: &str) -> Result<Vec<Self>, String> {
         if value == "all" {
             return Ok(Self::ALL.to_vec());
@@ -169,6 +195,9 @@ impl Q8KActivationMatvecRole {
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+/// Runtime policy for scalar sessions and matrix dispatch.
+///
+/// Defaults preserve the proven execution path and the nested-vector KV store.
 pub struct ScalarExecutionOptions {
     q8_k_activation_matvec_policy: Q8KActivationMatvecPolicy,
     q8_k_activation_matvec_roles: Q8KActivationMatvecRoleMask,
@@ -177,6 +206,7 @@ pub struct ScalarExecutionOptions {
 }
 
 impl ScalarExecutionOptions {
+    /// Enables or disables the legacy parity-scoped Q8_K activation policy.
     pub fn with_q8_k_activation_matvec(mut self, enabled: bool) -> Self {
         self.q8_k_activation_matvec_policy = if enabled {
             Q8KActivationMatvecPolicy::ExperimentalParityScoped
@@ -186,11 +216,17 @@ impl ScalarExecutionOptions {
         self
     }
 
+    /// Sets the explicit activation matvec policy.
     pub fn with_q8_k_activation_matvec_policy(mut self, policy: Q8KActivationMatvecPolicy) -> Self {
         self.q8_k_activation_matvec_policy = policy;
         self
     }
 
+    /// Restricts the parity-scoped activation experiment to selected roles.
+    ///
+    /// # Panics
+    ///
+    /// Panics when `roles` is empty.
     pub fn with_q8_k_activation_matvec_roles(
         mut self,
         roles: impl IntoIterator<Item = Q8KActivationMatvecRole>,
@@ -199,12 +235,16 @@ impl ScalarExecutionOptions {
         self
     }
 
+    /// Enables or disables reference-versus-candidate comparison profiling.
     pub fn with_q8_k_activation_matvec_comparison(mut self, enabled: bool) -> Self {
         self.compare_q8_k_activation_matvec = enabled;
         self
     }
 
-    #[cfg_attr(not(target_arch = "aarch64"), allow(dead_code))]
+    #[cfg_attr(
+        not(target_arch = "aarch64"),
+        allow(dead_code, reason = "activation policy is implemented only on aarch64")
+    )]
     pub(in crate::scalar) fn q8_k_activation_matvec(self) -> bool {
         matches!(
             self.q8_k_activation_matvec_policy,
@@ -212,7 +252,13 @@ impl ScalarExecutionOptions {
         )
     }
 
-    #[cfg_attr(not(target_arch = "aarch64"), allow(dead_code))]
+    #[cfg_attr(
+        not(target_arch = "aarch64"),
+        allow(
+            dead_code,
+            reason = "residual activation policy is implemented only on aarch64"
+        )
+    )]
     pub(in crate::scalar) fn residual_q8_activation_matvec(self) -> bool {
         matches!(
             self.q8_k_activation_matvec_policy,
@@ -245,10 +291,12 @@ impl ScalarExecutionOptions {
         self
     }
 
+    /// Returns a stable label for the selected activation experiment roles.
     pub fn q8_k_activation_matvec_roles_label(self) -> String {
         self.q8_k_activation_matvec_roles.label()
     }
 
+    /// Returns the selected activation matvec policy.
     pub fn q8_k_activation_matvec_policy(self) -> Q8KActivationMatvecPolicy {
         self.q8_k_activation_matvec_policy
     }
@@ -257,11 +305,13 @@ impl ScalarExecutionOptions {
         self.compare_q8_k_activation_matvec
     }
 
+    /// Sets the session KV-cache storage backend.
     pub fn with_kv_backend(mut self, backend: KvBackend) -> Self {
         self.kv_backend = backend;
         self
     }
 
+    /// Returns the selected session KV-cache storage backend.
     pub fn kv_backend(self) -> KvBackend {
         self.kv_backend
     }

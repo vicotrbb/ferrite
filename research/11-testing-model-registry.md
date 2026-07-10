@@ -1,4 +1,4 @@
-# Document 11: Testing Model Registry — From Tiny to Maximum
+# Document 11: Testing Model Registry, From Tiny to Maximum
 
 **Research Program:** CPU-Native LLM Inference Runtime  
 **Date:** June 2025
@@ -15,7 +15,7 @@ As we implement the runtime, we test against increasingly larger models. Each ti
 
 ---
 
-## Tier 0: Bring-Up (135M — 360M params)
+## Tier 0: Bring-Up (135M, 360M params)
 
 *Purpose: Prove the architecture compiles and produces a single correct token. Instant iteration loop.*
 
@@ -27,22 +27,22 @@ As we implement the runtime, we test against increasingly larger models. Each ti
 **Source:** `HuggingFaceTB/SmolLM2-135M-Instruct`, `HuggingFaceTB/SmolLM2-360M-Instruct` (open, Apache 2.0)
 
 **Why these models:**
-- Load instantly on any machine — no mmap streaming needed
-- Forward pass in microseconds — test iteration loop is instant
+- Load instantly on any machine, no mmap streaming needed
+- Forward pass in microseconds, test iteration loop is instant
 - Small enough to hand-debug: dump every intermediate tensor in a fraction of a second
-- Llama architecture — same code path as 8B Llama models
-- GQA ratio 3:1 — tests the grouped query attention path from day one
+- Llama architecture, same code path as 8B Llama models
+- GQA ratio 3:1, tests the grouped query attention path from day one
 - KV cache per token: ~0.5 KB (negligible)
 
 **Success criteria for Tier 0:**
 - [ ] GGUF parser loads model successfully
-- [ ] Forward pass produces output (even garbage is OK — we're testing plumbing)
+- [ ] Forward pass produces output (even garbage is OK, we're testing plumbing)
 - [ ] Token output matches llama.cpp reference output
 - [ ] Streaming mode works (even if all weights in RAM trivially)
 
 ---
 
-## Tier 1: Small Models (0.5B — 1.7B params)
+## Tier 1: Small Models (0.5B, 1.7B params)
 
 *Purpose: Validate SIMD kernels at real matrix sizes. First meaningful throughput measurements.*
 
@@ -57,9 +57,9 @@ As we implement the runtime, we test against increasingly larger models. Each ti
 
 **Key testing notes:**
 - **SmolLM2-1.7B has NO GQA** (32 kv heads = 32 attention heads = full MHA). This is a critical test to ensure our attention kernel handles the no-grouping case correctly. Large KV cache (96 MB at context 2K) relative to model size.
-- **Llama-3.2-1B** tests the Llama architecture family directly — validates we can run both the small and large Llama variants with the same code.
-- **Qwen2.5-0.5B** tests extreme GQA (7:1 ratio) — our attention kernel must handle broadcasting a single KV head to 7 query heads efficiently.
-- **Qwen2.5-1.5B** tests head_dim=128 (vs 64 in the smaller models) — validates our RoPE and attention kernels at the same head dimension used by 7B+ models.
+- **Llama-3.2-1B** tests the Llama architecture family directly, validates we can run both the small and large Llama variants with the same code.
+- **Qwen2.5-0.5B** tests extreme GQA (7:1 ratio), our attention kernel must handle broadcasting a single KV head to 7 query heads efficiently.
+- **Qwen2.5-1.5B** tests head_dim=128 (vs 64 in the smaller models), validates our RoPE and attention kernels at the same head dimension used by 7B+ models.
 
 **Expected throughput at 2 vCPU:** 10-30 tok/s (fast enough for comfortable interactive testing)
 
@@ -72,7 +72,7 @@ As we implement the runtime, we test against increasingly larger models. Each ti
 
 ---
 
-## Tier 2: Medium-Small (3B — 4B params)
+## Tier 2: Medium-Small (3B, 4B params)
 
 *Purpose: First models that feel "somewhat intelligent." Test memory management begins to matter.*
 
@@ -87,10 +87,10 @@ As we implement the runtime, we test against increasingly larger models. Each ti
 **Sources:** `Qwen/Qwen2.5-3B-Instruct`, `meta-llama/Llama-3.2-3B-Instruct`, `HuggingFaceTB/SmolLM3-3B`, `microsoft/Phi-3.5-mini-instruct`, `microsoft/Phi-4-mini-instruct`
 
 **Key testing notes:**
-- **Phi-3.5-mini has NO GQA** (full MHA) and uses the **Phi3 architecture** — our first non-Llama/non-Qwen architecture. Must implement Phi-specific attention (uses rotary embeddings differently) and the Phi attention variant.
-- **Phi-3.5 KV cache is ENORMOUS** — 576 MB at context 4K due to 32 KV heads × head_dim 96. This is the first model where KV cache memory management matters.
+- **Phi-3.5-mini has NO GQA** (full MHA) and uses the **Phi3 architecture**, our first non-Llama/non-Qwen architecture. Must implement Phi-specific attention (uses rotary embeddings differently) and the Phi attention variant.
+- **Phi-3.5 KV cache is ENORMOUS**, 576 MB at context 4K due to 32 KV heads × head_dim 96. This is the first model where KV cache memory management matters.
 - **Qwen2.5-3B** at Q4_K_M (1.9 GB + 115 MB KV) fits comfortably on any machine. Excellent for daily development testing.
-- **Phi-4-mini** has the Phi3 architecture + large vocab (200K tokens) — tests that our tokenizer handles large vocabularies efficiently.
+- **Phi-4-mini** has the Phi3 architecture + large vocab (200K tokens), tests that our tokenizer handles large vocabularies efficiently.
 
 **Expected throughput at 2 vCPU:** 5-15 tok/s (Q4_K_M)
 
@@ -103,7 +103,7 @@ As we implement the runtime, we test against increasingly larger models. Each ti
 
 ---
 
-## Tier 3: Medium — Primary Target (7B — 9B params)
+## Tier 3: Medium, Primary Target (7B, 9B params)
 
 *Purpose: This is where the runtime proves its value. Must run at 3-5 tok/s on 2 vCPU / 6 GB.*
 
@@ -118,30 +118,30 @@ As we implement the runtime, we test against increasingly larger models. Each ti
 
 **Key testing notes:**
 
-**Qwen2.5-7B — best overall test target:**
+**Qwen2.5-7B, best overall test target:**
 - Fits 6 GB at Q4_K_M (4.1 GB weights + 229 MB KV @ 4K + 300 MB overhead = 4.6 GB)
 - 7:1 GQA ratio → smallest KV cache of any 7B+ model
 - Tied embeddings (embed = lm_head shared) → saves ~200 MB weight memory
 - Fastest decode of any target model (fewest layers: 28, smallest KV reads)
 
-**Llama-3.1-8B — our reference benchmark:**
+**Llama-3.1-8B, our reference benchmark:**
 - Fits 6 GB at Q4_K_M (4.9 GB weights + 512 MB KV @ 4K = 5.7 GB)
 - 32 layers → heavier sequential compute
 - Most community benchmarks available for comparison
 
-**Mistral-7B-v0.3 — different family, similar arch:**
+**Mistral-7B-v0.3, different family, similar arch:**
 - Mistral architecture variant (mostly compatible with Llama)
 - Smaller vocab (32K) → faster LM head matmul, smaller embedding
 - Sliding window attention option (4096 tokens)
 
-**Gemma-2-9B — the stress test:**
-- **head_dim = 256** (double all others!) — tests our attention kernel at 2× width
-- **42 layers** — deepest model, most sequential compute
-- **Low GQA ratio (2:1)** — massive KV cache: 1,344 MB at context 4K FP16
+**Gemma-2-9B, the stress test:**
+- **head_dim = 256** (double all others!), tests our attention kernel at 2× width
+- **42 layers**, deepest model, most sequential compute
+- **Low GQA ratio (2:1)**, massive KV cache: 1,344 MB at context 4K FP16
 - Requires INT8 KV cache to fit in 6 GB
-- Sliding window attention (4096 fixed) — tests circular KV cache
-- Post-normalization + logit softcapping — unique Gemma-2 quirks
-- **This model will be last to pass all tests — it pushes every limit**
+- Sliding window attention (4096 fixed), tests circular KV cache
+- Post-normalization + logit softcapping, unique Gemma-2 quirks
+- **This model will be last to pass all tests, it pushes every limit**
 
 **Expected throughput at 2 vCPU (Q4_K_M):**
 - Qwen2.5-7B: 4-6 tok/s
@@ -162,7 +162,7 @@ As we implement the runtime, we test against increasingly larger models. Each ti
 
 ---
 
-## Tier 4: Large (14B — 32B params)
+## Tier 4: Large (14B, 32B params)
 
 *Purpose: Push streaming architecture to its limits. Test the runtime can handle models 3-4× RAM size.*
 
@@ -183,12 +183,12 @@ As we implement the runtime, we test against increasingly larger models. Each ti
 - Tests streaming architecture for models that DON'T fit in RAM
 
 **Phi-4 (14B):**
-- Phi3 architecture at scale — tests that our Phi implementation generalizes
-- 10 KV heads (4:1 GQA) — intermediate KV cache size
+- Phi3 architecture at scale, tests that our Phi implementation generalizes
+- 10 KV heads (4:1 GQA), intermediate KV cache size
 - Q4_K_M: 8.2 GB → must use streaming
 
 **Qwen2.5-32B:**
-- 64 layers — doubles the streaming read volume vs 8B models
+- 64 layers, doubles the streaming read volume vs 8B models
 - At Q4_K_M: 17.8 GB → streaming requires ~6 seconds/token on NVMe
 - Tests memory management under extreme pressure
 - If the streaming architecture works at 32B on 8 GB, it works anywhere

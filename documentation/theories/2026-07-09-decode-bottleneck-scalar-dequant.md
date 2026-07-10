@@ -10,7 +10,7 @@
 Qwen2.5-0.5B-Instruct "Q4_K_M" decode on the Apple M5 Pro is limited by
 instruction throughput of scalar weight-dequantization inside the Q5_0
 (and to a lesser degree Q6_K/Q4_K) NEON matvec kernels, plus Amdahl
-serialization of the sub-threshold attention projections — not by memory
+serialization of the sub-threshold attention projections, not by memory
 bandwidth and not by the HTTP layer.
 
 ## Evidence
@@ -19,7 +19,7 @@ bandwidth and not by the HTTP layer.
    Q5_0 roles (ffn_gate 9.06 ms, ffn_up 7.31 ms, q_proj 3.45 ms,
    o_proj 3.56 ms, k_proj 0.50 ms) plus Q6_K/Q4_K ffn_down 8.17 ms
    consume ~24 ms of a ~27 ms token. The Q8_0 output matvec streams
-   144.6 MiB in 1.24 ms (~117 GB/s — near hardware bandwidth), while the
+   144.6 MiB in 1.24 ms (~117 GB/s, near hardware bandwidth), while the
    Q5_0 roles stream at 4–9 GB/s. All kernels walk the same `Vec<u8>`
    weight layout, so the gap is kernel code, not data placement.
 2. The GGUF is mislabeled by its filename: parsing the header shows
@@ -29,7 +29,7 @@ bandwidth and not by the HTTP layer.
    per-element scalar bit surgery into `[f32; 4]` stack arrays
    (~16 scalar ops per 4 weights) before a single-accumulator FMA.
    `q8_0_neon.rs` by contrast does `vld1_s8` → `vmovl` widening →
-   4-lane FMA entirely in registers — and is ~15–30× faster per byte.
+   4-lane FMA entirely in registers, and is ~15–30× faster per byte.
 3. Threading: Q5_0/Q8_0 row-parallel gates require rows ≥ 4096, so
    q/k/v/o projections (896/128 rows) run single-threaded; generation
    CPU mean is ~757–790% of 1500% available.

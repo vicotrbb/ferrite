@@ -1,4 +1,7 @@
-#![allow(unsafe_code)]
+#![allow(
+    unsafe_code,
+    reason = "audited architecture-specific SIMD intrinsics are isolated in this module"
+)]
 
 use super::{math::dot, InferenceError};
 
@@ -173,8 +176,10 @@ mod aarch64 {
         let mut lanes = vdupq_n_f32(0.0);
         let mut index = 0usize;
         while index < len {
-            let left_lanes = vld1q_f32(left.add(index));
-            let right_lanes = vld1q_f32(right.add(index));
+            // SAFETY: the caller guarantees that both pointers address at
+            // least `len` values, and the loop advances in four-value chunks.
+            let (left_lanes, right_lanes) =
+                unsafe { (vld1q_f32(left.add(index)), vld1q_f32(right.add(index))) };
             lanes = vfmaq_f32(lanes, left_lanes, right_lanes);
             index += 4;
         }

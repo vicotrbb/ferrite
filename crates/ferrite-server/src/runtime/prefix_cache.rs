@@ -180,7 +180,7 @@ impl InferenceEngine {
     ) -> Result<RuntimePrefixCacheLookup, RuntimeError> {
         self.prefix_cache
             .lock()
-            .map_err(|_| RuntimeError::new("runtime prefix cache lock is poisoned"))
+            .map_err(|_error| RuntimeError::new("runtime prefix cache lock is poisoned"))
             .map(|mut cache| cache.lookup_longest_prefix(key))
     }
 
@@ -192,7 +192,7 @@ impl InferenceEngine {
     ) -> Result<(), RuntimeError> {
         self.prefix_cache
             .lock()
-            .map_err(|_| RuntimeError::new("runtime prefix cache lock is poisoned"))
+            .map_err(|_error| RuntimeError::new("runtime prefix cache lock is poisoned"))
             .map(|mut cache| cache.insert(key, snapshot, next_token))
     }
 

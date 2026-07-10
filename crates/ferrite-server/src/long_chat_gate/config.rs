@@ -614,7 +614,7 @@ fn parse_positive_usize(value: &str, flag: &str) -> Result<usize, LongChatGateEr
 fn os_string_to_string(value: OsString) -> Result<String, LongChatGateError> {
     value
         .into_string()
-        .map_err(|_| LongChatGateError::new("arguments must be valid UTF-8"))
+        .map_err(|_error| LongChatGateError::new("arguments must be valid UTF-8"))
 }
 
 fn usage() -> &'static str {

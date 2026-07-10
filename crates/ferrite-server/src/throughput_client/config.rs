@@ -311,7 +311,7 @@ fn next_value(
 fn os_string_to_string(value: OsString) -> Result<String, ClientConfigError> {
     value
         .into_string()
-        .map_err(|_| ClientConfigError::new("arguments must be valid UTF-8"))
+        .map_err(|_error| ClientConfigError::new("arguments must be valid UTF-8"))
 }
 
 fn parse_positive_usize(value: OsString, flag: &str) -> Result<usize, ClientConfigError> {

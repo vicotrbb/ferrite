@@ -19,7 +19,8 @@ traceable.
 
 - Added `documentation/README.md`.
 - Added `documentation/engineering/ferrite-operating-model.md`.
-- Added `documentation/engineering/ferrite-goal-prompt.md`.
+- Added the initial project goal, later consolidated into
+  `documentation/engineering/ferrite-operating-model.md`.
 - Added ADR, development note, research note, theory note, and benchmark note
   indexes and templates.
 - Added ADR 0001 to accept the documentation and iteration model.

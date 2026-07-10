@@ -51,7 +51,7 @@ noise.
 
 Official eval `2026-07-09-193755` (tag `thread-pool-and-granularity`):
 62.06 tok/s precise decode, p50 16.1 ms (vs 42.70 tok/s for slice A,
-31.99 baseline `2026-07-09-191148`). Server streamed tok/s 48.4 — the
+31.99 baseline `2026-07-09-191148`). Server streamed tok/s 48.4, the
 client metric still divides by elapsed-including-TTFT; decode-only
 matches the CLI number.
 
@@ -61,5 +61,5 @@ matches the CLI number.
 - Q5_0 kernel remains FMA-chain-bound; row-pairing ILP is the next
   kernel slice.
 - Thread-count probe should eventually be validated on x86 (homelab
-  pod) — `available_parallelism` fallback is the current behavior
+  pod), `available_parallelism` fallback is the current behavior
   there.

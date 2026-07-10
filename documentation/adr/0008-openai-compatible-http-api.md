@@ -94,8 +94,8 @@ Responses API are out of scope until explicit ADRs or plans add them.
 
 ## Evidence
 
-- `documentation/engineering/ferrite-goal-prompt.md` permits normal Rust
-  crates for generic infrastructure while keeping inference machinery custom.
+- `documentation/engineering/ferrite-operating-model.md` requires normal Rust
+  engineering standards while keeping inference machinery Ferrite-owned.
 - `research/08-implementation-roadmap.md` already lists an OpenAI-compatible
   API phase with `/v1/chat/completions`, `/v1/completions`, `/v1/models`, and
   `/health`.

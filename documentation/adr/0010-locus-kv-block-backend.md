@@ -23,10 +23,9 @@ function.
 Locus (`locus-alloc`) provides `KvBlockPool`, a single-owner, fixed-capacity
 block allocator purpose-built for exactly this shape of churn: fixed-size
 blocks, mapped (page-aligned) backing, generation-checked handles, and LIFO
-reuse. `docs/superpowers/specs/2026-07-06-ferrite-locus-kv-cache-design.md`
-records the full design and its success gate (no correctness regression, no
-decode-throughput loss, and an improvement in at least one of {allocations per
-token, peak/post-load RSS}).
+reuse. This ADR records the full design and its success gate: no correctness
+regression, no decode-throughput loss, and an improvement in at least one of
+allocations per token or peak/post-load RSS.
 
 ## Decision
 
@@ -53,13 +52,13 @@ boundary (`ensure_block`), so ~`tokens_per_block - 1` of every
 `tokens_per_block` pushes allocate nothing. `truncate` frees blocks back to
 the pool down to the number needed for the retained token count
 (`pool_stats().allocated` strictly decreases). Push order, causal masking,
-RoPE, and the dot-product kernels are unchanged — only the origin of the
+RoPE, and the dot-product kernels are unchanged, only the origin of the
 key/value slices changes, from an owned `Vec<f32>` to a block-backed `&[f32]`
 view.
 
 The pool is created in `LocusKvStore::new` and owned by the `LocusKvStore`,
 which is in turn owned by the `ScalarLlamaSession` that built it in
-`start_session_with_options` — the pool is per-session, not shared or
+`start_session_with_options`, the pool is per-session, not shared or
 global. LIFO reuse (`KvReuseOrder::Lifo`) therefore benefits only
 within-session reallocation: blocks freed by `truncate` (or by `restore`,
 which truncates to zero and re-pushes) are handed back out warm before any
@@ -87,7 +86,7 @@ parity test (see Evidence). Swapping storage does not change model output.
 Ferrite's workspace denies unsafe code (`deny(unsafe_code)`), and this design
 adds no exception. `LocusKvStore` reinterprets pool block bytes (`&mut [u8]`,
 the only type `KvBlockPool::block_mut` returns) as `&[f32]` / `&mut [f32]`
-using `bytemuck::try_cast_slice` / `try_cast_slice_mut` — a safe API; the
+using `bytemuck::try_cast_slice` / `try_cast_slice_mut`, a safe API; the
 `unsafe` needed to reinterpret the bytes lives inside `bytemuck`, not in
 Ferrite. This is sound only because of an alignment invariant, which this
 decision states and which the code relies on:
@@ -99,7 +98,7 @@ decision states and which the code relies on:
 - `block_size = tokens_per_block * head_kv_dim * size_of::<f32>()` bytes is
   constructed as a multiple of 4 by construction (`LocusKvStore::new`).
 - Every intra-block token offset is `(position % tokens_per_block) *
-  head_kv_dim * size_of::<f32>()` (`LocusKvStore::byte_range`) — also a
+  head_kv_dim * size_of::<f32>()` (`LocusKvStore::byte_range`), also a
   multiple of 4.
 
 Because both the block base address and every offset into it are 4-aligned,
@@ -155,9 +154,9 @@ path are byte-for-byte the pre-existing Vec-only path. Locus's `numa` feature
   tokens (see Evidence), not warm reuse carried into a subsequent session.
   Cross-session pooling would require a longer-lived shared pool owned above
   the session and is explicit future work, not part of this decision.
-- Real-model evidence for the design's actual success-gate metrics — peak
+- Real-model evidence for the design's actual success-gate metrics, peak
   and post-load RSS, decode throughput, and allocation churn over a longer
-  generation on a Tier 1 model — is pending a Tier 1 GGUF artifact (none is
+  generation on a Tier 1 model, is pending a Tier 1 GGUF artifact (none is
   present on the development host and none was downloaded for this slice).
   What is proven today is bit-identical correctness, pool mechanics (unit
   tests), a real measured allocation count on a synthetic fixture matching
@@ -187,8 +186,7 @@ path are byte-for-byte the pre-existing Vec-only path. Locus's `numa` feature
 
 ## Evidence
 
-- `crates/ferrite-inference/tests/kv_store_backend_parity.rs` —
-  `locus_backend_matches_vec_logits`: runs the same 5-token prompt (spanning
+- `crates/ferrite-inference/tests/kv_store_backend_parity.rs`,   `locus_backend_matches_vec_logits`: runs the same 5-token prompt (spanning
   a block boundary) through the Vec and Locus backends against a fixture
   GGUF whose Q/K/V/O and FFN weights genuinely mix across positions, and
   asserts bit-identical `token_id`, `logits`, and `kv_cache_bytes`.
@@ -198,7 +196,7 @@ path are byte-for-byte the pre-existing Vec-only path. Locus's `numa` feature
   boundaries, block reclamation on truncate (`pool_stats().allocated`
   strictly decreases), out-of-blocks error handling, and snapshot
   round-trip via re-push.
-- `documentation/benchmarks/2026-07-06-locus-kv-backend.md` — full evidence
+- `documentation/benchmarks/2026-07-06-locus-kv-backend.md`, full evidence
   note: release build with the feature, both test suites' pasted output, an
   end-to-end CLI run on a synthetic fixture (`--kv-backend locus
   --kv-tokens-per-block 2` producing identical `next_token_id`,
@@ -207,9 +205,6 @@ path are byte-for-byte the pre-existing Vec-only path. Locus's `numa` feature
   `2 * num_layers * ceil(tokens / tokens_per_block)`), and an explicit
   PROVEN/PENDING split for the real-model RSS/throughput numbers the design's
   success gate ultimately depends on.
-- `documentation/dev-notes/2026-07-06-locus-kv-backend.md` — narrative dev
+- `documentation/dev-notes/2026-07-06-locus-kv-backend.md`, narrative dev
   note for this slice, including the CLI/feature surface and the exact scope
   boundary (server has no wiring yet).
-- `docs/superpowers/specs/2026-07-06-ferrite-locus-kv-cache-design.md` — the
-  approved design this decision implements, including the rejected
-  alternatives above and the out-of-scope list.

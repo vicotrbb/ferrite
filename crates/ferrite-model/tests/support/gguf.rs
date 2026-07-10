@@ -1,4 +1,7 @@
-#![allow(dead_code)]
+#![allow(
+    dead_code,
+    reason = "each integration test uses a different fixture subset"
+)]
 
 use ferrite_model::gguf::GgmlType;
 

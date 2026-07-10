@@ -3,6 +3,7 @@ use std::time::Duration;
 use super::{matrix::MatrixStorageKind, InferenceError, Matrix, NextToken};
 
 #[derive(Clone, Debug, PartialEq)]
+/// Timing and storage metadata for one profiled matrix-vector operation.
 pub struct ScalarProfileEvent {
     label: String,
     elapsed: Duration,
@@ -13,6 +14,7 @@ pub struct ScalarProfileEvent {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+/// Numeric and argmax comparison between reference and candidate matvecs.
 pub struct ScalarMatVecComparison {
     label: String,
     storage_kind: MatrixStorageKind,
@@ -88,46 +90,58 @@ impl ScalarMatVecComparison {
         })
     }
 
+    /// Returns the projection or operation label.
     pub fn label(&self) -> &str {
         &self.label
     }
 
+    /// Returns the matrix storage representation.
     pub fn storage_kind(&self) -> MatrixStorageKind {
         self.storage_kind
     }
 
+    /// Returns the matrix row count.
     pub fn rows(&self) -> usize {
         self.rows
     }
 
+    /// Returns the matrix column count.
     pub fn cols(&self) -> usize {
         self.cols
     }
 
+    /// Returns the physical bytes owned by the matrix.
     pub fn storage_bytes(&self) -> u128 {
         self.storage_bytes
     }
 
+    /// Returns the largest absolute element difference.
     pub fn max_abs_diff(&self) -> f32 {
         self.max_abs_diff
     }
 
+    /// Returns the largest relative element difference, with a small floor on
+    /// the reference denominator.
     pub fn max_relative_diff(&self) -> f32 {
         self.max_relative_diff
     }
 
+    /// Returns the greatest-value index in the reference output.
     pub fn reference_argmax_index(&self) -> usize {
         self.reference_argmax_index
     }
 
+    /// Returns the greatest-value index in the candidate output.
     pub fn candidate_argmax_index(&self) -> usize {
         self.candidate_argmax_index
     }
 
+    /// Returns the reference output's gap between its largest two values.
     pub fn reference_argmax_margin(&self) -> f32 {
         self.reference_argmax_margin
     }
 
+    /// Returns the candidate output's gap between its largest two values.
     pub fn candidate_argmax_margin(&self) -> f32 {
         self.candidate_argmax_margin
     }
@@ -174,39 +188,50 @@ impl ScalarProfileEvent {
         }
     }
 
+    /// Returns the projection or operation label.
     pub fn label(&self) -> &str {
         &self.label
     }
 
+    /// Returns the measured operation duration.
     pub fn elapsed(&self) -> Duration {
         self.elapsed
     }
 
+    /// Returns the matrix storage representation.
     pub fn storage_kind(&self) -> MatrixStorageKind {
         self.storage_kind
     }
 
+    /// Returns the matrix row count.
     pub fn rows(&self) -> usize {
         self.rows
     }
 
+    /// Returns the matrix column count.
     pub fn cols(&self) -> usize {
         self.cols
     }
 
+    /// Returns the physical bytes owned by the matrix.
     pub fn storage_bytes(&self) -> u128 {
         self.storage_bytes
     }
 }
 
 #[derive(Clone, Debug, PartialEq)]
+/// A next-token result with per-matvec timing and comparison records.
 pub struct ProfiledNextToken {
+    /// The selected token and full vocabulary logits.
     pub next_token: NextToken,
+    /// Timed matrix-vector operations in execution order.
     pub events: Vec<ScalarProfileEvent>,
+    /// Optional reference-versus-candidate comparisons.
     pub comparisons: Vec<ScalarMatVecComparison>,
 }
 
 impl ProfiledNextToken {
+    /// Returns the sum of recorded matrix-vector durations.
     pub fn total_elapsed(&self) -> Duration {
         self.events
             .iter()
@@ -216,13 +241,18 @@ impl ProfiledNextToken {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+/// A selected token ID with per-matvec timing and comparison records.
 pub struct ProfiledTokenId {
+    /// The selected vocabulary token ID.
     pub token_id: usize,
+    /// Timed matrix-vector operations in execution order.
     pub events: Vec<ScalarProfileEvent>,
+    /// Optional reference-versus-candidate comparisons.
     pub comparisons: Vec<ScalarMatVecComparison>,
 }
 
 impl ProfiledTokenId {
+    /// Returns the sum of recorded matrix-vector durations.
     pub fn total_elapsed(&self) -> Duration {
         self.events
             .iter()

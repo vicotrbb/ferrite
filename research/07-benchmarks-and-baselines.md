@@ -50,7 +50,7 @@ Note: Qwen2.5-7B has slightly fewer parameters (7.62B vs 8.03B for Llama-3-8B) a
 
 | CPU | Threads | Decode tok/s | Source |
 |-----|---------|--------------|--------|
-| Xeon Platinum 8375C | 2 | ~3.5 | [ESTIMATED — 42 layers, more compute per token] |
+| Xeon Platinum 8375C | 2 | ~3.5 | [ESTIMATED, 42 layers, more compute per token] |
 | Epyc 7R13 | 2 | ~3.8 | [ESTIMATED] |
 
 Gemma-2-9B is expected to be slower due to:
@@ -71,7 +71,7 @@ From llama.cpp benchmarks (Llama-2-7B Q4_K_M, Xeon Platinum 8375C):
 | 16 | 14.5 | 4.68× | 29% |
 | 32 | 16.8 | 5.42× | 17% |
 
-**Key observation:** Diminishing returns beyond 8 threads. At 2 threads, we get 77% efficiency (1.55× speedup). This is consistent with memory bandwidth being the limiting factor — adding threads doesn't linearly increase bandwidth.
+**Key observation:** Diminishing returns beyond 8 threads. At 2 threads, we get 77% efficiency (1.55× speedup). This is consistent with memory bandwidth being the limiting factor, adding threads doesn't linearly increase bandwidth.
 
 ### 2.3 Prefill vs Decode Performance
 
@@ -362,10 +362,10 @@ Defining "useful" as **interactive chat** (user perceives responsive conversatio
 - llama.cpp already demonstrates ~3.5–5.2 tok/s on similar hardware
 - Memory fits for Llama-3.1-8B at Q4_K_M with 4096 context
 - Qwen2.5-7B fits even more comfortably (up to 8K+ context)
-- The main risk is **cloud VM variability** — noisy neighbors, burstable instances, and inconsistent memory bandwidth can push performance below 3 tok/s
+- The main risk is **cloud VM variability**, noisy neighbors, burstable instances, and inconsistent memory bandwidth can push performance below 3 tok/s
 
 **Recommendation:** Specify minimum instance types, not just vCPU/RAM counts:
-- AWS: c6i.large (2 vCPU, 4GB RAM — too tight) or c6i.xlarge (4 vCPU, 8GB — ideal)
+- AWS: c6i.large (2 vCPU, 4GB RAM, too tight) or c6i.xlarge (4 vCPU, 8GB, ideal)
 - GCP: e2-standard-2 or n2-standard-2
 - Azure: D2s_v5
 
@@ -448,11 +448,11 @@ The runtime is "production-ready" when it achieves:
 - Open source (MIT)
 
 **Our differentiation:**
-1. **Memory engineering** — llama.cpp doesn't optimize for 6 GB ceiling; our streaming + eviction approach does
-2. **Cloud-native** — Topology detection, memory pressure handling, graceful degradation
-3. **Rust safety** — No buffer overflows, no undefined behavior, auditable unsafe surface
-4. **Forward compatibility** — BitNet/ternary format support before llama.cpp implements it
-5. **API-first** — Production-quality axum server vs llama.cpp's basic HTTP handler
+1. **Memory engineering**, llama.cpp doesn't optimize for 6 GB ceiling; our streaming + eviction approach does
+2. **Cloud-native**, Topology detection, memory pressure handling, graceful degradation
+3. **Rust safety**, No buffer overflows, no undefined behavior, auditable unsafe surface
+4. **Forward compatibility**, BitNet/ternary format support before llama.cpp implements it
+5. **API-first**, Production-quality axum server vs llama.cpp's basic HTTP handler
 
 If none of these provide meaningful value over llama.cpp for a specific use case, the user should simply use llama.cpp. This runtime exists for teams that need production Rust infrastructure with memory engineering for constrained environments.
 

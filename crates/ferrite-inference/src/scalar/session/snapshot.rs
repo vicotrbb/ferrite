@@ -2,6 +2,7 @@ use super::ScalarLlamaSession;
 use crate::scalar::{memory, InferenceError};
 
 #[derive(Clone, Debug, PartialEq)]
+/// An owned, backend-independent snapshot of a session KV cache.
 pub struct ScalarLlamaSessionSnapshot {
     layer_keys: Vec<Vec<Vec<f32>>>,
     layer_values: Vec<Vec<Vec<f32>>>,
@@ -9,10 +10,16 @@ pub struct ScalarLlamaSessionSnapshot {
 }
 
 impl ScalarLlamaSessionSnapshot {
+    /// Returns the number of cached token positions in the snapshot.
     pub fn cached_token_count(&self) -> usize {
         self.cached_token_count
     }
 
+    /// Returns a copy truncated to the requested cached-token count.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `token_count` exceeds the snapshot length.
     pub fn truncate_to_cached_token_count(
         &self,
         token_count: usize,
@@ -33,6 +40,7 @@ impl ScalarLlamaSessionSnapshot {
         })
     }
 
+    /// Returns the logical bytes occupied by snapshot key and value vectors.
     pub fn kv_cache_bytes(&self) -> u128 {
         memory::kv_cache_bytes(&self.layer_keys, &self.layer_values)
     }
@@ -75,10 +83,22 @@ fn truncate_layers(layers: &[Vec<Vec<f32>>], token_count: usize) -> Vec<Vec<Vec<
 }
 
 impl<'a> ScalarLlamaSession<'a> {
+    /// Copies this session's KV state into a backend-independent snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the selected KV backend cannot produce a
+    /// structurally valid snapshot.
     pub fn cache_snapshot(&mut self) -> Result<ScalarLlamaSessionSnapshot, InferenceError> {
         self.store.snapshot(self.cached_token_count)
     }
 
+    /// Replaces this session's KV state from a compatible snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when layer or token counts do not match the model, or
+    /// the selected KV backend cannot restore the snapshot.
     pub fn restore_cache_snapshot(
         &mut self,
         snapshot: &ScalarLlamaSessionSnapshot,

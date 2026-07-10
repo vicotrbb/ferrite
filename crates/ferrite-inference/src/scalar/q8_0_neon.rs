@@ -1,4 +1,7 @@
-#![allow(unsafe_code)]
+#![allow(
+    unsafe_code,
+    reason = "audited aarch64 SIMD intrinsics are isolated in this kernel module"
+)]
 
 use super::{
     neon_util::native_f16_bits_to_f32,
@@ -90,6 +93,8 @@ pub(super) fn neon_q8_0_argmax_mul_vec_batch(
 
 fn neon_q8_0_row_dot_batch(row_chunk: &[u8], vectors: &[&[f32]], row_out: &mut [f32]) {
     for (block_index, block) in row_chunk.chunks_exact(Q8_0_BLOCK_BYTES).enumerate() {
+        // SAFETY: this aarch64 module has baseline NEON support, and each
+        // chunk is a complete Q8_0 block with a two-byte scale.
         let scale = unsafe { native_f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]])) };
         let col_base = block_index * Q8_0_BLOCK_VALUES;
         // SAFETY: each Q8_0 block has exactly 32 quantized bytes after the
@@ -116,6 +121,8 @@ unsafe fn neon_q8_0_widen_block(quantized: *const i8) -> [float32x4_t; 8] {
     let mut quads = [vdupq_n_f32(0.0); 8];
     let mut offset = 0usize;
     while offset < Q8_0_BLOCK_VALUES {
+        // SAFETY: the caller provides a readable 32-value quant block and the
+        // loop advances by eight, so each 8-lane load stays in bounds.
         let quantized_i16 = vmovl_s8(unsafe { vld1_s8(quantized.add(offset)) });
         quads[offset / 4] = vcvtq_f32_s32(vmovl_s16(vget_low_s16(quantized_i16)));
         quads[offset / 4 + 1] = vcvtq_f32_s32(vmovl_s16(vget_high_s16(quantized_i16)));
@@ -167,6 +174,8 @@ fn neon_q8_0_mul_vec_row_parallel(
 fn neon_q8_0_row_dot(row_chunk: &[u8], vector: &[f32]) -> f32 {
     let mut sum = 0.0;
     for (block_index, block) in row_chunk.chunks_exact(Q8_0_BLOCK_BYTES).enumerate() {
+        // SAFETY: this aarch64 module has baseline NEON support, and each
+        // chunk is a complete Q8_0 block with a two-byte scale.
         let scale = unsafe { native_f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]])) };
         let col_base = block_index * Q8_0_BLOCK_VALUES;
         // SAFETY: each Q8_0 block has exactly 32 quantized bytes and
@@ -196,6 +205,8 @@ pub(super) fn neon_q8_0_argmax_mul_vec(
     argmax_q8_0_rows(bytes, row_bytes, |row_bytes| {
         let mut sum = 0.0;
         for (block_index, block) in row_bytes.chunks_exact(Q8_0_BLOCK_BYTES).enumerate() {
+            // SAFETY: this aarch64 module has baseline NEON support, and each
+            // chunk is a complete Q8_0 block with a two-byte scale.
             let scale = unsafe { native_f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]])) };
             let col_base = block_index * Q8_0_BLOCK_VALUES;
             // SAFETY: each Q8_0 block has exactly 32 quantized bytes and
@@ -221,6 +232,8 @@ pub(super) fn neon_q8_0_parallel_argmax_mul_vec(
     parallel_argmax_q8_0_rows(bytes, row_bytes, |row_bytes| {
         let mut sum = 0.0;
         for (block_index, block) in row_bytes.chunks_exact(Q8_0_BLOCK_BYTES).enumerate() {
+            // SAFETY: this aarch64 module has baseline NEON support, and each
+            // chunk is a complete Q8_0 block with a two-byte scale.
             let scale = unsafe { native_f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]])) };
             let col_base = block_index * Q8_0_BLOCK_VALUES;
             // SAFETY: each Q8_0 block has exactly 32 quantized bytes and
@@ -242,17 +255,23 @@ pub(super) unsafe fn neon_q8_0_block_dot(quantized: *const i8, vector: *const f3
     let mut lanes = vdupq_n_f32(0.0);
     let mut offset = 0usize;
     while offset < Q8_0_BLOCK_VALUES {
-        let quantized_i8 = unsafe { vld1_s8(quantized.add(offset)) };
+        // SAFETY: callers provide readable 32-value quant and activation
+        // windows, and the loop advances in disjoint eight-value chunks.
+        let (quantized_i8, low_vector, high_vector) = unsafe {
+            (
+                vld1_s8(quantized.add(offset)),
+                vld1q_f32(vector.add(offset)),
+                vld1q_f32(vector.add(offset + 4)),
+            )
+        };
         let quantized_i16 = vmovl_s8(quantized_i8);
 
         let low_i32 = vmovl_s16(vget_low_s16(quantized_i16));
         let low_f32 = vcvtq_f32_s32(low_i32);
-        let low_vector = unsafe { vld1q_f32(vector.add(offset)) };
         lanes = vfmaq_f32(lanes, low_f32, low_vector);
 
         let high_i32 = vmovl_s16(vget_high_s16(quantized_i16));
         let high_f32 = vcvtq_f32_s32(high_i32);
-        let high_vector = unsafe { vld1q_f32(vector.add(offset + 4)) };
         lanes = vfmaq_f32(lanes, high_f32, high_vector);
 
         offset += 8;
@@ -274,6 +293,8 @@ mod tests {
             .map(|index| (index % 9) as f32 - 4.0)
             .collect::<Vec<_>>();
 
+        // SAFETY: both test vectors contain the complete 32-value windows
+        // consumed by the NEON kernel.
         let actual = unsafe { neon_q8_0_block_dot(quantized.as_ptr(), vector.as_ptr()) };
         let expected = quantized
             .iter()

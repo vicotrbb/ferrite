@@ -1,5 +1,11 @@
 use super::InferenceError;
 
+/// Applies root-mean-square normalization and element-wise weights.
+///
+/// # Errors
+///
+/// Returns an error for empty or mismatched inputs, non-finite values, an
+/// invalid epsilon, or a zero or non-finite normalization scale.
 pub fn rms_norm(input: &[f32], weight: &[f32], epsilon: f32) -> Result<Vec<f32>, InferenceError> {
     if input.is_empty() {
         return Err(InferenceError::new("rms_norm input must not be empty"));
@@ -37,6 +43,11 @@ pub fn rms_norm(input: &[f32], weight: &[f32], epsilon: f32) -> Result<Vec<f32>,
     Ok(output)
 }
 
+/// Returns the index of the first greatest finite value.
+///
+/// # Errors
+///
+/// Returns an error when `values` is empty or contains a non-finite value.
 pub fn argmax(values: &[f32]) -> Result<usize, InferenceError> {
     if values.is_empty() {
         return Err(InferenceError::new("argmax input must not be empty"));

@@ -1,4 +1,7 @@
-#![allow(unsafe_code)]
+#![allow(
+    unsafe_code,
+    reason = "audited x86_64 SIMD intrinsics are isolated in this kernel module"
+)]
 
 use super::{
     q6_k::{

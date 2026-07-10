@@ -4,18 +4,23 @@ version = "0.1.0"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+rust-version.workspace = true
 publish = false
+description = "Command-line generation, profiling, and benchmarking for Ferrite"
+readme = "../../README.md"
+keywords = ["llm", "inference", "cpu", "gguf", "benchmark"]
+categories = ["command-line-utilities", "science"]
 
 [[bin]]
 name = "ferrite"
 path = "src/main.rs"
 
 [dependencies]
-ferrite-inference = { path = "../ferrite-inference" }
-ferrite-model = { path = "../ferrite-model" }
+ferrite-inference.workspace = true
+ferrite-model.workspace = true
 
 [dev-dependencies]
-ferrite-fixtures = { path = "../ferrite-fixtures" }
+ferrite-fixtures.workspace = true
 
 [features]
 locus-kv = ["ferrite-inference/locus-kv"]

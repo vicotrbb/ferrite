@@ -1,5 +1,8 @@
 //! Experimental Q4_K × two-pass residual-Q8_K matvec for FEAT_I8MM CPUs.
-#![allow(unsafe_code)]
+#![allow(
+    unsafe_code,
+    reason = "audited aarch64 SIMD intrinsics are isolated in this kernel module"
+)]
 
 use super::{
     neon_util::native_f16_bits_to_f32,
@@ -55,6 +58,8 @@ pub(super) fn neon_q4_k_q8_residual_i8mm_mul_vec(
             output.copy_from_slice(&[pair.0, pair.1]);
         });
     if let Some(output) = tail_values.first_mut() {
+        // SAFETY: dispatch checked FEAT_I8MM, and the tail is one validated
+        // row paired with itself so the paired kernel can reuse its layout.
         *output =
             unsafe { row_dot_pair(&bytes[paired_bytes..], &bytes[paired_bytes..], &activation) }.0;
     }
@@ -178,10 +183,16 @@ unsafe fn block_dot_pair(left: &[u8], right: &[u8], activation: &BlockQ8KResidua
         }
     }
 
-    let left_d = unsafe { native_f16_bits_to_f32(u16::from_le_bytes([left[0], left[1]])) };
-    let left_dmin = unsafe { native_f16_bits_to_f32(u16::from_le_bytes([left[2], left[3]])) };
-    let right_d = unsafe { native_f16_bits_to_f32(u16::from_le_bytes([right[0], right[1]])) };
-    let right_dmin = unsafe { native_f16_bits_to_f32(u16::from_le_bytes([right[2], right[3]])) };
+    // SAFETY: I8MM implies NEON support, and both inputs are complete Q4_K
+    // blocks whose first four bytes contain the two half-precision scales.
+    let (left_d, left_dmin, right_d, right_dmin) = unsafe {
+        (
+            native_f16_bits_to_f32(u16::from_le_bytes([left[0], left[1]])),
+            native_f16_bits_to_f32(u16::from_le_bytes([left[2], left[3]])),
+            native_f16_bits_to_f32(u16::from_le_bytes([right[0], right[1]])),
+            native_f16_bits_to_f32(u16::from_le_bytes([right[2], right[3]])),
+        )
+    };
     let left_result = activation.passes[0].d
         * (left_d * weighted[0] as f32 - left_dmin * minimum[0] as f32)
         + activation.passes[1].d * (left_d * weighted[1] as f32 - left_dmin * minimum[1] as f32);
@@ -204,6 +215,8 @@ fn scale_min(index: usize, scales: &[u8]) -> (u8, u8) {
 
 #[inline(always)]
 unsafe fn matrix_dot_i8x16(mut sum: int32x4_t, rows: int8x16_t, columns: int8x16_t) -> int32x4_t {
+    // SAFETY: callers enter only after FEAT_I8MM detection, and the assembly
+    // touches registers only, with no memory or stack effects.
     unsafe {
         asm!(
             "smmla {sum:v}.4s, {rows:v}.16b, {columns:v}.16b",
@@ -245,6 +258,8 @@ mod tests {
             .iter()
             .map(|pass| neon_q4_k_q8_k_block_dot(&right, pass))
             .sum::<Result<f32, _>>()?;
+        // SAFETY: the runtime check above establishes FEAT_I8MM, and the test
+        // inputs are complete Q4_K and residual activation blocks.
         let actual = unsafe { block_dot_pair(&left, &right, &residual) };
 
         assert!((actual.0 - expected_left).abs() < 0.001);

@@ -19,7 +19,7 @@ lever on CPU.
 
 ## Decision
 
-Phase 1 — concurrent sessions (this ADR's implementation scope):
+Phase 1, concurrent sessions (this ADR's implementation scope):
 
 1. Drop the engine `Mutex`; hold `Arc<InferenceEngine>`. The engine is
    immutable after load except the prefix cache, which keeps its own
@@ -32,7 +32,7 @@ Phase 1 — concurrent sessions (this ADR's implementation scope):
    trades single-stream latency for aggregate throughput; both are
    measured with the existing throughput client (`--concurrency`).
 
-Phase 2 — batched decode (design, separate implementation slices):
+Phase 2, batched decode (design, separate implementation slices):
 
 1. `ferrite-inference` gains batched matvec kernels
    (`mul_vec_batched(weights, &[activation])`) for Q5_0/Q6_K/Q4_K/Q8_0/

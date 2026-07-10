@@ -1,4 +1,4 @@
-# Document 6: Target Model Architectures — 9B Class Models in Detail
+# Document 6: Target Model Architectures, 9B Class Models in Detail
 
 **Research Program:** CPU-Native LLM Inference Runtime  
 **Target Spec:** 9B parameter model, 2 vCPUs, 6 GB RAM, 2–5 tok/s  
@@ -16,7 +16,7 @@ The critical model parameters that affect our runtime:
 - **num_kv_heads (GQA ratio):** Determines KV cache size (fewer KV heads = smaller cache)
 - **head_dim:** Determines per-head compute and KV size
 - **hidden_size / intermediate_size:** Determines matmul dimensions (memory bandwidth)
-- **Attention variant:** MHA, GQA, MQA, sliding window — affects implementation
+- **Attention variant:** MHA, GQA, MQA, sliding window, affects implementation
 
 ---
 
@@ -175,7 +175,7 @@ Based on llama.cpp benchmarks for similar 7B Q4_K_M models:
 - Total params: ~9.24B
 - Q4_K_M: ~5.3 GB
 
-**KV cache (CRITICAL — much larger due to 8 KV heads × head_dim 256):**
+**KV cache (CRITICAL, much larger due to 8 KV heads × head_dim 256):**
 ```
 KV per token = 2 × 42 × 8 × 256 × 2 = 344,064 bytes ≈ 336 KB
 ```
@@ -197,7 +197,7 @@ KV per token = 2 × 42 × 8 × 256 × 2 = 344,064 bytes ≈ 336 KB
 **With Q4_0 weights (lighter, 5.0 GB) + INT8 KV:**
 - Total: 5.0 + 0.65 + 0.3 = **~5.95 GB** ✅ Barely fits
 
-**Verdict: Gemma-2-9B is TIGHT at 6 GB.** Requires INT8 KV cache AND Q4_0 (not Q4_K_M) weights to fit. Quality will be slightly lower but still acceptable. The sliding window is a memory blessing — KV cache never grows beyond 4096 tokens.
+**Verdict: Gemma-2-9B is TIGHT at 6 GB.** Requires INT8 KV cache AND Q4_0 (not Q4_K_M) weights to fit. Quality will be slightly lower but still acceptable. The sliding window is a memory blessing, KV cache never grows beyond 4096 tokens.
 
 ### 3.4 Implementation Quirks
 
@@ -205,7 +205,7 @@ KV per token = 2 × 42 × 8 × 256 × 2 = 344,064 bytes ≈ 336 KB
 2. **Pre-attention Q scaling:** Must scale Q before RoPE
 3. **Post-norm vs pre-norm:** LayerNorm applied after residual, not before
 4. **Sliding window:** All layers use sliding window; no "full attention" layers
-5. **Interleaved attention:** [UNVERIFIED] Some Gemma-2 variants interleave full and sliding window — check actual config
+5. **Interleaved attention:** [UNVERIFIED] Some Gemma-2 variants interleave full and sliding window, check actual config
 
 ### 3.5 Expected Throughput
 
@@ -274,7 +274,7 @@ KV per token = 2 × 32 × 8 × 128 × 2 = 131,072 bytes ≈ 128 KB
 | Q4_K_S | ~65.0% | Slight drop |
 | Q3_K_M | ~63.0% | Noticeable degradation |
 
-Llama-3.1-8B is known to quantize well — the model's weights are more uniformly distributed than some competitors, making quantization less lossy.
+Llama-3.1-8B is known to quantize well, the model's weights are more uniformly distributed than some competitors, making quantization less lossy.
 
 ### 4.4 Expected Throughput
 
@@ -315,7 +315,7 @@ From llama.cpp community benchmarks and our bandwidth analysis:
   - At 2048 tokens: 768 MB
   - Total: 2.2 + 0.75 + 0.3 = ~3.25 GB ✅ PLENTY of headroom
 
-**Quality:** Phi-3.5-mini punches above its weight — competitive with Llama-2-7B on many benchmarks despite being 3.8B.
+**Quality:** Phi-3.5-mini punches above its weight, competitive with Llama-2-7B on many benchmarks despite being 3.8B.
 
 **Throughput at 2 vCPU [ESTIMATED]:** 6-10 tok/s (small model, fast)
 
@@ -339,7 +339,7 @@ From llama.cpp community benchmarks and our bandwidth analysis:
 | Model | Params | Bits | Weight Size | Status |
 |-------|--------|------|-------------|--------|
 | BitNet-b1.58-2B-4T | 2B | 1.58 | ~0.4 GB | Released (Microsoft) |
-| bitnet_cpp (reference) | — | — | — | Reference impl |
+| bitnet_cpp (reference) |, |, |, | Reference impl |
 | Community 1-bit attempts | Various | 1-2 | Various | Experimental |
 
 **No 9B-class BitNet model publicly available as of June 2025.**
@@ -354,7 +354,7 @@ If a 9B BitNet model were released:
 - Plus: activations are FP16 (needed for residual streams, norms)
 
 **Matmul simplification:**
-- No dequantization needed — weights ARE the computation
+- No dequantization needed, weights ARE the computation
 - Matmul becomes: additions and subtractions only
 - CPU: ADD/SUB instructions are 2-4× faster than MUL on most architectures
 - SIMD: Can use bitwise operations to select add/sub/skip
@@ -463,8 +463,8 @@ If a suitable small MoE model existed:
 | Qwen2.5-7B | 7.62B | 4.1 GB | 115 MB | 229 MB | ~4.6 GB | ✅ Yes | ⭐⭐⭐⭐⭐ | 5+ tok/s |
 | Llama-3.1-8B | 8.03B | 4.9 GB | 256 MB | 512 MB | ~5.7 GB | ✅ Yes | ⭐⭐⭐⭐ | 3-4 tok/s |
 | Gemma-2-9B | 9.24B | 5.3 GB | 672 MB | 1344 MB | ~6.9 GB | ❌ (Q4_0+INT8 OK) | ⭐⭐⭐⭐⭐ | 2.5-3.5 tok/s |
-| Phi-3.5-mini | 3.8B | 2.2 GB | 768 MB (2K win) | — | ~3.3 GB | ✅ Plenty | ⭐⭐⭐⭐ | 6-10 tok/s |
-| Phi-4 (14B) | 14B | 8.3 GB | — | — | — | ❌ Too big | N/A | N/A |
+| Phi-3.5-mini | 3.8B | 2.2 GB | 768 MB (2K win) |, | ~3.3 GB | ✅ Plenty | ⭐⭐⭐⭐ | 6-10 tok/s |
+| Phi-4 (14B) | 14B | 8.3 GB |, |, |, | ❌ Too big | N/A | N/A |
 
 ### 8.2 Quantization Format Compatibility
 
@@ -488,10 +488,10 @@ If a suitable small MoE model existed:
 
 **Best to worst for 6GB/2vCPU target:**
 
-1. **Qwen2.5-7B** — Best overall: fits easily, fast, high GQA, excellent community support
-2. **Llama-3.1-8B** — Close second: fits at context 4096, excellent quality, well-known
-3. **Gemma-2-9B** — Tight fit: needs INT8 KV + Q4_0, but highest quality at 9B scale; sliding window is a memory gift
-4. **Phi-3.5-mini** — Fallback: fast and light, but only 3.8B params (lower capability ceiling)
+1. **Qwen2.5-7B**, Best overall: fits easily, fast, high GQA, excellent community support
+2. **Llama-3.1-8B**, Close second: fits at context 4096, excellent quality, well-known
+3. **Gemma-2-9B**, Tight fit: needs INT8 KV + Q4_0, but highest quality at 9B scale; sliding window is a memory gift
+4. **Phi-3.5-mini**, Fallback: fast and light, but only 3.8B params (lower capability ceiling)
 
 ---
 
@@ -519,7 +519,7 @@ Where:
 - Across 32 layers: ~3.26 GB (bulk of model!)
 
 **Computation:**
-1. Two matmuls (gate and up) in parallel or sequential — can fuse into one wider matmul
+1. Two matmuls (gate and up) in parallel or sequential, can fuse into one wider matmul
 2. Element-wise SiLU + multiply (trivial compute)
 3. One matmul (down)
 
@@ -547,7 +547,7 @@ fn apply_rope(x: &[f16], position: usize, dim: usize, theta: f32) -> Vec<f16> {
 }
 ```
 
-**Performance:** RoPE is lightweight — O(head_dim) per head per token. Not a bottleneck.
+**Performance:** RoPE is lightweight, O(head_dim) per head per token. Not a bottleneck.
 
 **SIMD optimization:** Process pairs of elements using AVX2 multiply-add instructions. For head_dim=128, that's 64 rotation pairs per head.
 
@@ -575,25 +575,25 @@ fn rms_norm(x: &[f16], weight: &[f16], eps: f32) -> Vec<f16> {
 ### 10.1 Primary Target: Llama-3.1-8B
 
 1. **Best overall fit for 6 GB** at Q4_K_M with context 4096
-2. **Standard architecture** — no exotic features (no softcap, no post-norm quirks)
-3. **Massive community support** — GGUF models widely available
-4. **4:1 GQA** — Reasonable KV cache size
-5. **32 layers** — Good balance of quality vs sequential compute depth
+2. **Standard architecture**, no exotic features (no softcap, no post-norm quirks)
+3. **Massive community support**, GGUF models widely available
+4. **4:1 GQA**, Reasonable KV cache size
+5. **32 layers**, Good balance of quality vs sequential compute depth
 
 ### 10.2 Secondary Target: Qwen2.5-7B
 
-1. **Best memory margin** — 4.1 GB weights leaves 1.9 GB for everything else
-2. **7:1 GQA** — Smallest KV cache of any target
-3. **Tied embeddings** — Saves ~200 MB (embed = lm_head)
-4. **28 layers** — Fewer sequential compute steps = faster per token
-5. **Excellent multilingual** — Good for international deployment
+1. **Best memory margin**, 4.1 GB weights leaves 1.9 GB for everything else
+2. **7:1 GQA**, Smallest KV cache of any target
+3. **Tied embeddings**, Saves ~200 MB (embed = lm_head)
+4. **28 layers**, Fewer sequential compute steps = faster per token
+5. **Excellent multilingual**, Good for international deployment
 
 ### 10.3 Stretch Target: Gemma-2-9B
 
-1. **Highest quality per parameter** — Best 9B-class model on reasoning/challenge benchmarks
-2. **Requires INT8 KV cache** — Implement as a runtime option
-3. **Sliding window simplifies** — Fixed 4096-token context window (no context growth management)
-4. **Special implementation needed** — softcap, pre-attention scaling, post-norm
+1. **Highest quality per parameter**, Best 9B-class model on reasoning/challenge benchmarks
+2. **Requires INT8 KV cache**, Implement as a runtime option
+3. **Sliding window simplifies**, Fixed 4096-token context window (no context growth management)
+4. **Special implementation needed**, softcap, pre-attention scaling, post-norm
 
 ### 10.4 Runtime Architecture Configuration
 

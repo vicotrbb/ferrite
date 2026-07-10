@@ -1,4 +1,8 @@
-# Ferrite Documentation
+# Ferrite Project Record
+
+User and contributor documentation lives in [`../docs`](../docs/README.md).
+This directory preserves the technical evidence behind Ferrite's design and
+performance decisions.
 
 Ferrite is built through an evidence-driven loop: research, decide, implement,
 validate, benchmark, document, and repeat. This directory is the project record
@@ -6,8 +10,8 @@ for that loop.
 
 ## Structure
 
-- `engineering/` - operating model, quality gates, engineering policies, and
-  project-level standards.
+- `engineering/` - the current operating model, quality gates, and durable
+  project-level standards. Transient plans and prompts do not belong here.
 - `adr/` - architecture decision records. Any durable technical direction,
   rejected alternative, unsafe boundary, dependency policy, or benchmark gate
   belongs here.

@@ -1,4 +1,4 @@
-# CPU-Native LLM Inference Runtime — Research Knowledge Base
+# CPU-Native LLM Inference Runtime, Research Knowledge Base
 
 **Target Spec:** Run a 9B parameter model (Qwen2.5-7B, Llama-3.1-8B, Gemma-2-9B) on 2 vCPUs and 6 GB RAM, delivering 2–5 tokens/second for interactive use.
 
@@ -10,7 +10,7 @@
 
 ## Overview
 
-This research knowledge base provides the engineering foundation for building a CPU-native LLM inference runtime from scratch. It consists of 9 deeply-researched documents covering every aspect of the system — from state-of-the-art survey through memory architecture, quantization formats, SIMD kernels, runtime design, model compatibility, benchmarking, implementation roadmap, and Rust ecosystem readiness.
+This research knowledge base provides the engineering foundation for building a CPU-native LLM inference runtime from scratch. It consists of 9 deeply-researched documents covering every aspect of the system, from state-of-the-art survey through memory architecture, quantization formats, SIMD kernels, runtime design, model compatibility, benchmarking, implementation roadmap, and Rust ecosystem readiness.
 
 A software engineer (or AI implementation agent) can read these documents sequentially and proceed directly to building a working prototype.
 
@@ -29,8 +29,8 @@ A software engineer (or AI implementation agent) can read these documents sequen
 | 7 | [Benchmarks and Baselines](07-benchmarks-and-baselines.md) | Real benchmark data, performance targets, gap analysis | Achievable: 3.5-6.1 tok/s; our target 3.5-5.0 tok/s matches llama.cpp |
 | 8 | [Implementation Roadmap](08-implementation-roadmap.md) | 6-phase plan, risks, open problems | 11 weeks (13 with buffer) for single engineer to production MVP |
 | 9 | [Rust Ecosystem](09-rust-ecosystem.md) | Crate landscape, FFI analysis, gap analysis | Ecosystem 3.6/5 ready; SIMD kernels and KV cache must be custom-built |
-| 10 | [Theoretical Frontiers](10-theoretical-frontiers.md) | **27 novel theories** — information theory limits, spectral decomposition, cache-resident attention, weight manifolds, asymmetric threading | Theoretical max ~10-15 tok/s; 9B unquantized at 1-2 tok/s possible with combined theories |
-| 11 | [Testing Model Registry](11-testing-model-registry.md) | **17 open-weight models** across 5 tiers — from 135M bring-up to 32B streaming | Progressive testing: SmolLM2→Qwen2.5→Llama→Phi→Mistral→Gemma |
+| 10 | [Theoretical Frontiers](10-theoretical-frontiers.md) | **27 novel theories**, information theory limits, spectral decomposition, cache-resident attention, weight manifolds, asymmetric threading | Theoretical max ~10-15 tok/s; 9B unquantized at 1-2 tok/s possible with combined theories |
+| 11 | [Testing Model Registry](11-testing-model-registry.md) | **17 open-weight models** across 5 tiers, from 135M bring-up to 32B streaming | Progressive testing: SmolLM2→Qwen2.5→Llama→Phi→Mistral→Gemma |
 
 ---
 
@@ -102,7 +102,7 @@ A software engineer (or AI implementation agent) can read these documents sequen
 - **Peak physical RAM: ~1.3 GB** (current layer + KV cache + overhead)
 - Achieve 0.2–0.5 tok/s decode on NVMe SSD
 
-This means **no quantization loss** on minimal hardware — a unique capability no other runtime offers. Users choose: Q4_K_M at 3-5 tok/s for interactive chat, or FP16 streaming at 0.2-0.5 tok/s for maximum quality.
+This means **no quantization loss** on minimal hardware, a unique capability no other runtime offers. Users choose: Q4_K_M at 3-5 tok/s for interactive chat, or FP16 streaming at 0.2-0.5 tok/s for maximum quality.
 
 ---
 

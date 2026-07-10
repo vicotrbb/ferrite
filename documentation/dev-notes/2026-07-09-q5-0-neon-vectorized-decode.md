@@ -22,8 +22,8 @@ the whole 32-value block in NEON registers:
 The FMA accumulation order (low quad then high quad per 4-lane step,
 single accumulator register, per-block `vaddvq_f32 × scale`) is exactly
 the order of the previous kernel, so the result is bit-identical: the
-only float operations — FMA into the same lanes in the same sequence,
-horizontal add, scale multiply — are unchanged.
+only float operations, FMA into the same lanes in the same sequence,
+horizontal add, scale multiply, are unchanged.
 
 ## Validation
 
@@ -65,7 +65,7 @@ ffn_up 7.31→4.62 ms, k_proj 0.50→0.28 ms (24-layer totals).
 - The kernel is now FMA-chain-latency-bound (single accumulator per
   block preserved for bit-identity). Next slice: independent per-row
   accumulator chains via row pairing (keeps per-row accumulation order,
-  so still bit-identical) — measured separately.
+  so still bit-identical), measured separately.
 - Q6_K/Q4_K NEON block dots still use scalar lane arrays (ffn_down).
 - Run-to-run spread on this host is ~±8%; slice acceptance uses
   median-of-3 benchmark runs plus the official eval record.

@@ -4,14 +4,23 @@ use std::error::Error;
 
 #[tokio::main]
 async fn main() {
-    if let Err(error) = run().await {
+    let arguments = std::env::args_os().collect::<Vec<_>>();
+    if arguments
+        .get(1)
+        .is_some_and(|argument| argument == "--help" || argument == "-h")
+    {
+        println!("{}", ferrite_server::config::usage());
+        return;
+    }
+
+    if let Err(error) = run(arguments).await {
         eprintln!("{error}");
         std::process::exit(1);
     }
 }
 
-async fn run() -> Result<(), Box<dyn Error>> {
-    let config = ServerConfig::parse(std::env::args_os())?;
+async fn run(arguments: Vec<std::ffi::OsString>) -> Result<(), Box<dyn Error>> {
+    let config = ServerConfig::parse(arguments)?;
     #[cfg(target_arch = "aarch64")]
     let use_memory_bound_pool = config.experimental_residual_q8_activation_matvec()
         && std::arch::is_aarch64_feature_detected!("i8mm");

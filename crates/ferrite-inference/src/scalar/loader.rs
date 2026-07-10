@@ -253,5 +253,6 @@ fn optional_f32_vector(
 }
 
 fn usize_from_u64(value: u64, name: &str) -> Result<usize, InferenceError> {
-    usize::try_from(value).map_err(|_| InferenceError::new(format!("{name} does not fit in usize")))
+    usize::try_from(value)
+        .map_err(|_error| InferenceError::new(format!("{name} does not fit in usize")))
 }

@@ -252,7 +252,7 @@ fn next_value(
 fn os_string_to_string(value: OsString) -> Result<String, ConfigError> {
     value
         .into_string()
-        .map_err(|_| ConfigError::new("arguments must be valid UTF-8"))
+        .map_err(|_error| ConfigError::new("arguments must be valid UTF-8"))
 }
 
 fn parse_token_limit(value: OsString, flag: &str) -> Result<usize, ConfigError> {
@@ -267,7 +267,7 @@ fn parse_millis(value: OsString, flag: &str) -> Result<u64, ConfigError> {
         .map_err(|error| ConfigError::new(format!("invalid {flag}: {error}")))
 }
 
-fn usage() -> &'static str {
+pub fn usage() -> &'static str {
     "usage: ferrite-server [--bind 127.0.0.1:8080] [--model-id ferrite-local] [--model path/to/model.gguf] [--api-key local-secret] [--default-max-tokens 16] [--hard-max-tokens 256] [--inference-wait-ms 0] [--experimental-prefix-cache] [--experimental-residual-q8-activation-matvec] [--experimental-batched-decode --max-batch-streams N] [--threads N] [--max-concurrent-inferences 1]"
 }
 

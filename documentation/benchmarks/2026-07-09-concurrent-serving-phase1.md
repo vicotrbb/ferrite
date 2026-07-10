@@ -19,7 +19,7 @@
 | 4 | 1 | 1.006 | 48.3 | 49.5 | 267 |
 | 4 | 2 | 1.492 | 71.6 | 36.9 | 355 |
 | 4 | 4 | 1.834 | 88.0 | 22.8 | 563 |
-| 1 (default) | 4 | 0.968 | 46.5 | 45.5 | — |
+| 1 (default) | 4 | 0.968 | 46.5 | 45.5 |, |
 
 Aggregate throughput at 4 concurrent streams is +89% over the
 serialized default (1.834 vs 0.968 req/s). Scaling is sub-linear because

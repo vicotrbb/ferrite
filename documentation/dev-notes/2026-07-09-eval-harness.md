@@ -1,20 +1,20 @@
-# 2026-07-09 — Evaluation harness (`scripts/eval.py`)
+# 2026-07-09, Evaluation harness (`scripts/eval.py`)
 
 ## What was built
 
 A one-command, stdlib-only Python 3 evaluation harness plus unit tests:
 
-- `scripts/eval.py` — orchestrates a release build, a CLI generation run, a
+- `scripts/eval.py`, orchestrates a release build, a CLI generation run, a
   precise in-process decode benchmark, and an OpenAI-server run driven by
   `ferrite-openai-throughput`; writes a versioned JSON record
   (`schema_version: 1`) and a Markdown summary to `scripts/evals/`.
-- `scripts/eval_test.py` — stdlib `unittest` suite (14 tests) covering the
+- `scripts/eval_test.py`, stdlib `unittest` suite (14 tests) covering the
   pure logic: key=value parsing, nearest-rank percentiles, `ps` cputime
   parsing, sample-window aggregation, CLI timing metrics from a synthetic
   timeline, output naming, and Markdown rendering.
 
-Design spec: `docs/superpowers/specs/2026-07-09-eval-script-design.md`.
-Plan: `docs/superpowers/plans/2026-07-09-eval-script.md`.
+The implementation contract and measurement method are recorded below, with
+the executable behavior covered by `scripts/eval_test.py`.
 
 ## How measurements are taken
 

@@ -222,7 +222,10 @@ pub(super) fn chat_batched_stream_response(
     )
 }
 
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "stream assembly keeps typed lifecycle callbacks explicit"
+)]
 fn stream_batched_generated_text<T>(
     scheduler: Arc<BatchScheduler>,
     prompt: String,

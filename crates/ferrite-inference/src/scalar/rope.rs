@@ -1,11 +1,22 @@
 use super::InferenceError;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// The coordinate-pairing convention used by rotary position encoding.
 pub enum RopeLayout {
+    /// Pair consecutive coordinates, as used by Llama.
     AdjacentPairs,
+    /// Pair coordinates from the first and second halves, as used by Qwen2.
     SplitHalf,
 }
 
+/// Applies adjacent-pair rotary position encoding to one attention head.
+///
+/// Dimensions beyond `rope_dimension_count` are copied unchanged.
+///
+/// # Errors
+///
+/// Returns an error for non-finite input, an odd or out-of-range rotary
+/// dimension count, or a non-positive or non-finite frequency base.
 pub fn apply_rope(
     values: &[f32],
     position: usize,

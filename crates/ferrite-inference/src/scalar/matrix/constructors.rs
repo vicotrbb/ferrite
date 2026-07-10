@@ -12,6 +12,12 @@ use crate::scalar::{
 };
 
 impl Matrix {
+    /// Creates an F32 matrix from row-major values.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the shape overflows, the data length does not
+    /// match `rows * cols`, or any value is non-finite.
     pub fn from_row_major(
         rows: usize,
         cols: usize,
@@ -37,6 +43,12 @@ impl Matrix {
         })
     }
 
+    /// Creates a Q8_0 matrix from GGML row-major block bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the column count is not block-aligned, byte size
+    /// does not match the shape, arithmetic overflows, or a scale is non-finite.
     pub fn from_q8_0_row_major_bytes(
         rows: usize,
         cols: usize,
@@ -66,6 +78,12 @@ impl Matrix {
         })
     }
 
+    /// Creates a Q5_0 matrix from GGML row-major block bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the column count is not block-aligned, byte size
+    /// does not match the shape, arithmetic overflows, or a scale is non-finite.
     pub fn from_q5_0_row_major_bytes(
         rows: usize,
         cols: usize,
@@ -95,6 +113,12 @@ impl Matrix {
         })
     }
 
+    /// Creates a Q4_K matrix from GGML row-major block bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the value count is not block-aligned, byte size
+    /// does not match the shape, arithmetic overflows, or a scale is non-finite.
     pub fn from_q4_k_row_major_bytes(
         rows: usize,
         cols: usize,
@@ -119,6 +143,12 @@ impl Matrix {
         })
     }
 
+    /// Creates a Q6_K matrix from GGML row-major block bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the value count is not block-aligned, byte size
+    /// does not match the shape, arithmetic overflows, or a scale is non-finite.
     pub fn from_q6_k_row_major_bytes(
         rows: usize,
         cols: usize,

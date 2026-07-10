@@ -13,6 +13,10 @@ use profiling::{profiled_argmax_mul_vec, profiled_layer_mul_vec, profiled_mul_ve
 pub use snapshot::ScalarLlamaSessionSnapshot;
 
 #[derive(Debug)]
+/// Mutable generation state for one immutable [`ScalarLlamaModel`].
+///
+/// A session owns its KV cache and execution policy. Accepting a token appends
+/// its per-layer key and value state and advances the cached position.
 pub struct ScalarLlamaSession<'a> {
     model: &'a ScalarLlamaModel,
     store: super::kv_store::KvCacheStore,
@@ -21,12 +25,16 @@ pub struct ScalarLlamaSession<'a> {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// A callback decision made during prompt evaluation.
 pub enum PromptEvaluationControl {
+    /// Continue evaluating the prompt.
     Continue,
+    /// Stop evaluation and return a cancellation error.
     Cancel,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// The token and optional layer at which prompt cancellation is polled.
 pub struct PromptEvaluationLocation {
     prompt_token_index: usize,
     token_id: usize,
@@ -34,6 +42,7 @@ pub struct PromptEvaluationLocation {
 }
 
 impl PromptEvaluationLocation {
+    /// Creates the location checked immediately before a prompt token begins.
     pub fn before_token(prompt_token_index: usize, token_id: usize) -> Self {
         Self {
             prompt_token_index,
@@ -42,6 +51,7 @@ impl PromptEvaluationLocation {
         }
     }
 
+    /// Creates a location checked before evaluating a transformer layer.
     pub fn layer(prompt_token_index: usize, token_id: usize, layer_index: usize) -> Self {
         Self {
             prompt_token_index,
@@ -50,20 +60,29 @@ impl PromptEvaluationLocation {
         }
     }
 
+    /// Returns the zero-based token index within the submitted prompt.
     pub fn prompt_token_index(self) -> usize {
         self.prompt_token_index
     }
 
+    /// Returns the vocabulary token ID at this location.
     pub fn token_id(self) -> usize {
         self.token_id
     }
 
+    /// Returns the zero-based layer index, or `None` before the token begins.
     pub fn layer_index(self) -> Option<usize> {
         self.layer_index
     }
 }
 
 impl<'a> ScalarLlamaSession<'a> {
+    /// Accepts every token in a nonempty prompt and returns the final next token.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an empty prompt, an out-of-range token, or an
+    /// inference shape, storage, or numeric failure.
     pub fn accept_prompt(&mut self, tokens: &[usize]) -> Result<NextToken, InferenceError> {
         self.accept_prompt_with_control_and_cancellation(
             tokens,
@@ -72,6 +91,15 @@ impl<'a> ScalarLlamaSession<'a> {
         )
     }
 
+    /// Accepts a prompt while calling `on_prompt_token` before each token.
+    ///
+    /// The callback receives the prompt index and token ID. Returning
+    /// [`PromptEvaluationControl::Cancel`] stops before that token is accepted.
+    ///
+    /// # Errors
+    ///
+    /// Returns callback errors, a cancellation error, or any error documented by
+    /// [`Self::accept_prompt`].
     pub fn accept_prompt_with_control(
         &mut self,
         tokens: &[usize],
@@ -82,6 +110,12 @@ impl<'a> ScalarLlamaSession<'a> {
         })
     }
 
+    /// Accepts a prompt while polling a cancellation callback throughout work.
+    ///
+    /// # Errors
+    ///
+    /// Returns callback errors, a cancellation error, or any error documented by
+    /// [`Self::accept_prompt`].
     pub fn accept_prompt_with_cancellation(
         &mut self,
         tokens: &[usize],
@@ -94,6 +128,12 @@ impl<'a> ScalarLlamaSession<'a> {
         )
     }
 
+    /// Accepts a prompt with per-token control and location-free cancellation.
+    ///
+    /// # Errors
+    ///
+    /// Returns callback errors, a cancellation error, or any error documented by
+    /// [`Self::accept_prompt`].
     pub fn accept_prompt_with_control_and_cancellation(
         &mut self,
         tokens: &[usize],
@@ -107,6 +147,15 @@ impl<'a> ScalarLlamaSession<'a> {
         )
     }
 
+    /// Accepts a prompt with per-token control and location-aware cancellation.
+    ///
+    /// Cancellation is polled before each token and before each transformer
+    /// layer. Tokens successfully completed before cancellation remain cached.
+    ///
+    /// # Errors
+    ///
+    /// Returns callback errors, a cancellation error, or any error documented by
+    /// [`Self::accept_prompt`].
     pub fn accept_prompt_with_control_and_location_cancellation(
         &mut self,
         tokens: &[usize],
@@ -145,6 +194,12 @@ impl<'a> ScalarLlamaSession<'a> {
         next.ok_or_else(|| InferenceError::new("prompt must contain at least one token"))
     }
 
+    /// Accepts one token and returns the selected next token and full logits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an out-of-range token or an inference shape,
+    /// storage, callback, or numeric failure.
     pub fn accept_token(&mut self, token_id: usize) -> Result<NextToken, InferenceError> {
         let accepted = self.accept_token_inner(token_id, None, None, OutputMode::Logits, |_| {
             Ok(PromptEvaluationControl::Continue)
@@ -157,6 +212,12 @@ impl<'a> ScalarLlamaSession<'a> {
         })
     }
 
+    /// Accepts one token while polling before each transformer layer.
+    ///
+    /// # Errors
+    ///
+    /// Returns callback errors, a cancellation error, or any error documented by
+    /// [`Self::accept_token`].
     pub fn accept_token_with_layer_control(
         &mut self,
         token_id: usize,
@@ -172,6 +233,15 @@ impl<'a> ScalarLlamaSession<'a> {
         })
     }
 
+    /// Accepts one token and returns only the selected next-token ID.
+    ///
+    /// This avoids materializing the vocabulary logit vector when the output
+    /// matrix supports fused argmax dispatch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an out-of-range token or an inference shape,
+    /// storage, or numeric failure.
     pub fn accept_token_id(&mut self, token_id: usize) -> Result<usize, InferenceError> {
         Ok(self
             .accept_token_inner(token_id, None, None, OutputMode::TokenIdOnly, |_| {
@@ -180,6 +250,12 @@ impl<'a> ScalarLlamaSession<'a> {
             .token_id)
     }
 
+    /// Accepts one token and returns its next ID with matvec profile records.
+    ///
+    /// # Errors
+    ///
+    /// Returns any error documented by [`Self::accept_token_id`], plus errors
+    /// raised while comparing experimental and reference kernels.
     pub fn accept_token_id_profiled(
         &mut self,
         token_id: usize,
@@ -200,6 +276,14 @@ impl<'a> ScalarLlamaSession<'a> {
         })
     }
 
+    /// Greedily generates `count` token IDs, beginning with `first_token_id`.
+    ///
+    /// The first ID is included in the returned sequence and then accepted to
+    /// select the following ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns any error encountered while accepting a generated token.
     pub fn generate_token_ids(
         &mut self,
         first_token_id: usize,
@@ -214,6 +298,12 @@ impl<'a> ScalarLlamaSession<'a> {
         Ok(token_ids)
     }
 
+    /// Accepts one token and returns full logits with matvec profile records.
+    ///
+    /// # Errors
+    ///
+    /// Returns any error documented by [`Self::accept_token`], plus errors
+    /// raised while comparing experimental and reference kernels.
     pub fn accept_token_profiled(
         &mut self,
         token_id: usize,

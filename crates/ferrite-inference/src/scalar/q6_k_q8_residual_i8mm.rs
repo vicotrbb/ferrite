@@ -1,5 +1,8 @@
 //! Experimental Q6_K × two-pass residual-Q8_K matvec for FEAT_I8MM CPUs.
-#![allow(unsafe_code)]
+#![allow(
+    unsafe_code,
+    reason = "audited aarch64 SIMD intrinsics are isolated in this kernel module"
+)]
 
 use super::{
     neon_util::native_f16_bits_to_f32,
@@ -58,6 +61,8 @@ pub(super) fn neon_q6_k_q8_residual_i8mm_mul_vec(
     if let Some(output) = tail_values.first_mut() {
         // Reusing the row as both operands preserves the left result and only
         // affects the uncommon odd-row tail.
+        // SAFETY: dispatch checked FEAT_I8MM and the tail contains one
+        // complete validated row, which is deliberately paired with itself.
         *output =
             unsafe { row_dot_pair(&bytes[paired_bytes..], &bytes[paired_bytes..], &activation) }.0;
     }
@@ -163,9 +168,14 @@ unsafe fn block_dot_pair(left: &[u8], right: &[u8], activation: &BlockQ8KResidua
         }
     }
 
-    let left_super = unsafe { native_f16_bits_to_f32(u16::from_le_bytes([left[208], left[209]])) };
-    let right_super =
-        unsafe { native_f16_bits_to_f32(u16::from_le_bytes([right[208], right[209]])) };
+    // SAFETY: I8MM implies NEON support, and both complete Q6_K blocks store
+    // their half-precision super-scales in bytes 208 and 209.
+    let (left_super, right_super) = unsafe {
+        (
+            native_f16_bits_to_f32(u16::from_le_bytes([left[208], left[209]])),
+            native_f16_bits_to_f32(u16::from_le_bytes([right[208], right[209]])),
+        )
+    };
     let left_result = activation.passes[0].d * left_super * weighted[0] as f32
         + activation.passes[1].d * left_super * weighted[1] as f32;
     let right_result = activation.passes[0].d * right_super * weighted[2] as f32
@@ -174,7 +184,10 @@ unsafe fn block_dot_pair(left: &[u8], right: &[u8], activation: &BlockQ8KResidua
 }
 
 #[target_feature(enable = "neon")]
-#[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "kernel arguments correspond directly to four packed Q6 lane groups"
+)]
 unsafe fn decode_groups(
     low: &[u8],
     high: &[u8],
@@ -185,6 +198,8 @@ unsafe fn decode_groups(
     two_bit_mask: std::arch::aarch64::uint8x16_t,
     offset: std::arch::aarch64::int8x16_t,
 ) -> [int8x16_t; 4] {
+    // SAFETY: callers pass complete Q6_K low and high bit planes, and all
+    // offsets select one in-bounds 16-byte window while NEON is enabled.
     unsafe {
         let low_1 = vld1q_u8(low.as_ptr().add(low_base + window_base));
         let low_2 = vld1q_u8(low.as_ptr().add(low_base + window_base + 32));
@@ -224,6 +239,8 @@ unsafe fn decode_groups(
 
 #[inline(always)]
 unsafe fn matrix_dot_i8x16(mut sum: int32x4_t, rows: int8x16_t, columns: int8x16_t) -> int32x4_t {
+    // SAFETY: callers enter only after FEAT_I8MM detection, and the assembly
+    // touches registers only, with no memory or stack effects.
     unsafe {
         asm!(
             "smmla {sum:v}.4s, {rows:v}.16b, {columns:v}.16b",
@@ -257,6 +274,8 @@ mod tests {
             .ok_or_else(|| InferenceError::new("missing residual activation block"))?;
         let expected_left = reference_dot(&left, &residual)?;
         let expected_right = reference_dot(&right, &residual)?;
+        // SAFETY: the runtime check above establishes FEAT_I8MM, and the test
+        // inputs are complete Q6_K and residual activation blocks.
         let actual = unsafe { block_dot_pair(&left, &right, &residual) };
 
         assert!((actual.0 - expected_left).abs() < 0.001);

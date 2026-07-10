@@ -1,5 +1,8 @@
 //! Experimental Q8_0 × two-pass residual-Q8 matvec for FEAT_I8MM CPUs.
-#![allow(unsafe_code)]
+#![allow(
+    unsafe_code,
+    reason = "audited aarch64 SIMD intrinsics are isolated in this kernel module"
+)]
 
 use super::{
     neon_util::native_f16_bits_to_f32,
@@ -39,6 +42,8 @@ pub(super) fn neon_q8_0_q8_residual_i8mm_mul_vec(
             output.copy_from_slice(&[pair.0, pair.1]);
         });
     if let Some(output) = tail_values.first_mut() {
+        // SAFETY: dispatch checked FEAT_I8MM and `prepare` validated the tail
+        // row, which is deliberately paired with itself.
         *output =
             unsafe { row_dot_pair(&bytes[paired_bytes..], &bytes[paired_bytes..], &activation) }.0;
     }
@@ -70,6 +75,8 @@ pub(super) fn neon_q8_0_q8_residual_i8mm_argmax(
         })
         .reduce(|| (usize::MAX, f32::NEG_INFINITY), choose_best);
     if paired_rows != rows {
+        // SAFETY: dispatch checked FEAT_I8MM and `prepare` validated the tail
+        // row, which is deliberately paired with itself.
         let score =
             unsafe { row_dot_pair(&bytes[paired_bytes..], &bytes[paired_bytes..], &activation) }.0;
         best = choose_best(best, (paired_rows, score));
@@ -170,6 +177,8 @@ unsafe fn block_dot_pair(left: &[u8], right: &[u8], activation: &BlockQ8Residual
 
 #[inline(always)]
 unsafe fn matrix_dot_i8x16(mut sum: int32x4_t, rows: int8x16_t, columns: int8x16_t) -> int32x4_t {
+    // SAFETY: callers enter only after FEAT_I8MM detection, and the assembly
+    // touches registers only, with no memory or stack effects.
     unsafe {
         asm!(
             "smmla {sum:v}.4s, {rows:v}.16b, {columns:v}.16b",
@@ -204,6 +213,8 @@ mod tests {
             reference_dot(&left, &activation),
             reference_dot(&right, &activation),
         );
+        // SAFETY: the runtime check above establishes FEAT_I8MM, and the test
+        // inputs are complete Q8_0 and residual activation blocks.
         let actual = unsafe { block_dot_pair(&left, &right, &activation) };
 
         assert_eq!(actual, expected);
@@ -211,6 +222,8 @@ mod tests {
     }
 
     fn reference_dot(weights: &[u8], activation: &BlockQ8Residual) -> f32 {
+        // SAFETY: this aarch64 test supplies a complete Q8_0 block, and NEON
+        // is available whenever the I8MM-gated test reaches this helper.
         let weight_scale =
             unsafe { native_f16_bits_to_f32(u16::from_le_bytes([weights[0], weights[1]])) };
         let mut dot = 0.0;

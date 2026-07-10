@@ -12,6 +12,7 @@ mod constructors;
 mod rows;
 
 #[derive(Clone, Debug, PartialEq)]
+/// A validated row-major matrix using F32 or a supported GGML quantization.
 pub struct Matrix {
     rows: usize,
     cols: usize,
@@ -19,15 +20,22 @@ pub struct Matrix {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// The physical storage representation of a [`Matrix`].
 pub enum MatrixStorageKind {
+    /// Row-major 32-bit floating-point values.
     F32,
+    /// GGML Q4_K quantized blocks.
     Q4K,
+    /// GGML Q5_0 quantized blocks.
     Q5_0,
+    /// GGML Q6_K quantized blocks.
     Q6K,
+    /// GGML Q8_0 quantized blocks.
     Q8_0,
 }
 
 impl MatrixStorageKind {
+    /// Returns the stable GGML-style label used in diagnostics and profiles.
     pub fn as_str(self) -> &'static str {
         match self {
             Self::F32 => "F32",
@@ -52,14 +60,17 @@ type MatrixPairOutput = (Vec<f32>, Vec<f32>);
 type MatrixTripletOutput = (Vec<f32>, Vec<f32>, Vec<f32>);
 
 impl Matrix {
+    /// Returns the matrix row count.
     pub fn rows(&self) -> usize {
         self.rows
     }
 
+    /// Returns the matrix column count.
     pub fn cols(&self) -> usize {
         self.cols
     }
 
+    /// Returns the matrix's physical storage representation.
     pub fn storage_kind(&self) -> MatrixStorageKind {
         match &self.data {
             MatrixData::F32(_) => MatrixStorageKind::F32,
@@ -70,6 +81,12 @@ impl Matrix {
         }
     }
 
+    /// Borrows one row from an F32 matrix.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `index` is out of range or the matrix uses a
+    /// quantized representation that cannot expose borrowed F32 values.
     pub fn row(&self, index: usize) -> Result<&[f32], InferenceError> {
         if index >= self.rows {
             return Err(InferenceError::new(format!(
@@ -92,10 +109,17 @@ impl Matrix {
         Ok(&data[start..end])
     }
 
+    /// Decodes and returns one matrix row as F32 values.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `index` is out of range or quantized data fails
+    /// structural or numeric validation.
     pub fn row_values(&self, index: usize) -> Result<Vec<f32>, InferenceError> {
         rows::row_values(&self.data, self.rows, self.cols, index)
     }
 
+    /// Returns bytes owned by the matrix's physical storage.
     pub fn storage_bytes(&self) -> u128 {
         match &self.data {
             MatrixData::F32(values) => values.len() as u128 * std::mem::size_of::<f32>() as u128,
@@ -106,10 +130,22 @@ impl Matrix {
         }
     }
 
+    /// Multiplies this matrix by one F32 activation vector.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a length mismatch, non-finite input, malformed
+    /// storage, arithmetic overflow, or non-finite kernel result.
     pub fn mul_vec(&self, vector: &[f32]) -> Result<Vec<f32>, InferenceError> {
         self.mul_vec_with_options(vector, ScalarExecutionOptions::default())
     }
 
+    /// Multiplies this matrix by one vector with an explicit kernel policy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a length mismatch, non-finite input, malformed
+    /// storage, arithmetic overflow, or non-finite kernel result.
     pub fn mul_vec_with_options(
         &self,
         vector: &[f32],
@@ -365,10 +401,22 @@ impl Matrix {
             .collect()
     }
 
+    /// Returns the highest-output row for one activation vector.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an empty matrix, a length mismatch, non-finite
+    /// input, malformed storage, or a kernel failure.
     pub fn argmax_mul_vec(&self, vector: &[f32]) -> Result<usize, InferenceError> {
         self.argmax_mul_vec_with_options(vector, ScalarExecutionOptions::default())
     }
 
+    /// Returns the highest-output row using an explicit kernel policy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an empty matrix, a length mismatch, non-finite
+    /// input, malformed storage, or a kernel failure.
     pub fn argmax_mul_vec_with_options(
         &self,
         vector: &[f32],
@@ -410,6 +458,12 @@ impl Matrix {
         argmax(&self.mul_vec_with_options(vector, options)?)
     }
 
+    /// Runs normal dispatch and verifies it against decoded scalar row dots.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid inputs, a kernel failure, or an output that
+    /// exceeds `relative_error_tolerance` from the reference result.
     pub fn mul_vec_checked_against_reference(
         &self,
         vector: &[f32],

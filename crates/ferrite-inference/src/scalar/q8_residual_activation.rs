@@ -1,4 +1,7 @@
-#![allow(unsafe_code)]
+#![allow(
+    unsafe_code,
+    reason = "audited aarch64 SIMD intrinsics are isolated in this quantizer module"
+)]
 
 use super::{q8_k::BlockQ8K, InferenceError};
 
@@ -123,6 +126,8 @@ unsafe fn quantize_residual_pass_neon(
     inverse_scale: f32,
     scale: f32,
 ) {
+    // SAFETY: both arrays contain exactly 32 values, the loop advances in
+    // eight-value chunks, and callers establish NEON support before entry.
     unsafe {
         let inverse = vdupq_n_f32(inverse_scale);
         let scale = vdupq_n_f32(scale);

@@ -587,9 +587,9 @@ def _fmt_bytes(value):
 def render_markdown(report):
     env = report["env"]
     lines = [
-        f"# Ferrite eval — {env.get('timestamp_utc', '?')}",
+        f"# Ferrite eval, {env.get('timestamp_utc', '?')}",
         "",
-        f"- host: {env.get('hostname')} — {env.get('cpu')}, "
+        f"- host: {env.get('hostname')}, {env.get('cpu')}, "
         f"{env.get('physical_cores')} cores, {_fmt_bytes(env.get('ram_bytes'))} RAM",
         f"- os: {env.get('platform')}",
         f"- commit: {env.get('git_commit')} ({env.get('git_branch')}"
@@ -680,7 +680,16 @@ def write_outputs(report, stem):
 
 
 def build_binaries():
-    cmd = ["cargo", "build", "--release", "-p", "ferrite-cli", "-p", "ferrite-server"]
+    cmd = [
+        "cargo",
+        "build",
+        "--release",
+        "--locked",
+        "-p",
+        "ferrite-cli",
+        "-p",
+        "ferrite-server",
+    ]
     print("$ " + " ".join(cmd))
     proc = subprocess.run(cmd, cwd=REPO_ROOT)
     if proc.returncode != 0:

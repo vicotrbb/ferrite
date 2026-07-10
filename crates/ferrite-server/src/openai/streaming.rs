@@ -54,7 +54,7 @@ impl StreamSender {
     fn send_event_blocking(&self, event: Event) -> Result<(), OpenAiHttpError> {
         self.sender
             .blocking_send(Ok(event))
-            .map_err(|_| OpenAiHttpError::internal("stream receiver closed"))
+            .map_err(|_error| OpenAiHttpError::internal("stream receiver closed"))
     }
 }
 

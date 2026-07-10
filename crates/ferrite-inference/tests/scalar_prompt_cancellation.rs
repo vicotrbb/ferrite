@@ -1,4 +1,7 @@
-#[allow(dead_code)]
+#[allow(
+    dead_code,
+    reason = "fixture fields document cancellation observations"
+)]
 mod support;
 
 use ferrite_fixtures::scalar_llama_f32_gguf_fixture;

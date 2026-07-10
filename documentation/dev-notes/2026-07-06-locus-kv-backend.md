@@ -7,14 +7,14 @@ Date: 2026-07-06
 Give Ferrite's scalar-path KV cache a pooled, block-allocated storage backend
 (Locus's `KvBlockPool`) as an opt-in alternative to the existing nested-`Vec`
 storage, with zero correctness regression and no decode-throughput loss, per
-`docs/superpowers/specs/2026-07-06-ferrite-locus-kv-cache-design.md`. This
-note records the evidence-gathering slice: what is proven now on this host
+`documentation/adr/0010-locus-kv-block-backend.md`. This note records the
+evidence-gathering slice: what is proven now on this host
 (no Tier 1 model artifact available), and what remains pending a real-model
 run.
 
 ## Context
 
-- Design: `docs/superpowers/specs/2026-07-06-ferrite-locus-kv-cache-design.md`.
+- Design: `documentation/adr/0010-locus-kv-block-backend.md`.
   Success gate: bit-identical logits/KV vs. the Vec backend, no decode-tok/s
   loss, and an improvement in at least one of {allocations per token,
   peak/post-load RSS}.
@@ -54,11 +54,11 @@ run.
   byte-for-byte the pre-existing Vec path.
 - The CLI prints `locus_pool_allocation_count` (from
   `pool_stats().allocation_count`, Locus's cumulative successful-allocation
-  counter — distinct from `pool_stats().allocated`, the current live-block
+  counter, distinct from `pool_stats().allocated`, the current live-block
   count) when the Locus backend is active, purely for this kind of
   allocation-mechanics evidence gathering.
 - `ferrite-server` has no `locus-kv` feature and no `--kv-backend` flag; the
-  server-side opt-in path does not exist yet (confirmed by grep — see the
+  server-side opt-in path does not exist yet (confirmed by grep, see the
   benchmark note's "Server opt-in path" section). This is intentional scope
   boundary for this slice, not an oversight.
 
@@ -108,7 +108,7 @@ run.
 
 4. End-to-end CLI check on a synthetic single-layer fixture GGUF (optional
    step in the evidence task, achieved via a throwaway test that wrote the
-   fixture bytes to a scratchpad path and was deleted immediately — no test
+   fixture bytes to a scratchpad path and was deleted immediately, no test
    churn committed): both `--kv-backend vec` (default) and `--kv-backend
    locus --kv-tokens-per-block 2` produced identical `next_token_id`,
    `generated_token_ids`, and `kv_cache_bytes` through the CLI. The Locus run
@@ -141,15 +141,14 @@ authorization, not measured in this slice):**
 - Real-model correctness parity (same token id, Vec vs. Locus, on dequantized
   weights rather than the tiny fixture).
 - Real-model allocation churn count over a longer generation.
-- Peak and post-load RSS, both backends, short and long sequence lengths —
-  the design's actual success-gate metric.
-- Decode throughput (tok/s) via `--benchmark-runs`, both backends — the
+- Peak and post-load RSS, both backends, short and long sequence lengths,   the design's actual success-gate metric.
+- Decode throughput (tok/s) via `--benchmark-runs`, both backends, the
   design's no-regression gate.
 - x86_64 build/behavior (this host is Apple Silicon only).
-- NUMA behavior — explicitly out of scope per the design spec (Locus's `numa`
+- NUMA behavior, explicitly out of scope per the design spec (Locus's `numa`
   feature is Linux-only and not enabled here).
 - The server-side opt-in path does not exist yet (no `locus-kv` feature or
-  `--kv-backend` flag in `ferrite-server`) — not "unmeasured," genuinely
+  `--kv-backend` flag in `ferrite-server`), not "unmeasured," genuinely
   unimplemented.
 
 Every PENDING item above has an exact repro command in the benchmark note so

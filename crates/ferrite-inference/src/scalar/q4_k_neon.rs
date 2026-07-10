@@ -1,4 +1,7 @@
-#![allow(unsafe_code)]
+#![allow(
+    unsafe_code,
+    reason = "audited aarch64 SIMD intrinsics are isolated in this kernel module"
+)]
 
 use super::{
     neon_util::{native_f16_bits_to_f32, widen_s8_lanes},
@@ -96,8 +99,14 @@ unsafe fn neon_q4_k_block_dot(block: &[u8], vector: &[f32]) -> Result<f32, Infer
         )));
     }
 
-    let d = unsafe { native_f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]])) };
-    let dmin = unsafe { native_f16_bits_to_f32(u16::from_le_bytes([block[2], block[3]])) };
+    // SAFETY: NEON is enabled on this function and the block length check
+    // above makes both half-precision scale reads valid.
+    let (d, dmin) = unsafe {
+        (
+            native_f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]])),
+            native_f16_bits_to_f32(u16::from_le_bytes([block[2], block[3]])),
+        )
+    };
     let scales = &block[4..16];
     let quants = &block[16..];
     let mut lanes = vdupq_n_f32(0.0);
@@ -187,6 +196,8 @@ mod tests {
             .map(|index| (index % 11) as f32 - 5.0)
             .collect::<Vec<_>>();
 
+        // SAFETY: the test provides one complete Q4_K block and a matching
+        // 256-value activation on an aarch64 target with baseline NEON.
         let actual = unsafe { neon_q4_k_block_dot(&block, &vector)? };
         let expected = decode_q4_k_values(&block, Q4_K_BLOCK_VALUES)?
             .iter()

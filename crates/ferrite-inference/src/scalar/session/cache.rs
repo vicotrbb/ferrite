@@ -39,14 +39,22 @@ impl<'a> ScalarLlamaSession<'a> {
         Ok(Self::from_store(model, store, options))
     }
 
+    /// Returns the number of token positions currently stored in the KV cache.
     pub fn cached_token_count(&self) -> usize {
         self.cached_token_count
     }
 
+    /// Returns the logical bytes occupied by cached key and value vectors.
     pub fn kv_cache_bytes(&self) -> u128 {
         self.store.kv_cache_bytes()
     }
 
+    /// Removes cached positions after `token_count`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `token_count` exceeds the current cache length or
+    /// the selected KV backend cannot complete the truncation.
     pub fn truncate_cache(&mut self, token_count: usize) -> Result<(), InferenceError> {
         if token_count > self.cached_token_count {
             return Err(InferenceError::new(format!(
@@ -60,6 +68,7 @@ impl<'a> ScalarLlamaSession<'a> {
     }
 
     #[cfg(feature = "locus-kv")]
+    /// Returns the Locus pool allocation count when this session uses Locus.
     pub fn locus_pool_allocation_count(&self) -> Option<u64> {
         match &self.store {
             crate::scalar::kv_store::KvCacheStore::Locus(store) => {

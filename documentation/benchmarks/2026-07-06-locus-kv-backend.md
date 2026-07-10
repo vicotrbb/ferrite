@@ -11,7 +11,7 @@ No real Tier 1 GGUF (e.g. Qwen2.5-1.5B) is present on this machine
 (`target/models/` does not exist; no `.gguf` file is tracked or cached in the
 repo tree), and per Ferrite's operating model this task did not download one.
 Every number below is either a pasted real command output or explicitly
-labeled PENDING — nothing is estimated or invented.
+labeled PENDING, nothing is estimated or invented.
 
 ## Tree State
 
@@ -42,7 +42,7 @@ for the exact repro commands against `target/models/qwen2.5-1.5b-instruct-q8_0.g
 (the artifact already referenced by the README and other benchmark notes in
 this repo). The optional end-to-end CLI check in PROVEN step 4 uses
 `ferrite_fixtures::scalar_llama_f32_gguf_fixture()`, a tiny synthetic
-single-layer GGUF used elsewhere in this repo's test suite — it proves
+single-layer GGUF used elsewhere in this repo's test suite, it proves
 plumbing and allocation mechanics only, **not** throughput or memory behavior.
 
 ## Build mode
@@ -80,7 +80,7 @@ test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; fini
 ```
 
 `crates/ferrite-inference/tests/kv_store_backend_parity.rs` loads a fixture
-GGUF with non-trivial (identity-mixing) Q/K/V/O and FFN weights — so cached
+GGUF with non-trivial (identity-mixing) Q/K/V/O and FFN weights, so cached
 keys/values genuinely mix across positions, unlike the quantized fixtures
 whose attention/FFN weights are zero. It runs `accept_prompt` on the same
 5-token prompt (spanning a 4-token block boundary) through the Vec backend and
@@ -167,10 +167,10 @@ and `kv_cache_bytes` end to end through the CLI, matching the library-level
 parity test. `locus_pool_allocation_count=8` is real, measured output: this
 fixture has 1 layer, `tokens_per_block=2`, and 8 total cached tokens (5 prompt
 + 3 generated), and `2 * num_layers * ceil(tokens/tokens_per_block) = 2 * 1 *
-ceil(8/2) = 8` — the analytic block-allocation formula (see below) matches the
+ceil(8/2) = 8`, the analytic block-allocation formula (see below) matches the
 observed counter exactly.
 
-**This step does not demonstrate throughput or memory behavior** — the model
+**This step does not demonstrate throughput or memory behavior**, the model
 is a few-KB synthetic fixture with a single layer; its timing and RSS are not
 representative of anything.
 
@@ -190,14 +190,14 @@ analysis:
 - The Locus backend allocates one pool block per `tokens_per_block` tokens per
   (layer, K/V) list: `2 * num_layers * ceil(tokens / tokens_per_block)` block
   allocations over a sequence of that many cached tokens
-  (`crates/ferrite-inference/src/scalar/kv_store/locus.rs`) — a
+  (`crates/ferrite-inference/src/scalar/kv_store/locus.rs`), a
   ~`tokens_per_block`× reduction in KV allocation count within the session
   versus the Vec backend's one allocation per token.
 - The pool is per-session: `LocusKvStore::new` creates its own
   `KvBlockPool`, owned by the `ScalarLlamaSession` built in
   `start_session_with_options`, and the whole pool is released when the
   session drops. `KvReuseOrder::Lifo` reuse (`KvBlockPool::free`) therefore
-  benefits only within-session reallocation — blocks freed by `truncate`
+  benefits only within-session reallocation, blocks freed by `truncate`
   (or `restore`) are handed back out warm before any fresh block is
   allocated. There is no cross-session block reuse; that would require a
   longer-lived shared pool owned above the session, which is not part of
@@ -210,8 +210,7 @@ analysis:
   formula).
 - This is an **allocation-count** argument only, and only about
   within-session reallocation. It says nothing about measured RSS or
-  throughput on a real model, and nothing about cross-session behavior —
-  those require PENDING work below.
+  throughput on a real model, and nothing about cross-session behavior,   those require PENDING work below.
 
 ---
 
@@ -277,7 +276,7 @@ The `ferrite-server` crate currently has no `locus-kv` cargo feature and no
 (confirmed by `grep -rln "kv-backend\|KvBackend\|locus-kv" crates/ferrite-server/`,
 which returns nothing, and by `crates/ferrite-server/Cargo.toml`, which has no
 `[features]` entry for `locus-kv`). The server-side opt-in path is not merely
-unmeasured — it does not exist yet. Wiring it is future work, not part of this
+unmeasured, it does not exist yet. Wiring it is future work, not part of this
 evidence task.
 
 ### x86_64 and NUMA

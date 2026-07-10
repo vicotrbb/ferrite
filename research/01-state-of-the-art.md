@@ -1,4 +1,4 @@
-# Document 1: State of the Art — Open-Source CPU Inference Engines
+# Document 1: State of the Art, Open-Source CPU Inference Engines
 
 **Research Program:** CPU-Native LLM Inference Runtime  
 **Target Spec:** 9B parameter model on 2 vCPUs, 6 GB RAM, 2–5 tokens/second  
@@ -45,10 +45,10 @@ llama.cpp is structured around the `ggml` tensor library (now `ggml` repo extrac
 ```
 
 **Key source files:**
-- `ggml/src/ggml-quants.c` — All quantized dot product kernels (Q4_0, Q4_K_M, Q5_K_S, etc.)
-- `ggml/src/ggml.c` — Core tensor operations, compute graph, threading
-- `src/llama.cpp` — Model architecture implementations
-- `ggml/include/ggml.h` — Public tensor API
+- `ggml/src/ggml-quants.c`, All quantized dot product kernels (Q4_0, Q4_K_M, Q5_K_S, etc.)
+- `ggml/src/ggml.c`, Core tensor operations, compute graph, threading
+- `src/llama.cpp`, Model architecture implementations
+- `ggml/include/ggml.h`, Public tensor API
 
 ### 2.2 GGUF Format Internals
 
@@ -108,7 +108,7 @@ llama.cpp uses a **work-stealing thread pool** with a fixed thread count (config
 - Synchronization via condition variables (futex-based on Linux)
 - Default thread count = number of physical cores (not hyperthreads)
 
-**For 2 vCPUs:** llama.cpp defaults to 2 threads. However, this is suboptimal if the 2 vCPUs are hyperthreads on a single physical core — in that case, 1 worker thread may outperform 2 due to resource contention.
+**For 2 vCPUs:** llama.cpp defaults to 2 threads. However, this is suboptimal if the 2 vCPUs are hyperthreads on a single physical core, in that case, 1 worker thread may outperform 2 due to resource contention.
 
 **Performance at 2 threads:** Based on community benchmarks:
 - Llama-3-8B Q4_K_M on AMD Epyc (2 cores): ~3–4 tok/s decode, ~50 tok/s prefill
@@ -164,24 +164,24 @@ ggml dispatches to platform-specific kernels at runtime:
 
 ### 2.7 What to Steal from llama.cpp
 
-1. **mmap-first loading model** — Near-zero load time, leverage OS page cache
-2. **GGUF format** — Well-specified, widely supported, mmap-friendly alignment
-3. **Bump allocator** for activations — Simple, fast, zero-fragmentation
-4. **Quantization type ecosystem** — Q4_K_M is the sweet spot for quality/size
-5. **SIMD kernel structure** — Per-quant-type dispatch with platform fallbacks
-6. **imatrix calibration** — Lightweight importance-weighted quantization
+1. **mmap-first loading model**, Near-zero load time, leverage OS page cache
+2. **GGUF format**, Well-specified, widely supported, mmap-friendly alignment
+3. **Bump allocator** for activations, Simple, fast, zero-fragmentation
+4. **Quantization type ecosystem**, Q4_K_M is the sweet spot for quality/size
+5. **SIMD kernel structure**, Per-quant-type dispatch with platform fallbacks
+6. **imatrix calibration**, Lightweight importance-weighted quantization
 
 ### 2.8 Known Bottlenecks and Limitations
 
-- **KV cache is always contiguous** — No paging, no eviction, no sharing. Wastes memory for short contexts after long prefill.
-- **No continuous batching** — One request at a time. The `llama-server` queues requests sequentially.
-- **Thread pool overhead** at low thread counts — Synchronization cost dominates when only 2 threads
+- **KV cache is always contiguous**, No paging, no eviction, no sharing. Wastes memory for short contexts after long prefill.
+- **No continuous batching**, One request at a time. The `llama-server` queues requests sequentially.
+- **Thread pool overhead** at low thread counts, Synchronization cost dominates when only 2 threads
 - **No speculative decoding** in mainline (experimental PRs exist)
-- **Memory ceiling** — KV cache + weights must all fit in RAM simultaneously
+- **Memory ceiling**, KV cache + weights must all fit in RAM simultaneously
 - **No disk offloading** for KV cache
 
 **Estimated 9B Q4_K_M on 2 vCPU / 6 GB RAM:**
-- Peak memory: ~5.5 GB (weights) + ~0.5 GB (KV cache @ 4096) + ~0.3 GB (overhead) = ~6.3 GB — **barely exceeds budget**
+- Peak memory: ~5.5 GB (weights) + ~0.5 GB (KV cache @ 4096) + ~0.3 GB (overhead) = ~6.3 GB, **barely exceeds budget**
 - Decode throughput: **2–4 tok/s** (achievable but tight)
 - Verdict: llama.cpp gets close but doesn't optimize for the *specifically constrained* 2-vCPU/6GB cloud scenario
 
@@ -227,7 +227,7 @@ vLLM is architecturally GPU-bound in three fundamental ways:
 
 2. **Continuous batching assumes GPU parallelism:** Batching 10+ requests simultaneously only makes sense when the GPU has enough SMs to parallelize. On 2 vCPUs, batching hurts more than it helps.
 
-3. **Memory model assumes HBM:** Paged KV cache works because GPU global memory latency (~400 cycles) is hidden by massive thread parallelism. On CPU, every page fault in the KV cache is a ~100ns L3 miss vs ~1ns hit — a 100x penalty that can't be hidden.
+3. **Memory model assumes HBM:** Paged KV cache works because GPU global memory latency (~400 cycles) is hidden by massive thread parallelism. On CPU, every page fault in the KV cache is a ~100ns L3 miss vs ~1ns hit, a 100x penalty that can't be hidden.
 
 ### 3.3 What IS Reusable from vLLM
 
@@ -240,7 +240,7 @@ Despite being GPU-only, vLLM's **software architecture** is highly relevant:
 | Copy-on-Write prefix sharing | **MEDIUM** | Useful for multi-turn chat where system prompts repeat; implementable with reference counting |
 | OpenAI-compatible API layer | **HIGH** | Direct reuse of API surface design |
 | Preemption / swapping logic | **HIGH** | When memory is tight (6 GB), preempting low-priority requests to disk is essential |
-| AsyncIO serving pattern | **HIGH** | FastAPI/async serving with SSE streaming — language-agnostic pattern |
+| AsyncIO serving pattern | **HIGH** | FastAPI/async serving with SSE streaming, language-agnostic pattern |
 
 ### 3.4 PagedAttention Internals
 
@@ -260,7 +260,7 @@ Physical: [Block#7]                 [Block#12]            [Block#3]
 
 ### 3.5 Memory Profile (Hypothetical 9B on CPU)
 
-Not applicable — vLLM does not support CPU execution. However, the scheduling concepts translate to:
+Not applicable, vLLM does not support CPU execution. However, the scheduling concepts translate to:
 - KV cache management: use contiguous allocation with LRU eviction
 - Request queue: FIFO with priority, preempt on memory pressure
 - Batching: at 2 threads, batch size 1–2 maximum
@@ -307,7 +307,7 @@ OpenVINO is Intel's inference optimization toolkit, structured as:
 **INT8 (Weight-Only Quantization, WOQ):**
 - Uses `MinMax` or `Asymmetric` quantization per channel
 - Applied via NNCF with or without calibration data
-- Reduces 9B FP16 (18GB) to ~9.5 GB — still too large for 6 GB
+- Reduces 9B FP16 (18GB) to ~9.5 GB, still too large for 6 GB
 
 **INT4 (Weight-Only, 4-bit):**
 - Uses `NF4` (NormalFloat4) or `INT4` symmetric/asymmetric
@@ -315,7 +315,7 @@ OpenVINO is Intel's inference optimization toolkit, structured as:
 - Reduces 9B to ~5.0–5.5 GB depending on format
 - OpenVINO's INT4 uses NF4 by default for LLMs (based on QLoRA research, arXiv:2305.14314)
 - **Calibration:** Optional dataset (RedPajama, WikiText) for scale optimization
-- **Without calibration:** RTN with NF4 format — quality is ~95% of calibrated on MMLU
+- **Without calibration:** RTN with NF4 format, quality is ~95% of calibrated on MMLU
 
 **Performance on x86:**
 
@@ -355,11 +355,11 @@ OpenVINO provides a `genai` module specifically for LLM inference:
 
 ### 4.5 What to Steal
 
-1. **NF4 format for INT4 quantization** — Better quality than uniform INT4 at same bit width
-2. **oneDNN kernel dispatch pattern** — Runtime CPU feature detection + kernel selection
-3. **Weight prepacking layout** — Reorganizing weights for cache-optimal access
-4. **Group-wise scale computation** — Per-128-element scales for INT4
-5. **Attention kernel fusion** — QKV + attention as single dispatched unit
+1. **NF4 format for INT4 quantization**, Better quality than uniform INT4 at same bit width
+2. **oneDNN kernel dispatch pattern**, Runtime CPU feature detection + kernel selection
+3. **Weight prepacking layout**, Reorganizing weights for cache-optimal access
+4. **Group-wise scale computation**, Per-128-element scales for INT4
+5. **Attention kernel fusion**, QKV + attention as single dispatched unit
 
 ---
 
@@ -423,10 +423,10 @@ ORT's `generators` library (onnxruntime-genai) provides LLM-specific serving wit
 
 ### 5.5 What to Steal
 
-1. **Graph transformer passes** — Operator fusion patterns applicable to any runtime
-2. **MLAS (Microsoft Linear Algebra Subprograms)** — High-performance CPU matmul with INT8 support; consider FFI
-3. **DynamicQuantizeLinear** pattern — Quantize activations on-the-fly during matmul
-4. **GenAI library design** — Clean LLM serving API on top of generic runtime
+1. **Graph transformer passes**, Operator fusion patterns applicable to any runtime
+2. **MLAS (Microsoft Linear Algebra Subprograms)**, High-performance CPU matmul with INT8 support; consider FFI
+3. **DynamicQuantizeLinear** pattern, Quantize activations on-the-fly during matmul
+4. **GenAI library design**, Clean LLM serving API on top of generic runtime
 
 ---
 
@@ -519,10 +519,10 @@ MLC-LLM's CPU performance via LLVM codegen is competitive with hand-written kern
 
 ### 7.4 What to Steal
 
-1. **Relax IR operator fusion passes** — The fusion patterns (MatMul+Add+ReLU, QKV concat) are model-agnostic
-2. **Quantization-aware compilation** — Compile-time insertion of dequant+quantize pairs
-3. **Metal shader generation** — Not relevant for our CPU target, but the compilation approach is instructive
-4. **WebLLM concept** — Running LLMs in browser via WebAssembly (WASM SIMD) - validates that portable CPU inference works
+1. **Relax IR operator fusion passes**, The fusion patterns (MatMul+Add+ReLU, QKV concat) are model-agnostic
+2. **Quantization-aware compilation**, Compile-time insertion of dequant+quantize pairs
+3. **Metal shader generation**, Not relevant for our CPU target, but the compilation approach is instructive
+4. **WebLLM concept**, Running LLMs in browser via WebAssembly (WASM SIMD) - validates that portable CPU inference works
 
 ---
 
@@ -637,17 +637,17 @@ Candle's CPU performance relative to llama.cpp:
 
 ### 8.6 What to Steal
 
-1. **QMatMul type design** — Clean abstraction over quantized and dense matmul
-2. **SafeTensor integration** — For non-GGUF model loading
-3. **Model implementations** — Candle-transformers has reference implementations for Llama, Mistral, Qwen2, Phi in Rust
-4. **dtype system** — Rust enum-based type dispatch for tensors
-5. **Crate modularity** — Separate core/nn/transformers crates is good architecture
+1. **QMatMul type design**, Clean abstraction over quantized and dense matmul
+2. **SafeTensor integration**, For non-GGUF model loading
+3. **Model implementations**, Candle-transformers has reference implementations for Llama, Mistral, Qwen2, Phi in Rust
+4. **dtype system**, Rust enum-based type dispatch for tensors
+5. **Crate modularity**, Separate core/nn/transformers crates is good architecture
 
 ### 8.7 What NOT to Steal
 
-1. CPU backend SIMD kernels — underoptimized compared to what we need
-2. Memory management — uses standard Rust allocators, no custom arena
-3. No mmap support for weights — critical missing feature
+1. CPU backend SIMD kernels, underoptimized compared to what we need
+2. Memory management, uses standard Rust allocators, no custom arena
+3. No mmap support for weights, critical missing feature
 4. KV cache is naive (Vec-based, no sharing, no eviction)
 
 ---
@@ -693,8 +693,8 @@ Reasons:
 **License:** MIT  
 
 kalosm is a high-level Rust AI framework that wraps multiple backends:
-- `kalosm-llama` — Wraps Candle for Llama/Mistral models
-- `kalosm-language` — NLP tools, RAG pipeline
+- `kalosm-llama`, Wraps Candle for Llama/Mistral models
+- `kalosm-language`, NLP tools, RAG pipeline
 - Performance: Same as Candle (wraps it), plus small overhead from abstraction layer
 
 **Assessment:** Too high-level for a performance-critical runtime. However, its API design (Rust-native chat interface, streaming, tool use) is worth studying for our API layer.
@@ -734,13 +734,13 @@ mistral.rs is the most complete Rust LLM serving system currently:
 **Architecture of interest:**
 - PagedAttention implementation in Rust (uses Candle tensor ops)
 - Scheduler with preemption
-- ISQ (In-Situ Quantization) — quantize FP16 models at load time
+- ISQ (In-Situ Quantization), quantize FP16 models at load time
 - LoRA adapter hot-loading
 
 **What to steal:**
 1. API server design (axum + streaming SSE)
 2. PagedAttention Rust implementation (adapt for contiguous allocation)
-3. ISQ concept — load FP16, quantize to INT4 at runtime
+3. ISQ concept, load FP16, quantize to INT4 at runtime
 4. ISQ (In-Situ Quantization) for on-the-fly model quantization
 5. Multi-model architecture abstraction
 
@@ -825,9 +825,9 @@ SGLang is a GPU-focused serving system emphasizing:
 - **Program-level optimization:** Compiles LLM programs into optimized execution graphs
 
 **Concepts to steal for CPU:**
-1. **RadixAttention** — Trie-based KV cache sharing is memory-efficient for multi-turn chat (store shared system prompt KV once, share across sessions)
-2. **Jump-forward decoding** — Deterministic portions of output decoded in batch (reduce decode iterations)
-3. **Constrained decoding** — JSON output mode useful for API consumers
+1. **RadixAttention**, Trie-based KV cache sharing is memory-efficient for multi-turn chat (store shared system prompt KV once, share across sessions)
+2. **Jump-forward decoding**, Deterministic portions of output decoded in batch (reduce decode iterations)
+3. **Constrained decoding**, JSON output mode useful for API consumers
 
 ---
 
@@ -835,16 +835,16 @@ SGLang is a GPU-focused serving system emphasizing:
 
 | Project | Language | CPU Viable | 9B @ 2-vCPU tok/s | Memory (9B Q4) | License | Reusability |
 |---------|----------|------------|--------------------|-----------------|---------|-------------|
-| llama.cpp | C/C++ | ✓ (best-in-class) | 2–4 | ~6.3 GB | MIT | HIGH — entire ggml library |
-| vLLM | Python+CUDA | ✗ | N/A | N/A (GPU) | Apache 2.0 | MEDIUM — scheduler concepts |
-| OpenVINO | C++ | ✓ (Intel-optimized) | 2–4 (Intel) | ~5.5 GB | Apache 2.0 | HIGH — oneDNN kernels |
-| ONNX RT | C++ | ✓ | 3–5 [EST] | ~5.5 GB | MIT | MEDIUM — MLAS, graph opts |
-| TensorRT-LLM | C++/CUDA | ✗ | N/A | N/A | Apache 2.0 | MEDIUM — architectural concepts |
-| MLC-LLM | Python/TVM | ✓ (mediocre) | 1.5–3 [EST] | ~5.5 GB | Apache 2.0 | LOW — compilation approach |
-| Candle | Rust | ✓ (60% of llama.cpp) | 1.5–3 | ~6.0 GB | MIT | HIGH — Rust tensor framework |
-| mistral.rs | Rust | ✓ (wraps Candle) | 1.5–3 | ~6.0 GB | MIT | HIGH — serving architecture |
-| burn | Rust | ✓ (poor) | <1 [EST] | ~18 GB | MIT | LOW — training-focused |
-| kalosm | Rust | ✓ (wraps Candle) | ~2 [EST] | ~6.0 GB | MIT | LOW — too high-level |
+| llama.cpp | C/C++ | ✓ (best-in-class) | 2–4 | ~6.3 GB | MIT | HIGH, entire ggml library |
+| vLLM | Python+CUDA | ✗ | N/A | N/A (GPU) | Apache 2.0 | MEDIUM, scheduler concepts |
+| OpenVINO | C++ | ✓ (Intel-optimized) | 2–4 (Intel) | ~5.5 GB | Apache 2.0 | HIGH, oneDNN kernels |
+| ONNX RT | C++ | ✓ | 3–5 [EST] | ~5.5 GB | MIT | MEDIUM, MLAS, graph opts |
+| TensorRT-LLM | C++/CUDA | ✗ | N/A | N/A | Apache 2.0 | MEDIUM, architectural concepts |
+| MLC-LLM | Python/TVM | ✓ (mediocre) | 1.5–3 [EST] | ~5.5 GB | Apache 2.0 | LOW, compilation approach |
+| Candle | Rust | ✓ (60% of llama.cpp) | 1.5–3 | ~6.0 GB | MIT | HIGH, Rust tensor framework |
+| mistral.rs | Rust | ✓ (wraps Candle) | 1.5–3 | ~6.0 GB | MIT | HIGH, serving architecture |
+| burn | Rust | ✓ (poor) | <1 [EST] | ~18 GB | MIT | LOW, training-focused |
+| kalosm | Rust | ✓ (wraps Candle) | ~2 [EST] | ~6.0 GB | MIT | LOW, too high-level |
 
 ---
 
@@ -852,10 +852,10 @@ SGLang is a GPU-focused serving system emphasizing:
 
 ### What to Build From Scratch (Rust)
 
-1. **Memory manager** — Custom mmap-based weight loader with eviction policies, not available in any Rust crate
-2. **KV cache allocator** — Contiguous, pre-allocated, with sliding window and eviction (not paged — CPU cache favors contiguous)
-3. **SIMD kernel layer** — Hand-tuned AVX2/AVX-512 intrinsics for quantized matmul, optimized for 2-thread scenarios
-4. **Streaming weight executor** — Load-compute-release pattern for layer-by-layer execution under memory pressure
+1. **Memory manager**, Custom mmap-based weight loader with eviction policies, not available in any Rust crate
+2. **KV cache allocator**, Contiguous, pre-allocated, with sliding window and eviction (not paged, CPU cache favors contiguous)
+3. **SIMD kernel layer**, Hand-tuned AVX2/AVX-512 intrinsics for quantized matmul, optimized for 2-thread scenarios
+4. **Streaming weight executor**, Load-compute-release pattern for layer-by-layer execution under memory pressure
 
 ### What to Borrow Directly
 
@@ -898,17 +898,17 @@ Based on this state-of-the-art survey, the implementation team should:
 
 1. **Start from Candle's model implementations** (they have working Qwen2, Llama, Gemma2, Mistral in Rust) but replace the CPU backend with optimized kernels.
 
-2. **Adopt GGUF as the primary format** — it's the most mature quantized serialization format, widely available (HuggingFace has GGUF versions of most models), and mmap-friendly.
+2. **Adopt GGUF as the primary format**, it's the most mature quantized serialization format, widely available (HuggingFace has GGUF versions of most models), and mmap-friendly.
 
-3. **Target Q4_K_M quantization** as the default — it provides the best quality/size tradeoff at ~5.5 GB for 9B models, fitting within 6 GB with KV cache at context 2048-4096.
+3. **Target Q4_K_M quantization** as the default, it provides the best quality/size tradeoff at ~5.5 GB for 9B models, fitting within 6 GB with KV cache at context 2048-4096.
 
-4. **Build the SIMD kernel layer from scratch** in Rust using `core::arch` — Candle's kernels are too slow (60-70% of llama.cpp), and llama.cpp's C kernels can be ported methodically.
+4. **Build the SIMD kernel layer from scratch** in Rust using `core::arch`, Candle's kernels are too slow (60-70% of llama.cpp), and llama.cpp's C kernels can be ported methodically.
 
-5. **Implement streaming weight loading** from day one — mmap the full model file, access weights layer-by-layer, use `madvise` hints for the OS page cache. This is the key differentiator for 6 GB systems.
+5. **Implement streaming weight loading** from day one, mmap the full model file, access weights layer-by-layer, use `madvise` hints for the OS page cache. This is the key differentiator for 6 GB systems.
 
-6. **Skip continuous batching** — at 2 threads, the overhead of dynamic scheduling exceeds batch-size-1 sequential processing. Add microbatching (fixed batch size 2) only if profiling shows benefit.
+6. **Skip continuous batching**, at 2 threads, the overhead of dynamic scheduling exceeds batch-size-1 sequential processing. Add microbatching (fixed batch size 2) only if profiling shows benefit.
 
-7. **Implement KV cache with sliding window + LRU eviction** — not PagedAttention (wrong for CPU), but SGLang-style RadixAttention for prefix sharing in multi-turn chat.
+7. **Implement KV cache with sliding window + LRU eviction**, not PagedAttention (wrong for CPU), but SGLang-style RadixAttention for prefix sharing in multi-turn chat.
 
 8. **Use mistral.rs's API server design** as the starting template for the OpenAI-compatible HTTP layer.
 

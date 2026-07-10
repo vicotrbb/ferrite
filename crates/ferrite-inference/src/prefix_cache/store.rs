@@ -1,22 +1,29 @@
 use super::{PrefixCacheEntry, PrefixCacheKey};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// A cache hit that reports the common token count between two compatible keys.
 pub struct PrefixCacheSharedPrefixHit<'a> {
     entry: &'a PrefixCacheEntry,
     shared_prefix_token_count: usize,
 }
 
 impl<'a> PrefixCacheSharedPrefixHit<'a> {
+    /// Returns the cache entry that produced the hit.
     pub fn entry(&self) -> &'a PrefixCacheEntry {
         self.entry
     }
 
+    /// Returns the number of leading tokens shared with the request key.
     pub fn shared_prefix_token_count(&self) -> usize {
         self.shared_prefix_token_count
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+/// A bounded in-memory store for prefix-cache metadata.
+///
+/// The store evicts least-recently-used entries until both the entry count and
+/// estimated KV byte budgets are satisfied. It does not own KV tensors.
 pub struct PrefixCacheMetadataStore {
     max_entries: usize,
     max_estimated_kv_bytes: u128,
@@ -25,6 +32,7 @@ pub struct PrefixCacheMetadataStore {
 }
 
 impl PrefixCacheMetadataStore {
+    /// Creates an empty store with entry-count and estimated-byte limits.
     pub fn new(max_entries: usize, max_estimated_kv_bytes: u128) -> Self {
         Self {
             max_entries,
@@ -34,6 +42,7 @@ impl PrefixCacheMetadataStore {
         }
     }
 
+    /// Inserts or replaces an entry and returns entries evicted by the budgets.
     pub fn insert(&mut self, entry: PrefixCacheEntry) -> Vec<PrefixCacheEntry> {
         if let Some(existing_index) = self
             .entries
@@ -53,6 +62,7 @@ impl PrefixCacheMetadataStore {
         self.evict_until_within_budget()
     }
 
+    /// Records an exact-key hit and returns the updated entry.
     pub fn record_hit(
         &mut self,
         key: &PrefixCacheKey,
@@ -63,6 +73,7 @@ impl PrefixCacheMetadataStore {
         Some(entry)
     }
 
+    /// Records the longest compatible cached prefix of the request key.
     pub fn record_longest_prefix_hit(
         &mut self,
         key: &PrefixCacheKey,
@@ -79,6 +90,7 @@ impl PrefixCacheMetadataStore {
         Some(&self.entries[index])
     }
 
+    /// Records the compatible entry with the longest nonempty shared prefix.
     pub fn record_longest_shared_prefix_hit(
         &mut self,
         key: &PrefixCacheKey,
@@ -100,18 +112,22 @@ impl PrefixCacheMetadataStore {
         })
     }
 
+    /// Returns an entry with an exactly matching key.
     pub fn get(&self, key: &PrefixCacheKey) -> Option<&PrefixCacheEntry> {
         self.entries.iter().find(|entry| entry.key() == key)
     }
 
+    /// Returns the number of entries in the store.
     pub fn len(&self) -> usize {
         self.entries.len()
     }
 
+    /// Returns `true` when the store contains no entries.
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
 
+    /// Returns the estimated KV bytes charged by all entries.
     pub fn estimated_kv_bytes(&self) -> u128 {
         self.estimated_kv_bytes
     }

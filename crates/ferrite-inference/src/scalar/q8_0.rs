@@ -1,4 +1,7 @@
-#![allow(unsafe_code)]
+#![allow(
+    unsafe_code,
+    reason = "audited SIMD half conversion is isolated in this quantization module"
+)]
 
 use super::{float::f16_bits_to_f32, InferenceError};
 #[cfg(any(target_arch = "aarch64", test))]

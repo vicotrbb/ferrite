@@ -1,4 +1,7 @@
-#![allow(dead_code)]
+#![allow(
+    dead_code,
+    reason = "each integration test uses a different support subset"
+)]
 
 pub mod http;
 pub mod openai_client;

@@ -4,7 +4,12 @@ version = "0.1.0"
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+rust-version.workspace = true
 publish = false
+description = "OpenAI-compatible HTTP serving for the Ferrite inference engine"
+readme = "../../README.md"
+keywords = ["llm", "inference", "openai", "http", "server"]
+categories = ["web-programming::http-server", "science"]
 
 [lib]
 name = "ferrite_server"
@@ -16,8 +21,8 @@ path = "src/main.rs"
 
 [dependencies]
 axum = "0.7"
-ferrite-inference = { path = "../ferrite-inference" }
-ferrite-model = { path = "../ferrite-model" }
+ferrite-inference.workspace = true
+ferrite-model.workspace = true
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["io-util", "macros", "net", "rt-multi-thread", "sync"] }
@@ -25,7 +30,7 @@ tokio-stream = { version = "0.1", features = ["sync"] }
 
 [dev-dependencies]
 async-openai = { version = "0.41.1", default-features = false, features = ["chat-completion", "completions", "model"] }
-ferrite-fixtures = { path = "../ferrite-fixtures" }
+ferrite-fixtures.workspace = true
 tower = { version = "0.5", features = ["util"] }
 
 [lints]

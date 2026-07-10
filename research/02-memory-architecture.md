@@ -76,7 +76,7 @@ Where:
 - n_layers = 64
 - n_kv_heads = 4 (GQA: 64 query heads / 16 groups = 4 KV heads per group)
 
-Wait — let me verify: Qwen2.5-9B has 64 attention heads and 4 KV heads (16:1 GQA ratio).
+Wait, let me verify: Qwen2.5-9B has 64 attention heads and 4 KV heads (16:1 GQA ratio).
 
 Actually checking: Qwen2.5-9B specs:
 - hidden_size = 3584
@@ -91,7 +91,7 @@ Let me recalculate with correct values:
 KV_cache = 2 × 48 × 4 × 128 × seq_len × bytes
 ```
 
-Wait — I need to be more careful. Let me look up the actual architectures.
+Wait, I need to be more careful. Let me look up the actual architectures.
 
 **Qwen2.5-7B (closest standard config):**
 - num_layers = 28
@@ -102,7 +102,7 @@ Wait — I need to be more careful. Let me look up the actual architectures.
 
 KV per token = 2 × 28 × 4 × 128 × sizeof(elem) = 2 × 28 × 4 × 128 × 2 = 57,344 bytes (FP16)
 
-Actually wait, the user spec says "Qwen2.5-9B: 64 layers, 4 heads KV, head_dim 128" — but Qwen2.5 doesn't have a 9B model. The actual models are Qwen2.5-7B (28 layers) and Qwen2.5-14B (48 layers). The user's spec references may be for Gemma-2-9B or Llama-3-8B.
+Actually wait, the user spec says "Qwen2.5-9B: 64 layers, 4 heads KV, head_dim 128", but Qwen2.5 doesn't have a 9B model. The actual models are Qwen2.5-7B (28 layers) and Qwen2.5-14B (48 layers). The user's spec references may be for Gemma-2-9B or Llama-3-8B.
 
 Let me use the actual model specifications and note discrepancies.
 
@@ -190,7 +190,7 @@ Per-layer activation ≈ hidden_size × sizeof(f16)
 - intermediate_size = 18944 (SwiGLU: 2 × 18944 → 37,888 × 2 = 75,776 bytes)
 - Attention: Q(3584), K(512), V(512), scores(kv_heads × seq_len) ≈ 7,168 + 1,024 + 1,024 + 4×seq_len×2
 
-For decode (seq_len doesn't grow the activation much — only the current token's Q/K/V matters):
+For decode (seq_len doesn't grow the activation much, only the current token's Q/K/V matters):
 - Q/K/V projection: ~3 × 7 KB = 21 KB
 - Attention scores (over full context, current query): ~4 × context × 2 bytes = 8 × context bytes
   - At context 4096: 32 KB
@@ -203,9 +203,9 @@ For decode (seq_len doesn't grow the activation much — only the current token'
 - **Total if pre-allocated for all layers:** ~5.6 MB (for Qwen2.5-7B's 28 layers)
 - **Total if reused:** ~200 KB
 
-**Critical optimization:** If layers execute sequentially and reuse the activation buffer, total activation memory is ~200 KB — negligible. If the runtime materializes all intermediate activations (as in training backprop), it explodes to ~50 MB per layer × 28 = 1.4 GB.
+**Critical optimization:** If layers execute sequentially and reuse the activation buffer, total activation memory is ~200 KB, negligible. If the runtime materializes all intermediate activations (as in training backprop), it explodes to ~50 MB per layer × 28 = 1.4 GB.
 
-**For our inference runtime: activation memory is essentially free** — we execute one layer at a time and reuse a single activation buffer.
+**For our inference runtime: activation memory is essentially free**, we execute one layer at a time and reuse a single activation buffer.
 
 ### 2.4 Prefill (Prompt Processing) Activation
 
@@ -330,7 +330,7 @@ mlock(model, file_size);  // Pin all pages in physical RAM
 - Requires sufficient mlockable memory (rlimit RLIMIT_MEMLOCK)
 - On 6 GB system with 5 GB model: **may fail** if other processes need memory
 
-#### Strategy D: Hybrid — Stream with madvise
+#### Strategy D: Hybrid, Stream with madvise
 ```c
 void *model = mmap(NULL, file_size, PROT_READ, MAP_PRIVATE, fd, 0);
 madvise(model, file_size, MADV_SEQUENTIAL);  // Hint: sequential access pattern
@@ -411,7 +411,7 @@ If the system must use swap, tuning can minimize impact:
 - At cost of ~5% CPU overhead, can effectively increase available memory by 1.5–2×
 - For our 6 GB system: effectively 7–8 GB with zram at ratio 1.5×
 
-**Recommendation:** Configure `swappiness=1` and enable zswap with zstd compression. Do NOT rely on swap as a primary memory strategy — it's a safety net, not a performance feature.
+**Recommendation:** Configure `swappiness=1` and enable zswap with zstd compression. Do NOT rely on swap as a primary memory strategy, it's a safety net, not a performance feature.
 
 ### 3.4 Memory-Mapped Quantized Weights: OS Page Cache Strategy
 
@@ -537,7 +537,7 @@ On cloud VMs with 2 vCPUs:
 
 ---
 
-## 4. The 6 GB Constraint — Honest Assessment
+## 4. The 6 GB Constraint, Honest Assessment
 
 ### 4.1 Which Models Fit?
 
@@ -556,7 +556,7 @@ On cloud VMs with 2 vCPUs:
 ### 4.2 What Must Be Sacrificed
 
 For Gemma-2-9B specifically:
-1. **Context length:** Limited to 1024 (INT8 KV) or 512 (FP16 KV) — significantly below the model's native 8192
+1. **Context length:** Limited to 1024 (INT8 KV) or 512 (FP16 KV), significantly below the model's native 8192
 2. **KV cache quantization:** Must use INT8 KV cache to fit context >512 (quality impact: ~1-2% perplexity degradation)
 3. **Streaming execution required:** Cannot hold all weights + full KV cache in physical RAM simultaneously; must use streaming layer-by-layer execution
 
@@ -633,7 +633,7 @@ fn generate_token_streaming(model: &StreamingModel, context: &[u32]) -> u32 {
     let mut hidden = model.embedding.lookup(context.last().unwrap());
     
     for layer_idx in 0..model.num_layers {
-        // 1. Touch the layer's weights — triggers page faults, loads from SSD
+        // 1. Touch the layer's weights, triggers page faults, loads from SSD
         let layer = &model.layers[layer_idx];  // mmap'd, not yet in physical RAM
         
         // 2. Compute the forward pass (CPU processes weights as they arrive)
@@ -729,7 +729,7 @@ fn generate_token(&mut self, input_token: u32) -> u32 {
     let mut hidden = self.embedding.lookup(input_token);
     
     for layer_idx in 0..self.num_layers {
-        // 1. Layer weights are mmap'd — accessing them triggers page fault if not cached
+        // 1. Layer weights are mmap'd, accessing them triggers page fault if not cached
         let layer = &self.model.layers[layer_idx];
         
         // 2. Compute attention + FFN using layer weights
@@ -760,7 +760,7 @@ fn generate_token(&mut self, input_token: u32) -> u32 {
 - At DDR4 bandwidth (~40 GB/s): 5 GB / 40 GB/s = ~125 ms per token
 - **Throughput: ~8 tok/s** (compute is memory-bound by weight reads)
 
-Wait — that's the theoretical memory bandwidth limit. Actual throughput is lower due to compute overhead (not purely memory-bound at this scale). Let me recalculate:
+Wait, that's the theoretical memory bandwidth limit. Actual throughput is lower due to compute overhead (not purely memory-bound at this scale). Let me recalculate:
 
 At 2 vCPUs on a cloud VM, effective memory bandwidth is likely ~20–30 GB/s (not full DDR4):
 - 5 GB / 25 GB/s = ~200 ms per token
@@ -793,7 +793,7 @@ llama.cpp uses mmap by default but does NOT implement layer-level streaming:
 1. No `MADV_DONTNEED` after layer computation (pages stay in cache, consuming physical RAM)
 2. No `MADV_SEQUENTIAL` hint (kernel may not optimize readahead pattern)
 3. No explicit memory pressure monitoring to trigger eviction
-4. KV cache is not evictable — if KV cache + model > RAM, the system will swap
+4. KV cache is not evictable, if KV cache + model > RAM, the system will swap
 
 **Our optimization:** Add explicit `madvise` management to reduce peak physical memory usage by up to 80% during streaming execution.
 
@@ -850,23 +850,23 @@ For Gemma-2-9B where INT8 KV is still too large at higher contexts:
 
 Based on the memory budget analysis, the runtime should:
 
-1. **Target Llama-3.1-8B as the primary model** — Best balance of quality, KV cache efficiency (8 KV heads, 128 head_dim), and memory fit at Q4_K_M + 4096 context.
+1. **Target Llama-3.1-8B as the primary model**, Best balance of quality, KV cache efficiency (8 KV heads, 128 head_dim), and memory fit at Q4_K_M + 4096 context.
 
-2. **Use Q4_K_M quantization by default** — At 4.9 GB for Llama-3.1-8B, leaves ~1.1 GB for KV cache, activations, and overhead. Comfortable 4096 context with FP16 KV.
+2. **Use Q4_K_M quantization by default**, At 4.9 GB for Llama-3.1-8B, leaves ~1.1 GB for KV cache, activations, and overhead. Comfortable 4096 context with FP16 KV.
 
-3. **Implement optional INT8 KV cache** — Enables context 8192 for Llama-3.1-8B and context 1024 for Gemma-2-9B. Quality loss is acceptable (~0.2 perplexity).
+3. **Implement optional INT8 KV cache**, Enables context 8192 for Llama-3.1-8B and context 1024 for Gemma-2-9B. Quality loss is acceptable (~0.2 perplexity).
 
-4. **Use mmap with explicit madvise** — `mmap()` + `madvise(MADV_SEQUENTIAL)` for weight access pattern hinting. `madvise(MADV_DONTNEED)` on layers when memory pressure is detected. No mlock (too memory-hungry).
+4. **Use mmap with explicit madvise**, `mmap()` + `madvise(MADV_SEQUENTIAL)` for weight access pattern hinting. `madvise(MADV_DONTNEED)` on layers when memory pressure is detected. No mlock (too memory-hungry).
 
-5. **Pre-allocate KV cache as contiguous buffer** — Single allocation at startup. For Llama-3.1-8B at context 4096 FP16: 512 MB. Use a circular buffer if multiple sessions share KV memory.
+5. **Pre-allocate KV cache as contiguous buffer**, Single allocation at startup. For Llama-3.1-8B at context 4096 FP16: 512 MB. Use a circular buffer if multiple sessions share KV memory.
 
-6. **Bump allocator for activations** — Pre-allocate 256 MB activation arena. Reset after each token. Never fragment.
+6. **Bump allocator for activations**, Pre-allocate 256 MB activation arena. Reset after each token. Never fragment.
 
-7. **Streaming execution for models exceeding RAM** — If model weights exceed available physical RAM, process layers sequentially and use `madvise(DONTNEED)` to free completed layer pages. Accept the page-fault overhead for cold cache.
+7. **Streaming execution for models exceeding RAM**, If model weights exceed available physical RAM, process layers sequentially and use `madvise(DONTNEED)` to free completed layer pages. Accept the page-fault overhead for cold cache.
 
-8. **Sliding window for Gemma-2-9B** — If supporting Gemma-2-9B, implement sliding window attention (last 2048 tokens only) to bound KV cache growth. This matches the model's native attention pattern.
+8. **Sliding window for Gemma-2-9B**, If supporting Gemma-2-9B, implement sliding window attention (last 2048 tokens only) to bound KV cache growth. This matches the model's native attention pattern.
 
-9. **Monitor memory pressure proactively** — Read `/proc/meminfo` periodically. When available memory drops below 200 MB, trigger KV cache eviction or reduce max context dynamically.
+9. **Monitor memory pressure proactively**, Read `/proc/meminfo` periodically. When available memory drops below 200 MB, trigger KV cache eviction or reduce max context dynamically.
 
 10. **Graceful degradation hierarchy:**
     - Full RAM: FP16 KV, full context, no streaming
