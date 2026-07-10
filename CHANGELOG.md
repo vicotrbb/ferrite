@@ -22,6 +22,8 @@ No unreleased changes.
   image provenance, and SBOM attestations.
 - Automated tag-driven release publication, including trusted crates.io
   publishing once the registry trust relationship is configured.
+- Source-distributed integration-test fixtures that remain package-verifiable
+  alongside the public Rust libraries.
 
 ### Changed
 

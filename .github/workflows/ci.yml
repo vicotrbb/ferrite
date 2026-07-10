@@ -78,5 +78,8 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - uses: dtolnay/rust-toolchain@a75363d06101555fc97c6c7e1e65670b99104d98 # 1.96.1
       - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+      - run: cargo package -p ferrite-fixtures --locked
       - run: cargo package -p ferrite-model --locked
+      # The inference package's exact fixture dependency is published during
+      # the release bootstrap, so CI can only inspect its contents before then.
       - run: cargo package -p ferrite-inference --locked --list
