@@ -18,6 +18,7 @@ pub enum Q8KActivationMatvecPolicy {
     #[default]
     DefaultOnly,
     ExperimentalParityScoped,
+    ExperimentalResidualI8mm,
 }
 
 impl Q8KActivationMatvecPolicy {
@@ -25,6 +26,7 @@ impl Q8KActivationMatvecPolicy {
         match self {
             Self::DefaultOnly => "default_only",
             Self::ExperimentalParityScoped => "experimental_parity_scoped",
+            Self::ExperimentalResidualI8mm => "experimental_residual_i8mm",
         }
     }
 }
@@ -210,6 +212,14 @@ impl ScalarExecutionOptions {
         )
     }
 
+    #[cfg_attr(not(target_arch = "aarch64"), allow(dead_code))]
+    pub(in crate::scalar) fn residual_q8_activation_matvec(self) -> bool {
+        matches!(
+            self.q8_k_activation_matvec_policy,
+            Q8KActivationMatvecPolicy::ExperimentalResidualI8mm
+        )
+    }
+
     #[cfg(test)]
     pub(in crate::scalar) fn q8_k_activation_matvec_for_role(
         self,
@@ -270,6 +280,7 @@ mod tests {
             Q8KActivationMatvecPolicy::DefaultOnly
         );
         assert!(!options.q8_k_activation_matvec());
+        assert!(!options.residual_q8_activation_matvec());
     }
 
     #[test]
@@ -297,6 +308,16 @@ mod tests {
     }
 
     #[test]
+    fn residual_i8mm_policy_is_distinct_from_legacy_q8_k_policy() {
+        let options = ScalarExecutionOptions::default().with_q8_k_activation_matvec_policy(
+            Q8KActivationMatvecPolicy::ExperimentalResidualI8mm,
+        );
+
+        assert!(!options.q8_k_activation_matvec());
+        assert!(options.residual_q8_activation_matvec());
+    }
+
+    #[test]
     fn q8_k_activation_matvec_policy_has_stable_output_names() {
         assert_eq!(
             Q8KActivationMatvecPolicy::DefaultOnly.as_str(),
@@ -305,6 +326,10 @@ mod tests {
         assert_eq!(
             Q8KActivationMatvecPolicy::ExperimentalParityScoped.as_str(),
             "experimental_parity_scoped"
+        );
+        assert_eq!(
+            Q8KActivationMatvecPolicy::ExperimentalResidualI8mm.as_str(),
+            "experimental_residual_i8mm"
         );
     }
 

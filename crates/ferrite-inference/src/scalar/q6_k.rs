@@ -120,6 +120,18 @@ pub(super) fn q6_k_mul_vec_with_options(
 
     #[cfg(target_arch = "aarch64")]
     {
+        if options.residual_q8_activation_matvec()
+            && cols != 0
+            && cols.is_multiple_of(Q6_K_BLOCK_VALUES)
+            && std::arch::is_aarch64_feature_detected!("i8mm")
+        {
+            return Ok(Q6KMatVecOutput {
+                values: super::q6_k_q8_residual_i8mm::neon_q6_k_q8_residual_i8mm_mul_vec(
+                    bytes, rows, cols, vector,
+                )?,
+                backend: Q6KMatVecBackend::Aarch64NeonQ8K,
+            });
+        }
         if options.q8_k_activation_matvec()
             && cols != 0
             && cols.is_multiple_of(Q6_K_BLOCK_VALUES)

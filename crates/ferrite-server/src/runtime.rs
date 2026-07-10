@@ -1,13 +1,16 @@
 mod cache_options;
 mod cache_trace;
 mod prefix_cache;
+mod scheduler;
 
 pub use cache_options::GenerationCacheOptions;
 pub use cache_trace::{PromptCacheLookup, PromptCacheTrace};
+pub use scheduler::{BatchScheduler, BatchedGenerationEvent};
 
 use ferrite_inference::scalar::{
     PromptEvaluationControl as ScalarPromptEvaluationControl,
-    PromptEvaluationLocation as ScalarPromptEvaluationLocation, ScalarLlamaModel,
+    PromptEvaluationLocation as ScalarPromptEvaluationLocation, Q8KActivationMatvecPolicy,
+    ScalarExecutionOptions, ScalarLlamaModel, ScalarLlamaSession,
 };
 use ferrite_model::{
     gguf::parse_gguf,
@@ -88,6 +91,7 @@ impl GenerationFinishSource {
 pub struct InferenceEngine {
     model: ScalarLlamaModel,
     tokenizer: GgufTokenizer,
+    execution_options: ScalarExecutionOptions,
     model_fingerprint: String,
     tokenizer_fingerprint: String,
     prefix_cache: Mutex<RuntimePrefixCache>,
@@ -107,10 +111,27 @@ impl InferenceEngine {
         Ok(Self {
             model,
             tokenizer,
+            execution_options: ScalarExecutionOptions::default(),
             model_fingerprint: format!("gguf-model-fnv64:{content_hash:016x}"),
             tokenizer_fingerprint: format!("gguf-tokenizer-fnv64:{content_hash:016x}"),
             prefix_cache: Mutex::new(RuntimePrefixCache::default()),
         })
+    }
+
+    pub fn with_execution_options(mut self, execution_options: ScalarExecutionOptions) -> Self {
+        self.execution_options = execution_options;
+        self
+    }
+
+    pub(crate) fn start_session(&self) -> Result<ScalarLlamaSession<'_>, RuntimeError> {
+        self.model
+            .start_session_with_options(self.execution_options)
+            .map_err(|error| RuntimeError::new(format!("failed to start session: {error}")))
+    }
+
+    pub(crate) fn batch_decode_compatible(&self) -> bool {
+        self.execution_options.q8_k_activation_matvec_policy()
+            == Q8KActivationMatvecPolicy::DefaultOnly
     }
 
     pub fn generate(&self, prompt: &str, max_tokens: usize) -> Result<GeneratedText, RuntimeError> {
@@ -243,7 +264,7 @@ impl InferenceEngine {
         let prefix_cache_key = self.prefix_cache_key_for_tokens(&prompt_token_ids, &cache_options);
         on_generation_stage(GenerationStage::PrefixCacheKeyBuilt);
 
-        let mut session = self.model.start_session();
+        let mut session = self.start_session()?;
         on_generation_stage(GenerationStage::SessionStarted);
         let mut cached_prompt_tokens = 0;
         let mut prompt_cache_trace = None;

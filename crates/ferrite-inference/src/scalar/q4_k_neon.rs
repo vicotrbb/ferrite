@@ -1,8 +1,7 @@
 #![allow(unsafe_code)]
 
 use super::{
-    float::f16_bits_to_f32,
-    neon_util::widen_s8_lanes,
+    neon_util::{native_f16_bits_to_f32, widen_s8_lanes},
     q4_k::{Q4KMatVecBackend, Q4KMatVecOutput, Q4_K_BLOCK_BYTES, Q4_K_BLOCK_VALUES},
     InferenceError,
 };
@@ -97,8 +96,8 @@ unsafe fn neon_q4_k_block_dot(block: &[u8], vector: &[f32]) -> Result<f32, Infer
         )));
     }
 
-    let d = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
-    let dmin = f16_bits_to_f32(u16::from_le_bytes([block[2], block[3]]));
+    let d = unsafe { native_f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]])) };
+    let dmin = unsafe { native_f16_bits_to_f32(u16::from_le_bytes([block[2], block[3]])) };
     let scales = &block[4..16];
     let quants = &block[16..];
     let mut lanes = vdupq_n_f32(0.0);

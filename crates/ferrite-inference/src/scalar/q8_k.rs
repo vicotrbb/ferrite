@@ -1,4 +1,12 @@
+#![cfg_attr(target_arch = "aarch64", allow(unsafe_code))]
+
 use super::InferenceError;
+
+#[cfg(target_arch = "aarch64")]
+use std::arch::aarch64::{
+    vcombine_s16, vcvtq_s32_f32, vdupq_n_f32, vld1q_f32, vmaxq_f32, vminq_f32, vmulq_f32,
+    vqmovn_s16, vqmovn_s32, vrndaq_f32, vst1_s8,
+};
 
 pub(in crate::scalar) const Q8_K_BLOCK_VALUES: usize = 256;
 pub(in crate::scalar) const Q8_K_GROUP_SIZE: usize = 16;
@@ -69,10 +77,16 @@ impl BlockQ8K {
         }
 
         let mut qs = [0i8; Q8_K_BLOCK_VALUES];
-        for (index, value) in values.iter().enumerate() {
-            let quantized = (inverse_scale * *value).round() as i32;
-            qs[index] = quantized.clamp(-127, 127) as i8;
+        #[cfg(target_arch = "aarch64")]
+        if std::arch::is_aarch64_feature_detected!("neon") {
+            // SAFETY: the runtime check establishes NEON support and the
+            // input/output slices both contain exactly 256 values.
+            unsafe { quantize_neon(values, inverse_scale, &mut qs) };
+        } else {
+            quantize_scalar(values, inverse_scale, &mut qs);
         }
+        #[cfg(not(target_arch = "aarch64"))]
+        quantize_scalar(values, inverse_scale, &mut qs);
 
         let mut bsums = [0i16; Q8_K_GROUPS];
         for (group_index, group) in qs.chunks_exact(Q8_K_GROUP_SIZE).enumerate() {
@@ -87,9 +101,43 @@ impl BlockQ8K {
     }
 }
 
+fn quantize_scalar(values: &[f32], inverse_scale: f32, qs: &mut [i8; Q8_K_BLOCK_VALUES]) {
+    for (index, value) in values.iter().enumerate() {
+        let quantized = (inverse_scale * *value).round() as i32;
+        qs[index] = quantized.clamp(-127, 127) as i8;
+    }
+}
+
+#[cfg(target_arch = "aarch64")]
+#[target_feature(enable = "neon")]
+unsafe fn quantize_neon(values: &[f32], inverse_scale: f32, qs: &mut [i8; Q8_K_BLOCK_VALUES]) {
+    unsafe {
+        let inverse = vdupq_n_f32(inverse_scale);
+        let minimum = vdupq_n_f32(-127.0);
+        let maximum = vdupq_n_f32(127.0);
+        for offset in (0..Q8_K_BLOCK_VALUES).step_by(8) {
+            let values_0 = vld1q_f32(values.as_ptr().add(offset));
+            let values_1 = vld1q_f32(values.as_ptr().add(offset + 4));
+            let rounded_0 = vmaxq_f32(
+                minimum,
+                vminq_f32(maximum, vrndaq_f32(vmulq_f32(values_0, inverse))),
+            );
+            let rounded_1 = vmaxq_f32(
+                minimum,
+                vminq_f32(maximum, vrndaq_f32(vmulq_f32(values_1, inverse))),
+            );
+            let quantized_i16 = vcombine_s16(
+                vqmovn_s32(vcvtq_s32_f32(rounded_0)),
+                vqmovn_s32(vcvtq_s32_f32(rounded_1)),
+            );
+            vst1_s8(qs.as_mut_ptr().add(offset), vqmovn_s16(quantized_i16));
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{BlockQ8K, Q8_K_BLOCK_VALUES, Q8_K_GROUPS, Q8_K_GROUP_SIZE};
+    use super::{quantize_scalar, BlockQ8K, Q8_K_BLOCK_VALUES, Q8_K_GROUPS, Q8_K_GROUP_SIZE};
     use crate::scalar::InferenceError;
 
     #[test]
@@ -106,6 +154,23 @@ mod tests {
         for (group_index, group) in block.qs.chunks_exact(Q8_K_GROUP_SIZE).enumerate() {
             let expected = group.iter().map(|value| i16::from(*value)).sum::<i16>();
             assert_eq!(block.bsums[group_index], expected);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn q8_k_neon_quantization_matches_scalar_rounding() -> Result<(), InferenceError> {
+        for seed in 0..32 {
+            let values = (0..Q8_K_BLOCK_VALUES)
+                .map(|index| {
+                    let mixed = index * 1_103 + seed * 7_919;
+                    ((mixed % 2_003) as f32 - 1_001.0) / ((seed % 7 + 1) as f32 * 19.0)
+                })
+                .collect::<Vec<_>>();
+            let actual = BlockQ8K::quantize(&values)?;
+            let mut expected = [0; Q8_K_BLOCK_VALUES];
+            quantize_scalar(&values, 1.0 / actual.d, &mut expected);
+            assert_eq!(actual.qs, expected, "seed={seed}");
         }
         Ok(())
     }

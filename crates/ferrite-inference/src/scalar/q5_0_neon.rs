@@ -1,14 +1,13 @@
 #![allow(unsafe_code)]
 
 use super::{
-    float::f16_bits_to_f32,
-    neon_util::widen_s8_lanes,
+    neon_util::{native_f16_bits_to_f32, widen_s8_lanes},
     q5_0::{Q5_0MatVecBackend, Q5_0MatVecOutput, Q5_0_BLOCK_BYTES, Q5_0_BLOCK_VALUES},
 };
 use rayon::prelude::*;
 use std::arch::aarch64::{
-    vaddvq_f32, vandq_u8, vcombine_u8, vdup_n_u8, vdupq_n_f32, vdupq_n_s8, vdupq_n_u8, vfmaq_f32,
-    vld1q_f32, vld1q_u8, vorrq_u8, vreinterpretq_s8_u8, vshrq_n_u8, vsubq_s8, vtstq_u8,
+    uint8x16_t, vaddq_s8, vaddvq_f32, vandq_u8, vcombine_u8, vdupq_n_f32, vdupq_n_u8, vfmaq_f32,
+    vld1_u8, vld1q_f32, vld1q_u8, vreinterpretq_s8_u8, vshrq_n_u8,
 };
 
 const ROW_PARALLEL_MIN_ROWS: usize = 512;
@@ -41,6 +40,41 @@ pub(super) fn neon_q5_0_mul_vec(
         values,
         backend: Q5_0MatVecBackend::Aarch64Neon,
     }
+}
+
+pub(super) fn neon_q5_0_mul_vec_pair(
+    left_bytes: &[u8],
+    right_bytes: &[u8],
+    rows: usize,
+    cols: usize,
+    vector: &[f32],
+) -> (Vec<f32>, Vec<f32>) {
+    let row_bytes = (cols / Q5_0_BLOCK_VALUES) * Q5_0_BLOCK_BYTES;
+    let mut left_values = vec![0.0; rows];
+    let mut right_values = vec![0.0; rows];
+
+    if uses_row_parallel(rows, cols) {
+        left_values
+            .par_iter_mut()
+            .zip(right_values.par_iter_mut())
+            .zip(left_bytes.par_chunks_exact(row_bytes))
+            .zip(right_bytes.par_chunks_exact(row_bytes))
+            .with_min_len(ROW_PARALLEL_MIN_ROWS_PER_TASK)
+            .for_each(|(((left_out, right_out), left_row), right_row)| {
+                (*left_out, *right_out) = neon_q5_0_row_dot_pair(left_row, right_row, vector);
+            });
+    } else {
+        for (((left_out, right_out), left_row), right_row) in left_values
+            .iter_mut()
+            .zip(&mut right_values)
+            .zip(left_bytes.chunks_exact(row_bytes))
+            .zip(right_bytes.chunks_exact(row_bytes))
+        {
+            (*left_out, *right_out) = neon_q5_0_row_dot_pair(left_row, right_row, vector);
+        }
+    }
+
+    (left_values, right_values)
 }
 
 fn neon_q5_0_mul_vec_row_parallel(
@@ -111,35 +145,23 @@ unsafe fn neon_q5_0_block_dot_batch(
     col_base: usize,
     row_out: &mut [f32],
 ) {
-    let scale = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
-    let high_bits = u32::from_le_bytes([block[2], block[3], block[4], block[5]]);
+    let scale = unsafe { native_f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]])) };
     let quants = &block[6..];
 
     // SAFETY: same bounds argument as `neon_q5_0_block_dot`; every load is
     // within the 16 quant bytes or a validated 32-element vector window.
     unsafe {
-        let bit_mask = vld1q_u8(HIGH_BIT_LANE_MASK.as_ptr());
         let quant_bytes = vld1q_u8(quants.as_ptr());
         let low_nibbles = vandq_u8(quant_bytes, vdupq_n_u8(0x0f));
         let high_nibbles = vshrq_n_u8(quant_bytes, 4);
-        let low_bit_bytes = vcombine_u8(
-            vdup_n_u8(high_bits as u8),
-            vdup_n_u8((high_bits >> 8) as u8),
-        );
-        let high_bit_bytes = vcombine_u8(
-            vdup_n_u8((high_bits >> 16) as u8),
-            vdup_n_u8((high_bits >> 24) as u8),
-        );
-        let low_high_bits = vandq_u8(vtstq_u8(low_bit_bytes, bit_mask), vdupq_n_u8(0x10));
-        let high_high_bits = vandq_u8(vtstq_u8(high_bit_bytes, bit_mask), vdupq_n_u8(0x10));
-        let offset = vdupq_n_s8(16);
-        let low_quads = widen_s8_lanes(vsubq_s8(
-            vreinterpretq_s8_u8(vorrq_u8(low_nibbles, low_high_bits)),
-            offset,
+        let (low_offsets, high_offsets) = q5_signed_offsets(block);
+        let low_quads = widen_s8_lanes(vaddq_s8(
+            vreinterpretq_s8_u8(low_nibbles),
+            vreinterpretq_s8_u8(low_offsets),
         ));
-        let high_quads = widen_s8_lanes(vsubq_s8(
-            vreinterpretq_s8_u8(vorrq_u8(high_nibbles, high_high_bits)),
-            offset,
+        let high_quads = widen_s8_lanes(vaddq_s8(
+            vreinterpretq_s8_u8(high_nibbles),
+            vreinterpretq_s8_u8(high_offsets),
         ));
 
         let mut stream = 0usize;
@@ -235,18 +257,69 @@ fn neon_q5_0_row_dot(row_chunk: &[u8], vector: &[f32]) -> f32 {
     sum
 }
 
+fn neon_q5_0_row_dot_pair(left_row: &[u8], right_row: &[u8], vector: &[f32]) -> (f32, f32) {
+    let mut left_sum = 0.0;
+    let mut right_sum = 0.0;
+    for (block_index, (left_block, right_block)) in left_row
+        .chunks_exact(Q5_0_BLOCK_BYTES)
+        .zip(right_row.chunks_exact(Q5_0_BLOCK_BYTES))
+        .enumerate()
+    {
+        let col_base = block_index * Q5_0_BLOCK_VALUES;
+        let activation = &vector[col_base..col_base + Q5_0_BLOCK_VALUES];
+        // SAFETY: both blocks and the activation window have the validated
+        // Q5_0 sizes. Each matrix keeps its original block accumulation order.
+        unsafe {
+            left_sum += neon_q5_0_block_dot(left_block, activation);
+            right_sum += neon_q5_0_block_dot(right_block, activation);
+        }
+    }
+    (left_sum, right_sum)
+}
+
 fn uses_row_parallel(rows: usize, _cols: usize) -> bool {
     rows >= ROW_PARALLEL_MIN_ROWS
 }
 
-/// Bit masks selecting the per-lane high bit: lanes 0-7 test bits 0-7 of one
-/// duplicated `high_bits` byte, lanes 8-15 test bits 0-7 of the next byte.
-const HIGH_BIT_LANE_MASK: [u8; 16] = [1, 2, 4, 8, 16, 32, 64, 128, 1, 2, 4, 8, 16, 32, 64, 128];
+const Q5_SIGN_OFFSETS: [[u8; 8]; 256] = build_q5_sign_offsets();
+
+const fn build_q5_sign_offsets() -> [[u8; 8]; 256] {
+    let mut table = [[0xf0u8; 8]; 256];
+    let mut byte = 0usize;
+    while byte < table.len() {
+        let mut bit = 0usize;
+        while bit < 8 {
+            if byte & (1 << bit) != 0 {
+                table[byte][bit] = 0;
+            }
+            bit += 1;
+        }
+        byte += 1;
+    }
+    table
+}
+
+/// Expands the Q5 high-bit word into signed offsets for the two nibble
+/// vectors. A set bit contributes zero; a clear bit contributes -16. The
+/// 2 KiB table remains L1-resident and lets one signed add finish each half.
+#[inline(always)]
+pub(super) unsafe fn q5_signed_offsets(block: &[u8]) -> (uint8x16_t, uint8x16_t) {
+    unsafe {
+        let low = vcombine_u8(
+            vld1_u8(Q5_SIGN_OFFSETS[block[2] as usize].as_ptr()),
+            vld1_u8(Q5_SIGN_OFFSETS[block[3] as usize].as_ptr()),
+        );
+        let high = vcombine_u8(
+            vld1_u8(Q5_SIGN_OFFSETS[block[4] as usize].as_ptr()),
+            vld1_u8(Q5_SIGN_OFFSETS[block[5] as usize].as_ptr()),
+        );
+        (low, high)
+    }
+}
 
 #[target_feature(enable = "neon")]
 pub(super) unsafe fn neon_q5_0_block_dot(block: &[u8], vector: &[f32]) -> f32 {
-    let scale = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
-    let high_bits = u32::from_le_bytes([block[2], block[3], block[4], block[5]]);
+    let scale = unsafe { native_f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]])) };
     let quants = &block[6..];
 
     // SAFETY: callers pass a length-checked 22-byte Q5_0 block (16 quant
@@ -254,7 +327,6 @@ pub(super) unsafe fn neon_q5_0_block_dot(block: &[u8], vector: &[f32]) -> f32 {
     // slice, so the 16-byte quant load, the mask-table load, and the eight
     // 4-lane vector loads below are all in bounds.
     unsafe {
-        let bit_mask = vld1q_u8(HIGH_BIT_LANE_MASK.as_ptr());
         let quant_bytes = vld1q_u8(quants.as_ptr());
 
         // Values 0..16 come from the low nibbles plus high bits 0..16;
@@ -262,25 +334,14 @@ pub(super) unsafe fn neon_q5_0_block_dot(block: &[u8], vector: &[f32]) -> f32 {
         let low_nibbles = vandq_u8(quant_bytes, vdupq_n_u8(0x0f));
         let high_nibbles = vshrq_n_u8(quant_bytes, 4);
 
-        let low_bit_bytes = vcombine_u8(
-            vdup_n_u8(high_bits as u8),
-            vdup_n_u8((high_bits >> 8) as u8),
+        let (low_offsets, high_offsets) = q5_signed_offsets(block);
+        let low_signed = vaddq_s8(
+            vreinterpretq_s8_u8(low_nibbles),
+            vreinterpretq_s8_u8(low_offsets),
         );
-        let high_bit_bytes = vcombine_u8(
-            vdup_n_u8((high_bits >> 16) as u8),
-            vdup_n_u8((high_bits >> 24) as u8),
-        );
-        let low_high_bits = vandq_u8(vtstq_u8(low_bit_bytes, bit_mask), vdupq_n_u8(0x10));
-        let high_high_bits = vandq_u8(vtstq_u8(high_bit_bytes, bit_mask), vdupq_n_u8(0x10));
-
-        let offset = vdupq_n_s8(16);
-        let low_signed = vsubq_s8(
-            vreinterpretq_s8_u8(vorrq_u8(low_nibbles, low_high_bits)),
-            offset,
-        );
-        let high_signed = vsubq_s8(
-            vreinterpretq_s8_u8(vorrq_u8(high_nibbles, high_high_bits)),
-            offset,
+        let high_signed = vaddq_s8(
+            vreinterpretq_s8_u8(high_nibbles),
+            vreinterpretq_s8_u8(high_offsets),
         );
 
         // Keep the exact FMA accumulation order of the previous kernel

@@ -3,8 +3,9 @@ use super::{
     error::OpenAiHttpError,
     generation::{generate_text, generate_texts},
     guards::{
-        acquire_inference_permit, ensure_model, ensure_supported_chat_request,
-        ensure_supported_completion_request, normalized_max_tokens, required_engine,
+        acquire_batch_admission_permit, acquire_inference_permit, ensure_model,
+        ensure_supported_chat_request, ensure_supported_completion_request, normalized_max_tokens,
+        required_engine,
     },
     json::AuthorizedOpenAiJson,
     prompt::render_chat_prompt,
@@ -12,8 +13,8 @@ use super::{
         ChatCompletionRequest, ChatCompletionResponse, CompletionRequest, CompletionResponse,
     },
     stream_generation::{
-        chat_stream_response, completion_stream_response, ChatStreamOptions,
-        CompletionStreamOptions,
+        chat_batched_stream_response, chat_stream_response, completion_batched_stream_response,
+        completion_stream_response, ChatStreamOptions, CompletionStreamOptions,
     },
 };
 use crate::runtime::GenerationCacheOptions;
@@ -63,29 +64,43 @@ async fn chat_completions(
     let max_tokens =
         normalized_max_tokens(&state, request.max_tokens(), request.max_tokens_param())?;
     let engine = required_engine(&state)?;
-    let permit = acquire_inference_permit(&state).await?;
+    let cache_options = chat_cache_options(&state, &request);
     if request.stream() {
+        let stream_options = ChatStreamOptions::new(
+            request.stop_sequences(),
+            request.stream_include_usage(),
+            request.stream_include_obfuscation(),
+            request.response_service_tier(),
+        );
+        if let Some(scheduler) = eligible_batch_scheduler(&state, &cache_options) {
+            let permit = acquire_batch_admission_permit(&state).await?;
+            return chat_batched_stream_response(
+                scheduler,
+                state.model_id().to_owned(),
+                prompt,
+                max_tokens,
+                stream_options,
+                permit,
+            );
+        }
+        let permit = acquire_inference_permit(&state).await?;
         return Ok(chat_stream_response(
             engine,
             state.model_id().to_owned(),
             prompt,
             max_tokens,
-            ChatStreamOptions::new(
-                request.stop_sequences(),
-                request.stream_include_usage(),
-                request.stream_include_obfuscation(),
-                request.response_service_tier(),
-            ),
-            chat_cache_options(&state, &request),
+            stream_options,
+            cache_options,
             permit,
         ));
     }
+    let permit = acquire_inference_permit(&state).await?;
     let generated = generate_text(
         Some(engine),
         prompt,
         max_tokens,
         request.stop_sequences(),
-        chat_cache_options(&state, &request),
+        cache_options,
         permit,
     )
     .await?;
@@ -146,30 +161,44 @@ async fn completions(
         None
     };
     let engine = required_engine(&state)?;
-    let permit = acquire_inference_permit(&state).await?;
+    let cache_options = completion_cache_options(&state, &request);
     if let Some(prompt) = stream_prompt {
         let echo_prompt = request.echo().then(|| prompt.clone());
+        let stream_options = CompletionStreamOptions::new(
+            request.stop_sequences(),
+            request.stream_include_usage(),
+            request.stream_include_obfuscation(),
+        )
+        .with_echo_prompt(echo_prompt);
+        if let Some(scheduler) = eligible_batch_scheduler(&state, &cache_options) {
+            let permit = acquire_batch_admission_permit(&state).await?;
+            return completion_batched_stream_response(
+                scheduler,
+                state.model_id().to_owned(),
+                prompt,
+                max_tokens,
+                stream_options,
+                permit,
+            );
+        }
+        let permit = acquire_inference_permit(&state).await?;
         return Ok(completion_stream_response(
             engine,
             state.model_id().to_owned(),
             prompt,
             max_tokens,
-            CompletionStreamOptions::new(
-                request.stop_sequences(),
-                request.stream_include_usage(),
-                request.stream_include_obfuscation(),
-            )
-            .with_echo_prompt(echo_prompt),
-            completion_cache_options(&state, &request),
+            stream_options,
+            cache_options,
             permit,
         ));
     }
+    let permit = acquire_inference_permit(&state).await?;
     let generated = generate_texts(
         Some(engine),
         request.prompts().to_vec(),
         max_tokens,
         request.stop_sequences(),
-        completion_cache_options(&state, &request),
+        cache_options,
         permit,
     )
     .await?;
@@ -189,6 +218,17 @@ fn completion_cache_options(
     request
         .cache_options()
         .with_prefix_cache_enabled(state.prefix_cache_enabled())
+}
+
+fn eligible_batch_scheduler(
+    state: &ServerState,
+    cache_options: &GenerationCacheOptions,
+) -> Option<std::sync::Arc<crate::runtime::BatchScheduler>> {
+    if cache_options.prefix_cache_enabled() || cache_options.prompt_cache_trace_enabled() {
+        None
+    } else {
+        state.batch_scheduler()
+    }
 }
 
 async fn method_not_allowed(

@@ -16,6 +16,7 @@ pub struct CliArgs {
     pub profile_next_token: bool,
     pub profile_benchmark_token: bool,
     pub experimental_q8_k_activation_matvec: bool,
+    pub experimental_residual_q8_activation_matvec: bool,
     pub experimental_q8_k_activation_roles: Option<Vec<Q8KActivationMatvecRole>>,
     pub compare_q8_k_activation_matvec: bool,
     pub stream: bool,
@@ -61,6 +62,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
     let mut profile_next_token = false;
     let mut profile_benchmark_token = false;
     let mut experimental_q8_k_activation_matvec = false;
+    let mut experimental_residual_q8_activation_matvec = false;
     let mut experimental_q8_k_activation_roles = None;
     let mut compare_q8_k_activation_matvec = false;
     let mut stream = false;
@@ -157,6 +159,9 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
             "--experimental-q8-k-activation-matvec" => {
                 experimental_q8_k_activation_matvec = true;
             }
+            "--experimental-residual-q8-activation-matvec" => {
+                experimental_residual_q8_activation_matvec = true;
+            }
             "--experimental-q8-k-activation-roles" => {
                 let roles = os_string_to_string(next_value(
                     &mut iter,
@@ -203,7 +208,8 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
         profile_next_token,
         profile_benchmark_token,
         q8_k_activation: Q8KActivationModeValidation {
-            experimental_matvec: experimental_q8_k_activation_matvec,
+            experimental_matvec: experimental_q8_k_activation_matvec
+                || experimental_residual_q8_activation_matvec,
             has_role_scope: experimental_q8_k_activation_roles.is_some(),
             compare_matvec: compare_q8_k_activation_matvec,
         },
@@ -211,6 +217,12 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
         expected_generated_token_ids: expected_generated_token_ids.as_deref(),
         prompt_token_ids: prompt_token_ids.as_deref(),
     })?;
+    if experimental_q8_k_activation_matvec && experimental_residual_q8_activation_matvec {
+        return Err(io::Error::other(
+            "use only one experimental activation-matvec policy at a time",
+        )
+        .into());
+    }
 
     let kv_tokens_per_block = kv_tokens_per_block.unwrap_or(16);
 
@@ -226,6 +238,7 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
         profile_next_token,
         profile_benchmark_token,
         experimental_q8_k_activation_matvec,
+        experimental_residual_q8_activation_matvec,
         experimental_q8_k_activation_roles,
         compare_q8_k_activation_matvec,
         stream,
@@ -305,7 +318,7 @@ fn validate_modes(validation: ModeValidation<'_>) -> Result<(), Box<dyn Error>> 
         && !validation.q8_k_activation.compare_matvec
     {
         return Err(io::Error::other(
-            "use --experimental-q8-k-activation-roles with --experimental-q8-k-activation-matvec or --compare-q8-k-activation-matvec",
+            "use --experimental-q8-k-activation-roles with an experimental activation-matvec policy or --compare-q8-k-activation-matvec",
         )
         .into());
     }
@@ -386,7 +399,7 @@ fn parse_token_ids(value: OsString) -> Result<Vec<usize>, Box<dyn Error>> {
 }
 
 fn usage() -> &'static str {
-    "usage: ferrite --model <path.gguf> (--prompt <text> | --prompt-token-ids <id[,id...]>) [--expect-token-id <id>] [--top-logits <count>] [--profile-next-token] [--generate-tokens <count>] [--expect-generated-token-ids <id[,id...]>] [--stream] [--benchmark-runs <count>] [--benchmark-tokenization-runs <count>] [--profile-benchmark-token] [--sleep-after-load-ms <ms>] [--experimental-q8-k-activation-matvec] [--experimental-q8-k-activation-roles <role[,role...]>] [--compare-q8-k-activation-matvec] [--kv-backend <vec|locus>] [--kv-tokens-per-block <count>] [--kv-max-tokens <count>]"
+    "usage: ferrite --model <path.gguf> (--prompt <text> | --prompt-token-ids <id[,id...]>) [--expect-token-id <id>] [--top-logits <count>] [--profile-next-token] [--generate-tokens <count>] [--expect-generated-token-ids <id[,id...]>] [--stream] [--benchmark-runs <count>] [--benchmark-tokenization-runs <count>] [--profile-benchmark-token] [--sleep-after-load-ms <ms>] [--experimental-q8-k-activation-matvec | --experimental-residual-q8-activation-matvec] [--experimental-q8-k-activation-roles <role[,role...]>] [--compare-q8-k-activation-matvec] [--kv-backend <vec|locus>] [--kv-tokens-per-block <count>] [--kv-max-tokens <count>]"
 }
 
 #[cfg(test)]

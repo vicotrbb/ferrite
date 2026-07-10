@@ -137,6 +137,62 @@ async fn chat_endpoint_streams_openai_sse_chunks() -> Result<(), Box<dyn std::er
 }
 
 #[tokio::test]
+async fn batched_completion_streams_match_default_path_under_parallel_load(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let model_path = write_fixture_model()?;
+    let default_engine = InferenceEngine::load(&model_path)?;
+    let default_app = router(ServerState::with_engine(
+        "fixture-model".to_owned(),
+        default_engine,
+    ));
+    let default_body = completion_stream_body(default_app, 4).await?;
+
+    let batched_engine = InferenceEngine::load(&model_path)?;
+    let batched_state = ServerState::with_engine("fixture-model".to_owned(), batched_engine)
+        .with_batched_decode(2)?;
+    let batched_app = router(batched_state);
+    let (first, second) = tokio::join!(
+        completion_stream_body(batched_app.clone(), 4),
+        completion_stream_body(batched_app, 4),
+    );
+    remove_fixture_model(&model_path)?;
+
+    let expected = completion_stream_signature(&default_body)?;
+    assert_eq!(completion_stream_signature(&first?)?, expected);
+    assert_eq!(completion_stream_signature(&second?)?, expected);
+    Ok(())
+}
+
+#[tokio::test]
+async fn batched_stream_releases_admission_permit_when_response_body_is_dropped(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let model_path = write_fixture_model()?;
+    let engine = InferenceEngine::load(&model_path)?;
+    let state =
+        ServerState::with_engine("fixture-model".to_owned(), engine).with_batched_decode(1)?;
+    let app = router(state.clone());
+    let response = app.oneshot(completion_stream_request(128)?).await?;
+    assert_eq!(response.status(), StatusCode::OK);
+    assert!(state.try_acquire_batch_admission_permit().is_none());
+
+    drop(response);
+    let deadline = Instant::now() + Duration::from_secs(2);
+    loop {
+        if state.try_acquire_batch_admission_permit().is_some() {
+            break;
+        }
+        if Instant::now() >= deadline {
+            remove_fixture_model(&model_path)?;
+            return Err("batched stream kept its admission permit after body drop".into());
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+
+    remove_fixture_model(&model_path)?;
+    Ok(())
+}
+
+#[tokio::test]
 async fn completion_stream_helper_emits_tokens_from_generation_callback(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let model_path = write_fixture_model()?;
@@ -211,4 +267,46 @@ fn stream_usage_cached_tokens(body: &str) -> Result<u64, Box<dyn std::error::Err
         }
     }
     Err(format!("missing stream usage cached_tokens: {body}").into())
+}
+
+fn completion_stream_request(
+    max_tokens: usize,
+) -> Result<Request<Body>, Box<dyn std::error::Error>> {
+    Ok(Request::builder()
+        .method("POST")
+        .uri("/v1/completions")
+        .header("content-type", "application/json")
+        .body(Body::from(format!(
+            r#"{{"model":"fixture-model","prompt":"hello","max_tokens":{max_tokens},"stream":true,"stream_options":{{"include_usage":true}}}}"#
+        )))?)
+}
+
+async fn completion_stream_body(
+    app: axum::Router,
+    max_tokens: usize,
+) -> Result<String, Box<dyn std::error::Error>> {
+    let response = app.oneshot(completion_stream_request(max_tokens)?).await?;
+    let status = response.status();
+    let body = to_text(response.into_body()).await?;
+    if status != StatusCode::OK {
+        return Err(format!("completion stream returned {status}: {body}").into());
+    }
+    Ok(body)
+}
+
+fn completion_stream_signature(
+    body: &str,
+) -> Result<Vec<serde_json::Value>, Box<dyn std::error::Error>> {
+    body.lines()
+        .filter_map(|line| line.strip_prefix("data: "))
+        .filter(|line| *line != "[DONE]")
+        .map(|line| {
+            let event: serde_json::Value = serde_json::from_str(line)?;
+            Ok(serde_json::json!({
+                "text": event["choices"][0]["text"],
+                "finish_reason": event["choices"][0]["finish_reason"],
+                "usage": event["usage"],
+            }))
+        })
+        .collect()
 }

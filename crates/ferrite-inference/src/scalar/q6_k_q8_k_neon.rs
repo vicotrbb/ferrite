@@ -1,7 +1,7 @@
 #![allow(unsafe_code)]
 
 use super::{
-    float::f16_bits_to_f32,
+    neon_util::native_f16_bits_to_f32,
     q6_k::{q6_k_storage_bytes, Q6_K_BLOCK_BYTES, Q6_K_BLOCK_VALUES},
     q8_k::BlockQ8K,
     InferenceError,
@@ -97,7 +97,8 @@ unsafe fn neon_q6_k_q8_k_block_dot_unchecked(block: &[u8], activation: &BlockQ8K
     let low_bits = &block[0..128];
     let high_bits = &block[128..192];
     let scales = &block[192..208];
-    let super_scale = f16_bits_to_f32(u16::from_le_bytes([block[208], block[209]]));
+    let super_scale =
+        unsafe { native_f16_bits_to_f32(u16::from_le_bytes([block[208], block[209]])) };
     let mut weighted_sum = 0i32;
     let mut correction_sum = 0i32;
 

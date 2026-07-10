@@ -6,7 +6,8 @@ use super::{
     streaming,
 };
 use crate::runtime::{
-    GenerationCacheOptions, GenerationControl, GenerationFinishSource, PromptEvaluationControl,
+    BatchScheduler, BatchedGenerationEvent, GenerationCacheOptions, GenerationControl,
+    GenerationFinishSource, PromptEvaluationControl,
 };
 use axum::response::Response;
 use std::cell::RefCell;
@@ -103,6 +104,42 @@ pub(super) fn completion_stream_response(
     )
 }
 
+pub(super) fn completion_batched_stream_response(
+    scheduler: Arc<BatchScheduler>,
+    model: String,
+    prompt: String,
+    max_tokens: usize,
+    options: CompletionStreamOptions,
+    permit: OwnedSemaphorePermit,
+) -> Result<Response, OpenAiHttpError> {
+    let include_usage = options.include_usage;
+    let context = CompletionStreamContext::new(model)
+        .with_usage_field(include_usage)
+        .with_obfuscation_field(options.include_obfuscation);
+    let initial_chunks = options
+        .echo_prompt
+        .into_iter()
+        .map(|prompt| context.token(prompt))
+        .collect();
+    let token_context = context.clone();
+    stream_batched_generated_text(
+        scheduler,
+        prompt,
+        max_tokens,
+        options.stop_sequences,
+        initial_chunks,
+        move |piece, _token_ids| token_context.token(piece.to_owned()),
+        move |generated| {
+            let mut chunks = vec![context.finish(generated.finish_reason())];
+            if include_usage {
+                chunks.push(context.usage(generated));
+            }
+            chunks
+        },
+        permit,
+    )
+}
+
 pub(super) fn chat_stream_response(
     engine: Arc<crate::runtime::InferenceEngine>,
     model: String,
@@ -144,6 +181,146 @@ pub(super) fn chat_stream_response(
         },
         permit,
     )
+}
+
+pub(super) fn chat_batched_stream_response(
+    scheduler: Arc<BatchScheduler>,
+    model: String,
+    prompt: String,
+    max_tokens: usize,
+    options: ChatStreamOptions,
+    permit: OwnedSemaphorePermit,
+) -> Result<Response, OpenAiHttpError> {
+    let include_usage = options.include_usage;
+    let context = ChatCompletionStreamContext::new(model)
+        .with_usage_field(include_usage)
+        .with_obfuscation_field(options.include_obfuscation)
+        .with_service_tier(options.service_tier);
+    let token_context = context.clone();
+    let include_token_ids = options.stop_sequences.is_empty();
+    stream_batched_generated_text(
+        scheduler,
+        prompt,
+        max_tokens,
+        options.stop_sequences,
+        vec![context.role()],
+        move |piece, token_ids| {
+            if include_token_ids {
+                token_context.token_with_ids(piece.to_owned(), token_ids.unwrap_or(&[]))
+            } else {
+                token_context.token(piece.to_owned())
+            }
+        },
+        move |generated| {
+            let mut chunks = vec![context.finish(generated.finish_reason())];
+            if include_usage {
+                chunks.push(context.usage(generated));
+            }
+            chunks
+        },
+        permit,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn stream_batched_generated_text<T>(
+    scheduler: Arc<BatchScheduler>,
+    prompt: String,
+    max_tokens: usize,
+    stop_sequences: Vec<String>,
+    initial_chunks: Vec<T>,
+    mut token_chunk: impl FnMut(&str, Option<&[usize]>) -> T + Send + 'static,
+    final_chunks: impl FnOnce(&crate::runtime::GeneratedText) -> Vec<T> + Send + 'static,
+    permit: OwnedSemaphorePermit,
+) -> Result<Response, OpenAiHttpError>
+where
+    T: serde::Serialize + Send + 'static,
+{
+    let mut events = scheduler
+        .submit(prompt, max_tokens, stop_sequences)
+        .map_err(|error| OpenAiHttpError::internal(error.to_string()))?;
+    let (sender, response) = streaming::channel_response();
+    tokio::task::spawn_blocking(move || {
+        let _permit = permit;
+        let lifecycle = RefCell::new(StreamLifecycle::new());
+        let result = (|| -> Result<(), OpenAiHttpError> {
+            for chunk in initial_chunks {
+                if let Err(error) = sender.send_json_blocking(&chunk) {
+                    lifecycle
+                        .borrow_mut()
+                        .record_disconnect(StreamDisconnectPoint::BeforeGeneration);
+                    return Err(error);
+                }
+            }
+            if sender.is_closed() {
+                lifecycle
+                    .borrow_mut()
+                    .record_disconnect(StreamDisconnectPoint::BeforeGeneration);
+                return Ok(());
+            }
+            {
+                let mut lifecycle = lifecycle.borrow_mut();
+                lifecycle.record_engine_lock_acquired();
+                lifecycle.record_generation_started();
+            }
+
+            while let Some(event) = events.blocking_recv() {
+                if sender.is_closed() {
+                    lifecycle
+                        .borrow_mut()
+                        .record_disconnect(StreamDisconnectPoint::TokenStreaming);
+                    return Ok(());
+                }
+                match event {
+                    BatchedGenerationEvent::Token { text, token_ids } => {
+                        lifecycle
+                            .borrow_mut()
+                            .record_generated_chunk(token_ids.len());
+                        sender
+                            .send_json_blocking(&token_chunk(&text, Some(&token_ids)))
+                            .inspect_err(|_| {
+                                lifecycle
+                                    .borrow_mut()
+                                    .record_disconnect(StreamDisconnectPoint::TokenStreaming);
+                            })?;
+                    }
+                    BatchedGenerationEvent::Finished(generated) => {
+                        for chunk in final_chunks(&generated) {
+                            sender.send_json_blocking(&chunk).inspect_err(|_| {
+                                lifecycle
+                                    .borrow_mut()
+                                    .record_disconnect(StreamDisconnectPoint::FinalChunks);
+                            })?;
+                        }
+                        sender.send_done_blocking().inspect_err(|_| {
+                            lifecycle
+                                .borrow_mut()
+                                .record_disconnect(StreamDisconnectPoint::FinalChunks);
+                        })?;
+                        return Ok(());
+                    }
+                    BatchedGenerationEvent::Failed(error) => {
+                        return Err(OpenAiHttpError::internal(error.to_string()));
+                    }
+                }
+            }
+
+            Err(OpenAiHttpError::internal(
+                "batch scheduler stopped before generation completed",
+            ))
+        })();
+        let lifecycle = lifecycle.into_inner();
+        let finish_reason = match (&result, lifecycle.has_disconnect()) {
+            (_, true) => StreamFinishReason::Cancelled,
+            (Ok(()), false) => StreamFinishReason::Completed,
+            (Err(_), false) => StreamFinishReason::Failed,
+        };
+        eprintln!("{}", lifecycle.finish(finish_reason).log_line());
+        if result.is_err() {
+            let _ = sender.send_done_blocking();
+        }
+    });
+    Ok(response)
 }
 
 struct StreamGenerationInput<T> {

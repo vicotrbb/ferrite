@@ -48,6 +48,9 @@ enum MatrixData {
     Q8_0(Vec<u8>),
 }
 
+type MatrixPairOutput = (Vec<f32>, Vec<f32>);
+type MatrixTripletOutput = (Vec<f32>, Vec<f32>, Vec<f32>);
+
 impl Matrix {
     pub fn rows(&self) -> usize {
         self.rows
@@ -132,9 +135,25 @@ impl Matrix {
             );
         }
         if let MatrixData::Q8_0(data) = &self.data {
+            #[cfg(target_arch = "aarch64")]
+            if options.residual_q8_activation_matvec()
+                && std::arch::is_aarch64_feature_detected!("i8mm")
+            {
+                return super::q8_0_q8_residual_i8mm::neon_q8_0_q8_residual_i8mm_mul_vec(
+                    data, self.rows, self.cols, vector,
+                );
+            }
             return q8_0_mul_vec(data, self.rows, self.cols, vector);
         }
         if let MatrixData::Q5_0(data) = &self.data {
+            #[cfg(target_arch = "aarch64")]
+            if options.residual_q8_activation_matvec()
+                && std::arch::is_aarch64_feature_detected!("dotprod")
+            {
+                return super::q5_0_q8_residual_neon::neon_q5_0_q8_residual_mul_vec(
+                    data, self.rows, self.cols, vector,
+                );
+            }
             return q5_0_mul_vec(data, self.rows, self.cols, vector);
         }
         if let MatrixData::F32(data) = &self.data {
@@ -147,6 +166,143 @@ impl Matrix {
             output.push(dot(&row, vector)?);
         }
         Ok(output)
+    }
+
+    /// Uses a paired Q5_0 kernel when both matrices have the same shape and
+    /// execution policy. `None` tells callers to use independent dispatch.
+    pub(in crate::scalar) fn mul_vec_pair_with_options(
+        &self,
+        other: &Self,
+        vector: &[f32],
+        left_options: ScalarExecutionOptions,
+        right_options: ScalarExecutionOptions,
+    ) -> Result<Option<MatrixPairOutput>, InferenceError> {
+        #[cfg(not(target_arch = "aarch64"))]
+        {
+            let _ = (other, vector, left_options, right_options);
+            return Ok(None);
+        }
+        #[cfg(target_arch = "aarch64")]
+        {
+            if self.rows != other.rows || self.cols != other.cols {
+                return Ok(None);
+            }
+            if self.cols != vector.len() {
+                return Err(InferenceError::new(format!(
+                    "matrix columns {} do not match vector length {}",
+                    self.cols,
+                    vector.len()
+                )));
+            }
+            let (MatrixData::Q5_0(left), MatrixData::Q5_0(right)) = (&self.data, &other.data)
+            else {
+                return Ok(None);
+            };
+            ensure_vector_values_finite(vector)?;
+            let left_residual = left_options.residual_q8_activation_matvec();
+            let right_residual = right_options.residual_q8_activation_matvec();
+            if left_residual != right_residual {
+                return Ok(None);
+            }
+            if left_residual && std::arch::is_aarch64_feature_detected!("dotprod") {
+                return super::q5_0_q8_residual_neon::neon_q5_0_q8_residual_mul_vec_pair(
+                    left, right, self.rows, self.cols, vector,
+                )
+                .map(Some);
+            }
+            super::q5_0::q5_0_mul_vec_pair(left, right, self.rows, self.cols, vector).map(Some)
+        }
+    }
+
+    /// Computes attention Q/K/V together while sharing one residual-Q8
+    /// activation across candidate Q5_0 projections. Returns `None` when
+    /// fewer than two projections can share that work.
+    pub(in crate::scalar) fn mul_vec_qkv_with_options(
+        &self,
+        key: &Self,
+        value: &Self,
+        vector: &[f32],
+        query_options: ScalarExecutionOptions,
+        key_options: ScalarExecutionOptions,
+        value_options: ScalarExecutionOptions,
+    ) -> Result<Option<MatrixTripletOutput>, InferenceError> {
+        #[cfg(not(target_arch = "aarch64"))]
+        {
+            let _ = (
+                key,
+                value,
+                vector,
+                query_options,
+                key_options,
+                value_options,
+            );
+            return Ok(None);
+        }
+        #[cfg(target_arch = "aarch64")]
+        {
+            if self.cols != vector.len()
+                || key.cols != vector.len()
+                || value.cols != vector.len()
+                || !std::arch::is_aarch64_feature_detected!("dotprod")
+            {
+                return Ok(None);
+            }
+            let candidates = [
+                self.is_q5_residual_candidate(query_options),
+                key.is_q5_residual_candidate(key_options),
+                value.is_q5_residual_candidate(value_options),
+            ];
+            if candidates
+                .into_iter()
+                .filter(|candidate| *candidate)
+                .count()
+                < 2
+            {
+                return Ok(None);
+            }
+
+            ensure_vector_values_finite(vector)?;
+            let activation =
+                super::q8_residual_activation::BlockQ8Residual::quantize_blocks(vector)?;
+            let (query, (key, value)) = rayon::join(
+                || self.mul_vec_with_shared_q5_residual(vector, query_options, &activation),
+                || {
+                    rayon::join(
+                        || key.mul_vec_with_shared_q5_residual(vector, key_options, &activation),
+                        || {
+                            value.mul_vec_with_shared_q5_residual(
+                                vector,
+                                value_options,
+                                &activation,
+                            )
+                        },
+                    )
+                },
+            );
+            Ok(Some((query?, key?, value?)))
+        }
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    fn is_q5_residual_candidate(&self, options: ScalarExecutionOptions) -> bool {
+        options.residual_q8_activation_matvec() && matches!(&self.data, MatrixData::Q5_0(_))
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    fn mul_vec_with_shared_q5_residual(
+        &self,
+        vector: &[f32],
+        options: ScalarExecutionOptions,
+        activation: &[super::q8_residual_activation::BlockQ8Residual],
+    ) -> Result<Vec<f32>, InferenceError> {
+        if options.residual_q8_activation_matvec() {
+            if let MatrixData::Q5_0(data) = &self.data {
+                return super::q5_0_q8_residual_neon::neon_q5_0_q8_residual_mul_vec_prequantized(
+                    data, self.rows, self.cols, activation,
+                );
+            }
+        }
+        self.mul_vec_with_options(vector, options)
     }
 
     /// Multiplies several activation vectors against this matrix in one
@@ -231,13 +387,23 @@ impl Matrix {
         }
 
         #[cfg(target_arch = "aarch64")]
-        if matches!(&self.data, MatrixData::Q6K(_)) && options.q8_k_activation_matvec() {
+        if matches!(&self.data, MatrixData::Q6K(_))
+            && (options.q8_k_activation_matvec() || options.residual_q8_activation_matvec())
+        {
             return argmax(&self.mul_vec_with_options(vector, options)?);
         }
         if let MatrixData::Q6K(data) = &self.data {
             return super::q6_k::q6_k_argmax_mul_vec(data, self.rows, self.cols, vector);
         }
         if let MatrixData::Q8_0(data) = &self.data {
+            #[cfg(target_arch = "aarch64")]
+            if options.residual_q8_activation_matvec()
+                && std::arch::is_aarch64_feature_detected!("i8mm")
+            {
+                return super::q8_0_q8_residual_i8mm::neon_q8_0_q8_residual_i8mm_argmax(
+                    data, self.rows, self.cols, vector,
+                );
+            }
             return q8_0_argmax_mul_vec(data, self.rows, self.cols, vector);
         }
 

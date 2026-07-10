@@ -1,7 +1,7 @@
 #![allow(unsafe_code)]
 
 use super::{
-    float::f16_bits_to_f32,
+    neon_util::native_f16_bits_to_f32,
     q8_0::{
         argmax_q8_0_rows, parallel_argmax_q8_0_rows, Q8_0MatVecBackend, Q8_0MatVecOutput,
         Q8_0_BLOCK_BYTES, Q8_0_BLOCK_VALUES,
@@ -90,7 +90,7 @@ pub(super) fn neon_q8_0_argmax_mul_vec_batch(
 
 fn neon_q8_0_row_dot_batch(row_chunk: &[u8], vectors: &[&[f32]], row_out: &mut [f32]) {
     for (block_index, block) in row_chunk.chunks_exact(Q8_0_BLOCK_BYTES).enumerate() {
-        let scale = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
+        let scale = unsafe { native_f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]])) };
         let col_base = block_index * Q8_0_BLOCK_VALUES;
         // SAFETY: each Q8_0 block has exactly 32 quantized bytes after the
         // scale, `cols` is validated as a multiple of 32, and every vector
@@ -167,7 +167,7 @@ fn neon_q8_0_mul_vec_row_parallel(
 fn neon_q8_0_row_dot(row_chunk: &[u8], vector: &[f32]) -> f32 {
     let mut sum = 0.0;
     for (block_index, block) in row_chunk.chunks_exact(Q8_0_BLOCK_BYTES).enumerate() {
-        let scale = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
+        let scale = unsafe { native_f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]])) };
         let col_base = block_index * Q8_0_BLOCK_VALUES;
         // SAFETY: each Q8_0 block has exactly 32 quantized bytes and
         // `cols` is validated as a multiple of 32, so every 8-byte
@@ -196,7 +196,7 @@ pub(super) fn neon_q8_0_argmax_mul_vec(
     argmax_q8_0_rows(bytes, row_bytes, |row_bytes| {
         let mut sum = 0.0;
         for (block_index, block) in row_bytes.chunks_exact(Q8_0_BLOCK_BYTES).enumerate() {
-            let scale = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
+            let scale = unsafe { native_f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]])) };
             let col_base = block_index * Q8_0_BLOCK_VALUES;
             // SAFETY: each Q8_0 block has exactly 32 quantized bytes and
             // `cols` is validated as a multiple of 32, so every 8-byte
@@ -221,7 +221,7 @@ pub(super) fn neon_q8_0_parallel_argmax_mul_vec(
     parallel_argmax_q8_0_rows(bytes, row_bytes, |row_bytes| {
         let mut sum = 0.0;
         for (block_index, block) in row_bytes.chunks_exact(Q8_0_BLOCK_BYTES).enumerate() {
-            let scale = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
+            let scale = unsafe { native_f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]])) };
             let col_base = block_index * Q8_0_BLOCK_VALUES;
             // SAFETY: each Q8_0 block has exactly 32 quantized bytes and
             // `cols` is validated as a multiple of 32, so every 8-byte

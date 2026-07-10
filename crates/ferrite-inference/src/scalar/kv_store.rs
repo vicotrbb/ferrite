@@ -161,6 +161,12 @@ impl VecKvStore {
     fn push(&mut self, layer: usize, key: Vec<f32>, value: Vec<f32>) -> Result<(), InferenceError> {
         self.check_dim("key", &key)?;
         self.check_dim("value", &value)?;
+        if key.iter().any(|value| !value.is_finite()) {
+            return Err(InferenceError::new("cached key must be finite"));
+        }
+        if value.iter().any(|value| !value.is_finite()) {
+            return Err(InferenceError::new("cached value must be finite"));
+        }
         let keys = self
             .layer_keys
             .get_mut(layer)

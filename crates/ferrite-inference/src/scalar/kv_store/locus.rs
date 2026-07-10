@@ -150,6 +150,12 @@ impl LocusKvStore {
                 value.len()
             )));
         }
+        if key.iter().any(|value| !value.is_finite()) {
+            return Err(InferenceError::new("cached key must be finite"));
+        }
+        if value.iter().any(|value| !value.is_finite()) {
+            return Err(InferenceError::new("cached value must be finite"));
+        }
         let position = self.layer_len(layer);
         self.ensure_block(layer, position)?;
         self.write_block(true, layer, position, &key)?;

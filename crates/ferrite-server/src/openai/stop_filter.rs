@@ -29,14 +29,15 @@ fn first_stop_index(text: &str, stop_sequences: &[String]) -> Option<usize> {
         .min()
 }
 
-pub(super) struct StopSequenceFilter {
+#[derive(Debug)]
+pub(crate) struct StopSequenceFilter {
     stop_sequences: Vec<String>,
     pending: String,
     stopped: bool,
 }
 
 impl StopSequenceFilter {
-    pub(super) fn new(stop_sequences: Vec<String>) -> Self {
+    pub(crate) fn new(stop_sequences: Vec<String>) -> Self {
         Self {
             stop_sequences,
             pending: String::new(),
@@ -44,7 +45,7 @@ impl StopSequenceFilter {
         }
     }
 
-    pub(super) fn push(&mut self, piece: &str) -> Vec<String> {
+    pub(crate) fn push(&mut self, piece: &str) -> Vec<String> {
         if self.stopped {
             return Vec::new();
         }
@@ -74,11 +75,11 @@ impl StopSequenceFilter {
         }
     }
 
-    pub(super) fn stopped(&self) -> bool {
+    pub(crate) fn stopped(&self) -> bool {
         self.stopped
     }
 
-    pub(super) fn finish(self) -> Vec<String> {
+    pub(crate) fn finish(self) -> Vec<String> {
         if self.stopped || self.pending.is_empty() {
             Vec::new()
         } else {

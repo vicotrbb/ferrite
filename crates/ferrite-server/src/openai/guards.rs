@@ -77,6 +77,14 @@ pub(super) async fn acquire_inference_permit(
     })
 }
 
+pub(super) async fn acquire_batch_admission_permit(
+    state: &ServerState,
+) -> Result<OwnedSemaphorePermit, OpenAiHttpError> {
+    state.acquire_batch_admission_permit().await.ok_or_else(|| {
+        OpenAiHttpError::rate_limited("batched inference queue is full; retry later")
+    })
+}
+
 pub(super) fn normalized_max_tokens(
     state: &ServerState,
     value: Option<usize>,

@@ -1,7 +1,7 @@
 #![allow(unsafe_code)]
 
 use super::{
-    float::f16_bits_to_f32,
+    neon_util::native_f16_bits_to_f32,
     q4_k::{q4_k_storage_bytes, Q4_K_BLOCK_BYTES, Q4_K_BLOCK_VALUES},
     q8_k::BlockQ8K,
     InferenceError,
@@ -94,8 +94,8 @@ pub(in crate::scalar) fn neon_q4_k_q8_k_block_dot(
 
 #[target_feature(enable = "neon")]
 unsafe fn neon_q4_k_q8_k_block_dot_unchecked(block: &[u8], activation: &BlockQ8K) -> f32 {
-    let d = f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]]));
-    let dmin = f16_bits_to_f32(u16::from_le_bytes([block[2], block[3]]));
+    let d = unsafe { native_f16_bits_to_f32(u16::from_le_bytes([block[0], block[1]])) };
+    let dmin = unsafe { native_f16_bits_to_f32(u16::from_le_bytes([block[2], block[3]])) };
     let scales = &block[4..16];
     let quants = &block[16..];
     let mask = vdupq_n_u8(0x0f);

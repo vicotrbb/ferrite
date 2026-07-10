@@ -57,7 +57,8 @@ pub fn argmax(values: &[f32]) -> Result<usize, InferenceError> {
     Ok(best_index)
 }
 
-pub(super) fn swiglu(gate: &[f32], up: &[f32]) -> Result<Vec<f32>, InferenceError> {
+#[cfg(test)]
+fn swiglu(gate: &[f32], up: &[f32]) -> Result<Vec<f32>, InferenceError> {
     ensure_len("ffn up", up, gate.len())?;
     if gate.iter().any(|value| !value.is_finite()) {
         return Err(InferenceError::new("swiglu gate must be finite"));
@@ -74,6 +75,24 @@ pub(super) fn swiglu(gate: &[f32], up: &[f32]) -> Result<Vec<f32>, InferenceErro
         output.push(value);
     }
     Ok(output)
+}
+
+pub(super) fn swiglu_in_place(gate: &mut [f32], up: &[f32]) -> Result<(), InferenceError> {
+    ensure_len("ffn up", up, gate.len())?;
+    if gate.iter().any(|value| !value.is_finite()) {
+        return Err(InferenceError::new("swiglu gate must be finite"));
+    }
+    if up.iter().any(|value| !value.is_finite()) {
+        return Err(InferenceError::new("swiglu up must be finite"));
+    }
+    for (gate, up) in gate.iter_mut().zip(up) {
+        let value = silu(*gate) * *up;
+        if !value.is_finite() {
+            return Err(InferenceError::new("swiglu result must be finite"));
+        }
+        *gate = value;
+    }
+    Ok(())
 }
 
 fn silu(value: f32) -> f32 {
@@ -122,7 +141,7 @@ pub(super) fn add_assign(left: &mut [f32], right: &[f32]) -> Result<(), Inferenc
     Ok(())
 }
 
-pub(super) fn softmax(values: &[f32]) -> Result<Vec<f32>, InferenceError> {
+pub(super) fn softmax_in_place(values: &mut [f32]) -> Result<(), InferenceError> {
     if values.is_empty() {
         return Err(InferenceError::new("softmax input must not be empty"));
     }
@@ -131,18 +150,20 @@ pub(super) fn softmax(values: &[f32]) -> Result<Vec<f32>, InferenceError> {
     }
 
     let max = values.iter().copied().fold(f32::NEG_INFINITY, f32::max);
-    let mut exp_values = Vec::with_capacity(values.len());
     let mut sum = 0.0;
-    for value in values {
+    for value in values.iter_mut() {
         let exp = (*value - max).exp();
         sum += exp;
-        exp_values.push(exp);
+        *value = exp;
     }
     if sum == 0.0 {
         return Err(InferenceError::new("softmax denominator is zero"));
     }
 
-    Ok(exp_values.into_iter().map(|value| value / sum).collect())
+    for value in values {
+        *value /= sum;
+    }
+    Ok(())
 }
 
 pub(super) fn ensure_len(
@@ -167,13 +188,32 @@ mod tests {
     #[test]
     fn softmax_rejects_non_finite_values() -> Result<(), InferenceError> {
         for value in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
-            let error = match softmax(&[0.0, value]) {
-                Ok(_) => return Err(InferenceError::new("non-finite softmax input should fail")),
+            let error = match softmax_in_place(&mut [0.0, value]) {
+                Ok(()) => return Err(InferenceError::new("non-finite softmax input should fail")),
                 Err(error) => error,
             };
 
             assert!(error.to_string().contains("softmax input must be finite"));
         }
+        Ok(())
+    }
+
+    #[test]
+    fn softmax_in_place_preserves_reference_operation_order() -> Result<(), InferenceError> {
+        let mut values = vec![-3.0f32, 0.25, 1.5, -0.75];
+        let max = values.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        let mut exponentials = values
+            .iter()
+            .map(|value| (*value - max).exp())
+            .collect::<Vec<_>>();
+        let sum = exponentials.iter().sum::<f32>();
+        for value in &mut exponentials {
+            *value /= sum;
+        }
+
+        softmax_in_place(&mut values)?;
+
+        assert_eq!(values, exponentials);
         Ok(())
     }
 
@@ -263,6 +303,18 @@ mod tests {
         };
 
         assert!(error.to_string().contains("swiglu result must be finite"));
+        Ok(())
+    }
+
+    #[test]
+    fn swiglu_in_place_matches_allocating_path() -> Result<(), InferenceError> {
+        let mut gate = vec![-3.0, -0.5, 0.0, 0.75, 4.0];
+        let up = vec![0.25, -2.0, 3.0, 1.5, -0.125];
+        let expected = swiglu(&gate, &up)?;
+
+        swiglu_in_place(&mut gate, &up)?;
+
+        assert_eq!(gate, expected);
         Ok(())
     }
 

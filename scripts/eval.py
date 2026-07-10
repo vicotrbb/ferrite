@@ -219,8 +219,16 @@ EvalConfig = namedtuple(
         "sleep_ms",
         "requests",
         "batch_streams",
+        "server_batch_streams",
+        "experimental_residual_q8_activation_matvec",
     ],
 )
+
+
+def cli_execution_flags(cfg):
+    if cfg.experimental_residual_q8_activation_matvec:
+        return ["--experimental-residual-q8-activation-matvec"]
+    return []
 
 
 def run_cli_batch_benchmark(ferrite_bin, model_path, cfg, streams):
@@ -273,7 +281,7 @@ def run_cli_phase(ferrite_bin, model_path, cfg):
         "--sleep-after-load-ms", str(cfg.sleep_ms),
         "--generate-tokens", str(cfg.generate_tokens),
         "--stream",
-    ]
+    ] + cli_execution_flags(cfg)
     phase["generation_command"] = " ".join(gen_cmd)
     run = run_timestamped(gen_cmd)
     if run.returncode != 0:
@@ -294,6 +302,7 @@ def run_cli_phase(ferrite_bin, model_path, cfg):
         "scalar_weight_bytes",
         "kv_cache_bytes",
         "generated_stopped_on_eos",
+        "q8_k_activation_matvec_policy",
     ):
         if key in kv:
             phase[key] = int(kv[key]) if key == "inference_threads" else kv[key]
@@ -316,7 +325,7 @@ def run_cli_phase(ferrite_bin, model_path, cfg):
         "--model", str(model_path),
         "--prompt", cfg.prompt,
         "--benchmark-runs", str(cfg.benchmark_runs),
-    ]
+    ] + cli_execution_flags(cfg)
     phase["benchmark_command"] = " ".join(bench_cmd)
     bench = run_timestamped(bench_cmd)
     if bench.returncode == 0:
@@ -367,7 +376,7 @@ def wait_for_health(port, proc, timeout_s=300):
     return False
 
 
-def run_server_phase(server_bin, throughput_bin, model_path, cfg):
+def run_server_phase(server_bin, throughput_bin, model_path, cfg, batch_streams=None):
     """Start ferrite-server, drive it with ferrite-openai-throughput, tear down."""
     phase = {"status": "ok"}
     port = find_free_port()
@@ -381,6 +390,13 @@ def run_server_phase(server_bin, throughput_bin, model_path, cfg):
         "--hard-max-tokens", str(cfg.generate_tokens),
         "--inference-wait-ms", "120000",
     ]
+    if batch_streams is not None:
+        server_cmd += [
+            "--experimental-batched-decode",
+            "--max-batch-streams", str(batch_streams),
+        ]
+    elif cfg.experimental_residual_q8_activation_matvec:
+        server_cmd.append("--experimental-residual-q8-activation-matvec")
     phase["server_command"] = " ".join(server_cmd)
     with tempfile.TemporaryFile(mode="w+", encoding="utf-8") as server_log:
         server = subprocess.Popen(server_cmd, stdout=server_log, stderr=subprocess.STDOUT)
@@ -400,6 +416,7 @@ def run_server_phase(server_bin, throughput_bin, model_path, cfg):
                 "--endpoint", "chat-completions",
                 "--prompt", cfg.prompt,
                 "--requests", str(cfg.requests),
+                "--concurrency", str(batch_streams or 1),
                 "--max-tokens", str(cfg.generate_tokens),
                 "--stream",
                 "--stream-usage",
@@ -424,9 +441,18 @@ def run_server_phase(server_bin, throughput_bin, model_path, cfg):
                 "elapsed_ms",
                 "streaming_usage_prompt_tokens",
                 "streaming_usage_completion_tokens",
+                "streaming_finish_reason",
+                "streaming_usage_finish_source",
+                "streaming_token_ids",
+                "streaming_text_bytes",
             ):
                 if key in kv:
                     phase[key] = kv[key]
+            phase["concurrency"] = batch_streams or 1
+            if "requests_per_second" in phase:
+                phase["aggregate_completion_tokens_per_second"] = round(
+                    float(phase["requests_per_second"]) * cfg.generate_tokens, 2
+                )
             request_window = aggregate_samples(
                 sampler.samples, t_requests_start, t_requests_end
             )
@@ -582,6 +608,7 @@ def render_markdown(report):
                 "| --- | --- |",
                 f"| status | {cli.get('status')} |",
                 f"| inference threads | {cli.get('inference_threads', '-')} |",
+                f"| activation matvec policy | {cli.get('q8_k_activation_matvec_policy', '-')} |",
                 f"| load | {cli.get('load_seconds', '-')} s |",
                 f"| TTFT (prefill, load excluded) | {cli.get('ttft_prefill_seconds', '-')} s |",
                 f"| decode tok/s (precise, in-process) | {cli.get('decode_tokens_per_second_precise', '-')} |",
@@ -611,20 +638,27 @@ def render_markdown(report):
                         f"{batch.get('cpu_peak_percent', '-')} % | "
                         f"{batch.get('status')} |"
                     )
-        server = entry.get("server")
-        if server:
-            lines += [
-                "",
-                "| Server metric | value |",
-                "| --- | --- |",
-                f"| status | {server.get('status')} |",
-                f"| TTFT | {server.get('streaming_time_to_first_token_ms', '-')} ms |",
-                f"| streamed tok/s | {server.get('streaming_tokens_per_second', '-')} |",
-                f"| token latency p50 / p95 | {server.get('streaming_token_latency_p50_ms', '-')} / {server.get('streaming_token_latency_p95_ms', '-')} ms |",
-                f"| requests/s | {server.get('requests_per_second', '-')} |",
-                f"| server RSS peak | {_fmt_bytes(server.get('server_rss_peak_bytes'))} |",
-                f"| server CPU mean / peak | {server.get('server_cpu_mean_percent', '-')} / {server.get('server_cpu_peak_percent', '-')} % |",
-            ]
+        for key, title in (
+            ("server", "Server"),
+            ("batched_server", "Continuous-batched server"),
+        ):
+            server = entry.get(key)
+            if server:
+                lines += [
+                    "",
+                    f"| {title} metric | value |",
+                    "| --- | --- |",
+                    f"| status | {server.get('status')} |",
+                    f"| concurrency | {server.get('concurrency', '-')} |",
+                    f"| TTFT | {server.get('streaming_time_to_first_token_ms', '-')} ms |",
+                    f"| first-stream tok/s | {server.get('streaming_tokens_per_second', '-')} |",
+                    f"| aggregate completion tok/s | {server.get('aggregate_completion_tokens_per_second', '-')} |",
+                    f"| token IDs match default | {server.get('token_ids_match_default', '-')} |",
+                    f"| token latency p50 / p95 | {server.get('streaming_token_latency_p50_ms', '-')} / {server.get('streaming_token_latency_p95_ms', '-')} ms |",
+                    f"| requests/s | {server.get('requests_per_second', '-')} |",
+                    f"| server RSS peak | {_fmt_bytes(server.get('server_rss_peak_bytes'))} |",
+                    f"| server CPU mean / peak | {server.get('server_cpu_mean_percent', '-')} / {server.get('server_cpu_peak_percent', '-')} % |",
+                ]
     lines.append("")
     return "\n".join(lines)
 
@@ -671,12 +705,24 @@ def parse_args(argv):
     parser.add_argument("--generate-tokens", type=int, default=64)
     parser.add_argument("--benchmark-runs", type=int, default=64)
     parser.add_argument(
+        "--experimental-residual-q8-activation-matvec",
+        action="store_true",
+        help="benchmark Ferrite's opt-in residual-Q8/I8MM activation matvec policy",
+    )
+    parser.add_argument(
         "--batch-streams",
         action="append",
         type=int,
         default=[],
         metavar="N",
         help="also benchmark an N-stream engine batch (repeatable; N must be >= 2)",
+    )
+    parser.add_argument(
+        "--server-batch-streams",
+        type=int,
+        default=None,
+        metavar="N",
+        help="also benchmark opt-in continuous-batched HTTP streaming at concurrency N",
     )
     parser.add_argument(
         "--sleep-ms", type=int, default=2000,
@@ -698,6 +744,10 @@ def main(argv=None):
     args = parse_args(argv)
     if any(streams < 2 for streams in args.batch_streams):
         raise SystemExit("--batch-streams values must be at least 2")
+    if args.server_batch_streams is not None and args.server_batch_streams < 2:
+        raise SystemExit("--server-batch-streams must be at least 2")
+    if args.server_batch_streams is not None and args.requests < args.server_batch_streams:
+        raise SystemExit("--requests must be at least --server-batch-streams")
     models = resolve_models(args)
     bins = build_binaries()
     env = capture_env()
@@ -708,6 +758,8 @@ def main(argv=None):
         sleep_ms=args.sleep_ms,
         requests=args.requests,
         batch_streams=tuple(dict.fromkeys(args.batch_streams)),
+        server_batch_streams=args.server_batch_streams,
+        experimental_residual_q8_activation_matvec=args.experimental_residual_q8_activation_matvec,
     )
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d-%H%M%S")
     model_results = []
@@ -722,6 +774,24 @@ def main(argv=None):
             entry["server"] = run_server_phase(
                 bins["server"], bins["throughput"], model_path, cfg
             )
+            if cfg.server_batch_streams is not None:
+                print(
+                    "batched server phase: "
+                    f"continuous batching x{cfg.server_batch_streams} ..."
+                )
+                entry["batched_server"] = run_server_phase(
+                    bins["server"],
+                    bins["throughput"],
+                    model_path,
+                    cfg,
+                    batch_streams=cfg.server_batch_streams,
+                )
+                default_ids = entry["server"].get("streaming_token_ids")
+                batched_ids = entry["batched_server"].get("streaming_token_ids")
+                if default_ids is not None and batched_ids is not None:
+                    entry["batched_server"]["token_ids_match_default"] = (
+                        batched_ids == default_ids
+                    )
         model_results.append(entry)
     report = build_report(env, cfg, model_results, tag=args.tag)
     json_path, md_path = write_outputs(report, output_stem(timestamp, models))

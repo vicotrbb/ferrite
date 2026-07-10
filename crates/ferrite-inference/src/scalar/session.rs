@@ -1,6 +1,6 @@
 use super::{
     attention::causal_attention,
-    math::{add_assign, argmax, rms_norm, swiglu},
+    math::{add_assign, argmax, rms_norm, swiglu_in_place},
     profile::{ProfiledNextToken, ProfiledTokenId, ScalarMatVecComparison, ScalarProfileEvent},
     InferenceError, NextToken, Q8KActivationMatvecRole, ScalarExecutionOptions, ScalarLlamaModel,
 };
@@ -267,38 +267,70 @@ impl<'a> ScalarLlamaSession<'a> {
                 &layer.attn_norm,
                 self.model.config.rms_norm_epsilon,
             )?;
-            let mut query = profiled_layer_mul_vec(
-                &layer.q_proj,
-                &normed,
-                layer_index,
-                "q_proj",
-                profile_events.as_deref_mut(),
-                comparison_events.as_deref_mut(),
-                self.options
-                    .scoped_to_q8_k_activation_role(Q8KActivationMatvecRole::QProj),
-            )?;
+            let q_options = self
+                .options
+                .scoped_to_q8_k_activation_role(Q8KActivationMatvecRole::QProj);
+            let k_options = self
+                .options
+                .scoped_to_q8_k_activation_role(Q8KActivationMatvecRole::KProj);
+            let v_options = self
+                .options
+                .scoped_to_q8_k_activation_role(Q8KActivationMatvecRole::VProj);
+            let (mut query, mut key, mut value) =
+                if profile_events.is_none() && comparison_events.is_none() {
+                    if let Some(qkv) = layer.q_proj.mul_vec_qkv_with_options(
+                        &layer.k_proj,
+                        &layer.v_proj,
+                        &normed,
+                        q_options,
+                        k_options,
+                        v_options,
+                    )? {
+                        qkv
+                    } else {
+                        let (query, (key, value)) = rayon::join(
+                            || layer.q_proj.mul_vec_with_options(&normed, q_options),
+                            || {
+                                rayon::join(
+                                    || layer.k_proj.mul_vec_with_options(&normed, k_options),
+                                    || layer.v_proj.mul_vec_with_options(&normed, v_options),
+                                )
+                            },
+                        );
+                        (query?, key?, value?)
+                    }
+                } else {
+                    let query = profiled_layer_mul_vec(
+                        &layer.q_proj,
+                        &normed,
+                        layer_index,
+                        "q_proj",
+                        profile_events.as_deref_mut(),
+                        comparison_events.as_deref_mut(),
+                        q_options,
+                    )?;
+                    let key = profiled_layer_mul_vec(
+                        &layer.k_proj,
+                        &normed,
+                        layer_index,
+                        "k_proj",
+                        profile_events.as_deref_mut(),
+                        comparison_events.as_deref_mut(),
+                        k_options,
+                    )?;
+                    let value = profiled_layer_mul_vec(
+                        &layer.v_proj,
+                        &normed,
+                        layer_index,
+                        "v_proj",
+                        profile_events.as_deref_mut(),
+                        comparison_events.as_deref_mut(),
+                        v_options,
+                    )?;
+                    (query, key, value)
+                };
             add_optional_bias(&mut query, layer.q_bias.as_deref())?;
-            let mut key = profiled_layer_mul_vec(
-                &layer.k_proj,
-                &normed,
-                layer_index,
-                "k_proj",
-                profile_events.as_deref_mut(),
-                comparison_events.as_deref_mut(),
-                self.options
-                    .scoped_to_q8_k_activation_role(Q8KActivationMatvecRole::KProj),
-            )?;
             add_optional_bias(&mut key, layer.k_bias.as_deref())?;
-            let mut value = profiled_layer_mul_vec(
-                &layer.v_proj,
-                &normed,
-                layer_index,
-                "v_proj",
-                profile_events.as_deref_mut(),
-                comparison_events.as_deref_mut(),
-                self.options
-                    .scoped_to_q8_k_activation_role(Q8KActivationMatvecRole::VProj),
-            )?;
             add_optional_bias(&mut value, layer.v_bias.as_deref())?;
 
             query = self.model.apply_rope_to_heads(
@@ -330,30 +362,57 @@ impl<'a> ScalarLlamaSession<'a> {
 
             let ffn_normed =
                 rms_norm(&hidden, &layer.ffn_norm, self.model.config.rms_norm_epsilon)?;
-            let gate = profiled_layer_mul_vec(
-                &layer.ffn_gate,
-                &ffn_normed,
-                layer_index,
-                "ffn_gate",
-                profile_events.as_deref_mut(),
-                comparison_events.as_deref_mut(),
-                self.options
-                    .scoped_to_q8_k_activation_role(Q8KActivationMatvecRole::FfnGate),
-            )?;
-            let up = profiled_layer_mul_vec(
-                &layer.ffn_up,
-                &ffn_normed,
-                layer_index,
-                "ffn_up",
-                profile_events.as_deref_mut(),
-                comparison_events.as_deref_mut(),
-                self.options
-                    .scoped_to_q8_k_activation_role(Q8KActivationMatvecRole::FfnUp),
-            )?;
-            let activated = swiglu(&gate, &up)?;
+            let gate_options = self
+                .options
+                .scoped_to_q8_k_activation_role(Q8KActivationMatvecRole::FfnGate);
+            let up_options = self
+                .options
+                .scoped_to_q8_k_activation_role(Q8KActivationMatvecRole::FfnUp);
+            let (mut gate, up) = if profile_events.is_none() && comparison_events.is_none() {
+                let paired = layer.ffn_gate.mul_vec_pair_with_options(
+                    &layer.ffn_up,
+                    &ffn_normed,
+                    gate_options,
+                    up_options,
+                )?;
+                if let Some(pair) = paired {
+                    pair
+                } else {
+                    let (gate, up) = rayon::join(
+                        || {
+                            layer
+                                .ffn_gate
+                                .mul_vec_with_options(&ffn_normed, gate_options)
+                        },
+                        || layer.ffn_up.mul_vec_with_options(&ffn_normed, up_options),
+                    );
+                    (gate?, up?)
+                }
+            } else {
+                let gate = profiled_layer_mul_vec(
+                    &layer.ffn_gate,
+                    &ffn_normed,
+                    layer_index,
+                    "ffn_gate",
+                    profile_events.as_deref_mut(),
+                    comparison_events.as_deref_mut(),
+                    gate_options,
+                )?;
+                let up = profiled_layer_mul_vec(
+                    &layer.ffn_up,
+                    &ffn_normed,
+                    layer_index,
+                    "ffn_up",
+                    profile_events.as_deref_mut(),
+                    comparison_events.as_deref_mut(),
+                    up_options,
+                )?;
+                (gate, up)
+            };
+            swiglu_in_place(&mut gate, &up)?;
             let ffn_output = profiled_layer_mul_vec(
                 &layer.ffn_down,
-                &activated,
+                &gate,
                 layer_index,
                 "ffn_down",
                 profile_events.as_deref_mut(),
@@ -462,9 +521,18 @@ pub fn accept_token_ids_batch(
             .collect::<Result<Vec<_>, _>>()?;
         let normed_refs = normed.iter().map(Vec::as_slice).collect::<Vec<_>>();
 
-        let mut queries = layer.q_proj.mul_vec_batch(&normed_refs)?;
-        let mut keys = layer.k_proj.mul_vec_batch(&normed_refs)?;
-        let mut values = layer.v_proj.mul_vec_batch(&normed_refs)?;
+        let (queries, (keys, values)) = rayon::join(
+            || layer.q_proj.mul_vec_batch(&normed_refs),
+            || {
+                rayon::join(
+                    || layer.k_proj.mul_vec_batch(&normed_refs),
+                    || layer.v_proj.mul_vec_batch(&normed_refs),
+                )
+            },
+        );
+        let mut queries = queries?;
+        let mut keys = keys?;
+        let mut values = values?;
 
         let mut attention_outputs = Vec::with_capacity(batch);
         for (index, session) in sessions.iter_mut().enumerate() {
@@ -509,14 +577,16 @@ pub fn accept_token_ids_batch(
             .map(|values| rms_norm(values, &layer.ffn_norm, model.config.rms_norm_epsilon))
             .collect::<Result<Vec<_>, _>>()?;
         let ffn_refs = ffn_normed.iter().map(Vec::as_slice).collect::<Vec<_>>();
-        let gates = layer.ffn_gate.mul_vec_batch(&ffn_refs)?;
-        let ups = layer.ffn_up.mul_vec_batch(&ffn_refs)?;
-        let activated = gates
-            .iter()
-            .zip(ups.iter())
-            .map(|(gate, up)| swiglu(gate, up))
-            .collect::<Result<Vec<_>, _>>()?;
-        let activated_refs = activated.iter().map(Vec::as_slice).collect::<Vec<_>>();
+        let (gates, ups) = rayon::join(
+            || layer.ffn_gate.mul_vec_batch(&ffn_refs),
+            || layer.ffn_up.mul_vec_batch(&ffn_refs),
+        );
+        let mut gates = gates?;
+        let ups = ups?;
+        for (gate, up) in gates.iter_mut().zip(&ups) {
+            swiglu_in_place(gate, up)?;
+        }
+        let activated_refs = gates.iter().map(Vec::as_slice).collect::<Vec<_>>();
         let downs = layer.ffn_down.mul_vec_batch(&activated_refs)?;
         for (index, values) in downs.iter().enumerate() {
             add_assign(&mut hidden[index], values)?;

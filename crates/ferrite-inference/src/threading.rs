@@ -21,6 +21,20 @@ use std::num::NonZeroUsize;
 /// existing pool is kept and its size is returned.
 pub fn init_global_pool(explicit_threads: Option<usize>) -> usize {
     let threads = resolve_thread_count(explicit_threads);
+    build_global_pool(threads)
+}
+
+/// Builds a pool sized for bandwidth-bound integer matvecs. Explicit and
+/// environment overrides retain precedence; the automatic choice leaves a
+/// roughly one third of the widest CPU level idle once additional workers
+/// stop increasing memory throughput.
+pub fn init_memory_bound_global_pool(explicit_threads: Option<usize>) -> usize {
+    let threads = resolve_override_thread_count(explicit_threads)
+        .unwrap_or_else(recommended_memory_bound_thread_count);
+    build_global_pool(threads)
+}
+
+fn build_global_pool(threads: usize) -> usize {
     match rayon::ThreadPoolBuilder::new()
         .num_threads(threads)
         .build_global()
@@ -32,8 +46,12 @@ pub fn init_global_pool(explicit_threads: Option<usize>) -> usize {
 
 /// The thread count that `init_global_pool` would use.
 pub fn resolve_thread_count(explicit_threads: Option<usize>) -> usize {
+    resolve_override_thread_count(explicit_threads).unwrap_or_else(recommended_thread_count)
+}
+
+fn resolve_override_thread_count(explicit_threads: Option<usize>) -> Option<usize> {
     if let Some(threads) = explicit_threads.filter(|threads| *threads > 0) {
-        return threads;
+        return Some(threads);
     }
     for var in ["FERRITE_THREADS", "RAYON_NUM_THREADS"] {
         if let Some(threads) = env::var(var)
@@ -41,10 +59,10 @@ pub fn resolve_thread_count(explicit_threads: Option<usize>) -> usize {
             .and_then(|value| value.trim().parse::<usize>().ok())
             .filter(|threads| *threads > 0)
         {
-            return threads;
+            return Some(threads);
         }
     }
-    recommended_thread_count()
+    None
 }
 
 /// Largest homogeneous performance-level core count on macOS, or the
@@ -60,6 +78,15 @@ pub fn recommended_thread_count() -> usize {
         }
     }
     fallback
+}
+
+/// Conservative default for kernels that saturate memory bandwidth before
+/// occupying the full homogeneous CPU level.
+pub fn recommended_memory_bound_thread_count() -> usize {
+    recommended_thread_count()
+        .saturating_mul(2)
+        .div_ceil(3)
+        .max(1)
 }
 
 #[cfg(target_os = "macos")]
@@ -111,5 +138,13 @@ mod tests {
             .unwrap_or(1);
         assert!(recommended >= 1);
         assert!(recommended <= logical);
+    }
+
+    #[test]
+    fn memory_bound_thread_count_is_positive_and_bounded() {
+        let regular = recommended_thread_count();
+        let memory_bound = recommended_memory_bound_thread_count();
+        assert!(memory_bound >= 1);
+        assert!(memory_bound <= regular);
     }
 }

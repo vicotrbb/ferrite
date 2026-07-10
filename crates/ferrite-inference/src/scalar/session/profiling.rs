@@ -107,7 +107,10 @@ fn compare_q8_k_activation_matvec(
 fn is_q8_k_comparable(storage_kind: MatrixStorageKind) -> bool {
     matches!(
         storage_kind,
-        MatrixStorageKind::Q4K | MatrixStorageKind::Q6K
+        MatrixStorageKind::Q4K
+            | MatrixStorageKind::Q5_0
+            | MatrixStorageKind::Q6K
+            | MatrixStorageKind::Q8_0
     )
 }
 

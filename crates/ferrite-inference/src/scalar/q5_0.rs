@@ -54,6 +54,33 @@ pub(super) fn q5_0_mul_vec(
     Ok(q5_0_mul_vec_with_backend(bytes, rows, cols, vector)?.values)
 }
 
+/// Multiplies two same-shaped Q5_0 matrices by one activation vector while
+/// exposing both independent dot products to each worker. Per-matrix block
+/// order is unchanged, so results are bit-identical to two standalone calls.
+pub(super) fn q5_0_mul_vec_pair(
+    left: &[u8],
+    right: &[u8],
+    rows: usize,
+    cols: usize,
+    vector: &[f32],
+) -> Result<(Vec<f32>, Vec<f32>), InferenceError> {
+    validate_q5_0_mul_vec(left, rows, cols, vector)?;
+    validate_q5_0_mul_vec(right, rows, cols, vector)?;
+
+    #[cfg(target_arch = "aarch64")]
+    {
+        if std::arch::is_aarch64_feature_detected!("neon") {
+            return Ok(super::q5_0_neon::neon_q5_0_mul_vec_pair(
+                left, right, rows, cols, vector,
+            ));
+        }
+    }
+
+    let left = scalar_q5_0_mul_vec(left, rows, cols, vector)?.values;
+    let right = scalar_q5_0_mul_vec(right, rows, cols, vector)?.values;
+    Ok((left, right))
+}
+
 pub(super) fn q5_0_mul_vec_with_backend(
     bytes: &[u8],
     rows: usize,
@@ -212,4 +239,45 @@ pub(super) fn q5_0_signed_values(block: &[u8]) -> [i8; Q5_0_BLOCK_VALUES] {
     }
 
     values
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn paired_matvec_is_bit_identical_to_independent_calls() -> Result<(), InferenceError> {
+        let rows = 512;
+        let cols = 64;
+        let blocks = rows * cols / Q5_0_BLOCK_VALUES;
+        let left = patterned_matrix(blocks, 17);
+        let right = patterned_matrix(blocks, 93);
+        let vector = (0..cols)
+            .map(|index| ((index * 13 % 31) as f32 - 15.0) / 7.0)
+            .collect::<Vec<_>>();
+
+        let expected_left = q5_0_mul_vec(&left, rows, cols, &vector)?;
+        let expected_right = q5_0_mul_vec(&right, rows, cols, &vector)?;
+        let (actual_left, actual_right) = q5_0_mul_vec_pair(&left, &right, rows, cols, &vector)?;
+
+        assert_eq!(actual_left, expected_left);
+        assert_eq!(actual_right, expected_right);
+        Ok(())
+    }
+
+    fn patterned_matrix(blocks: usize, seed: usize) -> Vec<u8> {
+        let mut bytes = Vec::with_capacity(blocks * Q5_0_BLOCK_BYTES);
+        for block_index in 0..blocks {
+            bytes.extend_from_slice(&0x3c00u16.to_le_bytes());
+            let high_bits = (block_index.wrapping_mul(0x9e37_79b9) ^ seed) as u32;
+            bytes.extend_from_slice(&high_bits.to_le_bytes());
+            bytes.extend((0..16).map(|index| {
+                block_index
+                    .wrapping_mul(29)
+                    .wrapping_add(index * 11)
+                    .wrapping_add(seed) as u8
+            }));
+        }
+        bytes
+    }
 }

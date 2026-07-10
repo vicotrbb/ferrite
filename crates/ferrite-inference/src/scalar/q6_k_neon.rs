@@ -1,8 +1,7 @@
 #![allow(unsafe_code)]
 
 use super::{
-    float::f16_bits_to_f32,
-    neon_util::widen_s8_lanes,
+    neon_util::{native_f16_bits_to_f32, widen_s8_lanes},
     q6_k::{Q6KMatVecBackend, Q6KMatVecOutput, Q6_K_BLOCK_BYTES, Q6_K_BLOCK_VALUES},
     InferenceError,
 };
@@ -144,7 +143,8 @@ pub(super) unsafe fn neon_q6_k_block_dot(
     let low_bits = &block[0..128];
     let high_bits = &block[128..192];
     let scales = &block[192..208];
-    let super_scale = f16_bits_to_f32(u16::from_le_bytes([block[208], block[209]]));
+    let super_scale =
+        unsafe { native_f16_bits_to_f32(u16::from_le_bytes([block[208], block[209]])) };
     let mut lanes = vdupq_n_f32(0.0);
 
     // SAFETY: `block` was length-checked above, so every 16-byte load from

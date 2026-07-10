@@ -128,7 +128,7 @@ class RenderMarkdownTest(unittest.TestCase):
                  "ram_bytes": 16 << 30, "platform": "macOS", "python": "3.14",
                  "git_commit": "abc123", "git_branch": "main", "git_dirty": False,
                  "rustc_version": "rustc 1.x", "logical_cores": 8},
-            cfg=ev.EvalConfig("hi", 64, 64, 2000, 4, (2,)),
+            cfg=ev.EvalConfig("hi", 64, 64, 2000, 4, (2,), 4, True),
             model_results=[{
                 "model_path": "target/models/model.gguf",
                 "cli": {"status": "ok", "load_seconds": 1.0,
@@ -148,6 +148,12 @@ class RenderMarkdownTest(unittest.TestCase):
                 "server": {"status": "ok",
                            "streaming_time_to_first_token_ms": "450",
                            "streaming_tokens_per_second": "11.5"},
+                "batched_server": {
+                    "status": "ok",
+                    "concurrency": 4,
+                    "aggregate_completion_tokens_per_second": 120.0,
+                    "token_ids_match_default": True,
+                },
             }],
             tag="unit-test",
         )
@@ -159,7 +165,21 @@ class RenderMarkdownTest(unittest.TestCase):
         self.assertIn("| inference threads | 8 |", markdown)
         self.assertIn("| 2 | 100.0 | 50.0 | 20.00 ms | True |", markdown)
         self.assertIn("| TTFT | 450 ms |", markdown)
+        self.assertIn("| Continuous-batched server metric | value |", markdown)
+        self.assertIn("| aggregate completion tok/s | 120.0 |", markdown)
+        self.assertIn("| token IDs match default | True |", markdown)
         self.assertIn("tag: unit-test", markdown)
+
+
+class CliExecutionFlagsTest(unittest.TestCase):
+    def test_residual_activation_flag_is_explicit(self):
+        enabled = ev.EvalConfig("hi", 64, 64, 2000, 4, (), None, True)
+        disabled = enabled._replace(experimental_residual_q8_activation_matvec=False)
+        self.assertEqual(
+            ev.cli_execution_flags(enabled),
+            ["--experimental-residual-q8-activation-matvec"],
+        )
+        self.assertEqual(ev.cli_execution_flags(disabled), [])
 
 
 if __name__ == "__main__":

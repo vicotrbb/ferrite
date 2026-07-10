@@ -1,5 +1,5 @@
 use crate::limits::TokenLimits;
-use crate::runtime::InferenceEngine;
+use crate::runtime::{BatchScheduler, InferenceEngine, RuntimeError};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
@@ -11,6 +11,8 @@ pub struct ServerState {
     model_id: String,
     engine: Option<Arc<InferenceEngine>>,
     inference_permits: Arc<Semaphore>,
+    batch_scheduler: Option<Arc<BatchScheduler>>,
+    batch_admission_permits: Option<Arc<Semaphore>>,
     inference_wait_timeout: Duration,
     api_key: Option<Arc<str>>,
     token_limits: TokenLimits,
@@ -23,6 +25,8 @@ impl ServerState {
             model_id,
             engine: None,
             inference_permits: Arc::new(Semaphore::new(INFERENCE_PERMITS)),
+            batch_scheduler: None,
+            batch_admission_permits: None,
             inference_wait_timeout: Duration::ZERO,
             api_key: None,
             token_limits: TokenLimits::default(),
@@ -35,6 +39,8 @@ impl ServerState {
             model_id,
             engine: Some(Arc::new(engine)),
             inference_permits: Arc::new(Semaphore::new(INFERENCE_PERMITS)),
+            batch_scheduler: None,
+            batch_admission_permits: None,
             inference_wait_timeout: Duration::ZERO,
             api_key: None,
             token_limits: TokenLimits::default(),
@@ -69,6 +75,25 @@ impl ServerState {
         self
     }
 
+    /// Enables scheduler-owned continuous batching for eligible streaming
+    /// requests. This is deliberately separate from the default inference
+    /// semaphore so enabling the experiment cannot change the legacy path.
+    pub fn with_batched_decode(mut self, max_batch_streams: usize) -> Result<Self, RuntimeError> {
+        let engine = self
+            .engine
+            .clone()
+            .ok_or_else(|| RuntimeError::new("batched decode requires a loaded model"))?;
+        if !engine.batch_decode_compatible() {
+            return Err(RuntimeError::new(
+                "batched decode requires the default activation matvec policy",
+            ));
+        }
+        let max_batch_streams = max_batch_streams.max(1);
+        self.batch_scheduler = Some(Arc::new(BatchScheduler::start(engine, max_batch_streams)?));
+        self.batch_admission_permits = Some(Arc::new(Semaphore::new(max_batch_streams)));
+        Ok(self)
+    }
+
     pub fn model_id(&self) -> &str {
         &self.model_id
     }
@@ -93,6 +118,10 @@ impl ServerState {
         self.prefix_cache_enabled
     }
 
+    pub fn batch_scheduler(&self) -> Option<Arc<BatchScheduler>> {
+        self.batch_scheduler.clone()
+    }
+
     pub fn try_acquire_inference_permit(&self) -> Option<OwnedSemaphorePermit> {
         self.inference_permits.clone().try_acquire_owned().ok()
     }
@@ -109,6 +138,26 @@ impl ServerState {
         .await
         .ok()
         .and_then(Result::ok)
+    }
+
+    pub fn try_acquire_batch_admission_permit(&self) -> Option<OwnedSemaphorePermit> {
+        self.batch_admission_permits
+            .as_ref()?
+            .clone()
+            .try_acquire_owned()
+            .ok()
+    }
+
+    pub async fn acquire_batch_admission_permit(&self) -> Option<OwnedSemaphorePermit> {
+        let permits = self.batch_admission_permits.as_ref()?.clone();
+        if self.inference_wait_timeout == Duration::ZERO {
+            return permits.try_acquire_owned().ok();
+        }
+
+        tokio::time::timeout(self.inference_wait_timeout, permits.acquire_owned())
+            .await
+            .ok()
+            .and_then(Result::ok)
     }
 }
 

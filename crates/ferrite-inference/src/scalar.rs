@@ -23,11 +23,17 @@ mod q4_k_q8_k;
 #[cfg(target_arch = "aarch64")]
 #[allow(dead_code)]
 mod q4_k_q8_k_neon;
+#[cfg(target_arch = "aarch64")]
+mod q4_k_q8_residual_i8mm;
+#[cfg(target_arch = "aarch64")]
+mod q4_k_q8_residual_neon;
 mod q5_0;
 #[cfg(target_arch = "x86_64")]
 mod q5_0_avx2;
 #[cfg(target_arch = "aarch64")]
 mod q5_0_neon;
+#[cfg(target_arch = "aarch64")]
+mod q5_0_q8_residual_neon;
 mod q6_k;
 #[cfg(target_arch = "x86_64")]
 mod q6_k_avx2;
@@ -38,15 +44,21 @@ mod q6_k_q8_k;
 #[cfg(target_arch = "aarch64")]
 #[allow(dead_code)]
 mod q6_k_q8_k_neon;
+#[cfg(target_arch = "aarch64")]
+mod q6_k_q8_residual_i8mm;
 mod q8_0;
 #[cfg(target_arch = "x86_64")]
 mod q8_0_avx2;
 #[cfg(target_arch = "aarch64")]
 mod q8_0_neon;
+#[cfg(target_arch = "aarch64")]
+mod q8_0_q8_residual_i8mm;
 #[allow(dead_code)]
 mod q8_k;
 #[cfg(test)]
 mod q8_k_reference_tests;
+#[cfg(target_arch = "aarch64")]
+mod q8_residual_activation;
 mod quantized;
 #[cfg(test)]
 mod quantized_tests;

@@ -38,6 +38,37 @@ fn cli_enables_experimental_q8_k_activation_matvec() -> Result<(), Box<dyn Error
 }
 
 #[test]
+fn cli_enables_experimental_residual_q8_activation_matvec() -> Result<(), Box<dyn Error>> {
+    let model_path = write_q4_k_fixture_model()?;
+    let binary = cli_binary()?;
+
+    let output = Command::new(binary)
+        .arg("--model")
+        .arg(&model_path)
+        .arg("--prompt-token-ids")
+        .arg("0")
+        .arg("--expect-token-id")
+        .arg("1")
+        .arg("--experimental-residual-q8-activation-matvec")
+        .output()?;
+
+    remove_fixture_model(&model_path)?;
+
+    assert!(
+        output.status.success(),
+        "cli failed with stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout)?;
+    assert!(stdout.contains("experimental_q8_k_activation_matvec=false"));
+    assert!(stdout.contains("experimental_residual_q8_activation_matvec=true"));
+    assert!(stdout.contains("q8_k_activation_matvec_policy=experimental_residual_i8mm"));
+    assert!(stdout.contains("next_token_id=1"));
+    assert!(stdout.contains("match=true"));
+    Ok(())
+}
+
+#[test]
 fn cli_compares_q8_k_activation_matvec_without_changing_execution_policy(
 ) -> Result<(), Box<dyn Error>> {
     let model_path = write_q4_k_fixture_model()?;
@@ -191,7 +222,7 @@ fn cli_rejects_q8_k_role_scope_without_comparison_or_experimental_dispatch(
     assert!(!output.status.success());
     let stderr = String::from_utf8(output.stderr)?;
     assert!(stderr.contains(
-        "use --experimental-q8-k-activation-roles with --experimental-q8-k-activation-matvec or --compare-q8-k-activation-matvec"
+        "use --experimental-q8-k-activation-roles with an experimental activation-matvec policy or --compare-q8-k-activation-matvec"
     ));
     Ok(())
 }

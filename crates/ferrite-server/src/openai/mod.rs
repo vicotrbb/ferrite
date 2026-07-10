@@ -57,7 +57,7 @@ mod routes_tests;
 mod seed_tests;
 #[cfg(test)]
 mod service_tier_tests;
-mod stop_filter;
+pub(crate) mod stop_filter;
 #[cfg(test)]
 mod stop_sequences_tests;
 mod stream_lifecycle;

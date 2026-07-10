@@ -16,7 +16,16 @@ use std::time::{Duration, Instant};
 
 pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error>> {
     let args = args::parse(args)?;
-    let inference_threads = ferrite_inference::threading::init_global_pool(args.threads);
+    #[cfg(target_arch = "aarch64")]
+    let use_memory_bound_pool = args.experimental_residual_q8_activation_matvec
+        && std::arch::is_aarch64_feature_detected!("i8mm");
+    #[cfg(not(target_arch = "aarch64"))]
+    let use_memory_bound_pool = false;
+    let inference_threads = if use_memory_bound_pool {
+        ferrite_inference::threading::init_memory_bound_global_pool(args.threads)
+    } else {
+        ferrite_inference::threading::init_global_pool(args.threads)
+    };
     println!("inference_threads={inference_threads}");
     let bytes = fs::read(&args.model_path)?;
     let model_file_bytes = bytes.len();
@@ -47,7 +56,9 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
     }
 
     let prompt_token_ids = prompt_token_ids(&tokenizer, args.prompt)?;
-    let q8_k_activation_matvec_policy = if args.experimental_q8_k_activation_matvec {
+    let q8_k_activation_matvec_policy = if args.experimental_residual_q8_activation_matvec {
+        Q8KActivationMatvecPolicy::ExperimentalResidualI8mm
+    } else if args.experimental_q8_k_activation_matvec {
         Q8KActivationMatvecPolicy::ExperimentalParityScoped
     } else {
         Q8KActivationMatvecPolicy::DefaultOnly
@@ -93,6 +104,10 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
     println!(
         "experimental_q8_k_activation_matvec={}",
         args.experimental_q8_k_activation_matvec
+    );
+    println!(
+        "experimental_residual_q8_activation_matvec={}",
+        args.experimental_residual_q8_activation_matvec
     );
     println!(
         "compare_q8_k_activation_matvec={}",

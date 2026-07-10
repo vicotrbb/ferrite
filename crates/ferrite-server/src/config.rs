@@ -15,6 +15,9 @@ pub struct ServerConfig {
     token_limits: TokenLimits,
     inference_wait_timeout: Duration,
     experimental_prefix_cache_enabled: bool,
+    experimental_residual_q8_activation_matvec: bool,
+    experimental_batched_decode_enabled: bool,
+    max_batch_streams: Option<usize>,
     inference_threads: Option<usize>,
     max_concurrent_inferences: usize,
 }
@@ -70,6 +73,24 @@ impl ServerConfig {
                 "--experimental-prefix-cache" => {
                     config.experimental_prefix_cache_enabled = true;
                 }
+                "--experimental-residual-q8-activation-matvec" => {
+                    config.experimental_residual_q8_activation_matvec = true;
+                }
+                "--experimental-batched-decode" => {
+                    config.experimental_batched_decode_enabled = true;
+                }
+                "--max-batch-streams" => {
+                    let value = os_string_to_string(next_value(&mut iter, "--max-batch-streams")?)?;
+                    let streams = value.parse::<usize>().map_err(|error| {
+                        ConfigError::new(format!("invalid --max-batch-streams: {error}"))
+                    })?;
+                    if streams == 0 {
+                        return Err(ConfigError::new(
+                            "--max-batch-streams must be greater than zero",
+                        ));
+                    }
+                    config.max_batch_streams = Some(streams);
+                }
                 "--threads" => {
                     let value = os_string_to_string(next_value(&mut iter, "--threads")?)?;
                     let threads = value
@@ -107,6 +128,29 @@ impl ServerConfig {
 
         config.token_limits = TokenLimits::new(default_max_tokens, hard_max_tokens)
             .map_err(|error| ConfigError::new(error.to_string()))?;
+        match (
+            config.experimental_batched_decode_enabled,
+            config.max_batch_streams,
+        ) {
+            (true, None) => {
+                return Err(ConfigError::new(
+                    "--experimental-batched-decode requires --max-batch-streams N",
+                ));
+            }
+            (false, Some(_)) => {
+                return Err(ConfigError::new(
+                    "--max-batch-streams requires --experimental-batched-decode",
+                ));
+            }
+            _ => {}
+        }
+        if config.experimental_residual_q8_activation_matvec
+            && config.experimental_batched_decode_enabled
+        {
+            return Err(ConfigError::new(
+                "--experimental-residual-q8-activation-matvec cannot be combined with --experimental-batched-decode",
+            ));
+        }
         Ok(config)
     }
 
@@ -138,6 +182,16 @@ impl ServerConfig {
         self.experimental_prefix_cache_enabled
     }
 
+    pub fn experimental_residual_q8_activation_matvec(&self) -> bool {
+        self.experimental_residual_q8_activation_matvec
+    }
+
+    pub fn experimental_batched_decode_max_streams(&self) -> Option<usize> {
+        self.experimental_batched_decode_enabled
+            .then_some(self.max_batch_streams)
+            .flatten()
+    }
+
     pub fn inference_threads(&self) -> Option<usize> {
         self.inference_threads
     }
@@ -157,6 +211,9 @@ impl Default for ServerConfig {
             token_limits: TokenLimits::default(),
             inference_wait_timeout: Duration::ZERO,
             experimental_prefix_cache_enabled: false,
+            experimental_residual_q8_activation_matvec: false,
+            experimental_batched_decode_enabled: false,
+            max_batch_streams: None,
             inference_threads: None,
             max_concurrent_inferences: 1,
         }
@@ -211,7 +268,7 @@ fn parse_millis(value: OsString, flag: &str) -> Result<u64, ConfigError> {
 }
 
 fn usage() -> &'static str {
-    "usage: ferrite-server [--bind 127.0.0.1:8080] [--model-id ferrite-local] [--model path/to/model.gguf] [--api-key local-secret] [--default-max-tokens 16] [--hard-max-tokens 256] [--inference-wait-ms 0] [--experimental-prefix-cache] [--threads N] [--max-concurrent-inferences 1]"
+    "usage: ferrite-server [--bind 127.0.0.1:8080] [--model-id ferrite-local] [--model path/to/model.gguf] [--api-key local-secret] [--default-max-tokens 16] [--hard-max-tokens 256] [--inference-wait-ms 0] [--experimental-prefix-cache] [--experimental-residual-q8-activation-matvec] [--experimental-batched-decode --max-batch-streams N] [--threads N] [--max-concurrent-inferences 1]"
 }
 
 #[cfg(test)]
@@ -302,6 +359,78 @@ mod tests {
         ])?;
 
         assert!(config.experimental_prefix_cache_enabled());
+        Ok(())
+    }
+
+    #[test]
+    fn parses_experimental_activation_matvec_flag() -> Result<(), Box<dyn Error>> {
+        let config = ServerConfig::parse([
+            OsString::from("ferrite-server"),
+            OsString::from("--experimental-residual-q8-activation-matvec"),
+        ])?;
+
+        assert!(config.experimental_residual_q8_activation_matvec());
+        Ok(())
+    }
+
+    #[test]
+    fn parses_experimental_batched_decode_flags() -> Result<(), Box<dyn Error>> {
+        let config = ServerConfig::parse([
+            OsString::from("ferrite-server"),
+            OsString::from("--experimental-batched-decode"),
+            OsString::from("--max-batch-streams"),
+            OsString::from("8"),
+        ])?;
+
+        assert_eq!(config.experimental_batched_decode_max_streams(), Some(8));
+        Ok(())
+    }
+
+    #[test]
+    fn batched_decode_requires_both_opt_in_flags() -> Result<(), Box<dyn Error>> {
+        let missing_limit = match ServerConfig::parse([
+            OsString::from("ferrite-server"),
+            OsString::from("--experimental-batched-decode"),
+        ]) {
+            Ok(_) => return Err("missing batch limit should be rejected".into()),
+            Err(error) => error,
+        };
+        assert_eq!(
+            missing_limit.to_string(),
+            "--experimental-batched-decode requires --max-batch-streams N"
+        );
+
+        let missing_opt_in = match ServerConfig::parse([
+            OsString::from("ferrite-server"),
+            OsString::from("--max-batch-streams"),
+            OsString::from("8"),
+        ]) {
+            Ok(_) => return Err("missing experimental opt-in should be rejected".into()),
+            Err(error) => error,
+        };
+        assert_eq!(
+            missing_opt_in.to_string(),
+            "--max-batch-streams requires --experimental-batched-decode"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn activation_matvec_rejects_batched_decode_combination() -> Result<(), Box<dyn Error>> {
+        let error = match ServerConfig::parse([
+            OsString::from("ferrite-server"),
+            OsString::from("--experimental-residual-q8-activation-matvec"),
+            OsString::from("--experimental-batched-decode"),
+            OsString::from("--max-batch-streams"),
+            OsString::from("4"),
+        ]) {
+            Ok(_) => return Err("incompatible experimental modes should be rejected".into()),
+            Err(error) => error,
+        };
+        assert_eq!(
+            error.to_string(),
+            "--experimental-residual-q8-activation-matvec cannot be combined with --experimental-batched-decode"
+        );
         Ok(())
     }
 

@@ -1,8 +1,18 @@
 # Implementation plan: continuous batching in ferrite-server (ADR 0011 phase 2, server half)
 
-Status: planned (engine half is implemented and committed:
+Status: v1 implemented behind explicit opt-in (engine half is implemented:
 `scalar::accept_token_ids_batch`, `Matrix::mul_vec_batch`,
 `Matrix::argmax_mul_vec_batch`, CLI `--benchmark-batch-streams`).
+
+Accepted evidence is recorded in the `2026-07-09-235740` eval: exact engine
+batches reach 102.58 / 128.14 / 149.29 aggregate tok/s at 2 / 4 / 8 streams;
+continuous HTTP batch 4 reaches 87.46 aggregate tok/s with token-ID parity.
+
+The server implementation lives in `runtime/scheduler.rs`. Streaming requests
+use it only when both `--experimental-batched-decode` and
+`--max-batch-streams N` are present and prefix-cache/trace behavior is not
+requested. Non-streaming and default streaming requests keep the original
+path. See `documentation/dev-notes/2026-07-09-continuous-batching-server-v1.md`.
 
 ## Goal
 
