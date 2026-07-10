@@ -11,13 +11,15 @@ Every final `vX.Y.Z` tag is expected to produce:
 - `SHA256SUMS`, SPDX SBOMs, and GitHub build attestations for those archives;
 - a non-root multi-architecture `ghcr.io/vicotrbb/ferrite` server image with
   OCI provenance and SBOM attestations;
-- `ferrite-model` followed by `ferrite-inference` on crates.io;
+- `ferrite-fixtures`, `ferrite-model`, and `ferrite-inference` on crates.io;
 - immutable GitHub Release assets and notes extracted from `CHANGELOG.md`.
 
 The `ferrite` and `ferrite-cli` crates.io names are owned by unrelated projects.
 Native archives are therefore the supported installation route for Ferrite's
-command-line binaries. The published Rust surface is limited to the two library
-crates above.
+command-line binaries. The published Rust surface is limited to the two runtime
+library crates above. `ferrite-fixtures` is published only so
+`ferrite-inference` can verify its source-distributed integration tests; it is
+not a supported production API.
 
 ## 1. Prepare a release commit
 
@@ -41,6 +43,7 @@ tag is created.
 Run every command in [evaluation and regression gates](evaluation.md). Also run:
 
 ```sh
+cargo package -p ferrite-fixtures --locked
 cargo package -p ferrite-model --locked
 cargo package -p ferrite-inference --locked --list
 python3 scripts/release_tools_test.py
@@ -49,6 +52,7 @@ python3 scripts/release_tools_test.py
 For a release after the initial library publication, also run:
 
 ```sh
+cargo semver-checks check-release -p ferrite-fixtures
 cargo semver-checks check-release -p ferrite-model
 cargo semver-checks check-release -p ferrite-inference
 ```
@@ -59,8 +63,9 @@ workflow runs them automatically for later library versions.
 
 Inspect package contents with `cargo package --list`. No model, generated cache,
 private plan, or unrelated benchmark asset may enter a crate archive.
-Run a full `cargo package -p ferrite-inference --locked` once its exact
-`ferrite-model` dependency version is available from the registry.
+Run a full `cargo package -p ferrite-inference --locked` once the exact
+`ferrite-fixtures` and `ferrite-model` dependency versions are available from
+the registry.
 
 Performance-affecting releases also require a clean `scripts/eval.sh` artifact
 with the model hash, token trace, build flags, machine, and regression analysis.
@@ -80,9 +85,10 @@ library crates, attaches checksums and SBOMs to a draft release, generates
 attestations, then publishes the immutable GitHub Release. It is the only
 supported publication path after the initial crates.io bootstrap.
 
-The first publication of each crates.io package must be performed manually from
-the exact release commit. Configure crates.io trusted publishing immediately
-afterward for repository `vicotrbb/ferrite`, workflow
+The first publication of all three crates.io packages must be performed manually
+from the exact release commit, in fixture, model, then inference order. Configure
+crates.io trusted publishing immediately afterward for each package, using
+repository `vicotrbb/ferrite`, workflow
 `.github/workflows/release.yml`, and environment `release`. Subsequent tags use
 short-lived OIDC credentials and do not require a stored registry token.
 

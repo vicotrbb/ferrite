@@ -19,7 +19,7 @@ PACKAGE_MANIFESTS = {
     "ferrite-model": ROOT / "crates/ferrite-model/Cargo.toml",
     "ferrite-server": ROOT / "crates/ferrite-server/Cargo.toml",
 }
-PUBLISHED_PACKAGES = {"ferrite-model", "ferrite-inference"}
+PUBLISHED_PACKAGES = {"ferrite-fixtures", "ferrite-model", "ferrite-inference"}
 SEMVER = re.compile(r"(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)$")
 
 

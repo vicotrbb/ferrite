@@ -46,6 +46,7 @@ jobs:
           printf 'revision=%s\n' "$revision" >> "$GITHUB_OUTPUT"
       - name: Package public crates
         run: |
+          cargo package -p ferrite-fixtures --locked
           cargo package -p ferrite-model --locked
           cargo package -p ferrite-inference --locked --list
 
@@ -232,42 +233,45 @@ jobs:
         run: |
           set -euo pipefail
           version="${{ needs.preflight.outputs.version }}"
-          model="https://crates.io/api/v1/crates/ferrite-model/${version}"
-          inference="https://crates.io/api/v1/crates/ferrite-inference/${version}"
-          model_package="https://crates.io/api/v1/crates/ferrite-model"
-          inference_package="https://crates.io/api/v1/crates/ferrite-inference"
+          packages=(ferrite-fixtures ferrite-model ferrite-inference)
           user_agent="ferrite-release/${version} (+https://github.com/vicotrbb/ferrite)"
-          model_status=$(curl --silent --output /dev/null --write-out '%{http_code}' --user-agent "$user_agent" "$model")
-          inference_status=$(curl --silent --output /dev/null --write-out '%{http_code}' --user-agent "$user_agent" "$inference")
-          case "$model_status" in
-            200) model_state=present ;;
-            404) model_state=absent ;;
-            *) printf 'unexpected ferrite-model registry response: %s\n' "$model_status" >&2; exit 1 ;;
-          esac
-          case "$inference_status" in
-            200) inference_state=present ;;
-            404) inference_state=absent ;;
-            *) printf 'unexpected ferrite-inference registry response: %s\n' "$inference_status" >&2; exit 1 ;;
-          esac
-          if [ "$model_state" != "$inference_state" ]; then
-            printf 'release version has a partial crates.io publication\n' >&2
+          version_state=""
+          package_history=""
+          for package in "${packages[@]}"; do
+            version_url="https://crates.io/api/v1/crates/${package}/${version}"
+            package_url="https://crates.io/api/v1/crates/${package}"
+            version_status=$(curl --silent --output /dev/null --write-out '%{http_code}' --user-agent "$user_agent" "$version_url")
+            package_status=$(curl --silent --output /dev/null --write-out '%{http_code}' --user-agent "$user_agent" "$package_url")
+            case "$version_status" in
+              200) state=present ;;
+              404) state=absent ;;
+              *) printf 'unexpected %s version registry response: %s\n' "$package" "$version_status" >&2; exit 1 ;;
+            esac
+            case "$package_status" in
+              200) history=present ;;
+              404) history=absent ;;
+              *) printf 'unexpected %s package registry response: %s\n' "$package" "$package_status" >&2; exit 1 ;;
+            esac
+            if [ -n "$version_state" ] && [ "$state" != "$version_state" ]; then
+              printf 'release version has a partial crates.io publication\n' >&2
+              exit 1
+            fi
+            if [ -n "$package_history" ] && [ "$history" != "$package_history" ]; then
+              printf 'library crates have inconsistent crates.io history\n' >&2
+              exit 1
+            fi
+            version_state="$state"
+            package_history="$history"
+          done
+          if [ "$version_state" = absent ] && [ "$package_history" = absent ]; then
+            printf 'initial crates.io publication must be bootstrapped manually before tagging\n' >&2
             exit 1
           fi
-          model_package_status=$(curl --silent --output /dev/null --write-out '%{http_code}' --user-agent "$user_agent" "$model_package")
-          inference_package_status=$(curl --silent --output /dev/null --write-out '%{http_code}' --user-agent "$user_agent" "$inference_package")
-          if [ "$model_package_status" != "$inference_package_status" ]; then
-            printf 'library crates have inconsistent crates.io history\n' >&2
-            exit 1
-          fi
-          case "$model_package_status" in
-            200) initial=false ;;
-            404) initial=true ;;
-            *) printf 'unexpected library registry response: %s\n' "$model_package_status" >&2; exit 1 ;;
-          esac
-          printf 'publish=%s\n' "$([ "$model_state" = absent ] && printf true || printf false)" >> "$GITHUB_OUTPUT"
-          printf 'initial=%s\n' "$initial" >> "$GITHUB_OUTPUT"
+          printf 'publish=%s\n' "$([ "$version_state" = absent ] && printf true || printf false)" >> "$GITHUB_OUTPUT"
+          printf 'initial=%s\n' "$([ "$package_history" = absent ] && printf true || printf false)" >> "$GITHUB_OUTPUT"
       - name: Verify library packages
         run: |
+          cargo package -p ferrite-fixtures --locked
           cargo package -p ferrite-model --locked
           cargo package -p ferrite-inference --locked --list
       - name: Install semantic-version checker
@@ -276,6 +280,7 @@ jobs:
       - name: Check public library API compatibility
         if: steps.registry.outputs.publish == 'true' && steps.registry.outputs.initial == 'false'
         run: |
+          cargo semver-checks check-release -p ferrite-fixtures --all-features
           cargo semver-checks check-release -p ferrite-model --all-features
           cargo semver-checks check-release -p ferrite-inference --all-features
       - name: Authenticate with crates.io trusted publishing
@@ -291,22 +296,25 @@ jobs:
           set -euo pipefail
           version="${{ needs.preflight.outputs.version }}"
           user_agent="ferrite-release/${version} (+https://github.com/vicotrbb/ferrite)"
-          cargo publish -p ferrite-model --locked
-          for attempt in $(seq 1 30); do
-            status=$(curl --silent --output /dev/null --write-out '%{http_code}' --user-agent "$user_agent" "https://crates.io/api/v1/crates/ferrite-model/${version}")
-            if [ "$status" = 200 ]; then
-              break
-            fi
-            if [ "$status" != 404 ]; then
-              printf 'unexpected ferrite-model registry response: %s\n' "$status" >&2
-              exit 1
-            fi
-            if [ "$attempt" -eq 30 ]; then
-              printf 'ferrite-model %s did not appear in crates.io in time\n' "$version" >&2
-              exit 1
-            fi
-            sleep 10
+          for package in ferrite-fixtures ferrite-model; do
+            cargo publish -p "$package" --locked
+            for attempt in $(seq 1 30); do
+              http_status=$(curl --silent --output /dev/null --write-out '%{http_code}' --user-agent "$user_agent" "https://crates.io/api/v1/crates/${package}/${version}")
+              if [ "$http_status" = 200 ]; then
+                break
+              fi
+              if [ "$http_status" != 404 ]; then
+                printf 'unexpected %s registry response: %s\n' "$package" "$http_status" >&2
+                exit 1
+              fi
+              if [ "$attempt" -eq 30 ]; then
+                printf '%s %s did not appear in crates.io in time\n' "$package" "$version" >&2
+                exit 1
+              fi
+              sleep 10
+            done
           done
+          cargo package -p ferrite-inference --locked
           cargo publish -p ferrite-inference --locked
 
   github-release:

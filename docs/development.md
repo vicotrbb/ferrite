@@ -61,6 +61,8 @@ When adding a dependency:
 The publishable library crates use this release order:
 
 ```sh
+cargo package -p ferrite-fixtures --locked
+cargo publish -p ferrite-fixtures --locked
 cargo package -p ferrite-model --locked
 cargo publish -p ferrite-model --locked
 cargo package -p ferrite-inference --locked
@@ -69,8 +71,9 @@ cargo publish -p ferrite-inference --locked
 
 Cargo verifies registry dependencies while preparing a package. Therefore,
 `ferrite-inference` cannot complete `cargo package` until the exact
-`ferrite-model` version in its manifest is available from crates.io. Before the
-first model-crate release, validate the inference archive file set with:
+`ferrite-fixtures` and `ferrite-model` versions in its manifest are available
+from crates.io. Before the first library release, validate the inference archive
+file set with:
 
 ```sh
 cargo package -p ferrite-inference --locked --list
