@@ -92,11 +92,12 @@ pub use profile::{ProfiledNextToken, ProfiledTokenId, ScalarMatVecComparison, Sc
 use rope::apply_rope_with_layout;
 pub use rope::{apply_rope, RopeLayout};
 pub use session::{
-    accept_token_ids_batch, PromptEvaluationControl, PromptEvaluationLocation, ScalarLlamaSession,
-    ScalarLlamaSessionSnapshot,
+    accept_token_contexts_batch, accept_token_ids_batch, PromptEvaluationControl,
+    PromptEvaluationLocation, ScalarLlamaSession, ScalarLlamaSessionSnapshot,
 };
 
 use ferrite_model::gguf::{GgufError, GgufFile};
+use ferrite_model::model_file::MappedModelFile;
 use ferrite_model::tokenizer::GgufTokenizer;
 use math::ensure_len;
 use std::fmt;
@@ -230,9 +231,17 @@ impl ScalarLlamaModel {
         ScalarLlamaSession::new_with_options(self, options)
     }
 
-    /// Returns the byte count of model weights owned by the scalar runtime.
+    /// Returns the byte count of physical model tensor storage.
+    ///
+    /// Shared mapped tensors are counted by their tensor ranges, not by the
+    /// complete mapped file size.
     pub fn scalar_weight_bytes(&self) -> u128 {
         memory::weights_bytes(&self.weights)
+    }
+
+    /// Returns the size of the shared GGUF mapping retained by quantized weights.
+    pub fn mapped_model_file_bytes(&self) -> usize {
+        memory::mapped_file_bytes(&self.weights)
     }
 
     /// Tokenizes a text prompt and returns the next token.
@@ -286,6 +295,24 @@ impl ScalarLlamaModel {
     /// storage encoding, byte ranges, or numeric validation fails.
     pub fn from_gguf_scalar(file: &GgufFile, bytes: &[u8]) -> Result<Self, InferenceError> {
         let (config, weights) = loader::load_scalar(file, bytes)?;
+        Self::new(config, weights)
+    }
+
+    /// Loads supported scalar and quantized weights from a mapped GGUF file.
+    ///
+    /// Quantized matrices retain shared read-only ranges of `mapped` instead
+    /// of copying their bytes into separate heap allocations. Dense tensors
+    /// are still decoded into owned F32 storage.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when model configuration, tensor presence, shape,
+    /// storage encoding, byte ranges, or numeric validation fails.
+    pub fn from_gguf_mapped(
+        file: &GgufFile,
+        mapped: &MappedModelFile,
+    ) -> Result<Self, InferenceError> {
+        let (config, weights) = loader::load_scalar_mapped(file, mapped)?;
         Self::new(config, weights)
     }
 

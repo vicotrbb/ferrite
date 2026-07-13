@@ -6,9 +6,9 @@ tools, and fixtures into small workspace crates.
 ## Request and inference flow
 
 ```text
-GGUF bytes
-  -> ferrite-model parses metadata, tensors, and tokenizer
-  -> ferrite-inference validates model shape and retains weights
+read-only GGUF mapping
+  -> ferrite-model parses metadata, tensor ranges, and tokenizer
+  -> ferrite-inference validates model shape and retains zero-copy quantized ranges
   -> ScalarLlamaSession owns KV state and evaluates prompt tokens
   -> architecture dispatch selects portable, AVX2, NEON, or I8MM kernels
   -> greedy argmax selects the next token
@@ -20,7 +20,8 @@ GGUF bytes
 ### `ferrite-model`
 
 Owns bounded GGUF parsing, architecture-aware configuration, tensor metadata,
-and tokenization. It does not execute model math.
+tokenization, and the shared read-only model-file mapping. It does not execute
+model math.
 
 ### `ferrite-inference`
 
@@ -30,6 +31,8 @@ prefix-cache identities, snapshots, and optional Locus KV storage.
 
 The default session is single-owner and keeps mutable KV state out of shared
 global structures. Model weights are immutable and can be shared by sessions.
+Quantized matrices retain validated ranges of one shared GGUF mapping; dense
+tensors are decoded into owned F32 storage.
 
 ### `ferrite-server`
 
@@ -52,9 +55,11 @@ depending on committed binary assets or network downloads.
 
 Portable implementations define correctness. Optimized modules are selected by
 compile-time architecture and runtime feature detection. Unsafe code is limited
-to architecture-specific modules, each allowance has a reason, every unsafe
-block documents its preconditions, and safe wrappers validate shapes and CPU
-features before entry.
+to architecture-specific kernels and the read-only file-mapping boundary. Each
+allowance has a reason, every unsafe block documents its preconditions, and
+safe kernel wrappers validate shapes and CPU features before entry. Mapping a
+file requires the application boundary to guarantee that the artifact is not
+modified or truncated while retained ranges are live.
 
 Optimized kernels must preserve the required accumulation order or pass an
 explicit numerical and token-parity gate. An optimization is not accepted from
@@ -65,7 +70,12 @@ inspection alone.
 The normal server path admits generation through a semaphore and runs a model
 session to completion or cancellation. Experimental continuous batching owns a
 scheduler that advances several streaming sessions together so matrix weights
-can be reused within each decode step.
+can be reused within each decode step. Concurrent arrivals are coalesced for a
+bounded five-millisecond admission window and their non-final prompt tokens are
+prefilled through the same weight-sharing batch kernels. Exact duplicate
+prompts are evaluated once, then copied into independent sessions through a
+validated KV snapshot. A single-session prompt skips the output projection for
+non-final prompt tokens because those intermediate logits are not observable.
 
 Prefix caching and continuous batching remain separate experimental contracts.
 Cache-enabled requests use the normal path.

@@ -9,6 +9,28 @@ pub(super) fn weights_bytes(weights: &ScalarLlamaWeights) -> u128 {
         + weights.layers.iter().map(layer_bytes).sum::<u128>()
 }
 
+pub(super) fn mapped_file_bytes(weights: &ScalarLlamaWeights) -> usize {
+    weights
+        .layers
+        .iter()
+        .flat_map(|layer| {
+            [
+                &layer.q_proj,
+                &layer.k_proj,
+                &layer.v_proj,
+                &layer.o_proj,
+                &layer.ffn_gate,
+                &layer.ffn_up,
+                &layer.ffn_down,
+            ]
+        })
+        .chain(std::iter::once(&weights.token_embedding))
+        .chain(weights.output.untied_matrix())
+        .map(Matrix::mapped_file_bytes)
+        .max()
+        .unwrap_or(0)
+}
+
 pub(super) fn kv_cache_bytes(keys: &[Vec<Vec<f32>>], values: &[Vec<Vec<f32>>]) -> u128 {
     nested_vector_bytes(keys) + nested_vector_bytes(values)
 }

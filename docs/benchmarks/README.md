@@ -8,7 +8,10 @@ experiments that still inform Ferrite's current architecture.
 - [`2026-07-09-concurrent-serving-phase1.md`](2026-07-09-concurrent-serving-phase1.md)
   records concurrent serving and batching evidence.
 - [`2026-07-10-oss-quality-hardening.md`](2026-07-10-oss-quality-hardening.md)
-  records the current full performance and parity gate.
+  records the preceding full performance and parity gate.
+- [`2026-07-13-memory-mapping-and-shared-prefill.md`](2026-07-13-memory-mapping-and-shared-prefill.md)
+  records the current zero-copy model-storage and repeated 131.45 to 159.58
+  tok/s shared-prompt server gate.
 
 Machine-readable eval runs live under [`../../scripts/evals/`](../../scripts/evals/).
 The eval artifacts are retained because they support comparable regression

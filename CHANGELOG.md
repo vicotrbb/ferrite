@@ -7,6 +7,48 @@ versioning for published crates while it remains in the `0.x` series.
 
 No unreleased changes.
 
+## 0.2.0 - 2026-07-13
+
+### Added
+
+- A shared read-only GGUF mapping API that lets validated quantized tensors
+  retain file ranges without a model-sized heap copy.
+- Context-only single-session and batched prefill paths for non-final prompt
+  tokens whose output logits are not observable.
+- Exact-prompt cohort fan-out through independent KV snapshots in the
+  continuous scheduler.
+- Eval schema version 3 with model SHA-256 records, complete ordered server
+  token-ID traces, and whole-cohort parity checks.
+
+### Changed
+
+- The CLI and server now load quantized weights from immutable mapped model
+  storage while retaining owned loading for library callers.
+- Continuous batching now uses a bounded five-millisecond admission window,
+  batched context-only prompt evaluation, and generic equal-token-sequence
+  prompt grouping.
+- Batched Q8 output argmax reuses per-worker scratch storage instead of
+  allocating a vector for every vocabulary row.
+- Architecture, server, CLI, evaluation, performance, and release guidance now
+  document mapped-file safety and the shared-prompt execution contract.
+
+### Performance
+
+- Raised the repeated four-request Qwen2.5 0.5B Q4_K_M shared-prompt server
+  median from 93.21 to 131.45 aggregate tokens per second, a 41.03% increase.
+- Reached a repeated eight-request median of 159.58 aggregate tokens per second.
+- Reduced four-request server peak RSS from 956.8 MiB to 568.8 MiB and retained
+  CLI RSS from 1,005.1 MiB to 556.7 MiB.
+- Reduced the four-request median time to first token from 880 ms to 183 ms.
+
+### Validation
+
+- Verified every response in the accepted request cohorts against complete
+  ordered token-ID traces and exact default-route parity.
+- Passed strict all-feature Rust checks, default and all-feature tests, rustdoc,
+  x86_64 Linux cross-checks, package verification, dependency policy, and
+  reproducible release-tool gates.
+
 ## 0.1.0 - 2026-07-10
 
 ### Added

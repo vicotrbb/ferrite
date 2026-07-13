@@ -231,8 +231,58 @@ fn summarizes_streaming_chat_token_ids_from_sse_body() -> Result<(), Box<dyn std
     assert_eq!(summary.content_chunks(), 2);
     assert_eq!(summary.token_id_chunks(), 2);
     assert_eq!(summary.token_ids(), 3);
+    assert_eq!(summary.token_id_trace(), Some([1, 2, 3].as_slice()));
     assert!(summary.all_content_chunks_have_token_ids());
     Ok(())
+}
+
+#[test]
+fn formats_ordered_streaming_token_id_trace() -> Result<(), Box<dyn std::error::Error>> {
+    let body = concat!(
+        "data: {\"choices\":[{\"delta\":{\"content\":\"a\"},\"token_ids\":[7,11],\"finish_reason\":null}]}\n\n",
+        "data: {\"choices\":[{\"delta\":{\"content\":\"b\"},\"token_ids\":[13],\"finish_reason\":null}]}\n\n",
+        "data: [DONE]\n\n",
+    );
+    let config = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--stream"),
+    ])?;
+    let mut token_ids = StreamingTokenIdsSummary::from_sse_body(body)
+        .ok_or("expected streaming token ID summary")?;
+    token_ids.set_all_request_traces_match(true);
+    let result = ThroughputResult {
+        completed_requests: 1,
+        elapsed: Duration::from_millis(400),
+        streaming_finish: None,
+        streaming_timing: None,
+        streaming_text: None,
+        streaming_token_ids: Some(token_ids),
+        streaming_usage: None,
+        rss: None,
+    };
+
+    let formatted = format_result(&config, result);
+    assert!(formatted.contains("streaming_token_id_trace=7,11,13"));
+    assert!(formatted.contains("streaming_all_token_id_traces_match=true"));
+    Ok(())
+}
+
+#[test]
+fn detects_divergent_streaming_token_id_traces() {
+    let summary = |id| {
+        StreamingTokenIdsSummary::from_sse_body(&format!(
+            "data: {{\"choices\":[{{\"delta\":{{\"content\":\"a\"}},\"token_ids\":[{id}],\"finish_reason\":null}}]}}\n\n"
+        ))
+    };
+    let mut first = None;
+    let mut all_match = true;
+
+    accumulate_streaming_token_id_trace(&mut first, summary(7), &mut all_match);
+    accumulate_streaming_token_id_trace(&mut first, summary(7), &mut all_match);
+    assert!(all_match);
+
+    accumulate_streaming_token_id_trace(&mut first, summary(11), &mut all_match);
+    assert!(!all_match);
 }
 
 #[test]

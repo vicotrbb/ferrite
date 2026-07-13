@@ -1,7 +1,11 @@
 //! Entry point for Ferrite's OpenAI-compatible HTTP server.
 
 use ferrite_inference::scalar::{Q8KActivationMatvecPolicy, ScalarExecutionOptions};
-use ferrite_server::{config::ServerConfig, runtime::InferenceEngine, state::ServerState};
+use ferrite_server::{
+    config::ServerConfig,
+    runtime::{InferenceEngine, RuntimeError},
+    state::ServerState,
+};
 use std::error::Error;
 
 #[tokio::main]
@@ -55,7 +59,7 @@ async fn run(arguments: Vec<std::ffi::OsString>) -> Result<(), Box<dyn Error>> {
             };
             let execution_options =
                 ScalarExecutionOptions::default().with_q8_k_activation_matvec_policy(policy);
-            let engine = InferenceEngine::load(path)?.with_execution_options(execution_options);
+            let engine = load_stable_model(path)?.with_execution_options(execution_options);
             ServerState::with_engine(config.model_id().to_owned(), engine)
         }
         None => ServerState::new(config.model_id().to_owned()),
@@ -79,4 +83,14 @@ async fn run(arguments: Vec<std::ffi::OsString>) -> Result<(), Box<dyn Error>> {
     let app = ferrite_server::router(state);
     axum::serve(listener, app).await?;
     Ok(())
+}
+
+#[allow(
+    unsafe_code,
+    reason = "the server process treats its configured model artifact as immutable while loaded"
+)]
+fn load_stable_model(path: &std::path::Path) -> Result<InferenceEngine, RuntimeError> {
+    // SAFETY: Ferrite never modifies or truncates its configured model.
+    // Operators must not replace the backing artifact while the server runs.
+    unsafe { InferenceEngine::load_mapped(path) }
 }

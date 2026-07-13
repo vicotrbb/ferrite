@@ -11,6 +11,7 @@ lines, samples `ps`, and aggregates.
 """
 
 import argparse
+import hashlib
 import json
 import math
 import os
@@ -26,7 +27,7 @@ from collections import namedtuple
 from datetime import datetime, timezone
 from pathlib import Path
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 REPO_ROOT = Path(__file__).resolve().parent.parent
 MODELS_DIR = REPO_ROOT / "target" / "models"
 EVALS_DIR = REPO_ROOT / "scripts" / "evals"
@@ -38,6 +39,15 @@ DEFAULT_MODEL_URL = (
 API_KEY = "ferrite-eval"
 
 Sample = namedtuple("Sample", ["t", "rss_bytes", "cpu_seconds"])
+
+
+def sha256_file(path):
+    """Return the lowercase SHA-256 digest for a file."""
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1 << 20), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def parse_kv_lines(lines):
@@ -221,14 +231,24 @@ EvalConfig = namedtuple(
         "batch_streams",
         "server_batch_streams",
         "experimental_residual_q8_activation_matvec",
+        "experimental_q8_k_activation_matvec",
+        "experimental_q8_k_activation_roles",
     ],
 )
 
 
 def cli_execution_flags(cfg):
+    flags = []
     if cfg.experimental_residual_q8_activation_matvec:
-        return ["--experimental-residual-q8-activation-matvec"]
-    return []
+        flags.append("--experimental-residual-q8-activation-matvec")
+    elif cfg.experimental_q8_k_activation_matvec:
+        flags.append("--experimental-q8-k-activation-matvec")
+    if cfg.experimental_q8_k_activation_roles:
+        flags += [
+            "--experimental-q8-k-activation-roles",
+            cfg.experimental_q8_k_activation_roles,
+        ]
+    return flags
 
 
 def run_cli_batch_benchmark(ferrite_bin, model_path, cfg, streams):
@@ -239,7 +259,7 @@ def run_cli_batch_benchmark(ferrite_bin, model_path, cfg, streams):
         "--prompt", cfg.prompt,
         "--benchmark-runs", str(cfg.benchmark_runs),
         "--benchmark-batch-streams", str(streams),
-    ]
+    ] + cli_execution_flags(cfg)
     result = {"streams": streams, "command": " ".join(cmd), "status": "ok"}
     run = run_timestamped(cmd)
     if run.returncode != 0:
@@ -444,6 +464,8 @@ def run_server_phase(server_bin, throughput_bin, model_path, cfg, batch_streams=
                 "streaming_finish_reason",
                 "streaming_usage_finish_source",
                 "streaming_token_ids",
+                "streaming_token_id_trace",
+                "streaming_all_token_id_traces_match",
                 "streaming_text_bytes",
             ):
                 if key in kv:
@@ -606,7 +628,13 @@ def render_markdown(report):
     if report.get("tag"):
         lines.append(f"- tag: {report['tag']}")
     for entry in report["models"]:
-        lines += ["", f"## {Path(entry['model_path']).name}", ""]
+        lines += [
+            "",
+            f"## {Path(entry['model_path']).name}",
+            "",
+            f"- model SHA-256: `{entry.get('model_sha256', '-')}`",
+            "",
+        ]
         cli = entry.get("cli")
         if cli:
             lines += [
@@ -659,6 +687,7 @@ def render_markdown(report):
                     f"| TTFT | {server.get('streaming_time_to_first_token_ms', '-')} ms |",
                     f"| first-stream tok/s | {server.get('streaming_tokens_per_second', '-')} |",
                     f"| aggregate completion tok/s | {server.get('aggregate_completion_tokens_per_second', '-')} |",
+                    f"| all request token-ID traces match | {server.get('streaming_all_token_id_traces_match', '-')} |",
                     f"| token IDs match default | {server.get('token_ids_match_default', '-')} |",
                     f"| token latency p50 / p95 | {server.get('streaming_token_latency_p50_ms', '-')} / {server.get('streaming_token_latency_p95_ms', '-')} ms |",
                     f"| requests/s | {server.get('requests_per_second', '-')} |",
@@ -725,6 +754,17 @@ def parse_args(argv):
         help="benchmark Ferrite's opt-in residual-Q8/I8MM activation matvec policy",
     )
     parser.add_argument(
+        "--experimental-q8-k-activation-matvec",
+        action="store_true",
+        help="benchmark Ferrite's opt-in one-pass Q8_K activation matvec policy",
+    )
+    parser.add_argument(
+        "--experimental-q8-k-activation-roles",
+        default=None,
+        metavar="ROLE[,ROLE...]",
+        help="restrict the selected activation matvec policy to named projection roles",
+    )
+    parser.add_argument(
         "--batch-streams",
         action="append",
         type=int,
@@ -757,6 +797,25 @@ def parse_args(argv):
 
 def main(argv=None):
     args = parse_args(argv)
+    if (
+        args.experimental_q8_k_activation_matvec
+        and args.experimental_residual_q8_activation_matvec
+    ):
+        raise SystemExit("activation matvec policies are mutually exclusive")
+    if args.experimental_q8_k_activation_roles and not (
+        args.experimental_q8_k_activation_matvec
+        or args.experimental_residual_q8_activation_matvec
+    ):
+        raise SystemExit(
+            "--experimental-q8-k-activation-roles requires an activation matvec policy"
+        )
+    if (
+        args.experimental_q8_k_activation_matvec
+        or args.experimental_q8_k_activation_roles
+    ) and not args.skip_server:
+        raise SystemExit(
+            "the server does not expose the selected activation policy; use --skip-server"
+        )
     if any(streams < 2 for streams in args.batch_streams):
         raise SystemExit("--batch-streams values must be at least 2")
     if args.server_batch_streams is not None and args.server_batch_streams < 2:
@@ -775,12 +834,17 @@ def main(argv=None):
         batch_streams=tuple(dict.fromkeys(args.batch_streams)),
         server_batch_streams=args.server_batch_streams,
         experimental_residual_q8_activation_matvec=args.experimental_residual_q8_activation_matvec,
+        experimental_q8_k_activation_matvec=args.experimental_q8_k_activation_matvec,
+        experimental_q8_k_activation_roles=args.experimental_q8_k_activation_roles,
     )
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d-%H%M%S")
     model_results = []
     for model_path in models:
         print(f"\n=== evaluating {model_path.name} ===")
-        entry = {"model_path": str(model_path)}
+        entry = {
+            "model_path": str(model_path),
+            "model_sha256": sha256_file(model_path),
+        }
         if not args.skip_cli:
             print("cli phase: generation + benchmark runs ...")
             entry["cli"] = run_cli_phase(bins["ferrite"], model_path, cfg)
@@ -801,11 +865,25 @@ def main(argv=None):
                     cfg,
                     batch_streams=cfg.server_batch_streams,
                 )
-                default_ids = entry["server"].get("streaming_token_ids")
-                batched_ids = entry["batched_server"].get("streaming_token_ids")
+                default_ids = entry["server"].get("streaming_token_id_trace")
+                batched_ids = entry["batched_server"].get(
+                    "streaming_token_id_trace"
+                )
+                default_cohort_matches = (
+                    entry["server"].get("streaming_all_token_id_traces_match")
+                    == "true"
+                )
+                batched_cohort_matches = (
+                    entry["batched_server"].get(
+                        "streaming_all_token_id_traces_match"
+                    )
+                    == "true"
+                )
                 if default_ids is not None and batched_ids is not None:
                     entry["batched_server"]["token_ids_match_default"] = (
-                        batched_ids == default_ids
+                        default_cohort_matches
+                        and batched_cohort_matches
+                        and batched_ids == default_ids
                     )
         model_results.append(entry)
     report = build_report(env, cfg, model_results, tag=args.tag)

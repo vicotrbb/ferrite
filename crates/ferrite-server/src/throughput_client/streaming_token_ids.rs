@@ -1,8 +1,10 @@
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct StreamingTokenIdsSummary {
     content_chunks: usize,
     token_id_chunks: usize,
     token_ids: usize,
+    token_id_trace: Option<Vec<u64>>,
+    all_request_traces_match: Option<bool>,
 }
 
 impl StreamingTokenIdsSummary {
@@ -11,11 +13,19 @@ impl StreamingTokenIdsSummary {
             content_chunks,
             token_id_chunks,
             token_ids,
+            token_id_trace: None,
+            all_request_traces_match: None,
         }
     }
 
     pub fn from_sse_body(body: &str) -> Option<Self> {
-        let mut summary = Self::new(0, 0, 0);
+        let mut summary = Self {
+            content_chunks: 0,
+            token_id_chunks: 0,
+            token_ids: 0,
+            token_id_trace: Some(Vec::new()),
+            all_request_traces_match: None,
+        };
 
         for event in sse_json_events(body) {
             summary.accumulate_event(&event);
@@ -34,6 +44,18 @@ impl StreamingTokenIdsSummary {
 
     pub fn token_ids(&self) -> usize {
         self.token_ids
+    }
+
+    pub fn token_id_trace(&self) -> Option<&[u64]> {
+        self.token_id_trace.as_deref()
+    }
+
+    pub fn all_request_traces_match(&self) -> Option<bool> {
+        self.all_request_traces_match
+    }
+
+    pub fn set_all_request_traces_match(&mut self, matches: bool) {
+        self.all_request_traces_match = Some(matches);
     }
 
     pub fn all_content_chunks_have_token_ids(&self) -> bool {
@@ -60,6 +82,14 @@ impl StreamingTokenIdsSummary {
             }
             self.token_id_chunks += 1;
             self.token_ids += token_ids.len();
+            let parsed_token_ids = token_ids
+                .iter()
+                .map(serde_json::Value::as_u64)
+                .collect::<Option<Vec<_>>>();
+            match (&mut self.token_id_trace, parsed_token_ids) {
+                (Some(trace), Some(parsed)) => trace.extend(parsed),
+                _ => self.token_id_trace = None,
+            }
         }
     }
 }

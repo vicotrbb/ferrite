@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parent.parent
 PACKAGER = ROOT / "scripts/package_release.py"
 PREFLIGHT = ROOT / "scripts/release_preflight.py"
 NOTES = ROOT / "scripts/release_notes.py"
+CURRENT_VERSION = "0.2.0"
 
 
 def run(*arguments: str) -> None:
@@ -34,7 +35,7 @@ def test_deterministic_archive() -> None:
             sys.executable,
             str(PACKAGER),
             "--version",
-            "0.1.0",
+            CURRENT_VERSION,
             "--target",
             "test-target",
             "--ferrite",
@@ -46,29 +47,38 @@ def test_deterministic_archive() -> None:
         )
         run(*common, "--output-dir", str(output_one))
         run(*common, "--output-dir", str(output_two))
-        archive_name = "ferrite-v0.1.0-test-target.tar.gz"
+        archive_name = f"ferrite-v{CURRENT_VERSION}-test-target.tar.gz"
         first = (output_one / archive_name).read_bytes()
         second = (output_two / archive_name).read_bytes()
         assert hashlib.sha256(first).digest() == hashlib.sha256(second).digest()
         with tarfile.open(output_one / archive_name) as archive:
             assert archive.getnames() == [
-                "ferrite-v0.1.0-test-target",
-                "ferrite-v0.1.0-test-target/bin",
-                "ferrite-v0.1.0-test-target/bin/ferrite",
-                "ferrite-v0.1.0-test-target/bin/ferrite-server",
-                "ferrite-v0.1.0-test-target/LICENSE",
-                "ferrite-v0.1.0-test-target/README.md",
-                "ferrite-v0.1.0-test-target/CHANGELOG.md",
-                "ferrite-v0.1.0-test-target/SECURITY.md",
+                f"ferrite-v{CURRENT_VERSION}-test-target",
+                f"ferrite-v{CURRENT_VERSION}-test-target/bin",
+                f"ferrite-v{CURRENT_VERSION}-test-target/bin/ferrite",
+                f"ferrite-v{CURRENT_VERSION}-test-target/bin/ferrite-server",
+                f"ferrite-v{CURRENT_VERSION}-test-target/LICENSE",
+                f"ferrite-v{CURRENT_VERSION}-test-target/README.md",
+                f"ferrite-v{CURRENT_VERSION}-test-target/CHANGELOG.md",
+                f"ferrite-v{CURRENT_VERSION}-test-target/SECURITY.md",
             ]
 
 
 def test_current_release_metadata() -> None:
-    run(sys.executable, str(PREFLIGHT), "--version", "0.1.0")
+    run(sys.executable, str(PREFLIGHT), "--version", CURRENT_VERSION)
     with tempfile.TemporaryDirectory() as temporary:
         notes = Path(temporary) / "release-notes.md"
-        run(sys.executable, str(NOTES), "--version", "0.1.0", "--output", str(notes))
-        assert notes.read_text().startswith("# Ferrite v0.1.0\n\n### Added")
+        run(
+            sys.executable,
+            str(NOTES),
+            "--version",
+            CURRENT_VERSION,
+            "--output",
+            str(notes),
+        )
+        assert notes.read_text().startswith(
+            f"# Ferrite v{CURRENT_VERSION}\n\n### Added"
+        )
 
 
 def main() -> int:

@@ -93,6 +93,7 @@ async fn run_requests(
     let mut streaming_timing = None;
     let mut streaming_text = None;
     let mut streaming_token_ids = None;
+    let mut all_streaming_token_id_traces_match = true;
     let mut streaming_usage = None;
 
     while completed_requests < config.requests() {
@@ -140,14 +141,22 @@ async fn run_requests(
             if stream && streaming_text.is_none() {
                 streaming_text = response_text;
             }
-            if stream && streaming_token_ids.is_none() {
-                streaming_token_ids = response_token_ids;
+            if stream {
+                accumulate_streaming_token_id_trace(
+                    &mut streaming_token_ids,
+                    response_token_ids,
+                    &mut all_streaming_token_id_traces_match,
+                );
             }
             if stream && streaming_usage.is_none() {
                 streaming_usage = response_usage;
             }
             completed_requests += 1;
         }
+    }
+
+    if let Some(summary) = &mut streaming_token_ids {
+        summary.set_all_request_traces_match(all_streaming_token_id_traces_match);
     }
 
     Ok(RequestRun {
@@ -158,6 +167,23 @@ async fn run_requests(
         streaming_token_ids,
         streaming_usage,
     })
+}
+
+fn accumulate_streaming_token_id_trace(
+    first: &mut Option<StreamingTokenIdsSummary>,
+    response: Option<StreamingTokenIdsSummary>,
+    all_match: &mut bool,
+) {
+    let response_trace = response
+        .as_ref()
+        .and_then(StreamingTokenIdsSummary::token_id_trace);
+    *all_match &= response_trace.is_some();
+
+    if let Some(first_summary) = first.as_ref() {
+        *all_match &= first_summary.token_id_trace() == response_trace;
+    } else if let Some(response_summary) = response {
+        *first = Some(response_summary);
+    }
 }
 
 pub fn format_result(config: &ThroughputClientConfig, result: ThroughputResult) -> String {
@@ -203,6 +229,15 @@ pub fn format_result(config: &ThroughputClientConfig, result: ThroughputResult) 
             token_ids.token_ids(),
             token_ids.all_content_chunks_have_token_ids(),
         ));
+        if let Some(trace) = token_ids.token_id_trace() {
+            output.push_str(&format!(
+                "\nstreaming_token_id_trace={}",
+                format_u64_list(trace)
+            ));
+        }
+        if let Some(matches) = token_ids.all_request_traces_match() {
+            output.push_str(&format!("\nstreaming_all_token_id_traces_match={matches}"));
+        }
     }
     if let Some(usage) = result.streaming_usage {
         output.push_str(&format!(
@@ -238,6 +273,14 @@ pub fn format_result(config: &ThroughputClientConfig, result: ThroughputResult) 
         ));
     }
     output
+}
+
+fn format_u64_list(values: &[u64]) -> String {
+    values
+        .iter()
+        .map(u64::to_string)
+        .collect::<Vec<_>>()
+        .join(",")
 }
 
 fn validate_streaming_token_count(

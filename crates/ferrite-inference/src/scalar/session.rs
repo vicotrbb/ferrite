@@ -180,15 +180,18 @@ impl<'a> ScalarLlamaSession<'a> {
             {
                 return Err(InferenceError::new("prompt evaluation cancelled"));
             }
-            next = Some(
-                self.accept_token_with_layer_control(token_id, |layer_index| {
-                    on_cancellation_poll(PromptEvaluationLocation::layer(
-                        index,
-                        token_id,
-                        layer_index,
-                    ))
-                })?,
-            );
+            let on_layer = |layer_index| {
+                on_cancellation_poll(PromptEvaluationLocation::layer(
+                    index,
+                    token_id,
+                    layer_index,
+                ))
+            };
+            if index + 1 == tokens.len() {
+                next = Some(self.accept_token_with_layer_control(token_id, on_layer)?);
+            } else {
+                self.accept_token_context_only_with_layer_control(token_id, on_layer)?;
+            }
         }
 
         next.ok_or_else(|| InferenceError::new("prompt must contain at least one token"))
@@ -205,7 +208,9 @@ impl<'a> ScalarLlamaSession<'a> {
             Ok(PromptEvaluationControl::Continue)
         })?;
         Ok(NextToken {
-            token_id: accepted.token_id,
+            token_id: accepted
+                .token_id
+                .ok_or_else(|| InferenceError::new("missing next token ID"))?,
             logits: accepted
                 .logits
                 .ok_or_else(|| InferenceError::new("missing logits for next token"))?,
@@ -226,7 +231,9 @@ impl<'a> ScalarLlamaSession<'a> {
         let accepted =
             self.accept_token_inner(token_id, None, None, OutputMode::Logits, on_layer)?;
         Ok(NextToken {
-            token_id: accepted.token_id,
+            token_id: accepted
+                .token_id
+                .ok_or_else(|| InferenceError::new("missing next token ID"))?,
             logits: accepted
                 .logits
                 .ok_or_else(|| InferenceError::new("missing logits for next token"))?,
@@ -243,11 +250,36 @@ impl<'a> ScalarLlamaSession<'a> {
     /// Returns an error for an out-of-range token or an inference shape,
     /// storage, or numeric failure.
     pub fn accept_token_id(&mut self, token_id: usize) -> Result<usize, InferenceError> {
-        Ok(self
-            .accept_token_inner(token_id, None, None, OutputMode::TokenIdOnly, |_| {
-                Ok(PromptEvaluationControl::Continue)
-            })?
-            .token_id)
+        self.accept_token_inner(token_id, None, None, OutputMode::TokenIdOnly, |_| {
+            Ok(PromptEvaluationControl::Continue)
+        })?
+        .token_id
+        .ok_or_else(|| InferenceError::new("missing next token ID"))
+    }
+
+    /// Accepts one token into the KV context without evaluating the output matrix.
+    ///
+    /// This is intended for non-final prompt tokens whose next-token result is
+    /// not observable. Transformer state and the KV cache are updated exactly
+    /// as they are for [`Self::accept_token_id`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an out-of-range token or an inference shape,
+    /// storage, or numeric failure.
+    pub fn accept_token_context_only(&mut self, token_id: usize) -> Result<(), InferenceError> {
+        self.accept_token_context_only_with_layer_control(token_id, |_| {
+            Ok(PromptEvaluationControl::Continue)
+        })
+    }
+
+    fn accept_token_context_only_with_layer_control(
+        &mut self,
+        token_id: usize,
+        on_layer: impl FnMut(usize) -> Result<PromptEvaluationControl, InferenceError>,
+    ) -> Result<(), InferenceError> {
+        self.accept_token_inner(token_id, None, None, OutputMode::ContextOnly, on_layer)?;
+        Ok(())
     }
 
     /// Accepts one token and returns its next ID with matvec profile records.
@@ -270,7 +302,9 @@ impl<'a> ScalarLlamaSession<'a> {
             |_| Ok(PromptEvaluationControl::Continue),
         )?;
         Ok(ProfiledTokenId {
-            token_id: accepted.token_id,
+            token_id: accepted
+                .token_id
+                .ok_or_else(|| InferenceError::new("missing profiled next token ID"))?,
             events,
             comparisons,
         })
@@ -318,7 +352,9 @@ impl<'a> ScalarLlamaSession<'a> {
             |_| Ok(PromptEvaluationControl::Continue),
         )?;
         let next_token = NextToken {
-            token_id: accepted.token_id,
+            token_id: accepted
+                .token_id
+                .ok_or_else(|| InferenceError::new("missing profiled next token ID"))?,
             logits: accepted
                 .logits
                 .ok_or_else(|| InferenceError::new("missing logits for profiled next token"))?,
@@ -513,18 +549,18 @@ impl<'a> ScalarLlamaSession<'a> {
             add_assign(&mut hidden, &ffn_output)?;
         }
 
-        let normed = rms_norm(
-            &hidden,
-            &self.model.weights.output_norm,
-            self.model.config.rms_norm_epsilon,
-        )?;
-        let output = self
-            .model
-            .weights
-            .output
-            .logits_matrix(&self.model.weights.token_embedding);
         let (token_id, logits) = match output_mode {
             OutputMode::Logits => {
+                let normed = rms_norm(
+                    &hidden,
+                    &self.model.weights.output_norm,
+                    self.model.config.rms_norm_epsilon,
+                )?;
+                let output = self
+                    .model
+                    .weights
+                    .output
+                    .logits_matrix(&self.model.weights.token_embedding);
                 let logits = profiled_mul_vec(
                     output,
                     &normed,
@@ -534,9 +570,19 @@ impl<'a> ScalarLlamaSession<'a> {
                     self.options
                         .scoped_to_q8_k_activation_role(Q8KActivationMatvecRole::Output),
                 )?;
-                (argmax(&logits)?, Some(logits))
+                (Some(argmax(&logits)?), Some(logits))
             }
             OutputMode::TokenIdOnly => {
+                let normed = rms_norm(
+                    &hidden,
+                    &self.model.weights.output_norm,
+                    self.model.config.rms_norm_epsilon,
+                )?;
+                let output = self
+                    .model
+                    .weights
+                    .output
+                    .logits_matrix(&self.model.weights.token_embedding);
                 let token_id = profiled_argmax_mul_vec(
                     output,
                     &normed,
@@ -546,8 +592,9 @@ impl<'a> ScalarLlamaSession<'a> {
                     self.options
                         .scoped_to_q8_k_activation_role(Q8KActivationMatvecRole::Output),
                 )?;
-                (token_id, None)
+                (Some(token_id), None)
             }
+            OutputMode::ContextOnly => (None, None),
         };
         self.cached_token_count += 1;
 
@@ -573,6 +620,33 @@ pub fn accept_token_ids_batch(
     sessions: &mut [ScalarLlamaSession<'_>],
     token_ids: &[usize],
 ) -> Result<Vec<usize>, InferenceError> {
+    accept_token_ids_batch_inner(sessions, token_ids, true)?
+        .ok_or_else(|| InferenceError::new("missing batched next token IDs"))
+}
+
+/// Advances several sessions without evaluating their output matrices.
+///
+/// This is the batched counterpart of
+/// [`ScalarLlamaSession::accept_token_context_only`] for non-final prompt
+/// tokens. Every session must share the same model.
+///
+/// # Errors
+///
+/// Returns an error when the batch is empty, lengths or model identities do
+/// not match, a token is out of range, or inference fails.
+pub fn accept_token_contexts_batch(
+    sessions: &mut [ScalarLlamaSession<'_>],
+    token_ids: &[usize],
+) -> Result<(), InferenceError> {
+    accept_token_ids_batch_inner(sessions, token_ids, false)?;
+    Ok(())
+}
+
+fn accept_token_ids_batch_inner(
+    sessions: &mut [ScalarLlamaSession<'_>],
+    token_ids: &[usize],
+    evaluate_output: bool,
+) -> Result<Option<Vec<usize>>, InferenceError> {
     if sessions.is_empty() {
         return Err(InferenceError::new(
             "batch must contain at least one session",
@@ -688,22 +762,26 @@ pub fn accept_token_ids_batch(
         }
     }
 
-    let normed_final = hidden
-        .iter()
-        .map(|values| {
-            rms_norm(
-                values,
-                &model.weights.output_norm,
-                model.config.rms_norm_epsilon,
-            )
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-    let output = model
-        .weights
-        .output
-        .logits_matrix(&model.weights.token_embedding);
-    let normed_refs = normed_final.iter().map(Vec::as_slice).collect::<Vec<_>>();
-    let next_token_ids = output.argmax_mul_vec_batch(&normed_refs)?;
+    let next_token_ids = if evaluate_output {
+        let normed_final = hidden
+            .iter()
+            .map(|values| {
+                rms_norm(
+                    values,
+                    &model.weights.output_norm,
+                    model.config.rms_norm_epsilon,
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let output = model
+            .weights
+            .output
+            .logits_matrix(&model.weights.token_embedding);
+        let normed_refs = normed_final.iter().map(Vec::as_slice).collect::<Vec<_>>();
+        Some(output.argmax_mul_vec_batch(&normed_refs)?)
+    } else {
+        None
+    };
 
     for session in sessions.iter_mut() {
         session.cached_token_count += 1;
@@ -715,11 +793,12 @@ pub fn accept_token_ids_batch(
 enum OutputMode {
     Logits,
     TokenIdOnly,
+    ContextOnly,
 }
 
 #[derive(Debug, PartialEq)]
 struct AcceptedToken {
-    token_id: usize,
+    token_id: Option<usize>,
     logits: Option<Vec<f32>>,
 }
 

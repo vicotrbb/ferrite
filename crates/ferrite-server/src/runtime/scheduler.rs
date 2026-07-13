@@ -3,18 +3,21 @@ use super::{
     InferenceEngine, RuntimeError, TokenTextBuffer,
 };
 use crate::openai::stop_filter::StopSequenceFilter;
-use ferrite_inference::scalar::{accept_token_ids_batch, ScalarLlamaSession};
+use ferrite_inference::scalar::{
+    accept_token_contexts_batch, accept_token_ids_batch, ScalarLlamaSession,
+};
 use std::collections::VecDeque;
 use std::sync::{
     mpsc::{self, Receiver, RecvTimeoutError, SyncSender, TryRecvError, TrySendError},
     Arc,
 };
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::sync::mpsc as tokio_mpsc;
 
 const EVENT_CHANNEL_CAPACITY: usize = 8;
 const IDLE_POLL_INTERVAL: Duration = Duration::from_millis(1);
+const BATCH_ADMISSION_WINDOW: Duration = Duration::from_millis(5);
 
 #[derive(Clone, Debug)]
 pub struct BatchScheduler {
@@ -83,6 +86,62 @@ struct ScheduledJob {
 }
 
 #[derive(Debug)]
+struct PreparedJob<'model> {
+    session: Option<ScalarLlamaSession<'model>>,
+    events: tokio_mpsc::Sender<BatchedGenerationEvent>,
+    stop_sequences: Vec<String>,
+    prompt_token_ids: Vec<usize>,
+    max_tokens: usize,
+    first_token_id: Option<usize>,
+}
+
+impl<'model> PreparedJob<'model> {
+    fn new(engine: &'model InferenceEngine, job: ScheduledJob) -> Result<Self, RuntimeError> {
+        let prompt_token_ids = engine
+            .tokenizer
+            .encode(&job.prompt)
+            .map_err(|error| RuntimeError::new(format!("failed to tokenize prompt: {error}")))?;
+        if prompt_token_ids.is_empty() {
+            return Err(RuntimeError::new("prompt must contain at least one token"));
+        }
+        if job.max_tokens == 0 {
+            return Err(RuntimeError::new("max tokens must be greater than zero"));
+        }
+
+        Ok(Self {
+            session: Some(engine.start_session()?),
+            events: job.events,
+            stop_sequences: job.stop_sequences,
+            prompt_token_ids,
+            max_tokens: job.max_tokens,
+            first_token_id: None,
+        })
+    }
+
+    fn into_active(self, engine: &InferenceEngine) -> Result<ActiveJob<'model>, RuntimeError> {
+        let first_token_id = self.first_token_id.ok_or_else(|| {
+            RuntimeError::new("batch scheduler invariant failed: prefill produced no token")
+        })?;
+        let mut active = ActiveJob {
+            session: self.session,
+            events: self.events,
+            pending_events: VecDeque::new(),
+            stop_filter: StopSequenceFilter::new(self.stop_sequences),
+            prompt_tokens: self.prompt_token_ids.len(),
+            remaining_tokens: self.max_tokens,
+            decode_input_token_id: None,
+            generated_token_ids: Vec::with_capacity(self.max_tokens),
+            token_texts: Vec::with_capacity(self.max_tokens),
+            token_id_chunks: Vec::with_capacity(self.max_tokens),
+            token_text_buffer: TokenTextBuffer::new(),
+            finished: false,
+        };
+        active.process_token(engine, first_token_id)?;
+        Ok(active)
+    }
+}
+
+#[derive(Debug)]
 struct ActiveJob<'model> {
     session: Option<ScalarLlamaSession<'model>>,
     events: tokio_mpsc::Sender<BatchedGenerationEvent>,
@@ -99,40 +158,6 @@ struct ActiveJob<'model> {
 }
 
 impl<'model> ActiveJob<'model> {
-    fn prepare(engine: &'model InferenceEngine, job: ScheduledJob) -> Result<Self, RuntimeError> {
-        let prompt_token_ids = engine
-            .tokenizer
-            .encode(&job.prompt)
-            .map_err(|error| RuntimeError::new(format!("failed to tokenize prompt: {error}")))?;
-        if prompt_token_ids.is_empty() {
-            return Err(RuntimeError::new("prompt must contain at least one token"));
-        }
-        if job.max_tokens == 0 {
-            return Err(RuntimeError::new("max tokens must be greater than zero"));
-        }
-
-        let mut session = engine.start_session()?;
-        let first = session
-            .accept_prompt(&prompt_token_ids)
-            .map_err(|error| RuntimeError::new(format!("failed to evaluate prompt: {error}")))?;
-        let mut active = Self {
-            session: Some(session),
-            events: job.events,
-            pending_events: VecDeque::new(),
-            stop_filter: StopSequenceFilter::new(job.stop_sequences),
-            prompt_tokens: prompt_token_ids.len(),
-            remaining_tokens: job.max_tokens,
-            decode_input_token_id: None,
-            generated_token_ids: Vec::with_capacity(job.max_tokens),
-            token_texts: Vec::with_capacity(job.max_tokens),
-            token_id_chunks: Vec::with_capacity(job.max_tokens),
-            token_text_buffer: TokenTextBuffer::new(),
-            finished: false,
-        };
-        active.process_token(engine, first.token_id)?;
-        Ok(active)
-    }
-
     fn process_token(
         &mut self,
         engine: &InferenceEngine,
@@ -287,18 +312,34 @@ fn scheduler_loop(
     let mut input_closed = false;
 
     loop {
+        let mut pending_jobs = Vec::with_capacity(max_batch_streams.saturating_sub(active.len()));
         if active.is_empty() && !input_closed {
             match receiver.recv() {
-                Ok(job) => admit_job(&engine, &mut active, job),
+                Ok(job) => pending_jobs.push(job),
                 Err(_) => input_closed = true,
             }
+            let admission_deadline = Instant::now() + BATCH_ADMISSION_WINDOW;
+            while pending_jobs.len() < max_batch_streams && !input_closed {
+                let remaining = admission_deadline.saturating_duration_since(Instant::now());
+                if remaining.is_zero() {
+                    break;
+                }
+                match receiver.recv_timeout(remaining) {
+                    Ok(job) => pending_jobs.push(job),
+                    Err(RecvTimeoutError::Timeout) => break,
+                    Err(RecvTimeoutError::Disconnected) => input_closed = true,
+                }
+            }
         }
-        while active.len() < max_batch_streams && !input_closed {
+        while active.len() + pending_jobs.len() < max_batch_streams && !input_closed {
             match receiver.try_recv() {
-                Ok(job) => admit_job(&engine, &mut active, job),
+                Ok(job) => pending_jobs.push(job),
                 Err(TryRecvError::Empty) => break,
                 Err(TryRecvError::Disconnected) => input_closed = true,
             }
+        }
+        if !pending_jobs.is_empty() {
+            admit_jobs(&engine, &mut active, pending_jobs);
         }
 
         for job in &mut active {
@@ -317,7 +358,7 @@ fn scheduler_loop(
         if ready.is_empty() {
             if active.len() < max_batch_streams && !input_closed {
                 match receiver.recv_timeout(IDLE_POLL_INTERVAL) {
-                    Ok(job) => admit_job(&engine, &mut active, job),
+                    Ok(job) => admit_jobs(&engine, &mut active, vec![job]),
                     Err(RecvTimeoutError::Timeout) => {}
                     Err(RecvTimeoutError::Disconnected) => input_closed = true,
                 }
@@ -395,16 +436,215 @@ fn scheduler_loop(
     }
 }
 
-fn admit_job<'model>(
+fn admit_jobs<'model>(
     engine: &'model InferenceEngine,
     active: &mut Vec<ActiveJob<'model>>,
-    job: ScheduledJob,
+    jobs: Vec<ScheduledJob>,
 ) {
-    let error_sender = job.events.clone();
-    match ActiveJob::prepare(engine, job) {
-        Ok(job) => active.push(job),
-        Err(error) => {
-            let _ = error_sender.blocking_send(BatchedGenerationEvent::Failed(error));
+    let mut prepared = Vec::with_capacity(jobs.len());
+    for job in jobs {
+        let error_sender = job.events.clone();
+        match PreparedJob::new(engine, job) {
+            Ok(job) => prepared.push(job),
+            Err(error) => {
+                let _ = error_sender.blocking_send(BatchedGenerationEvent::Failed(error));
+            }
         }
+    }
+    if prepared.is_empty() {
+        return;
+    }
+
+    if let Err(error) = prefill_jobs(&mut prepared) {
+        let error = RuntimeError::new(format!("failed to batch prefill prompt: {error}"));
+        for job in prepared {
+            let _ = job
+                .events
+                .blocking_send(BatchedGenerationEvent::Failed(error.clone()));
+        }
+        return;
+    }
+
+    for job in prepared {
+        let error_sender = job.events.clone();
+        match job.into_active(engine) {
+            Ok(job) => active.push(job),
+            Err(error) => {
+                let _ = error_sender.blocking_send(BatchedGenerationEvent::Failed(error));
+            }
+        }
+    }
+}
+
+fn prefill_jobs(jobs: &mut [PreparedJob<'_>]) -> Result<(), RuntimeError> {
+    let prompt_token_ids = jobs
+        .iter()
+        .map(|job| job.prompt_token_ids.as_slice())
+        .collect::<Vec<_>>();
+    let prompt_groups = equal_prompt_groups(&prompt_token_ids);
+    let representatives = prompt_groups
+        .iter()
+        .filter_map(|group| group.first().copied())
+        .collect::<Vec<_>>();
+    let max_prompt_len = representatives
+        .iter()
+        .map(|index| jobs[*index].prompt_token_ids.len())
+        .max()
+        .unwrap_or(0);
+    for position in 0..max_prompt_len {
+        let context_indices = representatives
+            .iter()
+            .copied()
+            .filter(|index| position + 1 < jobs[*index].prompt_token_ids.len())
+            .collect::<Vec<_>>();
+        advance_prefill_contexts(jobs, &context_indices, position)?;
+
+        let final_indices = representatives
+            .iter()
+            .copied()
+            .filter(|index| position + 1 == jobs[*index].prompt_token_ids.len())
+            .collect::<Vec<_>>();
+        advance_prefill_finals(jobs, &final_indices, position)?;
+    }
+
+    restore_equal_prompt_sessions(jobs, prompt_groups)?;
+    Ok(())
+}
+
+fn equal_prompt_groups(prompts: &[&[usize]]) -> Vec<Vec<usize>> {
+    let mut groups = Vec::<Vec<usize>>::new();
+    for (index, prompt) in prompts.iter().enumerate() {
+        if let Some(group) = groups.iter_mut().find(|group| prompts[group[0]] == *prompt) {
+            group.push(index);
+        } else {
+            groups.push(vec![index]);
+        }
+    }
+    groups
+}
+
+fn restore_equal_prompt_sessions(
+    jobs: &mut [PreparedJob<'_>],
+    prompt_groups: Vec<Vec<usize>>,
+) -> Result<(), RuntimeError> {
+    for group in prompt_groups {
+        let Some((&representative, duplicates)) = group.split_first() else {
+            continue;
+        };
+        if duplicates.is_empty() {
+            continue;
+        }
+        let first_token_id = jobs[representative].first_token_id.ok_or_else(|| {
+            RuntimeError::new("batch scheduler invariant failed: prefill produced no token")
+        })?;
+        let snapshot = jobs[representative]
+            .session
+            .as_mut()
+            .ok_or_else(|| {
+                RuntimeError::new("batch scheduler invariant failed: prefill session is missing")
+            })?
+            .cache_snapshot()
+            .map_err(|error| RuntimeError::new(error.to_string()))?;
+
+        for index in duplicates {
+            jobs[*index]
+                .session
+                .as_mut()
+                .ok_or_else(|| {
+                    RuntimeError::new(
+                        "batch scheduler invariant failed: duplicate prefill session is missing",
+                    )
+                })?
+                .restore_cache_snapshot(&snapshot)
+                .map_err(|error| RuntimeError::new(error.to_string()))?;
+            jobs[*index].first_token_id = Some(first_token_id);
+        }
+    }
+    Ok(())
+}
+
+fn advance_prefill_contexts(
+    jobs: &mut [PreparedJob<'_>],
+    indices: &[usize],
+    position: usize,
+) -> Result<(), RuntimeError> {
+    if indices.is_empty() {
+        return Ok(());
+    }
+    let (mut sessions, token_ids) = take_prefill_inputs(jobs, indices, position)?;
+    let result = if sessions.len() == 1 {
+        sessions[0].accept_token_context_only(token_ids[0])
+    } else {
+        accept_token_contexts_batch(&mut sessions, &token_ids)
+    };
+    restore_prefill_sessions(jobs, indices, sessions);
+    result.map_err(|error| RuntimeError::new(error.to_string()))
+}
+
+fn advance_prefill_finals(
+    jobs: &mut [PreparedJob<'_>],
+    indices: &[usize],
+    position: usize,
+) -> Result<(), RuntimeError> {
+    if indices.is_empty() {
+        return Ok(());
+    }
+    let (mut sessions, token_ids) = take_prefill_inputs(jobs, indices, position)?;
+    let result = if sessions.len() == 1 {
+        sessions[0]
+            .accept_token_id(token_ids[0])
+            .map(|token_id| vec![token_id])
+    } else {
+        accept_token_ids_batch(&mut sessions, &token_ids)
+    };
+    restore_prefill_sessions(jobs, indices, sessions);
+    for (index, token_id) in indices
+        .iter()
+        .copied()
+        .zip(result.map_err(|error| RuntimeError::new(error.to_string()))?)
+    {
+        jobs[index].first_token_id = Some(token_id);
+    }
+    Ok(())
+}
+
+fn take_prefill_inputs<'model>(
+    jobs: &mut [PreparedJob<'model>],
+    indices: &[usize],
+    position: usize,
+) -> Result<(Vec<ScalarLlamaSession<'model>>, Vec<usize>), RuntimeError> {
+    let mut sessions = Vec::with_capacity(indices.len());
+    let mut token_ids = Vec::with_capacity(indices.len());
+    for index in indices {
+        sessions.push(jobs[*index].session.take().ok_or_else(|| {
+            RuntimeError::new("batch scheduler invariant failed: prefill session is missing")
+        })?);
+        token_ids.push(jobs[*index].prompt_token_ids[position]);
+    }
+    Ok((sessions, token_ids))
+}
+
+fn restore_prefill_sessions<'model>(
+    jobs: &mut [PreparedJob<'model>],
+    indices: &[usize],
+    sessions: Vec<ScalarLlamaSession<'model>>,
+) {
+    for (index, session) in indices.iter().copied().zip(sessions) {
+        jobs[index].session = Some(session);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::equal_prompt_groups;
+
+    #[test]
+    fn groups_equal_prompts_by_first_arrival() {
+        let prompts: [&[usize]; 5] = [&[1, 2], &[3], &[1, 2], &[4, 5], &[3]];
+
+        assert_eq!(
+            equal_prompt_groups(&prompts),
+            [vec![0, 2], vec![1, 4], vec![3]]
+        );
     }
 }

@@ -14,5 +14,7 @@ mod gguf_config;
 
 /// Validated GGUF v3 metadata and tensor layout parsing.
 pub mod gguf;
+/// Read-only model-file mapping for shared GGUF tensor storage.
+pub mod model_file;
 /// Tokenization backed by metadata embedded in a parsed GGUF file.
 pub mod tokenizer;

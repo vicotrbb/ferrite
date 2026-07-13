@@ -40,7 +40,7 @@ impl OpenAiHttpResponse {
     }
 
     pub fn streaming_token_ids(&self) -> Option<StreamingTokenIdsSummary> {
-        self.streaming_token_ids
+        self.streaming_token_ids.clone()
     }
 
     pub fn streaming_usage(&self) -> Option<StreamingUsageSummary> {

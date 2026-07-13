@@ -283,6 +283,7 @@ fn has_token_ids_for_all_content_chunks(result: &LongChatScenarioResult) -> bool
     result
         .throughput()
         .streaming_token_ids
+        .as_ref()
         .is_some_and(|summary| summary.all_content_chunks_have_token_ids())
 }
 

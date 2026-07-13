@@ -74,10 +74,13 @@ scripts/eval.sh --help
 ```
 
 The harness builds locked release binaries, records the active Rust flags and
-target directory, runs CLI generation and precise
+target directory, records the model SHA-256, runs CLI generation and precise
 decode, optionally runs fixed engine batches, starts the HTTP server, drives a
 streaming throughput client, samples RSS and CPU through `ps`, and writes JSON
-plus Markdown to `scripts/evals/`.
+plus Markdown to `scripts/evals/`. Server parity first verifies that every
+response in each request cohort has the same complete ordered token-ID trace,
+then compares the default and continuous-batched route traces. Equal token
+counts alone do not pass the gate.
 
 A minimal local run is:
 

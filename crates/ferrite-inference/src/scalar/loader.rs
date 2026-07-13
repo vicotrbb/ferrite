@@ -3,10 +3,40 @@ use super::{
     ScalarLlamaOutputWeights, ScalarLlamaWeights,
 };
 use ferrite_model::gguf::{GgmlType, GgufFile, ModelArchitecture, ModelConfig, TensorInfo};
+use ferrite_model::model_file::MappedModelFile;
+
+#[derive(Clone, Copy)]
+enum LoaderSource<'a> {
+    Bytes(&'a [u8]),
+    Mapped(&'a MappedModelFile),
+}
+
+impl<'a> LoaderSource<'a> {
+    fn as_bytes(self) -> &'a [u8] {
+        match self {
+            Self::Bytes(bytes) => bytes,
+            Self::Mapped(file) => file.as_bytes(),
+        }
+    }
+}
 
 pub(super) fn load_scalar(
     file: &GgufFile,
     bytes: &[u8],
+) -> Result<(ScalarLlamaConfig, ScalarLlamaWeights), InferenceError> {
+    load_scalar_from_source(file, LoaderSource::Bytes(bytes))
+}
+
+pub(super) fn load_scalar_mapped(
+    file: &GgufFile,
+    mapped: &MappedModelFile,
+) -> Result<(ScalarLlamaConfig, ScalarLlamaWeights), InferenceError> {
+    load_scalar_from_source(file, LoaderSource::Mapped(mapped))
+}
+
+fn load_scalar_from_source(
+    file: &GgufFile,
+    source: LoaderSource<'_>,
 ) -> Result<(ScalarLlamaConfig, ScalarLlamaWeights), InferenceError> {
     let model = match file.model_config()? {
         ModelConfig::Llama(config) | ModelConfig::Qwen2(config) => config,
@@ -63,79 +93,79 @@ pub(super) fn load_scalar(
         layers.push(ScalarLlamaLayerWeights {
             attn_norm: f32_vector(
                 file,
-                bytes,
+                source,
                 &format!("blk.{layer_index}.attn_norm.weight"),
                 hidden_size,
             )?,
             q_proj: f32_matrix(
                 file,
-                bytes,
+                source,
                 &format!("blk.{layer_index}.attn_q.weight"),
                 hidden_size,
                 hidden_size,
             )?,
             q_bias: optional_f32_vector(
                 file,
-                bytes,
+                source,
                 &format!("blk.{layer_index}.attn_q.bias"),
                 hidden_size,
             )?,
             k_proj: f32_matrix(
                 file,
-                bytes,
+                source,
                 &format!("blk.{layer_index}.attn_k.weight"),
                 attention_head_count_kv * head_dim,
                 hidden_size,
             )?,
             k_bias: optional_f32_vector(
                 file,
-                bytes,
+                source,
                 &format!("blk.{layer_index}.attn_k.bias"),
                 attention_head_count_kv * head_dim,
             )?,
             v_proj: f32_matrix(
                 file,
-                bytes,
+                source,
                 &format!("blk.{layer_index}.attn_v.weight"),
                 attention_head_count_kv * head_dim,
                 hidden_size,
             )?,
             v_bias: optional_f32_vector(
                 file,
-                bytes,
+                source,
                 &format!("blk.{layer_index}.attn_v.bias"),
                 attention_head_count_kv * head_dim,
             )?,
             o_proj: f32_matrix(
                 file,
-                bytes,
+                source,
                 &format!("blk.{layer_index}.attn_output.weight"),
                 hidden_size,
                 hidden_size,
             )?,
             ffn_norm: f32_vector(
                 file,
-                bytes,
+                source,
                 &format!("blk.{layer_index}.ffn_norm.weight"),
                 hidden_size,
             )?,
             ffn_gate: f32_matrix(
                 file,
-                bytes,
+                source,
                 &format!("blk.{layer_index}.ffn_gate.weight"),
                 intermediate_size,
                 hidden_size,
             )?,
             ffn_up: f32_matrix(
                 file,
-                bytes,
+                source,
                 &format!("blk.{layer_index}.ffn_up.weight"),
                 intermediate_size,
                 hidden_size,
             )?,
             ffn_down: f32_matrix(
                 file,
-                bytes,
+                source,
                 &format!("blk.{layer_index}.ffn_down.weight"),
                 hidden_size,
                 intermediate_size,
@@ -143,14 +173,14 @@ pub(super) fn load_scalar(
         });
     }
 
-    let token_embedding = f32_matrix(file, bytes, "token_embd.weight", vocab_size, hidden_size)?;
-    let output = output_matrix_or_tied(file, bytes, &token_embedding, vocab_size, hidden_size)?;
+    let token_embedding = f32_matrix(file, source, "token_embd.weight", vocab_size, hidden_size)?;
+    let output = output_matrix_or_tied(file, source, &token_embedding, vocab_size, hidden_size)?;
 
     Ok((
         config,
         ScalarLlamaWeights {
             token_embedding,
-            output_norm: f32_vector(file, bytes, "output_norm.weight", hidden_size)?,
+            output_norm: f32_vector(file, source, "output_norm.weight", hidden_size)?,
             output,
             layers,
         },
@@ -164,7 +194,7 @@ fn required_tensor<'a>(file: &'a GgufFile, name: &str) -> Result<&'a TensorInfo,
 
 fn f32_matrix(
     file: &GgufFile,
-    bytes: &[u8],
+    source: LoaderSource<'_>,
     name: &str,
     rows: usize,
     cols: usize,
@@ -178,26 +208,38 @@ fn f32_matrix(
         )));
     }
 
-    match tensor.ty {
-        GgmlType::Q4K => {
+    match (tensor.ty, source) {
+        (GgmlType::Q4K, LoaderSource::Mapped(mapped)) => {
+            Matrix::from_q4_k_mapped_bytes(rows, cols, mapped.clone(), tensor.data_range.clone())
+        }
+        (GgmlType::Q5_0, LoaderSource::Mapped(mapped)) => {
+            Matrix::from_q5_0_mapped_bytes(rows, cols, mapped.clone(), tensor.data_range.clone())
+        }
+        (GgmlType::Q6K, LoaderSource::Mapped(mapped)) => {
+            Matrix::from_q6_k_mapped_bytes(rows, cols, mapped.clone(), tensor.data_range.clone())
+        }
+        (GgmlType::Q8_0, LoaderSource::Mapped(mapped)) => {
+            Matrix::from_q8_0_mapped_bytes(rows, cols, mapped.clone(), tensor.data_range.clone())
+        }
+        (GgmlType::Q4K, LoaderSource::Bytes(bytes)) => {
             Matrix::from_q4_k_row_major_bytes(rows, cols, tensor::raw_bytes(tensor, bytes)?)
         }
-        GgmlType::Q5_0 => {
+        (GgmlType::Q5_0, LoaderSource::Bytes(bytes)) => {
             Matrix::from_q5_0_row_major_bytes(rows, cols, tensor::raw_bytes(tensor, bytes)?)
         }
-        GgmlType::Q6K => {
+        (GgmlType::Q6K, LoaderSource::Bytes(bytes)) => {
             Matrix::from_q6_k_row_major_bytes(rows, cols, tensor::raw_bytes(tensor, bytes)?)
         }
-        GgmlType::Q8_0 => {
+        (GgmlType::Q8_0, LoaderSource::Bytes(bytes)) => {
             Matrix::from_q8_0_row_major_bytes(rows, cols, tensor::raw_bytes(tensor, bytes)?)
         }
-        _ => Matrix::from_row_major(rows, cols, tensor::f32_values(tensor, bytes)?),
+        _ => Matrix::from_row_major(rows, cols, tensor::f32_values(tensor, source.as_bytes())?),
     }
 }
 
 fn output_matrix_or_tied(
     file: &GgufFile,
-    bytes: &[u8],
+    source: LoaderSource<'_>,
     token_embedding: &Matrix,
     rows: usize,
     cols: usize,
@@ -205,7 +247,7 @@ fn output_matrix_or_tied(
     if file.tensor("output.weight").is_some() {
         Ok(ScalarLlamaOutputWeights::untied(f32_matrix(
             file,
-            bytes,
+            source,
             "output.weight",
             rows,
             cols,
@@ -223,7 +265,7 @@ fn output_matrix_or_tied(
 
 fn f32_vector(
     file: &GgufFile,
-    bytes: &[u8],
+    source: LoaderSource<'_>,
     name: &str,
     len: usize,
 ) -> Result<Vec<f32>, InferenceError> {
@@ -236,12 +278,12 @@ fn f32_vector(
         )));
     }
 
-    tensor::f32_values(tensor, bytes)
+    tensor::f32_values(tensor, source.as_bytes())
 }
 
 fn optional_f32_vector(
     file: &GgufFile,
-    bytes: &[u8],
+    source: LoaderSource<'_>,
     name: &str,
     len: usize,
 ) -> Result<Option<Vec<f32>>, InferenceError> {
@@ -249,7 +291,7 @@ fn optional_f32_vector(
         return Ok(None);
     }
 
-    f32_vector(file, bytes, name, len).map(Some)
+    f32_vector(file, source, name, len).map(Some)
 }
 
 fn usize_from_u64(value: u64, name: &str) -> Result<usize, InferenceError> {

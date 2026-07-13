@@ -9,8 +9,10 @@ use ferrite_inference::scalar::{
     apply_rope, argmax, rms_norm, Matrix, ScalarExecutionOptions, ScalarLlamaModel,
 };
 use ferrite_model::gguf::parse_gguf;
+use ferrite_model::model_file::MappedModelFile;
 use ferrite_model::tokenizer::GgufTokenizer;
 use std::error::Error;
+use std::fs;
 use std::io;
 use support::assertions::assert_close;
 use support::fixtures::qwen2_fixture_from_llama_fixture;
@@ -319,6 +321,26 @@ fn loads_scalar_llama_reference_weights_from_f32_gguf_fixture() -> Result<(), Bo
 }
 
 #[test]
+fn prompt_skips_unobserved_intermediate_outputs_without_changing_final_logits(
+) -> Result<(), Box<dyn Error>> {
+    let bytes = scalar_llama_f32_gguf_fixture();
+    let gguf = parse_gguf(&bytes)?;
+    let model = ScalarLlamaModel::from_gguf_scalar(&gguf, &bytes)?;
+    let mut prompt_session = model.start_session();
+    let mut explicit_session = model.start_session();
+
+    let prompt_next = prompt_session.accept_prompt(&[0, 0, 0])?;
+    explicit_session.accept_token_context_only(0)?;
+    explicit_session.accept_token_context_only(0)?;
+    let explicit_next = explicit_session.accept_token(0)?;
+
+    assert_eq!(prompt_next, explicit_next);
+    assert_eq!(prompt_session.cached_token_count(), 3);
+    assert_eq!(explicit_session.cached_token_count(), 3);
+    Ok(())
+}
+
+#[test]
 fn loads_scalar_qwen2_reference_weights_from_f32_gguf_fixture() -> Result<(), Box<dyn Error>> {
     let bytes = qwen2_fixture_from_llama_fixture(scalar_llama_f32_gguf_fixture());
     let gguf = parse_gguf(&bytes)?;
@@ -416,6 +438,36 @@ fn loads_scalar_llama_reference_weights_from_q4_k_gguf_fixture() -> Result<(), B
     assert_eq!(model.scalar_weight_bytes(), 17_184);
     assert_eq!(next.token_id, 1);
     assert!(next.logits[1] > next.logits[0]);
+    Ok(())
+}
+
+#[test]
+#[allow(
+    unsafe_code,
+    reason = "the test owns and keeps its temporary mapped file stable"
+)]
+fn mapped_q4_k_weights_match_owned_loading_without_a_heap_copy() -> Result<(), Box<dyn Error>> {
+    let bytes = scalar_llama_q4_k_gguf_fixture();
+    let owned_gguf = parse_gguf(&bytes)?;
+    let owned_model = ScalarLlamaModel::from_gguf_scalar(&owned_gguf, &bytes)?;
+    let path = std::env::temp_dir().join(format!(
+        "ferrite-inference-mapped-q4-k-{}.gguf",
+        std::process::id()
+    ));
+    fs::write(&path, &bytes)?;
+
+    // SAFETY: the test owns this temporary file and drops every mapping before
+    // removing it.
+    let mapped = unsafe { MappedModelFile::open(&path)? };
+    let mapped_gguf = parse_gguf(mapped.as_bytes())?;
+    let mapped_model = ScalarLlamaModel::from_gguf_mapped(&mapped_gguf, &mapped)?;
+
+    assert_eq!(mapped_model, owned_model);
+    assert_eq!(mapped_model.mapped_model_file_bytes(), bytes.len());
+    assert_eq!(mapped_model.next_token(0)?.token_id, 1);
+
+    drop((mapped_model, mapped));
+    fs::remove_file(path)?;
     Ok(())
 }
 

@@ -236,7 +236,7 @@ pub fn format_scenario_result(result: &LongChatScenarioResult) -> String {
             timing.max_token_latency().as_millis()
         ));
     }
-    if let Some(token_ids) = throughput.streaming_token_ids {
+    if let Some(token_ids) = &throughput.streaming_token_ids {
         output.push_str(&format!(
             "\nlong_chat_result_streaming_content_chunks={}\nlong_chat_result_streaming_token_id_chunks={}\nlong_chat_result_streaming_token_ids={}\nlong_chat_result_streaming_all_content_chunks_have_token_ids={}",
             token_ids.content_chunks(),
@@ -244,6 +244,17 @@ pub fn format_scenario_result(result: &LongChatScenarioResult) -> String {
             token_ids.token_ids(),
             token_ids.all_content_chunks_have_token_ids()
         ));
+        if let Some(trace) = token_ids.token_id_trace() {
+            output.push_str(&format!(
+                "\nlong_chat_result_streaming_token_id_trace={}",
+                format_u64_list(trace)
+            ));
+        }
+        if let Some(matches) = token_ids.all_request_traces_match() {
+            output.push_str(&format!(
+                "\nlong_chat_result_streaming_all_token_id_traces_match={matches}"
+            ));
+        }
     }
     if let Some(rss) = throughput.rss {
         output.push_str(&format!(
@@ -254,4 +265,12 @@ pub fn format_scenario_result(result: &LongChatScenarioResult) -> String {
         ));
     }
     output
+}
+
+fn format_u64_list(values: &[u64]) -> String {
+    values
+        .iter()
+        .map(u64::to_string)
+        .collect::<Vec<_>>()
+        .join(",")
 }
