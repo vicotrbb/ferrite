@@ -4,6 +4,9 @@ The `ferrite` binary is a low-level generation, parity, profiling, and
 benchmarking interface. It prints stable `key=value` records so scripts can
 parse results without scraping prose.
 
+Treat the selected GGUF artifact as immutable until the Ferrite process exits;
+replacing or truncating a live mapped model file is unsupported.
+
 ```sh
 target/release/ferrite --help
 target/release/ferrite --version
@@ -65,8 +68,9 @@ cargo build --release --locked -p ferrite-cli --features locus-kv
 - `--profile-next-token` reports the initial token's stage timings.
 - `--profile-benchmark-token` profiles the first measured benchmark step and
   requires `--benchmark-runs`.
-- `--sleep-after-load-ms <ms>` pauses after model loading and raw GGUF buffer
-  release, allowing an external RSS sampler to measure retained memory.
+- `--sleep-after-load-ms <ms>` pauses after model loading, allowing an external
+  RSS sampler to measure retained heap storage plus the shared read-only GGUF
+  mapping.
 
 ## Experimental activation policies
 

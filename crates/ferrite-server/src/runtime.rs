@@ -14,10 +14,11 @@ use ferrite_inference::scalar::{
 };
 use ferrite_model::{
     gguf::parse_gguf,
+    model_file::MappedModelFile,
     tokenizer::{GgufTokenizer, TokenizationControl},
 };
 use prefix_cache::{fnv64_bytes, RuntimePrefixCache};
-use std::{error::Error, fmt, fs, path::Path, sync::Mutex};
+use std::{error::Error, fmt, path::Path, sync::Mutex};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GenerationControl {
@@ -99,7 +100,7 @@ pub struct InferenceEngine {
 
 impl InferenceEngine {
     pub fn load(path: &Path) -> Result<Self, RuntimeError> {
-        let bytes = fs::read(path)
+        let bytes = std::fs::read(path)
             .map_err(|error| RuntimeError::new(format!("failed to read model: {error}")))?;
         let gguf = parse_gguf(&bytes)
             .map_err(|error| RuntimeError::new(format!("failed to parse GGUF: {error}")))?;
@@ -107,7 +108,44 @@ impl InferenceEngine {
             .map_err(|error| RuntimeError::new(format!("failed to load tokenizer: {error}")))?;
         let model = ScalarLlamaModel::from_gguf_scalar(&gguf, &bytes)
             .map_err(|error| RuntimeError::new(format!("failed to load scalar model: {error}")))?;
-        let content_hash = fnv64_bytes(&bytes);
+        Self::from_loaded_parts(model, tokenizer, fnv64_bytes(&bytes))
+    }
+
+    /// Loads a model while retaining zero-copy ranges of a read-only mapping.
+    ///
+    /// # Safety
+    ///
+    /// The underlying file must not be modified or truncated until the engine
+    /// and every clone of its mapped tensors have been dropped.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the file cannot be mapped or its GGUF metadata,
+    /// tokenizer, model tensors, or numeric values are invalid.
+    #[allow(
+        unsafe_code,
+        reason = "the caller accepts the model-file stability requirement"
+    )]
+    pub unsafe fn load_mapped(path: &Path) -> Result<Self, RuntimeError> {
+        // SAFETY: this method transfers the documented file-stability
+        // requirement to its caller.
+        let mapped_model = unsafe { MappedModelFile::open(path) }
+            .map_err(|error| RuntimeError::new(format!("failed to read model: {error}")))?;
+        let bytes = mapped_model.as_bytes();
+        let gguf = parse_gguf(bytes)
+            .map_err(|error| RuntimeError::new(format!("failed to parse GGUF: {error}")))?;
+        let tokenizer = GgufTokenizer::from_gguf(&gguf)
+            .map_err(|error| RuntimeError::new(format!("failed to load tokenizer: {error}")))?;
+        let model = ScalarLlamaModel::from_gguf_mapped(&gguf, &mapped_model)
+            .map_err(|error| RuntimeError::new(format!("failed to load scalar model: {error}")))?;
+        Self::from_loaded_parts(model, tokenizer, fnv64_bytes(bytes))
+    }
+
+    fn from_loaded_parts(
+        model: ScalarLlamaModel,
+        tokenizer: GgufTokenizer,
+        content_hash: u64,
+    ) -> Result<Self, RuntimeError> {
         Ok(Self {
             model,
             tokenizer,

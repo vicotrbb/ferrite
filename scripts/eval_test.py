@@ -3,6 +3,7 @@
 
 import importlib
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -120,6 +121,17 @@ class OutputStemTest(unittest.TestCase):
         self.assertEqual(stem, "2026-07-09-120000-first-multi")
 
 
+class Sha256FileTest(unittest.TestCase):
+    def test_hashes_file_bytes(self):
+        with tempfile.TemporaryDirectory() as root:
+            path = Path(root) / "model.gguf"
+            path.write_bytes(b"Ferrite")
+            self.assertEqual(
+                ev.sha256_file(path),
+                "deb633a52c55fc7d804f5aabd4bab825a9ad00b616ae77099a42b9d668d24544",
+            )
+
+
 class RenderMarkdownTest(unittest.TestCase):
     def test_report_renders_cli_and_server_sections(self):
         report = ev.build_report(
@@ -128,9 +140,10 @@ class RenderMarkdownTest(unittest.TestCase):
                  "ram_bytes": 16 << 30, "platform": "macOS", "python": "3.14",
                  "git_commit": "abc123", "git_branch": "main", "git_dirty": False,
                  "rustc_version": "rustc 1.x", "logical_cores": 8},
-            cfg=ev.EvalConfig("hi", 64, 64, 2000, 4, (2,), 4, True),
+            cfg=ev.EvalConfig("hi", 64, 64, 2000, 4, (2,), 4, True, False, None),
             model_results=[{
                 "model_path": "target/models/model.gguf",
+                "model_sha256": "ab" * 32,
                 "cli": {"status": "ok", "load_seconds": 1.0,
                         "inference_threads": 8,
                         "ttft_prefill_seconds": 0.5,
@@ -147,7 +160,8 @@ class RenderMarkdownTest(unittest.TestCase):
                         }]},
                 "server": {"status": "ok",
                            "streaming_time_to_first_token_ms": "450",
-                           "streaming_tokens_per_second": "11.5"},
+                           "streaming_tokens_per_second": "11.5",
+                           "streaming_all_token_id_traces_match": "true"},
                 "batched_server": {
                     "status": "ok",
                     "concurrency": 4,
@@ -160,11 +174,13 @@ class RenderMarkdownTest(unittest.TestCase):
         self.assertEqual(report["schema_version"], ev.SCHEMA_VERSION)
         markdown = ev.render_markdown(report)
         self.assertIn("## model.gguf", markdown)
+        self.assertIn(f"model SHA-256: `{'ab' * 32}`", markdown)
         self.assertIn("| load | 1.0 s |", markdown)
         self.assertIn("12.3", markdown)
         self.assertIn("| inference threads | 8 |", markdown)
         self.assertIn("| 2 | 100.0 | 50.0 | 20.00 ms | True |", markdown)
         self.assertIn("| TTFT | 450 ms |", markdown)
+        self.assertIn("| all request token-ID traces match | true |", markdown)
         self.assertIn("| Continuous-batched server metric | value |", markdown)
         self.assertIn("| aggregate completion tok/s | 120.0 |", markdown)
         self.assertIn("| token IDs match default | True |", markdown)
@@ -173,13 +189,26 @@ class RenderMarkdownTest(unittest.TestCase):
 
 class CliExecutionFlagsTest(unittest.TestCase):
     def test_residual_activation_flag_is_explicit(self):
-        enabled = ev.EvalConfig("hi", 64, 64, 2000, 4, (), None, True)
+        enabled = ev.EvalConfig("hi", 64, 64, 2000, 4, (), None, True, False, None)
         disabled = enabled._replace(experimental_residual_q8_activation_matvec=False)
         self.assertEqual(
             ev.cli_execution_flags(enabled),
             ["--experimental-residual-q8-activation-matvec"],
         )
         self.assertEqual(ev.cli_execution_flags(disabled), [])
+
+    def test_one_pass_policy_and_role_scope_are_explicit(self):
+        cfg = ev.EvalConfig(
+            "hi", 64, 64, 2000, 4, (), None, False, True, "q_proj,ffn_down"
+        )
+        self.assertEqual(
+            ev.cli_execution_flags(cfg),
+            [
+                "--experimental-q8-k-activation-matvec",
+                "--experimental-q8-k-activation-roles",
+                "q_proj,ffn_down",
+            ],
+        )
 
 
 if __name__ == "__main__":

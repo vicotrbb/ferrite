@@ -53,31 +53,42 @@ pub(super) fn neon_q8_0_argmax_mul_vec_batch(
 ) -> Vec<usize> {
     let batch = vectors.len();
     let row_bytes = (cols / Q8_0_BLOCK_VALUES) * Q8_0_BLOCK_BYTES;
-    let best = bytes
+    let (best, _) = bytes
         .par_chunks_exact(row_bytes)
         .enumerate()
+        .with_min_len(BATCH_ROWS_PER_TASK)
         .fold(
-            || vec![(usize::MAX, f32::NEG_INFINITY); batch],
-            |mut best, (row_index, row_chunk)| {
-                let mut dots = vec![0.0f32; batch];
+            || {
+                (
+                    vec![(usize::MAX, f32::NEG_INFINITY); batch],
+                    vec![0.0f32; batch],
+                )
+            },
+            |(mut best, mut dots), (row_index, row_chunk)| {
+                dots.fill(0.0);
                 neon_q8_0_row_dot_batch(row_chunk, vectors, &mut dots);
-                for (entry, dot) in best.iter_mut().zip(dots) {
+                for (entry, &dot) in best.iter_mut().zip(&dots) {
                     if dot > entry.1 || (dot == entry.1 && row_index < entry.0) {
                         *entry = (row_index, dot);
                     }
                 }
-                best
+                (best, dots)
             },
         )
         .reduce(
-            || vec![(usize::MAX, f32::NEG_INFINITY); batch],
-            |mut left, right| {
+            || {
+                (
+                    vec![(usize::MAX, f32::NEG_INFINITY); batch],
+                    vec![0.0f32; batch],
+                )
+            },
+            |(mut left, scratch), (right, _)| {
                 for (l, r) in left.iter_mut().zip(right) {
                     if r.1 > l.1 || (r.1 == l.1 && r.0 < l.0) {
                         *l = r;
                     }
                 }
-                left
+                (left, scratch)
             },
         );
     best.into_iter()

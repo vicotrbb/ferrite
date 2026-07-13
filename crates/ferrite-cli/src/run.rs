@@ -6,11 +6,12 @@ use ferrite_inference::scalar::{
     ScalarLlamaModel, ScalarLlamaSession,
 };
 use ferrite_model::gguf::parse_gguf;
+use ferrite_model::model_file::MappedModelFile;
 use ferrite_model::tokenizer::GgufTokenizer;
 use std::error::Error;
 use std::ffi::OsString;
-use std::fs;
 use std::io::{self, Write};
+use std::path::Path;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -27,15 +28,17 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
         ferrite_inference::threading::init_global_pool(args.threads)
     };
     println!("inference_threads={inference_threads}");
-    let bytes = fs::read(&args.model_path)?;
+    let mapped_model = map_stable_model_file(&args.model_path)?;
+    let bytes = mapped_model.as_bytes();
     let model_file_bytes = bytes.len();
     let gguf_parse_started = Instant::now();
-    let gguf = parse_gguf(&bytes)?;
+    let gguf = parse_gguf(bytes)?;
     let gguf_parse_ns = gguf_parse_started.elapsed().as_nanos();
     let tokenizer_load_started = Instant::now();
     let tokenizer = GgufTokenizer::from_gguf(&gguf)?;
     let tokenizer_load_ns = tokenizer_load_started.elapsed().as_nanos();
     if let Some(runs) = args.benchmark_tokenization_runs {
+        drop(mapped_model);
         return benchmark_tokenization(
             &tokenizer,
             args.prompt,
@@ -47,8 +50,7 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
             },
         );
     }
-    let model = ScalarLlamaModel::from_gguf_scalar(&gguf, &bytes)?;
-    drop(bytes);
+    let model = ScalarLlamaModel::from_gguf_mapped(&gguf, &mapped_model)?;
     if let Some(sleep_ms) = args.sleep_after_load_ms {
         println!("sleep_after_load_ms={sleep_ms}");
         io::stdout().flush()?;
@@ -199,7 +201,10 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
         }
     }
     println!("model_file_bytes={model_file_bytes}");
-    println!("model_file_retained_bytes=0");
+    println!(
+        "model_file_retained_bytes={}",
+        model.mapped_model_file_bytes()
+    );
     println!("scalar_weight_bytes={}", model.scalar_weight_bytes());
     println!("kv_cache_bytes={}", session.kv_cache_bytes());
     #[cfg(feature = "locus-kv")]
@@ -219,6 +224,17 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
         }
     }
     Ok(())
+}
+
+#[allow(
+    unsafe_code,
+    reason = "the CLI treats its model artifact as immutable for the process lifetime"
+)]
+fn map_stable_model_file(path: &Path) -> io::Result<MappedModelFile> {
+    // SAFETY: Ferrite opens the user-selected model read-only and never
+    // modifies or truncates it. The CLI requires operators not to replace the
+    // backing artifact while inference is running.
+    unsafe { MappedModelFile::open(path) }
 }
 
 /// Decodes `runs` steps across `streams` sessions with the batched step,
@@ -263,7 +279,10 @@ fn benchmark_batched_streams(
         "benchmark_batch_tokens_per_second={:.2}",
         total_tokens as f64 / (total_ns as f64 / 1e9)
     );
-    println!("model_file_retained_bytes=0");
+    println!(
+        "model_file_retained_bytes={}",
+        model.mapped_model_file_bytes()
+    );
     println!("scalar_weight_bytes={}", model.scalar_weight_bytes());
     println!("kv_cache_bytes={}", sessions[0].kv_cache_bytes());
     Ok(())

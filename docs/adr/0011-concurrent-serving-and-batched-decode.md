@@ -24,9 +24,11 @@ logic, and output. Supported kernels stream one weight row across several
 activation vectors while preserving each stream's accumulation order.
 
 The server's experimental scheduler owns continuous streaming batches. Requests
-join and leave at token boundaries, and per-stream outputs are fanned back to
-the existing SSE lifecycle. `--experimental-batched-decode` and
-`--max-batch-streams` are both required.
+are coalesced through a bounded admission window, non-final prompt tokens use
+context-only batched steps, exact duplicate prompts fan out through independent
+KV snapshots, streams join and leave decode at token boundaries, and
+per-stream outputs are fanned back to the existing SSE lifecycle.
+`--experimental-batched-decode` and `--max-batch-streams` are both required.
 
 Prefix-cache requests, trace-enabled requests, non-streaming requests, and the
 residual activation policy remain outside the continuous-batch contract and
@@ -54,7 +56,7 @@ throughput based on machine-specific evidence.
 ## Evidence
 
 - `crates/ferrite-inference/tests/batched_decode.rs` proves per-stream token
-  equivalence and model-identity rejection.
+  equivalence, context-only prefill equivalence, and model-identity rejection.
 - `crates/ferrite-server/src/runtime/scheduler.rs` implements scheduler-owned
   continuous batches.
 - `crates/ferrite-server/tests/openai_http.rs` covers disconnect and permit

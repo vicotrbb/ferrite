@@ -1,5 +1,7 @@
 use ferrite_fixtures::{scalar_llama_q5_0_gguf_fixture, scalar_llama_q8_0_gguf_fixture};
-use ferrite_inference::scalar::{accept_token_ids_batch, ScalarLlamaModel};
+use ferrite_inference::scalar::{
+    accept_token_contexts_batch, accept_token_ids_batch, ScalarLlamaModel,
+};
 use ferrite_model::gguf::parse_gguf;
 use std::error::Error;
 
@@ -95,5 +97,31 @@ fn batched_step_rejects_sessions_from_different_models() -> Result<(), Box<dyn E
         Err(error) => error,
     };
     assert!(error.to_string().contains("same model"));
+    Ok(())
+}
+
+#[test]
+fn batched_context_only_prefill_matches_independent_prompt_state() -> Result<(), Box<dyn Error>> {
+    let fixture = scalar_llama_q5_0_gguf_fixture();
+    let model = model_from(&fixture)?;
+    let mut independent = [model.start_session(), model.start_session()];
+    let mut batched = [model.start_session(), model.start_session()];
+
+    for token_ids in [[0, 0], [0, 0]] {
+        for (session, token_id) in independent.iter_mut().zip(token_ids) {
+            session.accept_token_context_only(token_id)?;
+        }
+        accept_token_contexts_batch(&mut batched, &token_ids)?;
+    }
+
+    let independent_next = independent
+        .iter_mut()
+        .map(|session| session.accept_token_id(0))
+        .collect::<Result<Vec<_>, _>>()?;
+    let batched_next = accept_token_ids_batch(&mut batched, &[0, 0])?;
+
+    assert_eq!(batched_next, independent_next);
+    assert_eq!(batched[0].cached_token_count(), 3);
+    assert_eq!(batched[1].cached_token_count(), 3);
     Ok(())
 }

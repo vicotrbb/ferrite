@@ -100,10 +100,18 @@ target/release/ferrite-server \
 ```
 
 Batching usually raises aggregate throughput while reducing each stream's
-throughput and increasing time to first token. The accepted four-stream server
-gate reached 92.24 aggregate completion tokens per second with token-ID parity.
-The same eval reached 110.03, 138.81, and 169.47 aggregate tokens per second in
-the two, four, and eight-stream engine batches.
+throughput. The accepted 2026-07-13 Apple M5 Pro gate reached a repeated median
+of 131.45 aggregate completion tokens per second at four requests, 41.03% above
+the initial 93.21 tok/s observation, and 159.58 tok/s at eight requests. Every
+response in each cohort matched the default route's complete ordered token-ID
+trace. The four-request median used 568.8 MiB peak RSS, 40.55% below the initial
+956.8 MiB observation. See the
+[complete gate](benchmarks/2026-07-13-memory-mapping-and-shared-prefill.md).
+
+Those measurements use the eval harness's shared-prompt workload. Exact equal
+prompts benefit from one prefill plus independent KV snapshot restoration;
+distinct prompts still use batched context-only prefill but do not receive that
+fan-out optimization.
 
 ## 6. Run the complete eval harness
 
@@ -114,14 +122,25 @@ scripts/eval.sh \
   --batch-streams 2 \
   --batch-streams 4 \
   --batch-streams 8 \
+  --skip-server \
+  --tag golden-path-residual
+
+scripts/eval.sh \
+  --model target/models/qwen2.5-0.5b-instruct-q4_k_m.gguf \
+  --skip-cli \
   --server-batch-streams 4 \
   --requests 4 \
-  --tag golden-path
+  --tag golden-path-server-batch
 ```
 
+Residual I8MM and continuous batching are separate execution contracts, so the
+harness evaluates them in separate invocations instead of silently changing a
+requested policy.
+
 The harness writes JSON and Markdown under `scripts/evals/` and records TTFT,
-decode throughput, token latency, RSS, CPU, commands, model, host, Rust version,
-commit, branch, and dirty-tree state.
+decode throughput, token latency, RSS, CPU, commands, model SHA-256, complete
+ordered server token-ID traces, cohort parity, host, Rust version, commit,
+branch, and dirty-tree state.
 
 ## 7. Promotion rule for optimizations
 

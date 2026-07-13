@@ -11,7 +11,7 @@ use super::q6_k::q6_k_mul_vec_with_options;
 use super::q6_k::{accumulate_q6_k_block, decode_q6_k_values, q6_k_argmax_mul_vec, q6_k_mul_vec};
 #[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
 use super::q6_k::{q6_k_mul_vec_with_backend, Q6KMatVecBackend};
-use super::q8_0::{q8_0_argmax_mul_vec, q8_0_mul_vec};
+use super::q8_0::{q8_0_argmax_mul_vec, q8_0_argmax_mul_vec_batch, q8_0_mul_vec};
 #[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
 use super::q8_0::{q8_0_mul_vec_with_backend, Q8_0MatVecBackend};
 use super::InferenceError;
@@ -322,6 +322,29 @@ fn q8_0_argmax_mul_vec_matches_full_matvec_argmax() -> Result<(), InferenceError
         .ok_or_else(|| InferenceError::new("expected non-empty Q8_0 output"))?;
 
     assert_eq!(q8_0_argmax_mul_vec(&bytes, 3, 32, &vector)?, expected);
+    Ok(())
+}
+
+#[test]
+fn q8_0_batched_argmax_matches_independent_argmaxes() -> Result<(), InferenceError> {
+    let mut bytes = Vec::new();
+    bytes.extend(q8_0_block_with_value(-2));
+    bytes.extend(q8_0_block_with_value(3));
+    bytes.extend(q8_0_block_with_value(3));
+    bytes.extend(q8_0_block_with_value(1));
+    let positive = [1.0; 32];
+    let negative = [-1.0; 32];
+    let vectors = [positive.as_slice(), negative.as_slice()];
+
+    let expected = vectors
+        .iter()
+        .map(|vector| q8_0_argmax_mul_vec(&bytes, 4, 32, vector))
+        .collect::<Result<Vec<_>, _>>()?;
+
+    assert_eq!(
+        q8_0_argmax_mul_vec_batch(&bytes, 4, 32, &vectors)?,
+        expected
+    );
     Ok(())
 }
 

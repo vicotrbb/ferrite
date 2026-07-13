@@ -1,4 +1,4 @@
-use super::{Matrix, MatrixData};
+use super::{Matrix, MatrixData, QuantizedBytes};
 use crate::scalar::{
     q4_k::validate_q4_k_finite_scales,
     q5_0::validate_q5_0_finite_scales,
@@ -10,6 +10,8 @@ use crate::scalar::{
     },
     InferenceError,
 };
+use ferrite_model::model_file::MappedModelFile;
+use std::ops::Range;
 
 impl Matrix {
     /// Creates an F32 matrix from row-major values.
@@ -54,6 +56,23 @@ impl Matrix {
         cols: usize,
         data: Vec<u8>,
     ) -> Result<Self, InferenceError> {
+        Self::from_q8_0_storage(rows, cols, QuantizedBytes::Owned(data))
+    }
+
+    pub(in crate::scalar) fn from_q8_0_mapped_bytes(
+        rows: usize,
+        cols: usize,
+        file: MappedModelFile,
+        range: Range<usize>,
+    ) -> Result<Self, InferenceError> {
+        Self::from_q8_0_storage(rows, cols, QuantizedBytes::mapped(file, range)?)
+    }
+
+    fn from_q8_0_storage(
+        rows: usize,
+        cols: usize,
+        data: QuantizedBytes,
+    ) -> Result<Self, InferenceError> {
         if !cols.is_multiple_of(Q8_0_BLOCK_VALUES) {
             return Err(InferenceError::new(format!(
                 "Q8_0 matrix columns {cols} must be divisible by {Q8_0_BLOCK_VALUES}"
@@ -69,7 +88,7 @@ impl Matrix {
                 data.len()
             )));
         }
-        validate_q8_0_finite_scales(&data)?;
+        validate_q8_0_finite_scales(data.as_slice())?;
 
         Ok(Self {
             rows,
@@ -89,6 +108,23 @@ impl Matrix {
         cols: usize,
         data: Vec<u8>,
     ) -> Result<Self, InferenceError> {
+        Self::from_q5_0_storage(rows, cols, QuantizedBytes::Owned(data))
+    }
+
+    pub(in crate::scalar) fn from_q5_0_mapped_bytes(
+        rows: usize,
+        cols: usize,
+        file: MappedModelFile,
+        range: Range<usize>,
+    ) -> Result<Self, InferenceError> {
+        Self::from_q5_0_storage(rows, cols, QuantizedBytes::mapped(file, range)?)
+    }
+
+    fn from_q5_0_storage(
+        rows: usize,
+        cols: usize,
+        data: QuantizedBytes,
+    ) -> Result<Self, InferenceError> {
         if !cols.is_multiple_of(Q5_0_BLOCK_VALUES) {
             return Err(InferenceError::new(format!(
                 "Q5_0 matrix columns {cols} must be divisible by {Q5_0_BLOCK_VALUES}"
@@ -104,7 +140,7 @@ impl Matrix {
                 data.len()
             )));
         }
-        validate_q5_0_finite_scales(&data)?;
+        validate_q5_0_finite_scales(data.as_slice())?;
 
         Ok(Self {
             rows,
@@ -124,6 +160,23 @@ impl Matrix {
         cols: usize,
         data: Vec<u8>,
     ) -> Result<Self, InferenceError> {
+        Self::from_q4_k_storage(rows, cols, QuantizedBytes::Owned(data))
+    }
+
+    pub(in crate::scalar) fn from_q4_k_mapped_bytes(
+        rows: usize,
+        cols: usize,
+        file: MappedModelFile,
+        range: Range<usize>,
+    ) -> Result<Self, InferenceError> {
+        Self::from_q4_k_storage(rows, cols, QuantizedBytes::mapped(file, range)?)
+    }
+
+    fn from_q4_k_storage(
+        rows: usize,
+        cols: usize,
+        data: QuantizedBytes,
+    ) -> Result<Self, InferenceError> {
         let value_count = rows
             .checked_mul(cols)
             .ok_or_else(|| InferenceError::new("Q4_K matrix value count overflow"))?;
@@ -134,7 +187,7 @@ impl Matrix {
                 data.len()
             )));
         }
-        validate_q4_k_finite_scales(&data)?;
+        validate_q4_k_finite_scales(data.as_slice())?;
 
         Ok(Self {
             rows,
@@ -154,6 +207,23 @@ impl Matrix {
         cols: usize,
         data: Vec<u8>,
     ) -> Result<Self, InferenceError> {
+        Self::from_q6_k_storage(rows, cols, QuantizedBytes::Owned(data))
+    }
+
+    pub(in crate::scalar) fn from_q6_k_mapped_bytes(
+        rows: usize,
+        cols: usize,
+        file: MappedModelFile,
+        range: Range<usize>,
+    ) -> Result<Self, InferenceError> {
+        Self::from_q6_k_storage(rows, cols, QuantizedBytes::mapped(file, range)?)
+    }
+
+    fn from_q6_k_storage(
+        rows: usize,
+        cols: usize,
+        data: QuantizedBytes,
+    ) -> Result<Self, InferenceError> {
         let value_count = rows
             .checked_mul(cols)
             .ok_or_else(|| InferenceError::new("Q6_K matrix value count overflow"))?;
@@ -164,7 +234,7 @@ impl Matrix {
                 data.len()
             )));
         }
-        validate_q6_k_finite_scales(&data)?;
+        validate_q6_k_finite_scales(data.as_slice())?;
 
         Ok(Self {
             rows,

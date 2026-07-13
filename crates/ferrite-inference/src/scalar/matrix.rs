@@ -7,6 +7,8 @@ use super::{
     quantized::{q5_0_mul_vec, q8_0_argmax_mul_vec, q8_0_mul_vec},
     InferenceError, ScalarExecutionOptions,
 };
+use ferrite_model::model_file::MappedModelFile;
+use std::{ops::Deref, ops::Range};
 
 mod constructors;
 mod rows;
@@ -47,13 +49,75 @@ impl MatrixStorageKind {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 enum MatrixData {
     F32(Vec<f32>),
-    Q4K(Vec<u8>),
-    Q5_0(Vec<u8>),
-    Q6K(Vec<u8>),
-    Q8_0(Vec<u8>),
+    Q4K(QuantizedBytes),
+    Q5_0(QuantizedBytes),
+    Q6K(QuantizedBytes),
+    Q8_0(QuantizedBytes),
+}
+
+impl PartialEq for MatrixData {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::F32(left), Self::F32(right)) => left == right,
+            (Self::Q4K(left), Self::Q4K(right))
+            | (Self::Q5_0(left), Self::Q5_0(right))
+            | (Self::Q6K(left), Self::Q6K(right))
+            | (Self::Q8_0(left), Self::Q8_0(right)) => left == right,
+            _ => false,
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+enum QuantizedBytes {
+    Owned(Vec<u8>),
+    Mapped {
+        file: MappedModelFile,
+        range: Range<usize>,
+    },
+}
+
+impl QuantizedBytes {
+    fn mapped(file: MappedModelFile, range: Range<usize>) -> Result<Self, InferenceError> {
+        if file.as_bytes().get(range.clone()).is_none() {
+            return Err(InferenceError::new(format!(
+                "quantized matrix byte range {range:?} is invalid for {} mapped bytes",
+                file.as_bytes().len()
+            )));
+        }
+        Ok(Self::Mapped { file, range })
+    }
+
+    fn as_slice(&self) -> &[u8] {
+        match self {
+            Self::Owned(bytes) => bytes,
+            Self::Mapped { file, range } => &file.as_bytes()[range.clone()],
+        }
+    }
+
+    fn mapped_file_bytes(&self) -> usize {
+        match self {
+            Self::Owned(_) => 0,
+            Self::Mapped { file, .. } => file.as_bytes().len(),
+        }
+    }
+}
+
+impl Deref for QuantizedBytes {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        self.as_slice()
+    }
+}
+
+impl PartialEq for QuantizedBytes {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_slice() == other.as_slice()
+    }
 }
 
 type MatrixPairOutput = (Vec<f32>, Vec<f32>);
@@ -119,7 +183,10 @@ impl Matrix {
         rows::row_values(&self.data, self.rows, self.cols, index)
     }
 
-    /// Returns bytes owned by the matrix's physical storage.
+    /// Returns the byte count of the matrix's physical tensor storage.
+    ///
+    /// The storage may be owned heap memory or a range retained from a shared
+    /// read-only GGUF mapping.
     pub fn storage_bytes(&self) -> u128 {
         match &self.data {
             MatrixData::F32(values) => values.len() as u128 * std::mem::size_of::<f32>() as u128,
@@ -127,6 +194,16 @@ impl Matrix {
             MatrixData::Q5_0(bytes) => bytes.len() as u128,
             MatrixData::Q6K(bytes) => bytes.len() as u128,
             MatrixData::Q8_0(bytes) => bytes.len() as u128,
+        }
+    }
+
+    pub(in crate::scalar) fn mapped_file_bytes(&self) -> usize {
+        match &self.data {
+            MatrixData::F32(_) => 0,
+            MatrixData::Q4K(bytes)
+            | MatrixData::Q5_0(bytes)
+            | MatrixData::Q6K(bytes)
+            | MatrixData::Q8_0(bytes) => bytes.mapped_file_bytes(),
         }
     }
 

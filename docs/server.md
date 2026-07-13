@@ -1,6 +1,8 @@
 # HTTP server
 
 `ferrite-server` loads one model and exposes a local OpenAI-compatible API.
+Treat the configured GGUF artifact as immutable for the complete server
+lifetime; replacing or truncating a live mapped model file is unsupported.
 Build and run release binaries for realistic behavior:
 
 ```sh
@@ -88,7 +90,11 @@ target/release/ferrite-server \
 
 Only eligible streaming chat and completion requests enter the batch
 scheduler. Non-streaming, prefix-cache, and trace-enabled requests use the
-normal inference-permit path.
+normal inference-permit path. The scheduler briefly coalesces concurrent
+arrivals, batches non-final prompt-token prefill without evaluating unused
+output logits, evaluates exact duplicate prompts once before restoring an
+independent KV snapshot into each request, and then lets streams join and leave
+the decode batch at token boundaries.
 
 ## Network exposure
 

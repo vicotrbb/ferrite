@@ -16,9 +16,10 @@ repository = "https://github.com/vicotrbb/ferrite"
 rust-version = "1.96"
 
 [workspace.dependencies]
-ferrite-fixtures = { version = "0.1.0", path = "crates/ferrite-fixtures" }
-ferrite-inference = { version = "0.1.0", path = "crates/ferrite-inference" }
-ferrite-model = { version = "0.1.0", path = "crates/ferrite-model" }
+ferrite-fixtures = { version = "0.2.0", path = "crates/ferrite-fixtures" }
+ferrite-inference = { version = "0.2.0", path = "crates/ferrite-inference" }
+ferrite-model = { version = "0.2.0", path = "crates/ferrite-model" }
+memmap2 = "0.9"
 
 [workspace.lints.rust]
 unsafe_code = "deny"

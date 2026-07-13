@@ -37,7 +37,7 @@ The following boundaries are part of the current contract.
 
 ## Stability
 
-- The publishable crates are version `0.1.0` and can evolve before 1.0.
+- The publishable crates are version `0.2.0` and can evolve before 1.0.
 - CLI `key=value` names, HTTP response shapes, and experimental flags are
   treated as compatibility surfaces, but can change with release notes.
 - Performance numbers are evidence for a named model, build, machine, and
