@@ -92,10 +92,10 @@ async fn chat_endpoint_reports_cached_tokens_when_experimental_prefix_cache_is_e
 ) -> Result<(), Box<dyn std::error::Error>> {
     let model_path = write_chat_fixture_model()?;
     let engine = InferenceEngine::load(&model_path)?;
-    let app = router(
-        ServerState::with_engine("fixture-model".to_owned(), engine)
-            .with_prefix_cache_enabled(true),
-    );
+    let state = ServerState::with_engine("fixture-model".to_owned(), engine)
+        .with_prefix_cache_enabled(true)
+        .with_batched_decode(2)?;
+    let app = router(state);
     let request_body = r#"{"model":"fixture-model","messages":[{"role":"user","content":"hello"}],"prompt_cache_key":"tenant-a:thread-1","max_completion_tokens":1}"#;
 
     let first_response = app
@@ -144,10 +144,10 @@ async fn completions_endpoint_reports_cached_tokens_when_experimental_prefix_cac
 ) -> Result<(), Box<dyn std::error::Error>> {
     let model_path = write_fixture_model()?;
     let engine = InferenceEngine::load(&model_path)?;
-    let app = router(
-        ServerState::with_engine("fixture-model".to_owned(), engine)
-            .with_prefix_cache_enabled(true),
-    );
+    let state = ServerState::with_engine("fixture-model".to_owned(), engine)
+        .with_prefix_cache_enabled(true)
+        .with_batched_decode(2)?;
+    let app = router(state);
     let request_body = r#"{"model":"fixture-model","prompt":"hello","prompt_cache_key":"tenant-a:completion-1","max_tokens":1}"#;
 
     let first_response = app

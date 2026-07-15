@@ -5,13 +5,18 @@ use std::ops::Range;
 mod reader;
 mod types;
 
-pub use crate::gguf_config::{LlamaConfig, ModelArchitecture, ModelConfig};
+pub use crate::gguf_config::{
+    ArchitectureExecution, AttentionProjectionLayout, FeedForwardProjectionLayout, LlamaConfig,
+    ModelArchitecture, ModelConfig, RotaryPairing, TransformerConfig,
+};
 use reader::Reader;
 pub use types::{GgmlType, MetadataValue, MetadataValueType};
 
 const GGUF_MAGIC: &[u8; 4] = b"GGUF";
 const GGUF_VERSION: u32 = 3;
 const DEFAULT_ALIGNMENT: u64 = 32;
+const MAX_METADATA_ENTRIES: u64 = 65_536;
+const MAX_TENSOR_COUNT: usize = 65_536;
 
 #[derive(Clone, Debug, PartialEq)]
 /// A validated view of one GGUF v3 file.
@@ -32,6 +37,25 @@ impl GgufFile {
         self.tensors.iter().find(|tensor| tensor.name == name)
     }
 
+    /// Returns the model-provided Jinja chat template when present.
+    ///
+    /// Ferrite exposes the source string for a bounded renderer and does not
+    /// execute arbitrary template code in the model parser.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `tokenizer.chat_template` is present with a type
+    /// other than string.
+    pub fn chat_template(&self) -> Result<Option<&str>, GgufError> {
+        match self.metadata.get("tokenizer.chat_template") {
+            Some(MetadataValue::String(template)) => Ok(Some(template)),
+            Some(other) => Err(GgufError::new(format!(
+                "tokenizer.chat_template must be a string, found {other:?}"
+            ))),
+            None => Ok(None),
+        }
+    }
+
     /// Builds a validated configuration for the architecture named in metadata.
     ///
     /// # Errors
@@ -39,12 +63,13 @@ impl GgufFile {
     /// Returns an error when the architecture is unsupported, required metadata
     /// is absent or has the wrong type, or transformer dimensions are invalid.
     pub fn model_config(&self) -> Result<ModelConfig, GgufError> {
-        let architecture = self.model_architecture()?;
+        let architecture = self.architecture()?;
         let config = self.transformer_config(architecture)?;
 
         match architecture {
             ModelArchitecture::Llama => Ok(ModelConfig::Llama(config)),
             ModelArchitecture::Qwen2 => Ok(ModelConfig::Qwen2(config)),
+            ModelArchitecture::Phi3 => Ok(ModelConfig::Phi3(config)),
         }
     }
 
@@ -55,7 +80,7 @@ impl GgufFile {
     /// Returns an error when the file is not a Llama model or its required
     /// configuration metadata is missing or invalid.
     pub fn llama_config(&self) -> Result<LlamaConfig, GgufError> {
-        let architecture = self.model_architecture()?;
+        let architecture = self.architecture()?;
         if architecture != ModelArchitecture::Llama {
             return Err(GgufError::new(format!(
                 "expected llama architecture, found {}",
@@ -66,7 +91,13 @@ impl GgufFile {
         self.transformer_config(ModelArchitecture::Llama)
     }
 
-    fn model_architecture(&self) -> Result<ModelArchitecture, GgufError> {
+    /// Returns the supported architecture declared by `general.architecture`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the metadata is missing, malformed, or names an
+    /// architecture that Ferrite does not support.
+    pub fn architecture(&self) -> Result<ModelArchitecture, GgufError> {
         match self.metadata.get("general.architecture") {
             Some(MetadataValue::String(architecture)) => {
                 ModelArchitecture::from_metadata(architecture).ok_or_else(|| {
@@ -97,7 +128,13 @@ impl GgufFile {
         let rope_dimension_count =
             match self.optional_nonzero_count(&format!("{prefix}.rope.dimension_count"))? {
                 Some(value) => value,
-                None if architecture == ModelArchitecture::Qwen2 => key_length,
+                None if matches!(
+                    architecture,
+                    ModelArchitecture::Qwen2 | ModelArchitecture::Phi3
+                ) =>
+                {
+                    key_length
+                }
                 None => {
                     return Err(GgufError::new(format!(
                         "missing required metadata {prefix}.rope.dimension_count"
@@ -234,12 +271,22 @@ pub fn parse_gguf(bytes: &[u8]) -> Result<GgufFile, GgufError> {
         )));
     }
 
-    let tensor_count = reader.read_u64()?;
+    let tensor_count = usize_from_u64(reader.read_u64()?, "tensor count")?;
     let metadata_count = reader.read_u64()?;
+    if tensor_count > MAX_TENSOR_COUNT {
+        return Err(GgufError::new(format!(
+            "tensor count {tensor_count} exceeds parser limit {MAX_TENSOR_COUNT}"
+        )));
+    }
+    if metadata_count > MAX_METADATA_ENTRIES {
+        return Err(GgufError::new(format!(
+            "metadata entry count {metadata_count} exceeds parser limit {MAX_METADATA_ENTRIES}"
+        )));
+    }
 
     let mut metadata = BTreeMap::new();
     for _ in 0..metadata_count {
-        let key = reader.read_string()?;
+        let key = reader.read_string_with_limit(u16::MAX as usize, "metadata key")?;
         validate_metadata_key(&key)?;
         let value_type = MetadataValueType::from_u32(reader.read_u32()?)?;
         let value = reader.read_metadata_value(value_type)?;
@@ -249,7 +296,14 @@ pub fn parse_gguf(bytes: &[u8]) -> Result<GgufFile, GgufError> {
     }
 
     let alignment = read_alignment(&metadata)?;
-    let mut raw_tensors = Vec::with_capacity(usize_from_u64(tensor_count, "tensor count")?);
+    let mut raw_tensors = Vec::new();
+    raw_tensors
+        .try_reserve_exact(tensor_count)
+        .map_err(|error| {
+            GgufError::new(format!(
+                "failed to reserve tensor directory capacity for {tensor_count} entries: {error}"
+            ))
+        })?;
     let mut tensor_names = BTreeSet::new();
     for _ in 0..tensor_count {
         let raw_tensor = reader.read_tensor_info(alignment)?;
@@ -273,7 +327,15 @@ pub fn parse_gguf(bytes: &[u8]) -> Result<GgufFile, GgufError> {
         return Err(GgufError::new("tensor data start is past end of file"));
     }
 
-    let mut tensors = Vec::with_capacity(raw_tensors.len());
+    let mut tensors = Vec::new();
+    tensors
+        .try_reserve_exact(raw_tensors.len())
+        .map_err(|error| {
+            GgufError::new(format!(
+                "failed to reserve validated tensor capacity for {} entries: {error}",
+                raw_tensors.len()
+            ))
+        })?;
     for raw in raw_tensors {
         let element_count = raw.element_count()?;
         let byte_len = raw.ty.storage_bytes(element_count)?;

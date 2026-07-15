@@ -9,7 +9,7 @@ use tokio::sync::Mutex;
 const DEFAULT_MODEL_PATH: &str = "target/models/SmolLM2-1.7B-Instruct-Q4_K_M.gguf";
 const REAL_MODEL_ID: &str = "smollm2-1.7b-q4_k_m";
 const COMPLETION_TEXT: &str = "\"";
-const CHAT_CONTENT: &str = "1";
+const CHAT_CONTENT: &str = "Hello";
 static REAL_MODEL_TEST_LOCK: Mutex<()> = Mutex::const_new(());
 
 #[tokio::test]

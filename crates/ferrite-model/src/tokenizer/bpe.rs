@@ -44,6 +44,18 @@ impl BpeMetadata {
 }
 
 pub(super) fn decode(ids: &[usize], tokens: &[String]) -> Result<String, TokenizerError> {
+    let bytes = decode_bytes(ids, tokens)?;
+    String::from_utf8(bytes).map_err(|error| {
+        let message = format!("BPE decoded invalid UTF-8: {error}");
+        if error.utf8_error().error_len().is_none() {
+            TokenizerError::incomplete_utf8(message)
+        } else {
+            TokenizerError::new(message)
+        }
+    })
+}
+
+pub(super) fn decode_bytes(ids: &[usize], tokens: &[String]) -> Result<Vec<u8>, TokenizerError> {
     let mut bytes = Vec::new();
     for id in ids {
         let token = tokens
@@ -53,14 +65,7 @@ pub(super) fn decode(ids: &[usize], tokens: &[String]) -> Result<String, Tokeniz
             bytes.push(unicode_to_byte(value)?);
         }
     }
-    String::from_utf8(bytes).map_err(|error| {
-        let message = format!("BPE decoded invalid UTF-8: {error}");
-        if error.utf8_error().error_len().is_none() {
-            TokenizerError::incomplete_utf8(message)
-        } else {
-            TokenizerError::new(message)
-        }
-    })
+    Ok(bytes)
 }
 
 pub(super) fn encode_with_cancellation(

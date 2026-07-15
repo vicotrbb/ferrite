@@ -1,12 +1,15 @@
 mod cache_options;
 mod cache_trace;
+mod json_grammar;
 mod prefix_cache;
 mod scheduler;
 
 pub use cache_options::GenerationCacheOptions;
 pub use cache_trace::{PromptCacheLookup, PromptCacheTrace};
+pub use prefix_cache::PrefixCacheStats;
 pub use scheduler::{BatchScheduler, BatchedGenerationEvent};
 
+use ferrite_inference::sampling::{Sampler, SamplingConfig};
 use ferrite_inference::scalar::{
     PromptEvaluationControl as ScalarPromptEvaluationControl,
     PromptEvaluationLocation as ScalarPromptEvaluationLocation, Q8KActivationMatvecPolicy,
@@ -17,6 +20,7 @@ use ferrite_model::{
     model_file::MappedModelFile,
     tokenizer::{GgufTokenizer, TokenizationControl},
 };
+use json_grammar::JsonObjectConstraint;
 use prefix_cache::{fnv64_bytes, RuntimePrefixCache};
 use std::{error::Error, fmt, path::Path, sync::Mutex};
 
@@ -75,6 +79,7 @@ pub enum GenerationFinishSource {
     Eos,
     GenerationControl,
     StopSequence,
+    StructuredOutput,
 }
 
 impl GenerationFinishSource {
@@ -84,6 +89,7 @@ impl GenerationFinishSource {
             Self::Eos => "eos",
             Self::GenerationControl => "generation_control",
             Self::StopSequence => "stop_sequence",
+            Self::StructuredOutput => "structured_output",
         }
     }
 }
@@ -95,6 +101,9 @@ pub struct InferenceEngine {
     execution_options: ScalarExecutionOptions,
     model_fingerprint: String,
     tokenizer_fingerprint: String,
+    chat_template: Option<String>,
+    chat_template_bos_token: Option<String>,
+    chat_template_fingerprint: String,
     prefix_cache: Mutex<RuntimePrefixCache>,
 }
 
@@ -104,11 +113,15 @@ impl InferenceEngine {
             .map_err(|error| RuntimeError::new(format!("failed to read model: {error}")))?;
         let gguf = parse_gguf(&bytes)
             .map_err(|error| RuntimeError::new(format!("failed to parse GGUF: {error}")))?;
+        let chat_template = gguf
+            .chat_template()
+            .map_err(|error| RuntimeError::new(format!("failed to load chat template: {error}")))?
+            .map(str::to_owned);
         let tokenizer = GgufTokenizer::from_gguf(&gguf)
             .map_err(|error| RuntimeError::new(format!("failed to load tokenizer: {error}")))?;
         let model = ScalarLlamaModel::from_gguf_scalar(&gguf, &bytes)
             .map_err(|error| RuntimeError::new(format!("failed to load scalar model: {error}")))?;
-        Self::from_loaded_parts(model, tokenizer, fnv64_bytes(&bytes))
+        Self::from_loaded_parts(model, tokenizer, fnv64_bytes(&bytes), chat_template)
     }
 
     /// Loads a model while retaining zero-copy ranges of a read-only mapping.
@@ -134,26 +147,65 @@ impl InferenceEngine {
         let bytes = mapped_model.as_bytes();
         let gguf = parse_gguf(bytes)
             .map_err(|error| RuntimeError::new(format!("failed to parse GGUF: {error}")))?;
+        let chat_template = gguf
+            .chat_template()
+            .map_err(|error| RuntimeError::new(format!("failed to load chat template: {error}")))?
+            .map(str::to_owned);
         let tokenizer = GgufTokenizer::from_gguf(&gguf)
             .map_err(|error| RuntimeError::new(format!("failed to load tokenizer: {error}")))?;
         let model = ScalarLlamaModel::from_gguf_mapped(&gguf, &mapped_model)
             .map_err(|error| RuntimeError::new(format!("failed to load scalar model: {error}")))?;
-        Self::from_loaded_parts(model, tokenizer, fnv64_bytes(bytes))
+        Self::from_loaded_parts(model, tokenizer, fnv64_bytes(bytes), chat_template)
     }
 
     fn from_loaded_parts(
         model: ScalarLlamaModel,
         tokenizer: GgufTokenizer,
         content_hash: u64,
+        chat_template: Option<String>,
     ) -> Result<Self, RuntimeError> {
+        let chat_template_bos_token = tokenizer
+            .bos_token_id()
+            .and_then(|token_id| tokenizer.token(token_id))
+            .map(str::to_owned);
+        let chat_template_fingerprint = chat_template.as_ref().map_or_else(
+            || "runtime-rendered-prompt-v1".to_owned(),
+            |template| {
+                format!(
+                    "gguf-chat-template-fnv64:{:016x}",
+                    fnv64_bytes(template.as_bytes())
+                )
+            },
+        );
         Ok(Self {
             model,
             tokenizer,
             execution_options: ScalarExecutionOptions::default(),
             model_fingerprint: format!("gguf-model-fnv64:{content_hash:016x}"),
             tokenizer_fingerprint: format!("gguf-tokenizer-fnv64:{content_hash:016x}"),
+            chat_template,
+            chat_template_bos_token,
+            chat_template_fingerprint,
             prefix_cache: Mutex::new(RuntimePrefixCache::default()),
         })
+    }
+
+    pub(crate) fn chat_template(&self) -> Option<&str> {
+        self.chat_template.as_deref()
+    }
+
+    pub(crate) fn chat_template_bos_token(&self) -> Option<&str> {
+        self.chat_template_bos_token.as_deref()
+    }
+
+    /// Returns the loaded tokenizer vocabulary size.
+    pub fn vocabulary_size(&self) -> usize {
+        self.tokenizer.len()
+    }
+
+    /// Returns the model's GGUF-declared maximum context length.
+    pub fn model_context_length(&self) -> Option<usize> {
+        self.model.context_length()
     }
 
     pub fn with_execution_options(mut self, execution_options: ScalarExecutionOptions) -> Self {
@@ -167,13 +219,61 @@ impl InferenceEngine {
             .map_err(|error| RuntimeError::new(format!("failed to start session: {error}")))
     }
 
+    pub fn validate_session_configuration(&self) -> Result<(), RuntimeError> {
+        let _session = self.start_session()?;
+        Ok(())
+    }
+
     pub(crate) fn batch_decode_compatible(&self) -> bool {
         self.execution_options.q8_k_activation_matvec_policy()
             == Q8KActivationMatvecPolicy::DefaultOnly
     }
 
+    pub(crate) fn validate_kv_capacity(
+        &self,
+        prompt_tokens: usize,
+        max_tokens: usize,
+    ) -> Result<(), RuntimeError> {
+        let required = prompt_tokens
+            .checked_add(max_tokens.saturating_sub(1))
+            .ok_or_else(|| RuntimeError::new("requested KV token count overflowed"))?;
+        if let Some(context_length) = self.model.context_length() {
+            if required > context_length {
+                return Err(RuntimeError::new(format!(
+                    "request needs capacity for {required} KV tokens but the model context length is {context_length}"
+                )));
+            }
+        }
+        if let ferrite_inference::scalar::KvBackend::Locus {
+            max_tokens: cap, ..
+        } = self.execution_options.kv_backend()
+        {
+            if required > cap {
+                return Err(RuntimeError::new(format!(
+                    "request needs capacity for {required} KV tokens but the configured Locus limit is {cap}"
+                )));
+            }
+        }
+        Ok(())
+    }
+
     pub fn generate(&self, prompt: &str, max_tokens: usize) -> Result<GeneratedText, RuntimeError> {
         self.generate_with_token_callback(prompt, max_tokens, |_| Ok(GenerationControl::Continue))
+    }
+
+    pub fn generate_with_sampling(
+        &self,
+        prompt: &str,
+        max_tokens: usize,
+        sampling: SamplingConfig,
+    ) -> Result<GeneratedText, RuntimeError> {
+        self.generate_with_sampling_and_token_callback_and_cache_options(
+            prompt,
+            max_tokens,
+            sampling,
+            GenerationCacheOptions::default(),
+            |_| Ok(GenerationControl::Continue),
+        )
     }
 
     pub fn generate_with_cache_options(
@@ -235,6 +335,67 @@ impl InferenceEngine {
         )
     }
 
+    pub fn generate_with_sampling_and_token_callback_and_cache_options(
+        &self,
+        prompt: &str,
+        max_tokens: usize,
+        sampling: SamplingConfig,
+        cache_options: GenerationCacheOptions,
+        mut on_token: impl FnMut(&str) -> Result<GenerationControl, RuntimeError>,
+    ) -> Result<GeneratedText, RuntimeError> {
+        self.generate_with_sampling_and_token_event_callback_and_cache_options(
+            prompt,
+            max_tokens,
+            sampling,
+            cache_options,
+            |token_text, _token_ids| on_token(token_text),
+        )
+    }
+
+    pub(crate) fn generate_json_object_with_sampling_and_token_callback_and_cache_options(
+        &self,
+        prompt: &str,
+        max_tokens: usize,
+        sampling: SamplingConfig,
+        cache_options: GenerationCacheOptions,
+        mut on_token: impl FnMut(&str) -> Result<GenerationControl, RuntimeError>,
+    ) -> Result<GeneratedText, RuntimeError> {
+        let constraint = JsonObjectConstraint::new(&self.tokenizer)?;
+        self.generate_with_stage_callbacks_and_constraint(
+            prompt,
+            max_tokens,
+            sampling,
+            cache_options,
+            Some(constraint),
+            || PromptEvaluationControl::Continue,
+            |_| {},
+            |_, _| PromptEvaluationControl::Continue,
+            |_| PromptEvaluationControl::Continue,
+            |token_text, _token_ids| on_token(token_text),
+        )
+    }
+
+    pub fn generate_with_sampling_and_token_event_callback_and_cache_options(
+        &self,
+        prompt: &str,
+        max_tokens: usize,
+        sampling: SamplingConfig,
+        cache_options: GenerationCacheOptions,
+        mut on_token: impl FnMut(&str, &[usize]) -> Result<GenerationControl, RuntimeError>,
+    ) -> Result<GeneratedText, RuntimeError> {
+        self.generate_with_stage_callbacks_and_cache_options(
+            prompt,
+            max_tokens,
+            sampling,
+            cache_options,
+            || PromptEvaluationControl::Continue,
+            |_| {},
+            |_, _| PromptEvaluationControl::Continue,
+            |_| PromptEvaluationControl::Continue,
+            &mut on_token,
+        )
+    }
+
     pub(crate) fn generate_with_prompt_callback_and_cache_options(
         &self,
         prompt: &str,
@@ -265,6 +426,7 @@ impl InferenceEngine {
         self.generate_with_stage_callbacks_and_cache_options(
             prompt,
             max_tokens,
+            SamplingConfig::default(),
             cache_options,
             || PromptEvaluationControl::Continue,
             |_| {},
@@ -285,6 +447,7 @@ impl InferenceEngine {
         &self,
         prompt: &str,
         max_tokens: usize,
+        sampling: SamplingConfig,
         cache_options: GenerationCacheOptions,
         mut on_tokenization_cancellation_poll: impl FnMut() -> PromptEvaluationControl,
         mut on_generation_stage: impl FnMut(GenerationStage),
@@ -292,6 +455,43 @@ impl InferenceEngine {
         mut on_prompt_cancellation_poll: impl FnMut(PromptEvaluationLocation) -> PromptEvaluationControl,
         mut on_token: impl FnMut(&str, &[usize]) -> Result<GenerationControl, RuntimeError>,
     ) -> Result<GeneratedText, RuntimeError> {
+        self.generate_with_stage_callbacks_and_constraint(
+            prompt,
+            max_tokens,
+            sampling,
+            cache_options,
+            None,
+            &mut on_tokenization_cancellation_poll,
+            &mut on_generation_stage,
+            &mut on_prompt_token,
+            &mut on_prompt_cancellation_poll,
+            &mut on_token,
+        )
+    }
+
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "constraint selection and lifecycle callbacks are independent generation policies"
+    )]
+    fn generate_with_stage_callbacks_and_constraint(
+        &self,
+        prompt: &str,
+        max_tokens: usize,
+        sampling: SamplingConfig,
+        cache_options: GenerationCacheOptions,
+        mut constraint: Option<JsonObjectConstraint>,
+        mut on_tokenization_cancellation_poll: impl FnMut() -> PromptEvaluationControl,
+        mut on_generation_stage: impl FnMut(GenerationStage),
+        mut on_prompt_token: impl FnMut(usize, usize) -> PromptEvaluationControl,
+        mut on_prompt_cancellation_poll: impl FnMut(PromptEvaluationLocation) -> PromptEvaluationControl,
+        mut on_token: impl FnMut(&str, &[usize]) -> Result<GenerationControl, RuntimeError>,
+    ) -> Result<GeneratedText, RuntimeError> {
+        if max_tokens == 0 {
+            return Err(RuntimeError::new("max tokens must be greater than zero"));
+        }
+        sampling
+            .validate()
+            .map_err(|error| RuntimeError::new(format!("invalid sampling policy: {error}")))?;
         let prompt_token_ids = self
             .tokenizer
             .encode_with_cancellation(prompt, || {
@@ -302,6 +502,7 @@ impl InferenceEngine {
         if prompt_token_ids.is_empty() {
             return Err(RuntimeError::new("prompt must contain at least one token"));
         }
+        self.validate_kv_capacity(prompt_token_ids.len(), max_tokens)?;
         let prefix_cache_key = self.prefix_cache_key_for_tokens(&prompt_token_ids, &cache_options);
         on_generation_stage(GenerationStage::PrefixCacheKeyBuilt);
 
@@ -325,9 +526,53 @@ impl InferenceEngine {
                 cached_prompt_tokens = cached.snapshot().cached_token_count();
                 let suffix = &prompt_token_ids[cached_prompt_tokens..];
                 if suffix.is_empty() {
-                    cached.next_token().cloned().ok_or_else(|| {
-                        RuntimeError::new("prefix cache hit is missing exact next token")
-                    })?
+                    if let Some(next) = cached.next_token().cloned() {
+                        next
+                    } else {
+                        let recompute_start =
+                            cached_prompt_tokens.checked_sub(1).ok_or_else(|| {
+                                RuntimeError::new(
+                                    "prefix cache hit cannot recover logits for an empty prompt",
+                                )
+                            })?;
+                        session.truncate_cache(recompute_start).map_err(|error| {
+                            RuntimeError::new(format!(
+                                "failed to truncate prompt cache for logits recovery: {error}"
+                            ))
+                        })?;
+                        cached_prompt_tokens = recompute_start;
+                        on_generation_stage(GenerationStage::PromptEvaluationStarted);
+                        let next = session
+                            .accept_prompt_with_control_and_location_cancellation(
+                                &prompt_token_ids[recompute_start..],
+                                |index, token_id| {
+                                    Ok(map_prompt_control(on_prompt_token(
+                                        recompute_start + index,
+                                        token_id,
+                                    )))
+                                },
+                                |location| {
+                                    Ok(map_prompt_control(on_prompt_cancellation_poll(
+                                        map_prompt_location(location, recompute_start),
+                                    )))
+                                },
+                            )
+                            .map_err(|error| {
+                                RuntimeError::new(format!(
+                                    "failed to recover logits from prompt cache: {error}"
+                                ))
+                            })?;
+                        self.store_prefix_cache_value(
+                            prefix_cache_key.clone(),
+                            session.cache_snapshot().map_err(|error| {
+                                RuntimeError::new(format!(
+                                    "failed to snapshot recovered prompt cache: {error}"
+                                ))
+                            })?,
+                            next.clone(),
+                        )?;
+                        next
+                    }
                 } else {
                     on_generation_stage(GenerationStage::PromptEvaluationStarted);
                     let next = session
@@ -404,7 +649,20 @@ impl InferenceEngine {
                 PromptCacheLookup::Disabled,
             ));
         }
-        let mut token_id = next.token_id;
+        let uses_fused_greedy_path = constraint.is_none() && sampling.uses_fused_greedy_path();
+        let mut sampler = if uses_fused_greedy_path {
+            None
+        } else {
+            let mut sampler = Sampler::new(sampling).map_err(|error| {
+                RuntimeError::new(format!("failed to initialize sampler: {error}"))
+            })?;
+            sampler.observe_all(&prompt_token_ids);
+            Some(sampler)
+        };
+        let mut token_id = match sampler.as_mut() {
+            Some(sampler) => select_token(sampler, &next.logits, constraint.as_mut())?,
+            None => next.token_id,
+        };
         let mut generated_token_ids = Vec::with_capacity(max_tokens);
         let mut token_id_chunks = Vec::with_capacity(max_tokens);
         let mut token_texts = Vec::with_capacity(max_tokens);
@@ -413,9 +671,9 @@ impl InferenceEngine {
         let mut finish_source = GenerationFinishSource::Length;
         let mut stopped_on_eos = false;
 
-        for _ in 0..max_tokens {
+        for output_index in 0..max_tokens {
             generated_token_ids.push(token_id);
-            if Some(token_id) == self.tokenizer.eos_token_id() {
+            if self.tokenizer.is_end_of_generation_token(token_id) {
                 finish_reason = GenerationFinishReason::Stop;
                 finish_source = GenerationFinishSource::Eos;
                 stopped_on_eos = true;
@@ -436,9 +694,37 @@ impl InferenceEngine {
                 finish_source = GenerationFinishSource::GenerationControl;
                 break;
             }
-            token_id = session.accept_token_id(token_id).map_err(|error| {
-                RuntimeError::new(format!("failed to generate next token: {error}"))
-            })?;
+            if constraint
+                .as_ref()
+                .is_some_and(JsonObjectConstraint::is_complete)
+            {
+                finish_reason = GenerationFinishReason::Stop;
+                finish_source = GenerationFinishSource::StructuredOutput;
+                break;
+            }
+            if output_index + 1 == max_tokens {
+                break;
+            }
+            token_id = match sampler.as_mut() {
+                Some(sampler) => {
+                    let next = session.accept_token(token_id).map_err(|error| {
+                        RuntimeError::new(format!("failed to generate next logits: {error}"))
+                    })?;
+                    select_token(sampler, &next.logits, constraint.as_mut())?
+                }
+                None => session.accept_token_id(token_id).map_err(|error| {
+                    RuntimeError::new(format!("failed to generate next token: {error}"))
+                })?,
+            };
+        }
+
+        if constraint
+            .as_ref()
+            .is_some_and(|constraint| !constraint.is_complete())
+        {
+            return Err(RuntimeError::new(
+                "structured output ended before a complete JSON object was generated",
+            ));
         }
 
         let visible_token_ids = if stopped_on_eos {
@@ -470,6 +756,19 @@ impl InferenceEngine {
         self.tokenizer
             .decode_if_complete(token_ids)
             .map_err(|error| RuntimeError::new(format!("failed to decode token text: {error}")))
+    }
+}
+
+fn select_token(
+    sampler: &mut Sampler,
+    logits: &[f32],
+    constraint: Option<&mut JsonObjectConstraint>,
+) -> Result<usize, RuntimeError> {
+    match constraint {
+        Some(constraint) => constraint.select_token(sampler, logits),
+        None => sampler
+            .sample(logits)
+            .map_err(|error| RuntimeError::new(format!("failed to sample token: {error}"))),
     }
 }
 
@@ -682,6 +981,19 @@ impl GeneratedText {
         self.finish_source = finish_source;
         self
     }
+
+    pub(crate) fn with_filtered_stop_text(mut self, text: String) -> Self {
+        self.token_texts = if text.is_empty() {
+            Vec::new()
+        } else {
+            vec![text.clone()]
+        };
+        self.token_id_chunks.clear();
+        self.text = text;
+        self.finish_reason = GenerationFinishReason::Stop;
+        self.finish_source = GenerationFinishSource::StopSequence;
+        self
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -740,6 +1052,61 @@ mod tests {
     }
 
     #[test]
+    fn sampled_generation_is_seeded_and_isolated_per_request(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let model_path = write_fixture_model()?;
+        let engine = InferenceEngine::load(&model_path)?;
+        remove_fixture_model(&model_path)?;
+        let sampling = SamplingConfig::default()
+            .with_temperature(1.0)
+            .with_seed(Some(42));
+
+        let expected = engine.generate_with_sampling("hello", 4, sampling.clone())?;
+        let _unrelated = engine.generate_with_sampling(
+            "winner",
+            4,
+            SamplingConfig::default()
+                .with_temperature(1.0)
+                .with_seed(Some(7)),
+        )?;
+        let actual = engine.generate_with_sampling("hello", 4, sampling)?;
+
+        assert_eq!(actual, expected);
+        Ok(())
+    }
+
+    #[test]
+    fn sampled_generation_applies_logit_bias() -> Result<(), Box<dyn std::error::Error>> {
+        let model_path = write_fixture_model()?;
+        let engine = InferenceEngine::load(&model_path)?;
+        remove_fixture_model(&model_path)?;
+        let mut logit_bias = std::collections::BTreeMap::new();
+        logit_bias.insert(1, 100.0);
+
+        let generated = engine.generate_with_sampling(
+            "hello",
+            1,
+            SamplingConfig::default().with_logit_bias(logit_bias),
+        )?;
+
+        assert_eq!(generated.text(), "hello");
+        Ok(())
+    }
+
+    #[test]
+    fn default_sampling_preserves_greedy_generation() -> Result<(), Box<dyn std::error::Error>> {
+        let model_path = write_fixture_model()?;
+        let engine = InferenceEngine::load(&model_path)?;
+        remove_fixture_model(&model_path)?;
+
+        assert_eq!(
+            engine.generate_with_sampling("hello", 4, SamplingConfig::default())?,
+            engine.generate("hello", 4)?
+        );
+        Ok(())
+    }
+
+    #[test]
     fn generate_marks_eos_finish_source() -> Result<(), Box<dyn std::error::Error>> {
         let model_path = write_fixture_model_with_eos_token_id(2)?;
         let engine = InferenceEngine::load(&model_path)?;
@@ -749,6 +1116,21 @@ mod tests {
 
         assert_eq!(generated.finish_reason(), GenerationFinishReason::Stop);
         assert_eq!(generated.finish_source(), GenerationFinishSource::Eos);
+        Ok(())
+    }
+
+    #[test]
+    fn generate_marks_eot_as_eos_finish_source() -> Result<(), Box<dyn std::error::Error>> {
+        let model_path = write_fixture_model_with_eot_token_id(2)?;
+        let engine = InferenceEngine::load(&model_path)?;
+        remove_fixture_model(&model_path)?;
+
+        let generated = engine.generate("hello", 4)?;
+
+        assert_eq!(generated.finish_reason(), GenerationFinishReason::Stop);
+        assert_eq!(generated.finish_source(), GenerationFinishSource::Eos);
+        assert_eq!(generated.completion_tokens(), 1);
+        assert_eq!(generated.text(), "");
         Ok(())
     }
 
@@ -872,6 +1254,7 @@ mod tests {
         let generated = engine.generate_with_stage_callbacks_and_cache_options(
             "hello",
             1,
+            SamplingConfig::default(),
             GenerationCacheOptions::default(),
             || PromptEvaluationControl::Continue,
             |stage| stages.push(stage),
@@ -904,6 +1287,7 @@ mod tests {
         let error = match engine.generate_with_stage_callbacks_and_cache_options(
             "hello",
             1,
+            SamplingConfig::default(),
             GenerationCacheOptions::default(),
             || PromptEvaluationControl::Cancel,
             |stage| stages.push(stage),
@@ -989,8 +1373,36 @@ mod tests {
             .tokenizer()
             .starts_with("gguf-tokenizer-fnv64:"));
         assert_eq!(key.fingerprints().template(), "runtime-rendered-prompt-v1");
-        assert_eq!(key.fingerprints().execution(), "scalar-default");
+        assert_eq!(
+            key.fingerprints().execution(),
+            "scalar:default_only:kernels=auto:kv=vec"
+        );
         assert_eq!(key.fingerprints().request_shape(), "text-generation-v1");
+        Ok(())
+    }
+
+    #[test]
+    fn prefix_cache_key_isolates_kernel_providers() -> Result<(), Box<dyn std::error::Error>> {
+        let model_path = write_fixture_model()?;
+        let automatic = InferenceEngine::load(&model_path)?;
+        let portable = InferenceEngine::load(&model_path)?.with_execution_options(
+            ScalarExecutionOptions::default()
+                .with_kernel_provider(ferrite_inference::scalar::KernelProvider::Portable),
+        );
+        remove_fixture_model(&model_path)?;
+        let options = GenerationCacheOptions::default();
+
+        let automatic_key = automatic.prefix_cache_key_for_prompt("winner", &options)?;
+        let portable_key = portable.prefix_cache_key_for_prompt("winner", &options)?;
+
+        assert_ne!(
+            automatic_key.fingerprints().execution(),
+            portable_key.fingerprints().execution()
+        );
+        assert!(portable_key
+            .fingerprints()
+            .execution()
+            .contains("kernels=portable"));
         Ok(())
     }
 
@@ -1013,6 +1425,198 @@ mod tests {
         assert_eq!(first.cached_prompt_tokens(), 0);
         assert_eq!(second.prompt_tokens(), 1);
         assert_eq!(second.cached_prompt_tokens(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn prefix_cache_limits_bound_entries_and_bytes() -> Result<(), Box<dyn std::error::Error>> {
+        let model_path = write_fixture_model()?;
+        let engine = InferenceEngine::load(&model_path)?.with_prefix_cache_limits(1, 1)?;
+        remove_fixture_model(&model_path)?;
+        let cache_options =
+            GenerationCacheOptions::from_namespace(Some("tenant-a:bounded".to_owned()))
+                .with_prefix_cache_enabled(true);
+
+        let first = engine.generate_with_cache_options("hello", 1, cache_options.clone())?;
+        let second = engine.generate_with_cache_options("hello", 1, cache_options)?;
+        let stats = engine.prefix_cache_stats()?;
+
+        assert_eq!(first.cached_prompt_tokens(), 0);
+        assert_eq!(second.cached_prompt_tokens(), 0);
+        assert_eq!(stats.entries(), 0);
+        assert_eq!(stats.estimated_kv_bytes(), 0);
+        assert_eq!(stats.max_entries(), 1);
+        assert_eq!(stats.max_bytes(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn prefix_cache_eviction_keeps_active_snapshot_lease_valid(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let model_path = write_fixture_model()?;
+        let engine = InferenceEngine::load(&model_path)?.with_prefix_cache_limits(1, u128::MAX)?;
+        remove_fixture_model(&model_path)?;
+        let cache_options =
+            GenerationCacheOptions::from_namespace(Some("tenant-a:leased".to_owned()))
+                .with_prefix_cache_enabled(true);
+        engine.generate_with_cache_options("hello", 1, cache_options.clone())?;
+        let hello_key = engine.prefix_cache_key_for_prompt("hello", &cache_options)?;
+        let lease = engine
+            .prefix_cache_lookup(&hello_key)?
+            .into_value()
+            .ok_or("expected cached hello snapshot")?;
+        assert_eq!(lease.snapshot_owner_count(), 2);
+
+        engine.generate_with_cache_options("winner", 1, cache_options)?;
+
+        assert_eq!(engine.prefix_cache_stats()?.entries(), 1);
+        assert_eq!(lease.snapshot_owner_count(), 1);
+        let mut restored = engine.start_session()?;
+        restored.restore_cache_snapshot(lease.snapshot())?;
+        assert_eq!(restored.cached_token_count(), 1);
+        assert!(engine
+            .prefix_cache_lookup(&hello_key)?
+            .into_value()
+            .is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn prefix_cache_churn_stays_within_configured_limits() -> Result<(), Box<dyn std::error::Error>>
+    {
+        const MAX_ENTRIES: usize = 3;
+        const MAX_BYTES: u128 = 1024;
+        let model_path = write_fixture_model()?;
+        let engine =
+            InferenceEngine::load(&model_path)?.with_prefix_cache_limits(MAX_ENTRIES, MAX_BYTES)?;
+        remove_fixture_model(&model_path)?;
+        let cache_options =
+            GenerationCacheOptions::from_namespace(Some("tenant-a:churn".to_owned()))
+                .with_prefix_cache_enabled(true);
+
+        for token_count in 1..=64 {
+            let prompt = "hello".repeat(token_count);
+            let generated =
+                engine.generate_with_cache_options(&prompt, 1, cache_options.clone())?;
+            assert_eq!(generated.prompt_tokens(), token_count);
+            let stats = engine.prefix_cache_stats()?;
+            assert!(stats.entries() <= MAX_ENTRIES);
+            assert!(stats.estimated_kv_bytes() <= MAX_BYTES);
+        }
+
+        let stats = engine.prefix_cache_stats()?;
+        assert!(stats.entries() <= MAX_ENTRIES);
+        assert!(stats.estimated_kv_bytes() <= MAX_BYTES);
+        Ok(())
+    }
+
+    #[test]
+    fn prefix_cache_namespaces_never_share_state() -> Result<(), Box<dyn std::error::Error>> {
+        let model_path = write_fixture_model()?;
+        let engine = InferenceEngine::load(&model_path)?;
+        remove_fixture_model(&model_path)?;
+        let tenant_a = GenerationCacheOptions::from_namespace(Some("tenant-a".to_owned()))
+            .with_prefix_cache_enabled(true);
+        let tenant_b = GenerationCacheOptions::from_namespace(Some("tenant-b".to_owned()))
+            .with_prefix_cache_enabled(true);
+
+        let first_a = engine.generate_with_cache_options("hello", 1, tenant_a.clone())?;
+        let first_b = engine.generate_with_cache_options("hello", 1, tenant_b)?;
+        let second_a = engine.generate_with_cache_options("hello", 1, tenant_a)?;
+
+        assert_eq!(first_a.cached_prompt_tokens(), 0);
+        assert_eq!(first_b.cached_prompt_tokens(), 0);
+        assert_eq!(second_a.cached_prompt_tokens(), 1);
+        Ok(())
+    }
+
+    #[cfg(all(feature = "locus-kv", unix))]
+    #[test]
+    fn locus_kv_capacity_fails_before_partial_prompt_evaluation(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let model_path = write_fixture_model()?;
+        let engine = InferenceEngine::load(&model_path)?.with_execution_options(
+            ScalarExecutionOptions::default().with_kv_backend(
+                ferrite_inference::scalar::KvBackend::Locus {
+                    tokens_per_block: 1,
+                    max_tokens: 2,
+                },
+            ),
+        );
+        remove_fixture_model(&model_path)?;
+
+        let error = match engine.generate("hellowinner", 2) {
+            Ok(_) => return Err("request above the Locus capacity should fail".into()),
+            Err(error) => error,
+        };
+
+        assert_eq!(
+            error.to_string(),
+            "request needs capacity for 3 KV tokens but the configured Locus limit is 2"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn generation_rejects_requests_beyond_the_gguf_context_before_evaluation(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let model_path = write_fixture_model()?;
+        let engine = InferenceEngine::load(&model_path)?;
+        remove_fixture_model(&model_path)?;
+        assert_eq!(engine.model_context_length(), Some(128));
+        let prompt = "hello".repeat(128);
+
+        let error = match engine.generate(&prompt, 2) {
+            Ok(_) => return Err("request above the GGUF context should fail".into()),
+            Err(error) => error,
+        };
+
+        assert_eq!(
+            error.to_string(),
+            "request needs capacity for 129 KV tokens but the model context length is 128"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn sampled_generation_recovers_logits_from_greedy_cache_entry(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let model_path = write_fixture_model()?;
+        let engine = InferenceEngine::load(&model_path)?;
+        remove_fixture_model(&model_path)?;
+        let prompt = "hellowinner";
+        let cache_options =
+            GenerationCacheOptions::from_namespace(Some("tenant-a:greedy-to-sampled".to_owned()))
+                .with_prefix_cache_enabled(true)
+                .with_prompt_cache_trace_enabled(true);
+        let prompt_token_ids = engine.tokenizer.encode(prompt)?;
+        let key = engine.prefix_cache_key_for_tokens(&prompt_token_ids, &cache_options);
+        let mut session = engine.start_session()?;
+        session.accept_token_context_only(prompt_token_ids[0])?;
+        let next_token_id = session.accept_token_id(prompt_token_ids[1])?;
+        let snapshot = session.cache_snapshot()?;
+        engine.store_prefix_cache_greedy_value(key, snapshot, next_token_id)?;
+        let sampling = SamplingConfig::default()
+            .with_temperature(1.0)
+            .with_seed(Some(42));
+
+        let uncached = engine.generate_with_sampling(prompt, 4, sampling.clone())?;
+        let cached = engine.generate_with_sampling_and_token_callback_and_cache_options(
+            prompt,
+            4,
+            sampling,
+            cache_options,
+            |_| Ok(GenerationControl::Continue),
+        )?;
+
+        assert_eq!(cached.text(), uncached.text());
+        assert_eq!(cached.token_id_chunks(), uncached.token_id_chunks());
+        assert_eq!(cached.finish_reason(), uncached.finish_reason());
+        assert_eq!(cached.cached_prompt_tokens(), 1);
+        assert_eq!(
+            cached.prompt_cache_trace().map(PromptCacheTrace::lookup),
+            Some(PromptCacheLookup::ExactHit)
+        );
         Ok(())
     }
 
@@ -1167,6 +1771,22 @@ mod tests {
         std::fs::write(
             &path,
             ferrite_fixtures::scalar_llama_f32_gguf_fixture_with_eos_token_id(eos_token_id),
+        )?;
+        Ok(path)
+    }
+
+    fn write_fixture_model_with_eot_token_id(
+        eot_token_id: u64,
+    ) -> Result<std::path::PathBuf, Box<dyn std::error::Error>> {
+        let mut path = std::env::temp_dir();
+        path.push(format!(
+            "ferrite-runtime-eot-fixture-{}-{}.gguf",
+            std::process::id(),
+            FIXTURE_COUNTER.fetch_add(1, Ordering::Relaxed)
+        ));
+        std::fs::write(
+            &path,
+            ferrite_fixtures::scalar_llama_f32_gguf_fixture_with_eot_token_id(eot_token_id),
         )?;
         Ok(path)
     }

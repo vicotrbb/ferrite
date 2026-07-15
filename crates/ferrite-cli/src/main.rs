@@ -2,6 +2,7 @@
 
 mod args;
 mod benchmark;
+mod model_acquisition;
 mod profile;
 mod run;
 

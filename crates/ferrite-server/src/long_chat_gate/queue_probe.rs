@@ -1,9 +1,10 @@
 use super::LongChatGateConfig;
-use std::{error::Error, net::SocketAddr};
+use std::{error::Error, net::SocketAddr, time::Duration};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
     sync::oneshot,
+    time::Instant,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -15,6 +16,9 @@ pub struct LongChatQueueProbeResult {
     contender_status: u16,
     contender_completed: bool,
     contender_generated_event: bool,
+    contender_admission_latency: Duration,
+    contender_time_to_first_generated_event: Duration,
+    contender_total_elapsed: Duration,
     max_tokens: usize,
 }
 
@@ -46,6 +50,10 @@ impl LongChatQueueProbeResult {
             contender_status: observation.contender_status,
             contender_completed: observation.contender_completed,
             contender_generated_event: observation.contender_generated_event,
+            contender_admission_latency: observation.contender_admission_latency,
+            contender_time_to_first_generated_event: observation
+                .contender_time_to_first_generated_event,
+            contender_total_elapsed: observation.contender_total_elapsed,
             max_tokens,
         }
     }
@@ -78,6 +86,18 @@ impl LongChatQueueProbeResult {
         self.contender_generated_event
     }
 
+    pub fn contender_admission_latency(&self) -> Duration {
+        self.contender_admission_latency
+    }
+
+    pub fn contender_time_to_first_generated_event(&self) -> Duration {
+        self.contender_time_to_first_generated_event
+    }
+
+    pub fn contender_total_elapsed(&self) -> Duration {
+        self.contender_total_elapsed
+    }
+
     pub fn contender_started_after_holder(&self) -> bool {
         self.holder_started_streaming && self.contender_status == 200
     }
@@ -101,6 +121,9 @@ struct LongChatQueueProbeObservation {
     contender_status: u16,
     contender_completed: bool,
     contender_generated_event: bool,
+    contender_admission_latency: Duration,
+    contender_time_to_first_generated_event: Duration,
+    contender_total_elapsed: Duration,
 }
 
 impl LongChatQueueProbeObservation {
@@ -111,6 +134,9 @@ impl LongChatQueueProbeObservation {
             contender_status: 200,
             contender_completed: true,
             contender_generated_event: true,
+            contender_admission_latency: Duration::ZERO,
+            contender_time_to_first_generated_event: Duration::ZERO,
+            contender_total_elapsed: Duration::ZERO,
         }
     }
 }
@@ -149,11 +175,11 @@ impl LongChatGateConfig {
             return Err("queue probe holder did not start streaming generated content".into());
         }
 
-        let contender = send_chat_stream_probe(addr, self.api_key(), &contender_body).await?;
-        let contender_status = http_status(&contender)?;
+        let contender = send_chat_stream_probe_timed(addr, self.api_key(), &contender_body).await?;
+        let contender_status = http_status(&contender.response)?;
         let contender_completed =
-            contender_status == 200 && validate_stream_response(&contender).is_ok();
-        let contender_generated_event = has_generated_stream_event(&contender);
+            contender_status == 200 && validate_stream_response(&contender.response).is_ok();
+        let contender_generated_event = has_generated_stream_event(&contender.response);
         let holder_completed = holder
             .await
             .map_err(|error| std::io::Error::other(format!("queue holder task failed: {error}")))?
@@ -167,6 +193,9 @@ impl LongChatGateConfig {
                 contender_status,
                 contender_completed,
                 contender_generated_event,
+                contender_admission_latency: contender.admission_latency,
+                contender_time_to_first_generated_event: contender.time_to_first_generated_event,
+                contender_total_elapsed: contender.total_elapsed,
             },
             max_tokens,
         );
@@ -215,7 +244,7 @@ impl LongChatGateConfig {
 
 pub fn format_queue_probe_result(result: &LongChatQueueProbeResult) -> String {
     format!(
-        "long_chat_queue_probe_holder_prompt_cache_key={}\nlong_chat_queue_probe_contender_prompt_cache_key={}\nlong_chat_queue_probe_holder_started_streaming={}\nlong_chat_queue_probe_holder_completed={}\nlong_chat_queue_probe_contender_status={}\nlong_chat_queue_probe_contender_completed={}\nlong_chat_queue_probe_contender_generated_event={}\nlong_chat_queue_probe_contender_started_after_holder={}\nlong_chat_queue_probe_max_tokens={}",
+        "long_chat_queue_probe_holder_prompt_cache_key={}\nlong_chat_queue_probe_contender_prompt_cache_key={}\nlong_chat_queue_probe_holder_started_streaming={}\nlong_chat_queue_probe_holder_completed={}\nlong_chat_queue_probe_contender_status={}\nlong_chat_queue_probe_contender_completed={}\nlong_chat_queue_probe_contender_generated_event={}\nlong_chat_queue_probe_contender_started_after_holder={}\nlong_chat_queue_probe_contender_admission_latency_ms={}\nlong_chat_queue_probe_contender_time_to_first_generated_event_ms={}\nlong_chat_queue_probe_contender_total_elapsed_ms={}\nlong_chat_queue_probe_max_tokens={}",
         result.holder_prompt_cache_key(),
         result.contender_prompt_cache_key(),
         result.holder_started_streaming(),
@@ -224,21 +253,54 @@ pub fn format_queue_probe_result(result: &LongChatQueueProbeResult) -> String {
         result.contender_completed(),
         result.contender_generated_event(),
         result.contender_started_after_holder(),
+        result.contender_admission_latency().as_millis(),
+        result.contender_time_to_first_generated_event().as_millis(),
+        result.contender_total_elapsed().as_millis(),
         result.max_tokens()
     )
 }
 
-async fn send_chat_stream_probe(
+struct TimedStreamResponse {
+    response: String,
+    admission_latency: Duration,
+    time_to_first_generated_event: Duration,
+    total_elapsed: Duration,
+}
+
+async fn send_chat_stream_probe_timed(
     addr: SocketAddr,
     api_key: &str,
     body: &str,
-) -> Result<String, Box<dyn Error>> {
+) -> Result<TimedStreamResponse, Box<dyn Error>> {
+    let started = Instant::now();
     let mut stream = TcpStream::connect(addr).await?;
     write_chat_stream_request(&mut stream, addr, api_key, body).await?;
 
     let mut response = Vec::new();
-    stream.read_to_end(&mut response).await?;
-    Ok(String::from_utf8(response)?)
+    let mut admission_latency = None;
+    let mut time_to_first_generated_event = None;
+    loop {
+        let mut chunk = [0_u8; 1024];
+        let bytes_read = stream.read(&mut chunk).await?;
+        if bytes_read == 0 {
+            break;
+        }
+        response.extend_from_slice(&chunk[..bytes_read]);
+        let text = std::str::from_utf8(&response)?;
+        if admission_latency.is_none() && text.contains("\r\n\r\n") {
+            admission_latency = Some(started.elapsed());
+        }
+        if time_to_first_generated_event.is_none() && has_generated_stream_event(text) {
+            time_to_first_generated_event = Some(started.elapsed());
+        }
+    }
+    Ok(TimedStreamResponse {
+        response: String::from_utf8(response)?,
+        admission_latency: admission_latency.ok_or("queue probe response had no headers")?,
+        time_to_first_generated_event: time_to_first_generated_event
+            .ok_or("queue probe response had no generated event")?,
+        total_elapsed: started.elapsed(),
+    })
 }
 
 async fn send_chat_stream_probe_with_start_signal(

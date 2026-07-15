@@ -3,7 +3,7 @@
     reason = "audited SIMD half conversion is isolated in this quantization module"
 )]
 
-use super::{float::f16_bits_to_f32, InferenceError};
+use super::{float::f16_bits_to_f32, InferenceError, ScalarExecutionOptions};
 #[cfg(any(target_arch = "aarch64", test))]
 use rayon::prelude::*;
 
@@ -52,6 +52,7 @@ pub(super) fn validate_q8_0_finite_scales(bytes: &[u8]) -> Result<(), InferenceE
     Ok(())
 }
 
+#[cfg(test)]
 pub(super) fn q8_0_mul_vec(
     bytes: &[u8],
     rows: usize,
@@ -61,11 +62,32 @@ pub(super) fn q8_0_mul_vec(
     Ok(q8_0_mul_vec_with_backend(bytes, rows, cols, vector)?.values)
 }
 
+pub(super) fn q8_0_mul_vec_with_options(
+    bytes: &[u8],
+    rows: usize,
+    cols: usize,
+    vector: &[f32],
+    options: ScalarExecutionOptions,
+) -> Result<Vec<f32>, InferenceError> {
+    Ok(q8_0_mul_vec_with_backend_and_options(bytes, rows, cols, vector, options)?.values)
+}
+
+#[cfg(test)]
 pub(super) fn q8_0_argmax_mul_vec(
     bytes: &[u8],
     rows: usize,
     cols: usize,
     vector: &[f32],
+) -> Result<usize, InferenceError> {
+    q8_0_argmax_mul_vec_with_options(bytes, rows, cols, vector, ScalarExecutionOptions::default())
+}
+
+pub(super) fn q8_0_argmax_mul_vec_with_options(
+    bytes: &[u8],
+    rows: usize,
+    cols: usize,
+    vector: &[f32],
+    options: ScalarExecutionOptions,
 ) -> Result<usize, InferenceError> {
     validate_q8_0_mul_vec(bytes, rows, cols, vector)?;
     if rows == 0 {
@@ -74,7 +96,7 @@ pub(super) fn q8_0_argmax_mul_vec(
 
     #[cfg(target_arch = "aarch64")]
     {
-        if std::arch::is_aarch64_feature_detected!("neon") {
+        if options.kernel_dispatch().neon() {
             if rows >= PARALLEL_ARGMAX_MIN_ROWS {
                 return Ok(super::q8_0_neon::neon_q8_0_parallel_argmax_mul_vec(
                     bytes, cols, vector,
@@ -87,7 +109,7 @@ pub(super) fn q8_0_argmax_mul_vec(
     }
     #[cfg(target_arch = "x86_64")]
     {
-        if std::arch::is_x86_feature_detected!("avx2") {
+        if options.kernel_dispatch().avx2() {
             return Ok(super::q8_0_avx2::avx2_q8_0_argmax_mul_vec(
                 bytes, rows, cols, vector,
             ));
@@ -97,13 +119,13 @@ pub(super) fn q8_0_argmax_mul_vec(
     scalar_q8_0_argmax_mul_vec(bytes, rows, cols, vector)
 }
 
-/// Batched matvec across several activation vectors; each stream's output
-/// is bit-identical to `q8_0_mul_vec` with that vector.
-pub(super) fn q8_0_mul_vec_batch(
+/// Batched matvec across several activation vectors using one provider policy.
+pub(super) fn q8_0_mul_vec_batch_with_options(
     bytes: &[u8],
     rows: usize,
     cols: usize,
     vectors: &[&[f32]],
+    options: ScalarExecutionOptions,
 ) -> Result<Vec<Vec<f32>>, InferenceError> {
     let Some(first) = vectors.first() else {
         return Ok(Vec::new());
@@ -112,7 +134,7 @@ pub(super) fn q8_0_mul_vec_batch(
 
     #[cfg(target_arch = "aarch64")]
     {
-        if std::arch::is_aarch64_feature_detected!("neon") {
+        if options.kernel_dispatch().neon() {
             return Ok(super::q8_0_neon::neon_q8_0_mul_vec_batch(
                 bytes, rows, cols, vectors,
             ));
@@ -121,17 +143,34 @@ pub(super) fn q8_0_mul_vec_batch(
 
     vectors
         .iter()
-        .map(|vector| q8_0_mul_vec(bytes, rows, cols, vector))
+        .map(|vector| q8_0_mul_vec_with_options(bytes, rows, cols, vector, options))
         .collect()
 }
 
 /// Batched greedy argmax over the logits matvec; each stream's result is
 /// identical to `q8_0_argmax_mul_vec` with that vector.
+#[cfg(test)]
 pub(super) fn q8_0_argmax_mul_vec_batch(
     bytes: &[u8],
     rows: usize,
     cols: usize,
     vectors: &[&[f32]],
+) -> Result<Vec<usize>, InferenceError> {
+    q8_0_argmax_mul_vec_batch_with_options(
+        bytes,
+        rows,
+        cols,
+        vectors,
+        ScalarExecutionOptions::default(),
+    )
+}
+
+pub(super) fn q8_0_argmax_mul_vec_batch_with_options(
+    bytes: &[u8],
+    rows: usize,
+    cols: usize,
+    vectors: &[&[f32]],
+    options: ScalarExecutionOptions,
 ) -> Result<Vec<usize>, InferenceError> {
     let Some(first) = vectors.first() else {
         return Ok(Vec::new());
@@ -143,7 +182,7 @@ pub(super) fn q8_0_argmax_mul_vec_batch(
 
     #[cfg(target_arch = "aarch64")]
     {
-        if std::arch::is_aarch64_feature_detected!("neon") {
+        if options.kernel_dispatch().neon() {
             return Ok(super::q8_0_neon::neon_q8_0_argmax_mul_vec_batch(
                 bytes, cols, vectors,
             ));
@@ -152,21 +191,38 @@ pub(super) fn q8_0_argmax_mul_vec_batch(
 
     vectors
         .iter()
-        .map(|vector| q8_0_argmax_mul_vec(bytes, rows, cols, vector))
+        .map(|vector| q8_0_argmax_mul_vec_with_options(bytes, rows, cols, vector, options))
         .collect()
 }
 
+#[cfg(test)]
 pub(super) fn q8_0_mul_vec_with_backend(
     bytes: &[u8],
     rows: usize,
     cols: usize,
     vector: &[f32],
 ) -> Result<Q8_0MatVecOutput, InferenceError> {
+    q8_0_mul_vec_with_backend_and_options(
+        bytes,
+        rows,
+        cols,
+        vector,
+        ScalarExecutionOptions::default(),
+    )
+}
+
+fn q8_0_mul_vec_with_backend_and_options(
+    bytes: &[u8],
+    rows: usize,
+    cols: usize,
+    vector: &[f32],
+    options: ScalarExecutionOptions,
+) -> Result<Q8_0MatVecOutput, InferenceError> {
     validate_q8_0_mul_vec(bytes, rows, cols, vector)?;
 
     #[cfg(target_arch = "aarch64")]
     {
-        if std::arch::is_aarch64_feature_detected!("neon") {
+        if options.kernel_dispatch().neon() {
             return Ok(super::q8_0_neon::neon_q8_0_mul_vec(
                 bytes, rows, cols, vector,
             ));
@@ -174,7 +230,7 @@ pub(super) fn q8_0_mul_vec_with_backend(
     }
     #[cfg(target_arch = "x86_64")]
     {
-        if std::arch::is_x86_feature_detected!("avx2") {
+        if options.kernel_dispatch().avx2() {
             return Ok(super::q8_0_avx2::avx2_q8_0_mul_vec(
                 bytes, rows, cols, vector,
             ));

@@ -1,10 +1,9 @@
 use super::{
     completion_prompt::CompletionPrompt,
-    logit_bias::is_neutral_logit_bias,
     model_id::deserialize_model_id,
-    neutral_options::{is_neutral_number, is_neutral_number_in},
+    neutral_options::is_neutral_number,
     prompt_cache_key::is_prompt_cache_key,
-    seed::is_seed,
+    sampling_options::{sampling_config, SamplingOptionError},
     stop_sequences::{is_supported_stop_sequences, stop_sequences},
     stream_flag::StreamFlag,
     stream_options::StreamOptions,
@@ -33,7 +32,13 @@ pub struct CompletionRequest {
     #[serde(default)]
     temperature: Option<Value>,
     #[serde(default)]
+    top_k: Option<Value>,
+    #[serde(default)]
     top_p: Option<Value>,
+    #[serde(default)]
+    min_p: Option<Value>,
+    #[serde(default)]
+    repetition_penalty: Option<Value>,
     #[serde(default)]
     n: Option<Value>,
     #[serde(default)]
@@ -105,6 +110,22 @@ impl CompletionRequest {
         stop_sequences(&self.stop)
     }
 
+    pub(crate) fn sampling_config(
+        &self,
+    ) -> Result<ferrite_inference::sampling::SamplingConfig, SamplingOptionError> {
+        sampling_config(
+            &self.temperature,
+            &self.top_k,
+            &self.top_p,
+            &self.min_p,
+            &self.repetition_penalty,
+            &self.frequency_penalty,
+            &self.presence_penalty,
+            &self.logit_bias,
+            &self.seed,
+        )
+    }
+
     pub fn cache_options(&self) -> crate::runtime::GenerationCacheOptions {
         crate::runtime::GenerationCacheOptions::from_namespace(
             self.prompt_cache_key
@@ -120,27 +141,12 @@ impl CompletionRequest {
             .with_present("stream", self.stream.is_malformed())
             .with_present("max_tokens", self.max_tokens.is_malformed())
             .with_present("suffix", self.suffix.is_some())
-            .with_present(
-                "temperature",
-                !is_neutral_number_in(&self.temperature, &[0.0, 1.0]),
-            )
-            .with_present("top_p", !is_neutral_number(&self.top_p, 1.0))
             .with_present("n", !is_neutral_number(&self.n, 1.0))
             .with_present("logprobs", self.logprobs.is_some())
             .with_present("echo", !self.echo_option_is_supported())
             .with_present("stop", !is_supported_stop_sequences(&self.stop))
-            .with_present(
-                "presence_penalty",
-                !is_neutral_number(&self.presence_penalty, 0.0),
-            )
-            .with_present(
-                "frequency_penalty",
-                !is_neutral_number(&self.frequency_penalty, 0.0),
-            )
             .with_present("best_of", !is_neutral_number(&self.best_of, 1.0))
-            .with_present("logit_bias", !is_neutral_logit_bias(&self.logit_bias))
             .with_present("user", !is_user_identifier(&self.user))
-            .with_present("seed", !is_seed(&self.seed))
             .with_present(
                 "prompt_cache_key",
                 !is_prompt_cache_key(&self.prompt_cache_key),

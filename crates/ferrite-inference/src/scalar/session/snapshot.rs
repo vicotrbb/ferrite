@@ -73,6 +73,16 @@ impl ScalarLlamaSessionSnapshot {
     pub(in crate::scalar) fn layer_values_owned(&self) -> Vec<Vec<Vec<f32>>> {
         self.layer_values.clone()
     }
+
+    #[cfg(all(feature = "locus-kv", unix))]
+    pub(in crate::scalar) fn layer_keys(&self) -> &[Vec<Vec<f32>>] {
+        &self.layer_keys
+    }
+
+    #[cfg(all(feature = "locus-kv", unix))]
+    pub(in crate::scalar) fn layer_values(&self) -> &[Vec<Vec<f32>>] {
+        &self.layer_values
+    }
 }
 
 fn truncate_layers(layers: &[Vec<Vec<f32>>], token_count: usize) -> Vec<Vec<Vec<f32>>> {
@@ -103,6 +113,14 @@ impl<'a> ScalarLlamaSession<'a> {
         &mut self,
         snapshot: &ScalarLlamaSessionSnapshot,
     ) -> Result<(), InferenceError> {
+        if let Some(context_length) = self.model.context_length {
+            if snapshot.cached_token_count > context_length {
+                return Err(InferenceError::new(format!(
+                    "cache snapshot with {} tokens exceeds model context length {context_length}",
+                    snapshot.cached_token_count
+                )));
+            }
+        }
         let expected_layers = self.model.weights.layers.len();
         if snapshot.layer_keys.len() != expected_layers
             || snapshot.layer_values.len() != expected_layers

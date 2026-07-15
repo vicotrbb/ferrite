@@ -22,8 +22,10 @@ Start with the path that matches your goal.
 ## Understand and contribute
 
 - [Architecture](architecture.md)
+- [CPU portability and dispatch](portability.md)
 - [Library API](library-api.md)
 - [Operational tools](benchmark-tools.md)
+- [Acceptance matrix](acceptance-matrix.md)
 - [Evaluation and regression gates](evaluation.md)
 - [Development guide](development.md)
 - [Safety policy](safety.md)

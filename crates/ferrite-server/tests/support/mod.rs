@@ -45,6 +45,15 @@ impl LiveServer {
         Self::start_with_state(configure).await
     }
 
+    pub async fn start_with_fixture_configured(
+        fixture: &[u8],
+        configure: impl FnOnce(ServerState) -> ServerState,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
+        let model_path = write_fixture_model_bytes(fixture)?;
+        Self::start_with_loaded_model(MODEL_ID, &model_path, Some(model_path.clone()), configure)
+            .await
+    }
+
     pub async fn start_with_api_key(api_key: &str) -> Result<Self, Box<dyn std::error::Error>> {
         Self::start_with_state(|state| state.with_api_key(api_key)).await
     }
@@ -114,15 +123,16 @@ impl Drop for LiveServer {
 }
 
 fn write_fixture_model() -> Result<PathBuf, Box<dyn std::error::Error>> {
+    write_fixture_model_bytes(&ferrite_fixtures::scalar_llama_chat_f32_gguf_fixture())
+}
+
+fn write_fixture_model_bytes(bytes: &[u8]) -> Result<PathBuf, Box<dyn std::error::Error>> {
     let mut path = std::env::temp_dir();
     path.push(format!(
         "ferrite-server-http-fixture-{}-{}.gguf",
         std::process::id(),
         FIXTURE_COUNTER.fetch_add(1, Ordering::Relaxed)
     ));
-    std::fs::write(
-        &path,
-        ferrite_fixtures::scalar_llama_chat_f32_gguf_fixture(),
-    )?;
+    std::fs::write(&path, bytes)?;
     Ok(path)
 }

@@ -9,8 +9,7 @@ pub struct ChatContent {
 }
 
 impl ChatContent {
-    #[cfg(test)]
-    pub fn from_text(text: impl Into<String>) -> Self {
+    pub(crate) fn from_text(text: impl Into<String>) -> Self {
         Self {
             text: text.into(),
             has_refusal_part: false,

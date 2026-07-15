@@ -54,7 +54,7 @@ async fn unknown_openai_routes_require_matching_bearer_token(
     let response = app
         .oneshot(
             Request::builder()
-                .uri("/v1/responses")
+                .uri("/v1/not-a-ferrite-route")
                 .body(Body::empty())?,
         )
         .await?;

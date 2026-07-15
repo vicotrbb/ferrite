@@ -2,7 +2,10 @@ use super::{
     tensor, InferenceError, Matrix, ScalarLlamaConfig, ScalarLlamaLayerWeights,
     ScalarLlamaOutputWeights, ScalarLlamaWeights,
 };
-use ferrite_model::gguf::{GgmlType, GgufFile, ModelArchitecture, ModelConfig, TensorInfo};
+use ferrite_model::gguf::{
+    AttentionProjectionLayout, FeedForwardProjectionLayout, GgmlType, GgufFile, RotaryPairing,
+    TensorInfo,
+};
 use ferrite_model::model_file::MappedModelFile;
 
 #[derive(Clone, Copy)]
@@ -38,9 +41,9 @@ fn load_scalar_from_source(
     file: &GgufFile,
     source: LoaderSource<'_>,
 ) -> Result<(ScalarLlamaConfig, ScalarLlamaWeights), InferenceError> {
-    let model = match file.model_config()? {
-        ModelConfig::Llama(config) | ModelConfig::Qwen2(config) => config,
-    };
+    let model_config = file.model_config()?;
+    let model = model_config.transformer();
+    let execution = model.architecture.execution();
     let hidden_size = usize_from_u64(model.embedding_length, "model.embedding_length")?;
     let intermediate_size = usize_from_u64(model.feed_forward_length, "model.feed_forward_length")?;
     let attention_head_count =
@@ -81,15 +84,124 @@ fn load_scalar_from_source(
             "model.rope.dimension_count",
         )?,
         rope_freq_base: model.rope_freq_base.unwrap_or(10_000.0),
-        rope_layout: match model.architecture {
-            ModelArchitecture::Llama => super::RopeLayout::AdjacentPairs,
-            ModelArchitecture::Qwen2 => super::RopeLayout::SplitHalf,
+        rope_layout: match execution.rotary_pairing {
+            RotaryPairing::Adjacent => super::RopeLayout::AdjacentPairs,
+            RotaryPairing::SplitHalf => super::RopeLayout::SplitHalf,
         },
         rms_norm_epsilon: model.attention_layer_norm_rms_epsilon.unwrap_or(0.0),
     };
 
     let mut layers = Vec::with_capacity(block_count);
     for layer_index in 0..block_count {
+        let (q_proj, q_bias, k_proj, k_bias, v_proj, v_bias) = match execution.attention {
+            AttentionProjectionLayout::Separate => (
+                f32_matrix(
+                    file,
+                    source,
+                    &format!("blk.{layer_index}.attn_q.weight"),
+                    hidden_size,
+                    hidden_size,
+                )?,
+                optional_f32_vector(
+                    file,
+                    source,
+                    &format!("blk.{layer_index}.attn_q.bias"),
+                    hidden_size,
+                )?,
+                f32_matrix(
+                    file,
+                    source,
+                    &format!("blk.{layer_index}.attn_k.weight"),
+                    attention_head_count_kv * head_dim,
+                    hidden_size,
+                )?,
+                optional_f32_vector(
+                    file,
+                    source,
+                    &format!("blk.{layer_index}.attn_k.bias"),
+                    attention_head_count_kv * head_dim,
+                )?,
+                f32_matrix(
+                    file,
+                    source,
+                    &format!("blk.{layer_index}.attn_v.weight"),
+                    attention_head_count_kv * head_dim,
+                    hidden_size,
+                )?,
+                optional_f32_vector(
+                    file,
+                    source,
+                    &format!("blk.{layer_index}.attn_v.bias"),
+                    attention_head_count_kv * head_dim,
+                )?,
+            ),
+            AttentionProjectionLayout::FusedQkv => {
+                let kv_width = attention_head_count_kv
+                    .checked_mul(head_dim)
+                    .ok_or_else(|| {
+                        InferenceError::new("model fused QKV key/value width overflow")
+                    })?;
+                let fused_rows =
+                    hidden_size
+                        .checked_add(kv_width.checked_mul(2).ok_or_else(|| {
+                            InferenceError::new("model fused QKV row count overflow")
+                        })?)
+                        .ok_or_else(|| InferenceError::new("model fused QKV row count overflow"))?;
+                let name = format!("blk.{layer_index}.attn_qkv.weight");
+                let fused = f32_matrix(file, source, &name, fused_rows, hidden_size)?;
+                let q_proj = fused.row_range(0..hidden_size)?;
+                let k_proj = fused.row_range(hidden_size..hidden_size + kv_width)?;
+                let v_proj = fused.row_range(hidden_size + kv_width..fused_rows)?;
+                let (q_bias, k_bias, v_bias) = match optional_f32_vector(
+                    file,
+                    source,
+                    &format!("blk.{layer_index}.attn_qkv.bias"),
+                    fused_rows,
+                )? {
+                    Some(fused_bias) => (
+                        Some(fused_bias[0..hidden_size].to_vec()),
+                        Some(fused_bias[hidden_size..hidden_size + kv_width].to_vec()),
+                        Some(fused_bias[hidden_size + kv_width..].to_vec()),
+                    ),
+                    None => (None, None, None),
+                };
+                (q_proj, q_bias, k_proj, k_bias, v_proj, v_bias)
+            }
+        };
+        let (ffn_gate, ffn_up) = match execution.feed_forward {
+            FeedForwardProjectionLayout::Separate => (
+                f32_matrix(
+                    file,
+                    source,
+                    &format!("blk.{layer_index}.ffn_gate.weight"),
+                    intermediate_size,
+                    hidden_size,
+                )?,
+                f32_matrix(
+                    file,
+                    source,
+                    &format!("blk.{layer_index}.ffn_up.weight"),
+                    intermediate_size,
+                    hidden_size,
+                )?,
+            ),
+            FeedForwardProjectionLayout::FusedGateUp => {
+                let fused_rows = intermediate_size
+                    .checked_mul(2)
+                    .ok_or_else(|| InferenceError::new("model fused gate/up row count overflow"))?;
+                let fused = f32_matrix(
+                    file,
+                    source,
+                    &format!("blk.{layer_index}.ffn_up.weight"),
+                    fused_rows,
+                    hidden_size,
+                )?;
+                (
+                    fused.row_range(0..intermediate_size)?,
+                    fused.row_range(intermediate_size..fused_rows)?,
+                )
+            }
+        };
         layers.push(ScalarLlamaLayerWeights {
             attn_norm: f32_vector(
                 file,
@@ -97,45 +209,12 @@ fn load_scalar_from_source(
                 &format!("blk.{layer_index}.attn_norm.weight"),
                 hidden_size,
             )?,
-            q_proj: f32_matrix(
-                file,
-                source,
-                &format!("blk.{layer_index}.attn_q.weight"),
-                hidden_size,
-                hidden_size,
-            )?,
-            q_bias: optional_f32_vector(
-                file,
-                source,
-                &format!("blk.{layer_index}.attn_q.bias"),
-                hidden_size,
-            )?,
-            k_proj: f32_matrix(
-                file,
-                source,
-                &format!("blk.{layer_index}.attn_k.weight"),
-                attention_head_count_kv * head_dim,
-                hidden_size,
-            )?,
-            k_bias: optional_f32_vector(
-                file,
-                source,
-                &format!("blk.{layer_index}.attn_k.bias"),
-                attention_head_count_kv * head_dim,
-            )?,
-            v_proj: f32_matrix(
-                file,
-                source,
-                &format!("blk.{layer_index}.attn_v.weight"),
-                attention_head_count_kv * head_dim,
-                hidden_size,
-            )?,
-            v_bias: optional_f32_vector(
-                file,
-                source,
-                &format!("blk.{layer_index}.attn_v.bias"),
-                attention_head_count_kv * head_dim,
-            )?,
+            q_proj,
+            q_bias,
+            k_proj,
+            k_bias,
+            v_proj,
+            v_bias,
             o_proj: f32_matrix(
                 file,
                 source,
@@ -149,20 +228,8 @@ fn load_scalar_from_source(
                 &format!("blk.{layer_index}.ffn_norm.weight"),
                 hidden_size,
             )?,
-            ffn_gate: f32_matrix(
-                file,
-                source,
-                &format!("blk.{layer_index}.ffn_gate.weight"),
-                intermediate_size,
-                hidden_size,
-            )?,
-            ffn_up: f32_matrix(
-                file,
-                source,
-                &format!("blk.{layer_index}.ffn_up.weight"),
-                intermediate_size,
-                hidden_size,
-            )?,
+            ffn_gate,
+            ffn_up,
             ffn_down: f32_matrix(
                 file,
                 source,
@@ -209,11 +276,20 @@ fn f32_matrix(
     }
 
     match (tensor.ty, source) {
+        (GgmlType::F16, LoaderSource::Mapped(mapped)) => {
+            Matrix::from_f16_mapped_bytes(rows, cols, mapped.clone(), tensor.data_range.clone())
+        }
+        (GgmlType::BF16, LoaderSource::Mapped(mapped)) => {
+            Matrix::from_bf16_mapped_bytes(rows, cols, mapped.clone(), tensor.data_range.clone())
+        }
         (GgmlType::Q4K, LoaderSource::Mapped(mapped)) => {
             Matrix::from_q4_k_mapped_bytes(rows, cols, mapped.clone(), tensor.data_range.clone())
         }
         (GgmlType::Q5_0, LoaderSource::Mapped(mapped)) => {
             Matrix::from_q5_0_mapped_bytes(rows, cols, mapped.clone(), tensor.data_range.clone())
+        }
+        (GgmlType::Q5K, LoaderSource::Mapped(mapped)) => {
+            Matrix::from_q5_k_mapped_bytes(rows, cols, mapped.clone(), tensor.data_range.clone())
         }
         (GgmlType::Q6K, LoaderSource::Mapped(mapped)) => {
             Matrix::from_q6_k_mapped_bytes(rows, cols, mapped.clone(), tensor.data_range.clone())
@@ -221,11 +297,20 @@ fn f32_matrix(
         (GgmlType::Q8_0, LoaderSource::Mapped(mapped)) => {
             Matrix::from_q8_0_mapped_bytes(rows, cols, mapped.clone(), tensor.data_range.clone())
         }
+        (GgmlType::F16, LoaderSource::Bytes(bytes)) => {
+            Matrix::from_f16_row_major_bytes(rows, cols, tensor::raw_bytes(tensor, bytes)?)
+        }
+        (GgmlType::BF16, LoaderSource::Bytes(bytes)) => {
+            Matrix::from_bf16_row_major_bytes(rows, cols, tensor::raw_bytes(tensor, bytes)?)
+        }
         (GgmlType::Q4K, LoaderSource::Bytes(bytes)) => {
             Matrix::from_q4_k_row_major_bytes(rows, cols, tensor::raw_bytes(tensor, bytes)?)
         }
         (GgmlType::Q5_0, LoaderSource::Bytes(bytes)) => {
             Matrix::from_q5_0_row_major_bytes(rows, cols, tensor::raw_bytes(tensor, bytes)?)
+        }
+        (GgmlType::Q5K, LoaderSource::Bytes(bytes)) => {
+            Matrix::from_q5_k_row_major_bytes(rows, cols, tensor::raw_bytes(tensor, bytes)?)
         }
         (GgmlType::Q6K, LoaderSource::Bytes(bytes)) => {
             Matrix::from_q6_k_row_major_bytes(rows, cols, tensor::raw_bytes(tensor, bytes)?)

@@ -6,6 +6,8 @@ use support::http::{
     abort_http_stream_after_marker, response_json, send_http_request, send_http_request_with_bearer,
 };
 
+const DISCONNECT_TEST_CONTEXT_LENGTH: u64 = 8192;
+
 #[tokio::test]
 async fn live_http_server_accepts_openai_style_model_list() -> Result<(), Box<dyn std::error::Error>>
 {
@@ -159,9 +161,13 @@ async fn live_http_server_streams_openai_style_chat_chunks(
 async fn live_http_server_releases_inference_permit_after_streaming_tcp_disconnect(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let token_limits = TokenLimits::new(16, 4096)?;
-    let server =
-        support::LiveServer::start_configured(|state| state.with_token_limits(token_limits))
-            .await?;
+    let fixture = ferrite_fixtures::scalar_llama_chat_f32_gguf_fixture_with_context_length(
+        DISCONNECT_TEST_CONTEXT_LENGTH,
+    );
+    let server = support::LiveServer::start_with_fixture_configured(&fixture, |state| {
+        state.with_token_limits(token_limits)
+    })
+    .await?;
     let request_body = format!(
         r#"{{"model":"{}","messages":[{{"role":"user","content":"hello"}}],"max_completion_tokens":4096,"stream":true}}"#,
         support::MODEL_ID
@@ -201,9 +207,13 @@ async fn live_http_server_releases_inference_permit_after_streaming_tcp_disconne
 async fn live_http_server_releases_inference_permit_after_initial_role_chunk_disconnect(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let token_limits = TokenLimits::new(16, 4096)?;
-    let server =
-        support::LiveServer::start_configured(|state| state.with_token_limits(token_limits))
-            .await?;
+    let fixture = ferrite_fixtures::scalar_llama_chat_f32_gguf_fixture_with_context_length(
+        DISCONNECT_TEST_CONTEXT_LENGTH,
+    );
+    let server = support::LiveServer::start_with_fixture_configured(&fixture, |state| {
+        state.with_token_limits(token_limits)
+    })
+    .await?;
     let request_body = format!(
         r#"{{"model":"{}","messages":[{{"role":"user","content":"hello"}}],"max_completion_tokens":4096,"stream":true}}"#,
         support::MODEL_ID

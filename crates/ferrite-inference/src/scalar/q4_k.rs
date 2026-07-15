@@ -45,13 +45,13 @@ pub(super) fn q4_k_mul_vec_with_backend(
     q4_k_mul_vec_with_options(bytes, rows, cols, vector, ScalarExecutionOptions::default())
 }
 
-/// Batched matvec across several activation vectors; each stream's output
-/// is bit-identical to a default-dispatch `q4_k_mul_vec_with_options` call.
-pub(super) fn q4_k_mul_vec_batch(
+/// Batched matvec across several activation vectors using one provider policy.
+pub(super) fn q4_k_mul_vec_batch_with_options(
     bytes: &[u8],
     rows: usize,
     cols: usize,
     vectors: &[&[f32]],
+    options: ScalarExecutionOptions,
 ) -> Result<Vec<Vec<f32>>, InferenceError> {
     let Some(first) = vectors.first() else {
         return Ok(Vec::new());
@@ -60,10 +60,7 @@ pub(super) fn q4_k_mul_vec_batch(
 
     #[cfg(target_arch = "aarch64")]
     {
-        if cols != 0
-            && cols.is_multiple_of(Q4_K_BLOCK_VALUES)
-            && std::arch::is_aarch64_feature_detected!("neon")
-        {
+        if cols != 0 && cols.is_multiple_of(Q4_K_BLOCK_VALUES) && options.kernel_dispatch().neon() {
             return super::q4_k_neon::neon_q4_k_mul_vec_batch(bytes, rows, cols, vectors);
         }
     }
@@ -71,7 +68,7 @@ pub(super) fn q4_k_mul_vec_batch(
     vectors
         .iter()
         .map(|vector| {
-            q4_k_mul_vec_with_options(bytes, rows, cols, vector, ScalarExecutionOptions::default())
+            q4_k_mul_vec_with_options(bytes, rows, cols, vector, options)
                 .map(|output| output.values)
         })
         .collect()
@@ -93,7 +90,7 @@ pub(super) fn q4_k_mul_vec_with_options(
         if options.residual_q8_activation_matvec()
             && cols != 0
             && cols.is_multiple_of(Q4_K_BLOCK_VALUES)
-            && std::arch::is_aarch64_feature_detected!("i8mm")
+            && options.kernel_dispatch().i8mm()
         {
             return Ok(Q4KMatVecOutput {
                 values: super::q4_k_q8_residual_i8mm::neon_q4_k_q8_residual_i8mm_mul_vec(
@@ -105,7 +102,7 @@ pub(super) fn q4_k_mul_vec_with_options(
         if options.residual_q8_activation_matvec()
             && cols != 0
             && cols.is_multiple_of(Q4_K_BLOCK_VALUES)
-            && std::arch::is_aarch64_feature_detected!("dotprod")
+            && options.kernel_dispatch().dotprod()
         {
             return Ok(Q4KMatVecOutput {
                 values: super::q4_k_q8_residual_neon::neon_q4_k_q8_residual_mul_vec(
@@ -117,26 +114,20 @@ pub(super) fn q4_k_mul_vec_with_options(
         if options.q8_k_activation_matvec()
             && cols != 0
             && cols.is_multiple_of(Q4_K_BLOCK_VALUES)
-            && std::arch::is_aarch64_feature_detected!("neon")
+            && options.kernel_dispatch().neon()
         {
             return Ok(Q4KMatVecOutput {
                 values: super::q4_k_q8_k_neon::neon_q4_k_q8_k_mul_vec(bytes, rows, cols, vector)?,
                 backend: Q4KMatVecBackend::Aarch64NeonQ8K,
             });
         }
-        if cols != 0
-            && cols.is_multiple_of(Q4_K_BLOCK_VALUES)
-            && std::arch::is_aarch64_feature_detected!("neon")
-        {
+        if cols != 0 && cols.is_multiple_of(Q4_K_BLOCK_VALUES) && options.kernel_dispatch().neon() {
             return super::q4_k_neon::neon_q4_k_mul_vec(bytes, rows, cols, vector);
         }
     }
     #[cfg(target_arch = "x86_64")]
     {
-        if cols != 0
-            && cols.is_multiple_of(Q4_K_BLOCK_VALUES)
-            && std::arch::is_x86_feature_detected!("avx2")
-        {
+        if cols != 0 && cols.is_multiple_of(Q4_K_BLOCK_VALUES) && options.kernel_dispatch().avx2() {
             return super::q4_k_avx2::avx2_q4_k_mul_vec(bytes, rows, cols, vector);
         }
     }

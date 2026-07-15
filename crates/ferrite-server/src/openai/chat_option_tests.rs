@@ -19,7 +19,50 @@ async fn chat_endpoint_accepts_neutral_sampling_options() -> Result<(), Box<dyn 
 #[tokio::test]
 async fn chat_endpoint_accepts_openai_default_temperature() -> Result<(), Box<dyn std::error::Error>>
 {
-    assert_chat_option_is_accepted(r#""temperature":1"#).await
+    assert_chat_option_is_accepted(r#""temperature":1,"top_k":1"#).await
+}
+
+#[tokio::test]
+async fn chat_endpoint_applies_logit_bias() -> Result<(), Box<dyn std::error::Error>> {
+    let body = accepted_chat_option_response(r#""temperature":0,"logit_bias":{"1":100}"#).await?;
+    assert_eq!(body["choices"][0]["message"]["content"], "hello");
+    Ok(())
+}
+
+#[tokio::test]
+async fn chat_endpoint_rejects_out_of_vocabulary_logit_bias(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let model_path = write_chat_fixture_model()?;
+    let engine = InferenceEngine::load(&model_path)?;
+    let app = router(ServerState::with_engine("fixture-model".to_owned(), engine));
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/chat/completions")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            r#"{"model":"fixture-model","messages":[{"role":"user","content":"hello"}],"max_completion_tokens":1,"logit_bias":{"999999":1}}"#,
+        ))?;
+    let response = app.oneshot(request).await?;
+    remove_fixture_model(&model_path)?;
+
+    let status = response.status();
+    let body = to_json(response.into_body()).await?;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+    assert_eq!(body["error"]["param"], "logit_bias");
+    assert!(body["error"]["message"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("vocabulary size"));
+    Ok(())
+}
+
+#[tokio::test]
+async fn chat_endpoint_accepts_extended_sampling_controls() -> Result<(), Box<dyn std::error::Error>>
+{
+    assert_chat_option_is_accepted(
+        r#""temperature":0.8,"top_k":1,"top_p":0.9,"min_p":0.05,"repetition_penalty":1.1,"presence_penalty":0.2,"frequency_penalty":-0.2,"seed":42"#,
+    )
+    .await
 }
 
 #[tokio::test]

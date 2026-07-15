@@ -1,0 +1,137 @@
+{
+  "schema_version": 1,
+  "status": "diagnostic",
+  "started_from_failed_acceptance_artifact": "scripts/evals/2026-07-14-092611-qwen2.5-1.5b-instruct-q8_0-multi.json",
+  "failed_acceptance_manifest": "scripts/evals/2026-07-14-091206-acceptance-suite.json",
+  "source": {
+    "commit": "33a11d0be6e2417a145d9aea5033a6430be4163d",
+    "branch": "main",
+    "dirty": true,
+    "source_tree_sha256_at_diagnostic": "944c40197474459a71ecc1af59fe4f5fa209ee4a5829b9e87e80a73332dd5987"
+  },
+  "host": {
+    "hostname": "Mac.localdomain",
+    "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+    "cpu": "Apple M5 Pro",
+    "physical_cores": 15,
+    "logical_cores": 15,
+    "ram_bytes": 25769803776
+  },
+  "model": {
+    "id": "phi3-mini-4k-instruct-q4",
+    "revision": "a64113399c2f6b8ad3e11c394733a2ddadaa7f33",
+    "bytes": 2393231072,
+    "sha256": "8a83c7fb9049a9b2e92266fa7ad04933bb53aa1e85136b7b30f1b8000ff2edef"
+  },
+  "configuration": {
+    "prompt_sha256": "24cc5f0e33f4f7dfd00e514d83eaec343a97f0b51102e5407b2ff72397f6adeb",
+    "requests": 4,
+    "concurrency": 4,
+    "max_tokens": 64,
+    "kernel_provider": "auto",
+    "experimental_batched_decode": true,
+    "max_batch_streams": 4,
+    "post_cohort_idle_ms": 2000,
+    "vec_backend": {
+      "kv_backend": "vec"
+    },
+    "locus_backend": {
+      "kv_backend": "locus",
+      "kv_tokens_per_block": 16,
+      "kv_max_tokens_per_session": 128
+    }
+  },
+  "binaries": {
+    "vec_server": {
+      "path": "target/release/ferrite-server",
+      "sha256": "cfce3116099e46b5bbe873d4f179bf17b874dc3d5fbe680876dbd5aeaddbf15a"
+    },
+    "vec_throughput": {
+      "path": "target/release/ferrite-openai-throughput",
+      "sha256": "39d38ff03a3d8976f59f3478aa6f46f9edf9b12117caf13dfdce752df50484c0"
+    },
+    "locus_server": {
+      "path": "target/locus-diagnostic/release/ferrite-server",
+      "sha256": "9ea2ba4d64c5403b396162828ba070fe2c4607618fb4c5184099f959dca57e83"
+    },
+    "locus_throughput": {
+      "path": "target/locus-diagnostic/release/ferrite-openai-throughput",
+      "sha256": "af3558de21f84116e1dbdc2e705815c21cc1a2a64b03761cc854353c270cbdc9"
+    }
+  },
+  "locus_build_command": [
+    "cargo",
+    "build",
+    "--release",
+    "--locked",
+    "-p",
+    "ferrite-server",
+    "--features",
+    "locus-kv"
+  ],
+  "shared_token_ids": [
+    18527, 29901, 450, 390, 504, 29891, 317, 737, 272, 13, 13, 26222,
+    2501, 263, 931, 29892, 297, 263, 2319, 12180, 284, 4726, 4257, 922,
+    370, 929, 911, 29892, 727, 10600, 263, 21580, 29891, 19964, 4257,
+    390, 504, 29891, 29889, 390, 504, 29891, 471, 385, 2030, 19964,
+    29892, 2175, 5742, 491, 278, 4726, 29915, 29879, 19681, 746, 896,
+    6153, 304, 278, 4272, 29889, 940, 10398
+  ],
+  "failed_vec_acceptance_soak": {
+    "post_cohort_idle_ms": 500,
+    "rss_idle_bytes": [2679144448, 2679816192, 3073490944],
+    "rss_growth_bytes": 394346496,
+    "rss_tail_range_bytes": 393674752,
+    "tolerance_bytes": 16777216,
+    "stable": false,
+    "exact_trace_stable": true
+  },
+  "failed_locus_500ms_acceptance_soak": {
+    "artifact": "scripts/evals/2026-07-14-102615-qwen2.5-1.5b-instruct-q8_0-multi.json",
+    "manifest": "scripts/evals/2026-07-14-101723-acceptance-suite.json",
+    "source_tree_sha256": "bed8d16a35ddb0e53ecd50dcd1b769773d6d3c16233c901568a4161215177fb3",
+    "post_cohort_idle_ms": 500,
+    "rss_idle_bytes": [2401320960, 2381316096, 2795732992],
+    "rss_growth_bytes": 394412032,
+    "rss_tail_range_bytes": 414416896,
+    "tolerance_bytes": 16777216,
+    "stable": false,
+    "exact_trace_stable": true,
+    "postflight_clean": false,
+    "postflight_note": "OrbStack Helper reached 56.8 percent. The child was already functionally rejected by its own RSS gate."
+  },
+  "focused_vec_diagnostic": {
+    "cohorts": [
+      {"elapsed_ms": 86160, "ttft_ms": 6676, "rss_idle_bytes": 2679373824},
+      {"elapsed_ms": 85904, "ttft_ms": 6178, "rss_idle_bytes": 2566930432},
+      {"elapsed_ms": 86420, "ttft_ms": 6216, "rss_idle_bytes": 2548940800},
+      {"elapsed_ms": 86484, "ttft_ms": 6198, "rss_idle_bytes": 2679242752},
+      {"elapsed_ms": 86494, "ttft_ms": 6117, "rss_idle_bytes": 2671280128},
+      {"elapsed_ms": 86894, "ttft_ms": 6249, "rss_idle_bytes": 2622619648}
+    ],
+    "rss_full_range_bytes": 130433024,
+    "rss_tail_range_bytes": 56623104,
+    "rss_growth_bytes": -56754176,
+    "all_exact_traces_match": true
+  },
+  "focused_locus_diagnostic": {
+    "cohorts": [
+      {"elapsed_ms": 86654, "ttft_ms": 6511, "rss_idle_bytes": 2401894400},
+      {"elapsed_ms": 86764, "ttft_ms": 6765, "rss_idle_bytes": 2400550912},
+      {"elapsed_ms": 86862, "ttft_ms": 6511, "rss_idle_bytes": 2402222080},
+      {"elapsed_ms": 87956, "ttft_ms": 6484, "rss_idle_bytes": 2401697792},
+      {"elapsed_ms": 87530, "ttft_ms": 6847, "rss_idle_bytes": 2402123776},
+      {"elapsed_ms": 87003, "ttft_ms": 6376, "rss_idle_bytes": 2401026048}
+    ],
+    "rss_full_range_bytes": 1671168,
+    "rss_tail_range_bytes": 1097728,
+    "rss_growth_bytes": -868352,
+    "all_exact_traces_match": true
+  },
+  "cleanup": {
+    "vec_server_remaining": false,
+    "locus_server_remaining": false,
+    "throughput_client_remaining": false
+  },
+  "claim_scope": "Allocator and quiescence-boundary diagnosis only. The focused cohorts were not clean-host screened, used manual two-second idle sampling, and did not run the default server route. The normal 500 ms Locus child was rejected by its RSS gate and also had a contaminated postflight. Throughput and TTFT values are diagnostic. A repeated clean eval-suite artifact with an explicit quiescence boundary is required before promotion."
+}

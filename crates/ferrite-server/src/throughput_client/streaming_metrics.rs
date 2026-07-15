@@ -9,6 +9,9 @@ pub struct StreamingTimingSummary {
     p50_token_latency: Duration,
     p95_token_latency: Duration,
     max_token_latency: Duration,
+    request_count: usize,
+    p50_time_to_first_token: Duration,
+    p95_time_to_first_token: Duration,
 }
 
 impl StreamingTimingSummary {
@@ -25,7 +28,23 @@ impl StreamingTimingSummary {
             p50_token_latency: percentile_nearest_rank(&token_latencies, 0.50),
             p95_token_latency: percentile_nearest_rank(&token_latencies, 0.95),
             max_token_latency: token_latencies[token_latencies.len() - 1],
+            request_count: 1,
+            p50_time_to_first_token: time_to_first_token,
+            p95_time_to_first_token: time_to_first_token,
         })
+    }
+
+    pub fn from_request_summaries(summaries: &[Self]) -> Option<Self> {
+        let mut cohort = *summaries.first()?;
+        let mut time_to_first_token = summaries
+            .iter()
+            .map(Self::time_to_first_token)
+            .collect::<Vec<_>>();
+        time_to_first_token.sort_unstable();
+        cohort.request_count = summaries.len();
+        cohort.p50_time_to_first_token = percentile_nearest_rank(&time_to_first_token, 0.50);
+        cohort.p95_time_to_first_token = percentile_nearest_rank(&time_to_first_token, 0.95);
+        Some(cohort)
     }
 
     pub fn token_events(&self) -> usize {
@@ -66,6 +85,18 @@ impl StreamingTimingSummary {
 
     pub fn max_token_latency(&self) -> Duration {
         self.max_token_latency
+    }
+
+    pub fn request_count(&self) -> usize {
+        self.request_count
+    }
+
+    pub fn p50_time_to_first_token(&self) -> Duration {
+        self.p50_time_to_first_token
+    }
+
+    pub fn p95_time_to_first_token(&self) -> Duration {
+        self.p95_time_to_first_token
     }
 
     pub fn tokens_per_second(&self) -> f64 {

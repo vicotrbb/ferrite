@@ -44,6 +44,12 @@ pub(crate) fn push_kv_u64(bytes: &mut Vec<u8>, key: &str, value: u64) {
     push_u64(bytes, value);
 }
 
+pub(crate) fn push_kv_f32(bytes: &mut Vec<u8>, key: &str, value: f32) {
+    push_string(bytes, key);
+    push_u32(bytes, 6);
+    bytes.extend_from_slice(&value.to_le_bytes());
+}
+
 pub(crate) fn push_kv_string_array(bytes: &mut Vec<u8>, key: &str, values: &[&str]) {
     push_string(bytes, key);
     push_u32(bytes, VALUE_ARRAY);

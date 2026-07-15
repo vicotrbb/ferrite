@@ -20,7 +20,7 @@ use super::ScalarExecutionOptions;
 
 #[cfg(target_arch = "x86_64")]
 fn expected_q4_k_x86_backend() -> Q4KMatVecBackend {
-    if std::arch::is_x86_feature_detected!("avx2") {
+    if super::CpuKernelCapabilities::detect().avx2() {
         Q4KMatVecBackend::X86_64Avx2
     } else {
         Q4KMatVecBackend::Scalar
@@ -29,7 +29,7 @@ fn expected_q4_k_x86_backend() -> Q4KMatVecBackend {
 
 #[cfg(target_arch = "x86_64")]
 fn expected_q5_0_x86_backend() -> Q5_0MatVecBackend {
-    if std::arch::is_x86_feature_detected!("avx2") {
+    if super::CpuKernelCapabilities::detect().avx2() {
         Q5_0MatVecBackend::X86_64Avx2
     } else {
         Q5_0MatVecBackend::Scalar
@@ -38,7 +38,7 @@ fn expected_q5_0_x86_backend() -> Q5_0MatVecBackend {
 
 #[cfg(target_arch = "x86_64")]
 fn expected_q6_k_x86_backend() -> Q6KMatVecBackend {
-    if std::arch::is_x86_feature_detected!("avx2") {
+    if super::CpuKernelCapabilities::detect().avx2() {
         Q6KMatVecBackend::X86_64Avx2
     } else {
         Q6KMatVecBackend::Scalar
@@ -47,7 +47,7 @@ fn expected_q6_k_x86_backend() -> Q6KMatVecBackend {
 
 #[cfg(target_arch = "x86_64")]
 fn expected_q8_0_x86_backend() -> Q8_0MatVecBackend {
-    if std::arch::is_x86_feature_detected!("avx2") {
+    if super::CpuKernelCapabilities::detect().avx2() {
         Q8_0MatVecBackend::X86_64Avx2
     } else {
         Q8_0MatVecBackend::Scalar
@@ -222,6 +222,21 @@ fn q6_k_argmax_mul_vec_matches_full_matvec_argmax() -> Result<(), InferenceError
         .ok_or_else(|| InferenceError::new("empty argmax"))?;
 
     assert_eq!(q6_k_argmax_mul_vec(&bytes, 3, 256, &vector)?, expected);
+    Ok(())
+}
+
+#[test]
+fn q6_k_argmax_handles_a_block_spanning_multiple_rows() -> Result<(), InferenceError> {
+    let mut block = vec![0u8; 128 + 64];
+    block[32] = 0xff;
+    block.extend(vec![1u8; 16]);
+    block.extend_from_slice(&0x3c00u16.to_le_bytes());
+    let vector = vec![1.0; 128];
+
+    let values = q6_k_mul_vec(&block, 2, 128, &vector)?;
+    let expected = if values[0] >= values[1] { 0 } else { 1 };
+
+    assert_eq!(q6_k_argmax_mul_vec(&block, 2, 128, &vector)?, expected);
     Ok(())
 }
 

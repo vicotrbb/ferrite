@@ -118,12 +118,12 @@ fn assert_qwen_stream_response(
     );
     let stop_events = events
         .iter()
-        .filter(|event| event["choices"][0]["finish_reason"] == "stop")
+        .filter(|event| event["choices"][0]["finish_reason"] == "length")
         .collect::<Vec<_>>();
     assert_eq!(
         stop_events.len(),
         1,
-        "expected exactly one terminal stream chunk"
+        "expected exactly one length terminal stream chunk"
     );
     assert_eq!(stop_events[0]["choices"][0]["text"], "");
     Ok(())

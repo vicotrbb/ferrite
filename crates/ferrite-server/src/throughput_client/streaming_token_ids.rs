@@ -5,6 +5,8 @@ pub struct StreamingTokenIdsSummary {
     token_ids: usize,
     token_id_trace: Option<Vec<u64>>,
     all_request_traces_match: Option<bool>,
+    prompt_token_id_traces: Option<Vec<Option<Vec<u64>>>>,
+    all_prompt_traces_stable: Option<bool>,
 }
 
 impl StreamingTokenIdsSummary {
@@ -15,6 +17,8 @@ impl StreamingTokenIdsSummary {
             token_ids,
             token_id_trace: None,
             all_request_traces_match: None,
+            prompt_token_id_traces: None,
+            all_prompt_traces_stable: None,
         }
     }
 
@@ -25,6 +29,8 @@ impl StreamingTokenIdsSummary {
             token_ids: 0,
             token_id_trace: Some(Vec::new()),
             all_request_traces_match: None,
+            prompt_token_id_traces: None,
+            all_prompt_traces_stable: None,
         };
 
         for event in sse_json_events(body) {
@@ -56,6 +62,19 @@ impl StreamingTokenIdsSummary {
 
     pub fn set_all_request_traces_match(&mut self, matches: bool) {
         self.all_request_traces_match = Some(matches);
+    }
+
+    pub fn prompt_token_id_traces(&self) -> Option<&[Option<Vec<u64>>]> {
+        self.prompt_token_id_traces.as_deref()
+    }
+
+    pub fn all_prompt_traces_stable(&self) -> Option<bool> {
+        self.all_prompt_traces_stable
+    }
+
+    pub fn set_prompt_token_id_traces(&mut self, traces: Vec<Option<Vec<u64>>>, all_stable: bool) {
+        self.prompt_token_id_traces = Some(traces);
+        self.all_prompt_traces_stable = Some(all_stable);
     }
 
     pub fn all_content_chunks_have_token_ids(&self) -> bool {

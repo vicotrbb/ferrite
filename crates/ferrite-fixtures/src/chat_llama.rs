@@ -6,16 +6,22 @@ use crate::gguf_writer::{
 /// Builds a small F32 Llama GGUF fixture with chat-role tokens.
 #[must_use]
 pub fn scalar_llama_chat_f32_gguf_fixture() -> Vec<u8> {
-    scalar_llama_chat_gguf_fixture(None)
+    scalar_llama_chat_gguf_fixture(None, 128)
 }
 
 /// Builds the chat fixture with an explicit tokenizer EOS token ID.
 #[must_use]
 pub fn scalar_llama_chat_f32_gguf_fixture_with_eos_token_id(eos_token_id: u64) -> Vec<u8> {
-    scalar_llama_chat_gguf_fixture(Some(eos_token_id))
+    scalar_llama_chat_gguf_fixture(Some(eos_token_id), 128)
 }
 
-fn scalar_llama_chat_gguf_fixture(eos_token_id: Option<u64>) -> Vec<u8> {
+/// Builds the chat fixture with an explicit model context length.
+#[must_use]
+pub fn scalar_llama_chat_f32_gguf_fixture_with_context_length(context_length: u64) -> Vec<u8> {
+    scalar_llama_chat_gguf_fixture(None, context_length)
+}
+
+fn scalar_llama_chat_gguf_fixture(eos_token_id: Option<u64>, context_length: u64) -> Vec<u8> {
     let alignment = 64u64;
     let tokens = [
         "<unk>",
@@ -41,7 +47,7 @@ fn scalar_llama_chat_gguf_fixture(eos_token_id: Option<u64>) -> Vec<u8> {
     push_u64(&mut bytes, if eos_token_id.is_some() { 14 } else { 13 });
     push_kv_string(&mut bytes, "general.architecture", "llama");
     push_kv_u64(&mut bytes, "general.alignment", alignment);
-    push_kv_u64(&mut bytes, "llama.context_length", 8);
+    push_kv_u64(&mut bytes, "llama.context_length", context_length);
     push_kv_u64(&mut bytes, "llama.embedding_length", 2);
     push_kv_u64(&mut bytes, "llama.block_count", 1);
     push_kv_u64(&mut bytes, "llama.feed_forward_length", 2);

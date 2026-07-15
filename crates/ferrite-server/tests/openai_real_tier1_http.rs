@@ -99,10 +99,10 @@ async fn live_http_server_chats_with_real_tier1_model() -> Result<(), Box<dyn st
     let body = response_json(&response)?;
     assert_eq!(body["object"], "chat.completion");
     assert_eq!(body["model"], REAL_MODEL_ID);
-    assert_eq!(body["choices"][0]["message"]["content"], "你好");
-    assert_eq!(body["usage"]["prompt_tokens"], 8);
+    assert_eq!(body["choices"][0]["message"]["content"], "Hello");
+    assert_eq!(body["usage"]["prompt_tokens"], 31);
     assert_eq!(body["usage"]["completion_tokens"], 1);
-    assert_eq!(body["usage"]["total_tokens"], 9);
+    assert_eq!(body["usage"]["total_tokens"], 32);
     Ok(())
 }
 
@@ -136,7 +136,7 @@ async fn live_http_server_streams_chat_with_real_tier1_model(
     );
     assert!(response.contains("data: {\"id\":\"chatcmpl-ferrite-"));
     assert!(response.contains("\"object\":\"chat.completion.chunk\""));
-    assert!(response.contains("\"delta\":{\"content\":\"你好\"}"));
+    assert!(response.contains("\"delta\":{\"content\":\"Hello\"}"));
     assert!(response.contains("data: [DONE]"));
     Ok(())
 }

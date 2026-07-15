@@ -52,13 +52,21 @@ impl CompletionStreamContext {
     }
 
     pub fn token(&self, text: String) -> CompletionStreamChunk {
+        self.token_chunk(text, None)
+    }
+
+    pub fn token_with_ids(&self, text: String, token_ids: &[usize]) -> CompletionStreamChunk {
+        self.token_chunk(text, Some(token_ids.to_vec()))
+    }
+
+    fn token_chunk(&self, text: String, token_ids: Option<Vec<usize>>) -> CompletionStreamChunk {
         CompletionStreamChunk {
             id: self.id.clone(),
             object: "text_completion",
             created: self.created,
             model: self.model.clone(),
             system_fingerprint: None,
-            choices: vec![CompletionStreamChoice::content(text)],
+            choices: vec![CompletionStreamChoice::content(text, token_ids)],
             obfuscation: self.obfuscation(),
             usage: self.null_usage(),
         }
@@ -103,8 +111,13 @@ impl CompletionStreamChunk {
     pub fn from_generation(model: String, generated: &GeneratedText) -> Vec<Self> {
         let context = CompletionStreamContext::new(model);
         let mut chunks = Vec::new();
-        for text in generated.token_texts() {
-            chunks.push(context.token(text.clone()));
+        for (index, text) in generated.token_texts().iter().enumerate() {
+            let token_ids = generated.token_id_chunks().get(index);
+            if let Some(token_ids) = token_ids.filter(|ids| !ids.is_empty()) {
+                chunks.push(context.token_with_ids(text.clone(), token_ids));
+            } else {
+                chunks.push(context.token(text.clone()));
+            }
         }
         chunks.push(context.finish(generated.finish_reason()));
         chunks
@@ -117,15 +130,18 @@ struct CompletionStreamChoice {
     index: usize,
     logprobs: Option<Value>,
     finish_reason: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    token_ids: Option<Vec<usize>>,
 }
 
 impl CompletionStreamChoice {
-    fn content(text: String) -> Self {
+    fn content(text: String, token_ids: Option<Vec<usize>>) -> Self {
         Self {
             text,
             index: 0,
             logprobs: None,
             finish_reason: None,
+            token_ids,
         }
     }
 
@@ -135,6 +151,7 @@ impl CompletionStreamChoice {
             index: 0,
             logprobs: None,
             finish_reason: Some(finish_reason(reason)),
+            token_ids: None,
         }
     }
 }
@@ -196,6 +213,21 @@ mod tests {
         let chunk = serde_json::to_value(context.token("hello".to_owned()))?;
 
         assert!(chunk.get("obfuscation").is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn completion_stream_content_chunk_can_include_token_ids(
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let context =
+            CompletionStreamContext::new("fixture-model".to_owned()).with_obfuscation_field(false);
+        let chunk = serde_json::to_value(context.token_with_ids("hello".to_owned(), &[42, 43]))?;
+
+        assert_eq!(chunk["choices"][0]["text"], "hello");
+        assert_eq!(
+            chunk["choices"][0]["token_ids"],
+            serde_json::json!([42, 43])
+        );
         Ok(())
     }
 }

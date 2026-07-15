@@ -1,18 +1,22 @@
 # Getting started
 
-This guide builds Ferrite, downloads the small reference model, runs local
-generation, and starts the OpenAI-compatible server.
+This guide builds Ferrite, acquires a verified model, runs local generation,
+and starts the OpenAI-compatible server.
 
 ## Requirements
 
-- A 64-bit Linux or macOS host.
+- A 64-bit Windows, Linux, or macOS host. Release archives currently cover
+  macOS arm64 and Linux x86_64. Other maintained CI platforms build from
+  source.
 - An aarch64 CPU with NEON, or an x86_64 CPU with AVX2 for the optimized paths.
 - Rust 1.96.1. The repository's `rust-toolchain.toml` selects it automatically
   when Rust is installed through rustup.
 - Python 3 for the optional eval harness.
+- `curl` for built-in resumable model acquisition on Windows, Linux, or macOS.
 - Enough disk and memory for the selected GGUF model. The reference Qwen2.5
-  0.5B Q4_K_M artifact is about 469 MiB on disk and used about 1.0 GiB peak RSS
-  in the recorded Apple M5 Pro eval. Other models can require much more.
+  0.5B Q4_K_M artifact is about 469 MiB on disk and used about 557 MiB peak RSS
+  in the accepted 2026-07-14 Apple M5 Pro eval. Other models can require much
+  more.
 
 For a versioned binary install, see [installation and verification](install.md)
 first. Building from source remains the right path for development and for
@@ -29,9 +33,44 @@ cargo build --release --locked -p ferrite-cli -p ferrite-server
 Always use a release build for inference measurements. Debug builds include
 checks and omit the optimizer, so their speed is not representative.
 
-## Get the reference model
+## One-command verified first run
 
-The eval harness can download the current reference artifact:
+The built-in registry contains the official Microsoft Phi-3 Mini 4K Instruct
+Q4 GGUF at one immutable revision. This command acquires and verifies the model
+when absent, then generates locally:
+
+```sh
+target/release/ferrite \
+  --model-id phi3-mini-4k-instruct-q4 \
+  --prompt '<|user|>
+Write one sentence about a lighthouse.<|end|>
+<|assistant|>' \
+  --generate-tokens 32 \
+  --stream
+```
+
+The artifact is 2,393,231,072 bytes. Ferrite prints its source, revision,
+license, filename, expected size, and SHA-256 before loading it. Acquisition is
+resumable, restricted to HTTPS, and completed only after the pinned size and
+hash match. The final model and `artifact.json` manifest are read-only.
+
+The default cache root is:
+
+| Platform | Cache root |
+| --- | --- |
+| macOS | `~/Library/Caches/ferrite/models` |
+| Linux | `$XDG_CACHE_HOME/ferrite/models`, or `~/.cache/ferrite/models` |
+| Windows | `%LOCALAPPDATA%\Ferrite\models` |
+
+Set `FERRITE_MODEL_CACHE` or pass `--model-cache` to override the root. Pass
+`--offline` to require a verified cache hit and prohibit network acquisition.
+
+The model remains local after acquisition. Ferrite has no built-in telemetry
+or remote inference fallback.
+
+## Get the evaluation reference model
+
+The eval harness can download the pinned reference artifact:
 
 ```sh
 scripts/eval.sh --download --skip-cli --skip-server
@@ -44,10 +83,18 @@ model is stored as:
 target/models/qwen2.5-0.5b-instruct-q4_k_m.gguf
 ```
 
-Models are intentionally ignored by Git. Review the model's license and source
-before using it outside local evaluation.
+The download is pinned to Qwen revision
+`df5bf01389a39c743ab467d734bf501681e041c5`. The harness verifies the exact
+491,400,032-byte size and SHA-256 before atomically publishing the cache file.
+An incomplete or mismatched partial download is removed. Eval JSON for this
+artifact records its Qwen source, revision, Apache-2.0 license, filename, size,
+SHA-256, license URL, and download URL.
 
-## Generate text
+This smaller Qwen2.5 artifact is the performance harness reference, not the
+built-in first-run model. Models are intentionally ignored by Git. Review each
+model's license and source before using it outside local evaluation.
+
+## Generate with an explicit model path
 
 ```sh
 target/release/ferrite \

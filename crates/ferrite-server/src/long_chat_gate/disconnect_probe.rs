@@ -10,6 +10,10 @@ use tokio::{
 pub struct LongChatDisconnectProbeResult {
     aborted_after_generated_event: bool,
     reconnect_completed: bool,
+    reconnect_attempts: usize,
+    disconnect_to_reconnect_admission: Duration,
+    disconnect_to_reconnect_first_generated_event: Duration,
+    disconnect_to_reconnect_completion: Duration,
     max_tokens: usize,
 }
 
@@ -22,8 +26,20 @@ impl LongChatDisconnectProbeResult {
         Self {
             aborted_after_generated_event,
             reconnect_completed,
+            reconnect_attempts: usize::from(reconnect_completed),
+            disconnect_to_reconnect_admission: Duration::ZERO,
+            disconnect_to_reconnect_first_generated_event: Duration::ZERO,
+            disconnect_to_reconnect_completion: Duration::ZERO,
             max_tokens,
         }
+    }
+
+    fn with_recovery_timing(mut self, timing: ReconnectTiming) -> Self {
+        self.reconnect_attempts = timing.attempts;
+        self.disconnect_to_reconnect_admission = timing.admission;
+        self.disconnect_to_reconnect_first_generated_event = timing.first_generated_event;
+        self.disconnect_to_reconnect_completion = timing.completion;
+        self
     }
 
     pub fn aborted_after_generated_event(&self) -> bool {
@@ -40,6 +56,22 @@ impl LongChatDisconnectProbeResult {
 
     pub fn reconnect_started_new_generation(&self) -> bool {
         self.aborted_after_generated_event && self.reconnect_generated_event()
+    }
+
+    pub fn reconnect_attempts(&self) -> usize {
+        self.reconnect_attempts
+    }
+
+    pub fn disconnect_to_reconnect_admission(&self) -> Duration {
+        self.disconnect_to_reconnect_admission
+    }
+
+    pub fn disconnect_to_reconnect_first_generated_event(&self) -> Duration {
+        self.disconnect_to_reconnect_first_generated_event
+    }
+
+    pub fn disconnect_to_reconnect_completion(&self) -> Duration {
+        self.disconnect_to_reconnect_completion
     }
 
     pub fn max_tokens(&self) -> usize {
@@ -61,14 +93,17 @@ impl LongChatGateConfig {
         }
 
         let reconnect_body = self.disconnect_probe_body(max_tokens)?;
-        reconnect_until_completed(
+        let disconnected_at = Instant::now();
+        let recovery_timing = reconnect_until_completed(
             addr,
             self.api_key(),
             &reconnect_body,
             self.disconnect_reconnect_timeout(),
+            disconnected_at,
         )
         .await?;
-        Ok(LongChatDisconnectProbeResult::new(true, true, max_tokens))
+        Ok(LongChatDisconnectProbeResult::new(true, true, max_tokens)
+            .with_recovery_timing(recovery_timing))
     }
 
     fn disconnect_probe_body(&self, max_tokens: usize) -> Result<String, Box<dyn Error>> {
@@ -93,11 +128,17 @@ impl LongChatGateConfig {
 
 pub fn format_disconnect_probe_result(result: &LongChatDisconnectProbeResult) -> String {
     format!(
-        "long_chat_disconnect_probe_aborted_after_generated_event={}\nlong_chat_disconnect_probe_reconnect_completed={}\nlong_chat_disconnect_probe_reconnect_generated_event={}\nlong_chat_disconnect_probe_reconnect_started_new_generation={}\nlong_chat_disconnect_probe_max_tokens={}",
+        "long_chat_disconnect_probe_aborted_after_generated_event={}\nlong_chat_disconnect_probe_reconnect_completed={}\nlong_chat_disconnect_probe_reconnect_generated_event={}\nlong_chat_disconnect_probe_reconnect_started_new_generation={}\nlong_chat_disconnect_probe_reconnect_attempts={}\nlong_chat_disconnect_probe_disconnect_to_reconnect_admission_ms={}\nlong_chat_disconnect_probe_disconnect_to_reconnect_first_generated_event_ms={}\nlong_chat_disconnect_probe_disconnect_to_reconnect_completion_ms={}\nlong_chat_disconnect_probe_max_tokens={}",
         result.aborted_after_generated_event(),
         result.reconnect_completed(),
         result.reconnect_generated_event(),
         result.reconnect_started_new_generation(),
+        result.reconnect_attempts(),
+        result.disconnect_to_reconnect_admission().as_millis(),
+        result
+            .disconnect_to_reconnect_first_generated_event()
+            .as_millis(),
+        result.disconnect_to_reconnect_completion().as_millis(),
         result.max_tokens()
     )
 }
@@ -125,17 +166,52 @@ async fn abort_after_generated_event(
     }
 }
 
-async fn send_chat_stream_probe(
+struct TimedStreamResponse {
+    response: String,
+    headers_at: Instant,
+    first_generated_event_at: Option<Instant>,
+    completed_at: Instant,
+}
+
+async fn send_chat_stream_probe_timed(
     addr: SocketAddr,
     api_key: &str,
     body: &str,
-) -> Result<String, Box<dyn Error>> {
+) -> Result<TimedStreamResponse, Box<dyn Error>> {
     let mut stream = TcpStream::connect(addr).await?;
     write_chat_stream_request(&mut stream, addr, api_key, body).await?;
 
     let mut response = Vec::new();
-    stream.read_to_end(&mut response).await?;
-    Ok(String::from_utf8(response)?)
+    let mut headers_at = None;
+    let mut first_generated_event_at = None;
+    loop {
+        let mut chunk = [0_u8; 1024];
+        let bytes_read = stream.read(&mut chunk).await?;
+        if bytes_read == 0 {
+            break;
+        }
+        response.extend_from_slice(&chunk[..bytes_read]);
+        let text = std::str::from_utf8(&response)?;
+        if headers_at.is_none() && text.contains("\r\n\r\n") {
+            headers_at = Some(Instant::now());
+        }
+        if first_generated_event_at.is_none() && has_generated_stream_event(text) {
+            first_generated_event_at = Some(Instant::now());
+        }
+    }
+    Ok(TimedStreamResponse {
+        response: String::from_utf8(response)?,
+        headers_at: headers_at.ok_or("reconnect response had no headers")?,
+        first_generated_event_at,
+        completed_at: Instant::now(),
+    })
+}
+
+struct ReconnectTiming {
+    attempts: usize,
+    admission: Duration,
+    first_generated_event: Duration,
+    completion: Duration,
 }
 
 async fn reconnect_until_completed(
@@ -143,13 +219,25 @@ async fn reconnect_until_completed(
     api_key: &str,
     body: &str,
     timeout: Duration,
-) -> Result<(), Box<dyn Error>> {
+    disconnected_at: Instant,
+) -> Result<ReconnectTiming, Box<dyn Error>> {
     let deadline = Instant::now() + timeout;
+    let mut attempts = 0;
     loop {
-        let response = send_chat_stream_probe(addr, api_key, body).await?;
-        let status = http_status(&response)?;
+        attempts += 1;
+        let response = send_chat_stream_probe_timed(addr, api_key, body).await?;
+        let status = http_status(&response.response)?;
         if status == 200 {
-            return validate_reconnect_response(&response);
+            validate_reconnect_response(&response.response)?;
+            return Ok(ReconnectTiming {
+                attempts,
+                admission: response.headers_at.duration_since(disconnected_at),
+                first_generated_event: response
+                    .first_generated_event_at
+                    .ok_or("reconnect response had no generated event")?
+                    .duration_since(disconnected_at),
+                completion: response.completed_at.duration_since(disconnected_at),
+            });
         }
         if !is_retryable_reconnect_status(status) {
             return Err(format!("expected reconnect probe status 200, got {status}").into());

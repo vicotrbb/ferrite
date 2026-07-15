@@ -15,8 +15,8 @@ async fn live_http_server_chats_with_smollm_1_7b_q4_reference_prompt(
     let server = support::LiveServer::start_with_existing_model(REAL_MODEL_ID, model_path).await?;
     let case = PromptCase {
         prompt: "hello world",
-        prompt_tokens: 9,
-        content: "1",
+        prompt_tokens: 32,
+        content: "Hello",
     };
 
     let response = send_http_request(
@@ -90,33 +90,33 @@ fn prompt_cases() -> [PromptCase; 6] {
     [
         PromptCase {
             prompt: "hello world",
-            prompt_tokens: 9,
-            content: "1",
+            prompt_tokens: 32,
+            content: "Hello",
         },
         PromptCase {
             prompt: "The capital of France is",
-            prompt_tokens: 12,
-            content: "\n",
+            prompt_tokens: 35,
+            content: "The",
         },
         PromptCase {
             prompt: "Once upon a time",
-            prompt_tokens: 11,
-            content: "\n",
+            prompt_tokens: 34,
+            content: "Once",
         },
         PromptCase {
             prompt: "Rust is a systems programming language",
-            prompt_tokens: 13,
-            content: "\n",
+            prompt_tokens: 37,
+            content: "Yes",
         },
         PromptCase {
             prompt: "Machine learning models can",
-            prompt_tokens: 11,
-            content: "1",
+            prompt_tokens: 34,
+            content: "Machine",
         },
         PromptCase {
             prompt: "The recipe calls for",
-            prompt_tokens: 11,
-            content: "1",
+            prompt_tokens: 34,
+            content: "I",
         },
     ]
 }
@@ -191,7 +191,8 @@ fn assert_smollm_chat_stream_response(
         .iter()
         .filter_map(|event| {
             let choice = &event["choices"][0];
-            (choice["finish_reason"].is_null()).then(|| choice["delta"]["content"].as_str())?
+            (choice["finish_reason"].is_null() && choice["delta"]["role"].is_null())
+                .then(|| choice["delta"]["content"].as_str())?
         })
         .collect::<Vec<_>>();
     assert_eq!(
@@ -201,12 +202,12 @@ fn assert_smollm_chat_stream_response(
     );
     let stop_events = events
         .iter()
-        .filter(|event| event["choices"][0]["finish_reason"] == "stop")
+        .filter(|event| event["choices"][0]["finish_reason"] == "length")
         .collect::<Vec<_>>();
     assert_eq!(
         stop_events.len(),
         1,
-        "expected exactly one terminal stream chunk"
+        "expected exactly one length terminal stream chunk"
     );
     assert!(
         stop_events[0]["choices"][0]["delta"]["content"].is_null(),

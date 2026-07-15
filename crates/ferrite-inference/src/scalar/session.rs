@@ -374,6 +374,7 @@ impl<'a> ScalarLlamaSession<'a> {
         output_mode: OutputMode,
         mut on_layer: impl FnMut(usize) -> Result<PromptEvaluationControl, InferenceError>,
     ) -> Result<AcceptedToken, InferenceError> {
+        self.ensure_context_position_available()?;
         if token_id >= self.model.config.vocab_size {
             return Err(InferenceError::new(format!(
                 "token id {token_id} is out of bounds for vocab size {}",
@@ -600,6 +601,18 @@ impl<'a> ScalarLlamaSession<'a> {
 
         Ok(AcceptedToken { token_id, logits })
     }
+
+    fn ensure_context_position_available(&self) -> Result<(), InferenceError> {
+        if let Some(context_length) = self.model.context_length {
+            if self.cached_token_count >= context_length {
+                return Err(InferenceError::new(format!(
+                    "model context length {context_length} is exhausted at token position {}",
+                    self.cached_token_count
+                )));
+            }
+        }
+        Ok(())
+    }
 }
 
 /// Advances several sessions of the same model by one token each,
@@ -668,6 +681,15 @@ fn accept_token_ids_batch_inner(
             "all sessions in a batch must share the same model",
         ));
     }
+    let options = sessions[0].options;
+    if sessions.iter().any(|session| session.options != options) {
+        return Err(InferenceError::new(
+            "all sessions in a batch must share the same execution options",
+        ));
+    }
+    for session in sessions.iter() {
+        session.ensure_context_position_available()?;
+    }
     for token_id in token_ids {
         if *token_id >= model.config.vocab_size {
             return Err(InferenceError::new(format!(
@@ -690,12 +712,27 @@ fn accept_token_ids_batch_inner(
             .collect::<Result<Vec<_>, _>>()?;
         let normed_refs = normed.iter().map(Vec::as_slice).collect::<Vec<_>>();
 
+        let query_options = options.scoped_to_q8_k_activation_role(Q8KActivationMatvecRole::QProj);
+        let key_options = options.scoped_to_q8_k_activation_role(Q8KActivationMatvecRole::KProj);
+        let value_options = options.scoped_to_q8_k_activation_role(Q8KActivationMatvecRole::VProj);
         let (queries, (keys, values)) = rayon::join(
-            || layer.q_proj.mul_vec_batch(&normed_refs),
+            || {
+                layer
+                    .q_proj
+                    .mul_vec_batch_with_options(&normed_refs, query_options)
+            },
             || {
                 rayon::join(
-                    || layer.k_proj.mul_vec_batch(&normed_refs),
-                    || layer.v_proj.mul_vec_batch(&normed_refs),
+                    || {
+                        layer
+                            .k_proj
+                            .mul_vec_batch_with_options(&normed_refs, key_options)
+                    },
+                    || {
+                        layer
+                            .v_proj
+                            .mul_vec_batch_with_options(&normed_refs, value_options)
+                    },
                 )
             },
         );
@@ -736,7 +773,10 @@ fn accept_token_ids_batch_inner(
             .iter()
             .map(Vec::as_slice)
             .collect::<Vec<_>>();
-        let projected = layer.o_proj.mul_vec_batch(&attention_refs)?;
+        let projected = layer.o_proj.mul_vec_batch_with_options(
+            &attention_refs,
+            options.scoped_to_q8_k_activation_role(Q8KActivationMatvecRole::OProj),
+        )?;
         for (index, values) in projected.iter().enumerate() {
             add_assign(&mut hidden[index], values)?;
         }
@@ -746,9 +786,19 @@ fn accept_token_ids_batch_inner(
             .map(|values| rms_norm(values, &layer.ffn_norm, model.config.rms_norm_epsilon))
             .collect::<Result<Vec<_>, _>>()?;
         let ffn_refs = ffn_normed.iter().map(Vec::as_slice).collect::<Vec<_>>();
+        let gate_options = options.scoped_to_q8_k_activation_role(Q8KActivationMatvecRole::FfnGate);
+        let up_options = options.scoped_to_q8_k_activation_role(Q8KActivationMatvecRole::FfnUp);
         let (gates, ups) = rayon::join(
-            || layer.ffn_gate.mul_vec_batch(&ffn_refs),
-            || layer.ffn_up.mul_vec_batch(&ffn_refs),
+            || {
+                layer
+                    .ffn_gate
+                    .mul_vec_batch_with_options(&ffn_refs, gate_options)
+            },
+            || {
+                layer
+                    .ffn_up
+                    .mul_vec_batch_with_options(&ffn_refs, up_options)
+            },
         );
         let mut gates = gates?;
         let ups = ups?;
@@ -756,7 +806,10 @@ fn accept_token_ids_batch_inner(
             swiglu_in_place(gate, up)?;
         }
         let activated_refs = gates.iter().map(Vec::as_slice).collect::<Vec<_>>();
-        let downs = layer.ffn_down.mul_vec_batch(&activated_refs)?;
+        let downs = layer.ffn_down.mul_vec_batch_with_options(
+            &activated_refs,
+            options.scoped_to_q8_k_activation_role(Q8KActivationMatvecRole::FfnDown),
+        )?;
         for (index, values) in downs.iter().enumerate() {
             add_assign(&mut hidden[index], values)?;
         }
@@ -778,7 +831,10 @@ fn accept_token_ids_batch_inner(
             .output
             .logits_matrix(&model.weights.token_embedding);
         let normed_refs = normed_final.iter().map(Vec::as_slice).collect::<Vec<_>>();
-        Some(output.argmax_mul_vec_batch(&normed_refs)?)
+        Some(output.argmax_mul_vec_batch_with_options(
+            &normed_refs,
+            options.scoped_to_q8_k_activation_role(Q8KActivationMatvecRole::Output),
+        )?)
     } else {
         None
     };

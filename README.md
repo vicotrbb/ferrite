@@ -6,7 +6,7 @@ kernels, and exposes both a command-line interface and an OpenAI-compatible
 HTTP server.
 
 Ferrite is currently alpha software. The supported surface is deliberately
-small and well tested, but model coverage and sampling features are not yet
+small and well tested, but model, template, and sampling coverage are not yet
 complete.
 
 ## Install
@@ -32,12 +32,22 @@ extraction, container, and model-integrity instructions.
 
 ## Highlights
 
-- Llama and Qwen2 model architectures, including Qwen2.5 GGUF artifacts.
-- F32, F16, BF16, Q4_K, Q5_0, Q6_K, and Q8_0 tensor loading.
-- NEON, Arm I8MM, and x86_64 AVX2 kernels with portable fallbacks.
-- Greedy text generation, token streaming, profiling, and reproducible evals.
-- OpenAI-compatible models, completions, and chat-completions endpoints.
-- Optional prompt-prefix caching and experimental continuous batching.
+- Llama, Qwen2, and Phi-3 model architectures, including a verified official
+  Phi-3 Mini 4K Instruct path.
+- F32, F16, BF16, Q4_K, Q5_0, Q5_K, Q6_K, and Q8_0 tensor loading.
+- Shared mapped storage for dense-16 and quantized matrices, with bounded
+  token-embedding row decoding.
+- Central runtime dispatch for NEON, Arm DotProd and I8MM, and x86_64 AVX2,
+  with a forceable portable correctness provider.
+- Fused greedy generation plus seeded temperature, top-k, top-p, min-p,
+  penalty, and logit-bias sampling.
+- OpenAI-compatible models, completions, chat completions, and a bounded
+  non-streaming Responses endpoint.
+- Grammar-constrained JSON objects and bounded function-call parsing. Ferrite
+  reports function calls but never executes application tools.
+- Unified prompt-prefix reuse and experimental continuous batching for greedy
+  streaming and non-streaming requests, with bounded queues and cache budgets.
+- Optional fixed-block Locus KV storage with explicit per-session capacity.
 - No model or binary test assets committed to the repository. Test GGUF data
   is generated in memory, and real-model tests use local artifacts explicitly.
 
@@ -52,7 +62,25 @@ cd ferrite
 cargo build --release --locked -p ferrite-cli -p ferrite-server
 ```
 
-Place a supported GGUF model under `target/models/`, then run a completion:
+For the shortest verified first run, ask Ferrite to acquire the pinned
+Microsoft Phi-3 Mini 4K Instruct Q4 artifact and generate locally:
+
+```sh
+target/release/ferrite \
+  --model-id phi3-mini-4k-instruct-q4 \
+  --prompt '<|user|>
+Write one sentence about Rust.<|end|>
+<|assistant|>' \
+  --generate-tokens 32 \
+  --stream
+```
+
+The first invocation downloads about 2.39 GB over HTTPS, verifies the pinned
+size and SHA-256, publishes it atomically into the user model cache, and makes
+the artifact and provenance manifest read-only. Later invocations reverify the
+cached bytes. Pass `--offline` to prohibit acquisition.
+
+To use another supported GGUF, provide its path directly:
 
 ```sh
 target/release/ferrite \
@@ -95,6 +123,7 @@ experimental kernel is faster or compatible on every CPU.
 - [Architecture](docs/architecture.md)
 - [Library API](docs/library-api.md)
 - [Operational tools](docs/benchmark-tools.md)
+- [Acceptance matrix](docs/acceptance-matrix.md)
 - [Evaluation and regression gates](docs/evaluation.md)
 - [Development guide](docs/development.md)
 - [Safety policy](docs/safety.md)
@@ -125,10 +154,12 @@ scripts                    eval harness, raw eval records, and repository checks
 ## Quality gates
 
 The required local checks are documented in [CONTRIBUTING.md](CONTRIBUTING.md).
-CI runs formatting, strict Clippy, default and all-feature tests on Linux and
-macOS, plus a separate Rust 1.96 MSRV check. Linux jobs also enforce rustdoc,
-doctests, documentation, repository hygiene, eval-harness tests, package
-contents, RustSec advisories, licenses, duplicate dependencies, and sources.
+CI runs formatting, strict Clippy, and default plus all-feature tests on Linux
+x86_64, Linux arm64, macOS arm64, macOS x86_64, and Windows x86_64, plus a
+separate Rust 1.96 MSRV check and focused Rosetta parity. Linux jobs also
+enforce rustdoc, doctests, documentation, repository hygiene, eval-harness
+tests, package contents, RustSec advisories, licenses, duplicate dependencies,
+and sources.
 
 ## License
 

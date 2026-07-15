@@ -53,6 +53,13 @@ Backend-sensitive near-ties must be documented as a bounded caveat, not hidden.
 They do not by themselves prove Ferrite is wrong, and they also do not certify
 Ferrite's quantized arithmetic as numerically equivalent to every CPU backend.
 
+A reviewed near-tie exception must be executable rather than prose-only. Its
+policy case must pin the model hash, prompt hash, request mode, output ceiling,
+reference revision, rendered prompt hash, prompt count, finish reason, first
+divergence index, recorded logit gap, and exact traces from both runtimes. The
+comparison is accepted under that named policy, never relabeled as exact
+parity. Any new trace remains a rejection until separately reviewed.
+
 CPU-only parity remains a separate validation target. Before optimized SIMD,
 threaded, mmap-backed, or architecture-specific CPU kernels are treated as
 correct, Ferrite must compare those optimized paths against the Ferrite scalar
@@ -104,5 +111,7 @@ mistake a backend-sensitive near-tie for broad correctness.
   the internal correctness reference.
 - [`../evaluation.md`](../evaluation.md) requires model identity, commands,
   fixed inputs, and token traces for parity claims.
+- [`../../scripts/numerical-policies/qwen2.5-1.5b-chat-near-ties-v1.json`](../../scripts/numerical-policies/qwen2.5-1.5b-chat-near-ties-v1.json)
+  records the currently reviewed exact near-tie identities.
 - [`../benchmarks/2026-07-10-oss-quality-hardening.md`](../benchmarks/2026-07-10-oss-quality-hardening.md)
   records exact 512-token parity for the current optimized policy.

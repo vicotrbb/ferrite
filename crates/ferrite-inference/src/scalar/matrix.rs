@@ -1,10 +1,13 @@
 use super::{
+    dense16::{bf16_mul_vec_with_options, f16_mul_vec_with_options},
     kernel_check::ensure_within_relative_error,
     math::{argmax, dot},
-    matvec::f32_mul_vec,
+    matvec::f32_mul_vec_with_options,
     q4_k::q4_k_mul_vec_with_options,
+    q5_0::q5_0_mul_vec_with_options,
+    q5_k::q5_k_mul_vec_with_options,
     q6_k::q6_k_mul_vec_with_options,
-    quantized::{q5_0_mul_vec, q8_0_argmax_mul_vec, q8_0_mul_vec},
+    q8_0::{q8_0_argmax_mul_vec_with_options, q8_0_mul_vec_with_options},
     InferenceError, ScalarExecutionOptions,
 };
 use ferrite_model::model_file::MappedModelFile;
@@ -14,7 +17,7 @@ mod constructors;
 mod rows;
 
 #[derive(Clone, Debug, PartialEq)]
-/// A validated row-major matrix using F32 or a supported GGML quantization.
+/// A validated row-major matrix using dense or supported GGML quantized storage.
 pub struct Matrix {
     rows: usize,
     cols: usize,
@@ -26,10 +29,16 @@ pub struct Matrix {
 pub enum MatrixStorageKind {
     /// Row-major 32-bit floating-point values.
     F32,
+    /// Row-major IEEE 16-bit floating-point values.
+    F16,
+    /// Row-major brain floating-point values.
+    BF16,
     /// GGML `Q4_K` quantized blocks.
     Q4K,
     /// GGML `Q5_0` quantized blocks.
     Q5_0,
+    /// GGML `Q5_K` quantized blocks.
+    Q5K,
     /// GGML `Q6_K` quantized blocks.
     Q6K,
     /// GGML `Q8_0` quantized blocks.
@@ -41,8 +50,11 @@ impl MatrixStorageKind {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::F32 => "F32",
+            Self::F16 => "F16",
+            Self::BF16 => "BF16",
             Self::Q4K => "Q4_K",
             Self::Q5_0 => "Q5_0",
+            Self::Q5K => "Q5_K",
             Self::Q6K => "Q6_K",
             Self::Q8_0 => "Q8_0",
         }
@@ -52,18 +64,24 @@ impl MatrixStorageKind {
 #[derive(Clone, Debug)]
 enum MatrixData {
     F32(Vec<f32>),
-    Q4K(QuantizedBytes),
-    Q5_0(QuantizedBytes),
-    Q6K(QuantizedBytes),
-    Q8_0(QuantizedBytes),
+    F16(MatrixBytes),
+    BF16(MatrixBytes),
+    Q4K(MatrixBytes),
+    Q5_0(MatrixBytes),
+    Q5K(MatrixBytes),
+    Q6K(MatrixBytes),
+    Q8_0(MatrixBytes),
 }
 
 impl PartialEq for MatrixData {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Self::F32(left), Self::F32(right)) => left == right,
-            (Self::Q4K(left), Self::Q4K(right))
+            (Self::F16(left), Self::F16(right))
+            | (Self::BF16(left), Self::BF16(right))
+            | (Self::Q4K(left), Self::Q4K(right))
             | (Self::Q5_0(left), Self::Q5_0(right))
+            | (Self::Q5K(left), Self::Q5K(right))
             | (Self::Q6K(left), Self::Q6K(right))
             | (Self::Q8_0(left), Self::Q8_0(right)) => left == right,
             _ => false,
@@ -72,7 +90,7 @@ impl PartialEq for MatrixData {
 }
 
 #[derive(Clone, Debug)]
-enum QuantizedBytes {
+enum MatrixBytes {
     Owned(Vec<u8>),
     Mapped {
         file: MappedModelFile,
@@ -80,11 +98,11 @@ enum QuantizedBytes {
     },
 }
 
-impl QuantizedBytes {
+impl MatrixBytes {
     fn mapped(file: MappedModelFile, range: Range<usize>) -> Result<Self, InferenceError> {
         if file.as_bytes().get(range.clone()).is_none() {
             return Err(InferenceError::new(format!(
-                "quantized matrix byte range {range:?} is invalid for {} mapped bytes",
+                "matrix byte range {range:?} is invalid for {} mapped bytes",
                 file.as_bytes().len()
             )));
         }
@@ -104,9 +122,32 @@ impl QuantizedBytes {
             Self::Mapped { file, .. } => file.as_bytes().len(),
         }
     }
+
+    fn slice(&self, relative: Range<usize>) -> Result<Self, InferenceError> {
+        let selected = self.as_slice().get(relative.clone()).ok_or_else(|| {
+            InferenceError::new(format!(
+                "matrix subrange {relative:?} is out of bounds for {} bytes",
+                self.as_slice().len()
+            ))
+        })?;
+        match self {
+            Self::Owned(_) => Ok(Self::Owned(selected.to_vec())),
+            Self::Mapped { file, range } => {
+                let start = range
+                    .start
+                    .checked_add(relative.start)
+                    .ok_or_else(|| InferenceError::new("mapped matrix subrange start overflow"))?;
+                let end = range
+                    .start
+                    .checked_add(relative.end)
+                    .ok_or_else(|| InferenceError::new("mapped matrix subrange end overflow"))?;
+                Self::mapped(file.clone(), start..end)
+            }
+        }
+    }
 }
 
-impl Deref for QuantizedBytes {
+impl Deref for MatrixBytes {
     type Target = [u8];
 
     fn deref(&self) -> &Self::Target {
@@ -114,7 +155,7 @@ impl Deref for QuantizedBytes {
     }
 }
 
-impl PartialEq for QuantizedBytes {
+impl PartialEq for MatrixBytes {
     fn eq(&self, other: &Self) -> bool {
         self.as_slice() == other.as_slice()
     }
@@ -138,8 +179,11 @@ impl Matrix {
     pub fn storage_kind(&self) -> MatrixStorageKind {
         match &self.data {
             MatrixData::F32(_) => MatrixStorageKind::F32,
+            MatrixData::F16(_) => MatrixStorageKind::F16,
+            MatrixData::BF16(_) => MatrixStorageKind::BF16,
             MatrixData::Q4K(_) => MatrixStorageKind::Q4K,
             MatrixData::Q5_0(_) => MatrixStorageKind::Q5_0,
+            MatrixData::Q5K(_) => MatrixStorageKind::Q5K,
             MatrixData::Q6K(_) => MatrixStorageKind::Q6K,
             MatrixData::Q8_0(_) => MatrixStorageKind::Q8_0,
         }
@@ -183,6 +227,79 @@ impl Matrix {
         rows::row_values(&self.data, self.rows, self.cols, index)
     }
 
+    /// Returns a matrix containing a contiguous range of rows.
+    ///
+    /// Mapped dense-16 and quantized matrices retain a read-only view of the
+    /// selected byte range. Owned matrices copy only the selected rows.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an empty or out-of-bounds range, arithmetic
+    /// overflow, or a quantized shape whose rows do not end on block
+    /// boundaries.
+    pub fn row_range(&self, range: Range<usize>) -> Result<Self, InferenceError> {
+        if range.start >= range.end || range.end > self.rows {
+            return Err(InferenceError::new(format!(
+                "matrix row range {range:?} is invalid for {} rows",
+                self.rows
+            )));
+        }
+        let selected_rows = range.end - range.start;
+        let data = match &self.data {
+            MatrixData::F32(values) => {
+                let start = range
+                    .start
+                    .checked_mul(self.cols)
+                    .ok_or_else(|| InferenceError::new("F32 matrix row range start overflow"))?;
+                let end = range
+                    .end
+                    .checked_mul(self.cols)
+                    .ok_or_else(|| InferenceError::new("F32 matrix row range end overflow"))?;
+                MatrixData::F32(values[start..end].to_vec())
+            }
+            MatrixData::F16(bytes) => MatrixData::F16(slice_matrix_rows(
+                bytes,
+                range,
+                dense16_row_bytes(self.cols)?,
+            )?),
+            MatrixData::BF16(bytes) => MatrixData::BF16(slice_matrix_rows(
+                bytes,
+                range,
+                dense16_row_bytes(self.cols)?,
+            )?),
+            MatrixData::Q4K(bytes) => MatrixData::Q4K(slice_matrix_rows(
+                bytes,
+                range,
+                super::q4_k::q4_k_storage_bytes(self.cols)?,
+            )?),
+            MatrixData::Q5_0(bytes) => MatrixData::Q5_0(slice_matrix_rows(
+                bytes,
+                range,
+                super::q5_0::q5_0_row_bytes(self.cols)?,
+            )?),
+            MatrixData::Q5K(bytes) => MatrixData::Q5K(slice_matrix_rows(
+                bytes,
+                range,
+                super::q5_k::q5_k_storage_bytes(self.cols)?,
+            )?),
+            MatrixData::Q6K(bytes) => MatrixData::Q6K(slice_matrix_rows(
+                bytes,
+                range,
+                super::q6_k::q6_k_storage_bytes(self.cols)?,
+            )?),
+            MatrixData::Q8_0(bytes) => MatrixData::Q8_0(slice_matrix_rows(
+                bytes,
+                range,
+                super::q8_0::q8_0_row_bytes(self.cols)?,
+            )?),
+        };
+        Ok(Self {
+            rows: selected_rows,
+            cols: self.cols,
+            data,
+        })
+    }
+
     /// Returns the byte count of the matrix's physical tensor storage.
     ///
     /// The storage may be owned heap memory or a range retained from a shared
@@ -190,8 +307,10 @@ impl Matrix {
     pub fn storage_bytes(&self) -> u128 {
         match &self.data {
             MatrixData::F32(values) => values.len() as u128 * std::mem::size_of::<f32>() as u128,
+            MatrixData::F16(bytes) | MatrixData::BF16(bytes) => bytes.len() as u128,
             MatrixData::Q4K(bytes) => bytes.len() as u128,
             MatrixData::Q5_0(bytes) => bytes.len() as u128,
+            MatrixData::Q5K(bytes) => bytes.len() as u128,
             MatrixData::Q6K(bytes) => bytes.len() as u128,
             MatrixData::Q8_0(bytes) => bytes.len() as u128,
         }
@@ -200,8 +319,11 @@ impl Matrix {
     pub(in crate::scalar) fn mapped_file_bytes(&self) -> usize {
         match &self.data {
             MatrixData::F32(_) => 0,
-            MatrixData::Q4K(bytes)
+            MatrixData::F16(bytes)
+            | MatrixData::BF16(bytes)
+            | MatrixData::Q4K(bytes)
             | MatrixData::Q5_0(bytes)
+            | MatrixData::Q5K(bytes)
             | MatrixData::Q6K(bytes)
             | MatrixData::Q8_0(bytes) => bytes.mapped_file_bytes(),
         }
@@ -247,30 +369,38 @@ impl Matrix {
                 q6_k_mul_vec_with_options(data, self.rows, self.cols, vector, options)?.values,
             );
         }
+        if let MatrixData::Q5K(data) = &self.data {
+            return q5_k_mul_vec_with_options(data, self.rows, self.cols, vector, options);
+        }
         if let MatrixData::Q8_0(data) = &self.data {
             #[cfg(target_arch = "aarch64")]
-            if options.residual_q8_activation_matvec()
-                && std::arch::is_aarch64_feature_detected!("i8mm")
-            {
+            if options.residual_q8_activation_matvec() && options.kernel_dispatch().i8mm() {
                 return super::q8_0_q8_residual_i8mm::neon_q8_0_q8_residual_i8mm_mul_vec(
                     data, self.rows, self.cols, vector,
                 );
             }
-            return q8_0_mul_vec(data, self.rows, self.cols, vector);
+            return q8_0_mul_vec_with_options(data, self.rows, self.cols, vector, options);
         }
         if let MatrixData::Q5_0(data) = &self.data {
             #[cfg(target_arch = "aarch64")]
-            if options.residual_q8_activation_matvec()
-                && std::arch::is_aarch64_feature_detected!("dotprod")
-            {
+            if options.residual_q8_activation_matvec() && options.kernel_dispatch().dotprod() {
                 return super::q5_0_q8_residual_neon::neon_q5_0_q8_residual_mul_vec(
                     data, self.rows, self.cols, vector,
                 );
             }
-            return q5_0_mul_vec(data, self.rows, self.cols, vector);
+            return q5_0_mul_vec_with_options(data, self.rows, self.cols, vector, options);
         }
         if let MatrixData::F32(data) = &self.data {
-            return Ok(f32_mul_vec(self.rows, self.cols, data, vector)?.into_values());
+            return Ok(
+                f32_mul_vec_with_options(self.rows, self.cols, data, vector, options)?
+                    .into_values(),
+            );
+        }
+        if let MatrixData::F16(data) = &self.data {
+            return f16_mul_vec_with_options(data, self.rows, self.cols, vector, options);
+        }
+        if let MatrixData::BF16(data) = &self.data {
+            return bf16_mul_vec_with_options(data, self.rows, self.cols, vector, options);
         }
 
         let mut output = Vec::with_capacity(self.rows);
@@ -317,13 +447,21 @@ impl Matrix {
             if left_residual != right_residual {
                 return Ok(None);
             }
-            if left_residual && std::arch::is_aarch64_feature_detected!("dotprod") {
+            if left_residual && left_options.kernel_dispatch().dotprod() {
                 return super::q5_0_q8_residual_neon::neon_q5_0_q8_residual_mul_vec_pair(
                     left, right, self.rows, self.cols, vector,
                 )
                 .map(Some);
             }
-            super::q5_0::q5_0_mul_vec_pair(left, right, self.rows, self.cols, vector).map(Some)
+            super::q5_0::q5_0_mul_vec_pair_with_options(
+                left,
+                right,
+                self.rows,
+                self.cols,
+                vector,
+                left_options,
+            )
+            .map(Some)
         }
     }
 
@@ -356,7 +494,7 @@ impl Matrix {
             if self.cols != vector.len()
                 || key.cols != vector.len()
                 || value.cols != vector.len()
-                || !std::arch::is_aarch64_feature_detected!("dotprod")
+                || !query_options.kernel_dispatch().dotprod()
             {
                 return Ok(None);
             }
@@ -398,7 +536,9 @@ impl Matrix {
 
     #[cfg(target_arch = "aarch64")]
     fn is_q5_residual_candidate(&self, options: ScalarExecutionOptions) -> bool {
-        options.residual_q8_activation_matvec() && matches!(&self.data, MatrixData::Q5_0(_))
+        options.residual_q8_activation_matvec()
+            && options.kernel_dispatch().dotprod()
+            && matches!(&self.data, MatrixData::Q5_0(_))
     }
 
     #[cfg(target_arch = "aarch64")]
@@ -429,6 +569,14 @@ impl Matrix {
     /// Returns an error for a vector length mismatch, non-finite input,
     /// malformed matrix storage, arithmetic overflow, or non-finite output.
     pub fn mul_vec_batch(&self, vectors: &[&[f32]]) -> Result<Vec<Vec<f32>>, InferenceError> {
+        self.mul_vec_batch_with_options(vectors, ScalarExecutionOptions::default())
+    }
+
+    pub(in crate::scalar) fn mul_vec_batch_with_options(
+        &self,
+        vectors: &[&[f32]],
+        options: ScalarExecutionOptions,
+    ) -> Result<Vec<Vec<f32>>, InferenceError> {
         for vector in vectors {
             if self.cols != vector.len() {
                 return Err(InferenceError::new(format!(
@@ -441,19 +589,35 @@ impl Matrix {
         }
 
         if let MatrixData::Q5_0(data) = &self.data {
-            return super::q5_0::q5_0_mul_vec_batch(data, self.rows, self.cols, vectors);
+            return super::q5_0::q5_0_mul_vec_batch_with_options(
+                data, self.rows, self.cols, vectors, options,
+            );
         }
         if let MatrixData::Q8_0(data) = &self.data {
-            return super::q8_0::q8_0_mul_vec_batch(data, self.rows, self.cols, vectors);
+            return super::q8_0::q8_0_mul_vec_batch_with_options(
+                data, self.rows, self.cols, vectors, options,
+            );
         }
         if let MatrixData::Q6K(data) = &self.data {
-            return super::q6_k::q6_k_mul_vec_batch(data, self.rows, self.cols, vectors);
+            return super::q6_k::q6_k_mul_vec_batch_with_options(
+                data, self.rows, self.cols, vectors, options,
+            );
         }
         if let MatrixData::Q4K(data) = &self.data {
-            return super::q4_k::q4_k_mul_vec_batch(data, self.rows, self.cols, vectors);
+            return super::q4_k::q4_k_mul_vec_batch_with_options(
+                data, self.rows, self.cols, vectors, options,
+            );
+        }
+        if let MatrixData::Q5K(data) = &self.data {
+            return super::q5_k::q5_k_mul_vec_batch_with_options(
+                data, self.rows, self.cols, vectors, options,
+            );
         }
 
-        vectors.iter().map(|vector| self.mul_vec(vector)).collect()
+        vectors
+            .iter()
+            .map(|vector| self.mul_vec_with_options(vector, options))
+            .collect()
     }
 
     /// Greedy argmax for several activation vectors in one weight pass
@@ -465,6 +629,14 @@ impl Matrix {
     /// Returns an error for an empty matrix, vector length mismatch,
     /// non-finite input, malformed storage, or non-finite output.
     pub fn argmax_mul_vec_batch(&self, vectors: &[&[f32]]) -> Result<Vec<usize>, InferenceError> {
+        self.argmax_mul_vec_batch_with_options(vectors, ScalarExecutionOptions::default())
+    }
+
+    pub(in crate::scalar) fn argmax_mul_vec_batch_with_options(
+        &self,
+        vectors: &[&[f32]],
+        options: ScalarExecutionOptions,
+    ) -> Result<Vec<usize>, InferenceError> {
         for vector in vectors {
             if self.cols != vector.len() {
                 return Err(InferenceError::new(format!(
@@ -480,12 +652,14 @@ impl Matrix {
         }
 
         if let MatrixData::Q8_0(data) = &self.data {
-            return super::q8_0::q8_0_argmax_mul_vec_batch(data, self.rows, self.cols, vectors);
+            return super::q8_0::q8_0_argmax_mul_vec_batch_with_options(
+                data, self.rows, self.cols, vectors, options,
+            );
         }
 
         vectors
             .iter()
-            .map(|vector| self.argmax_mul_vec(vector))
+            .map(|vector| self.argmax_mul_vec_with_options(vector, options))
             .collect()
     }
 
@@ -529,18 +703,18 @@ impl Matrix {
             return argmax(&self.mul_vec_with_options(vector, options)?);
         }
         if let MatrixData::Q6K(data) = &self.data {
-            return super::q6_k::q6_k_argmax_mul_vec(data, self.rows, self.cols, vector);
+            return super::q6_k::q6_k_argmax_mul_vec_with_options(
+                data, self.rows, self.cols, vector, options,
+            );
         }
         if let MatrixData::Q8_0(data) = &self.data {
             #[cfg(target_arch = "aarch64")]
-            if options.residual_q8_activation_matvec()
-                && std::arch::is_aarch64_feature_detected!("i8mm")
-            {
+            if options.residual_q8_activation_matvec() && options.kernel_dispatch().i8mm() {
                 return super::q8_0_q8_residual_i8mm::neon_q8_0_q8_residual_i8mm_argmax(
                     data, self.rows, self.cols, vector,
                 );
             }
-            return q8_0_argmax_mul_vec(data, self.rows, self.cols, vector);
+            return q8_0_argmax_mul_vec_with_options(data, self.rows, self.cols, vector, options);
         }
 
         argmax(&self.mul_vec_with_options(vector, options)?)
@@ -587,4 +761,25 @@ fn ensure_vector_values_finite(vector: &[f32]) -> Result<(), InferenceError> {
         return Err(InferenceError::new("matrix vector values must be finite"));
     }
     Ok(())
+}
+
+fn slice_matrix_rows(
+    bytes: &MatrixBytes,
+    range: Range<usize>,
+    row_bytes: usize,
+) -> Result<MatrixBytes, InferenceError> {
+    let start = range
+        .start
+        .checked_mul(row_bytes)
+        .ok_or_else(|| InferenceError::new("matrix row range start overflow"))?;
+    let end = range
+        .end
+        .checked_mul(row_bytes)
+        .ok_or_else(|| InferenceError::new("matrix row range end overflow"))?;
+    bytes.slice(start..end)
+}
+
+fn dense16_row_bytes(cols: usize) -> Result<usize, InferenceError> {
+    cols.checked_mul(2)
+        .ok_or_else(|| InferenceError::new("dense-16 matrix row byte length overflow"))
 }

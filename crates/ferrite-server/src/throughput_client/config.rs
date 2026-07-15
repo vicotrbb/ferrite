@@ -5,7 +5,7 @@ pub struct ThroughputClientConfig {
     addr: SocketAddr,
     endpoint: OpenAiEndpoint,
     model: String,
-    prompt: String,
+    prompts: Vec<String>,
     assistant_context: Option<String>,
     follow_up: Option<String>,
     prompt_cache_key: Option<String>,
@@ -13,7 +13,7 @@ pub struct ThroughputClientConfig {
     stop: Option<String>,
     requests: usize,
     concurrency: usize,
-    max_tokens: usize,
+    max_token_budgets: Vec<usize>,
     stream: bool,
     stream_usage: bool,
     rss_pid: Option<u32>,
@@ -50,6 +50,8 @@ impl ThroughputClientConfig {
         let mut config = Self::default();
         let mut iter = args.into_iter();
         let _program = iter.next();
+        let mut saw_prompt = false;
+        let mut saw_max_tokens = false;
 
         while let Some(arg) = iter.next() {
             let flag = arg
@@ -73,7 +75,12 @@ impl ThroughputClientConfig {
                     config.endpoint = parse_endpoint(next_value(&mut iter, "--endpoint")?)?;
                 }
                 "--prompt" => {
-                    config.prompt = os_string_to_string(next_value(&mut iter, "--prompt")?)?;
+                    let prompt = os_string_to_string(next_value(&mut iter, "--prompt")?)?;
+                    if !saw_prompt {
+                        config.prompts.clear();
+                        saw_prompt = true;
+                    }
+                    config.prompts.push(prompt);
                 }
                 "--assistant-context" => {
                     let assistant_context =
@@ -123,10 +130,15 @@ impl ThroughputClientConfig {
                     )?;
                 }
                 "--max-tokens" => {
-                    config.max_tokens = parse_positive_usize(
+                    let max_tokens = parse_positive_usize(
                         next_value(&mut iter, "--max-tokens")?,
                         "--max-tokens",
                     )?;
+                    if !saw_max_tokens {
+                        config.max_token_budgets.clear();
+                        saw_max_tokens = true;
+                    }
+                    config.max_token_budgets.push(max_tokens);
                 }
                 "--stream" => {
                     config.stream = true;
@@ -182,6 +194,20 @@ impl ThroughputClientConfig {
                 "--prompt-cache-trace requires --endpoint chat-completions",
             ));
         }
+        let configured_cases = config.prompts.len().max(config.max_token_budgets.len());
+        if config.requests < configured_cases {
+            return Err(ClientConfigError::new(format!(
+                "--requests must be at least the number of configured prompt or token-budget values ({configured_cases})"
+            )));
+        }
+        if config.prompts.len() > 1
+            && config.max_token_budgets.len() > 1
+            && config.prompts.len() != config.max_token_budgets.len()
+        {
+            return Err(ClientConfigError::new(
+                "repeatable --prompt and --max-tokens values must have equal counts when both are repeated",
+            ));
+        }
 
         Ok(config)
     }
@@ -199,7 +225,22 @@ impl ThroughputClientConfig {
     }
 
     pub fn prompt(&self) -> &str {
-        &self.prompt
+        &self.prompts[0]
+    }
+
+    pub fn prompts(&self) -> &[String] {
+        &self.prompts
+    }
+
+    pub fn prompt_for_request(&self, request_index: usize) -> &str {
+        &self.prompts[request_index % self.prompts.len()]
+    }
+
+    pub fn distinct_prompt_count(&self) -> usize {
+        let mut prompts = self.prompts.iter().map(String::as_str).collect::<Vec<_>>();
+        prompts.sort_unstable();
+        prompts.dedup();
+        prompts.len()
     }
 
     pub fn assistant_context(&self) -> Option<&str> {
@@ -231,7 +272,22 @@ impl ThroughputClientConfig {
     }
 
     pub fn max_tokens(&self) -> usize {
-        self.max_tokens
+        self.max_token_budgets[0]
+    }
+
+    pub fn max_token_budgets(&self) -> &[usize] {
+        &self.max_token_budgets
+    }
+
+    pub fn max_tokens_for_request(&self, request_index: usize) -> usize {
+        self.max_token_budgets[request_index % self.max_token_budgets.len()]
+    }
+
+    pub fn distinct_max_token_budget_count(&self) -> usize {
+        let mut budgets = self.max_token_budgets.clone();
+        budgets.sort_unstable();
+        budgets.dedup();
+        budgets.len()
     }
 
     pub fn stream(&self) -> bool {
@@ -261,7 +317,7 @@ impl Default for ThroughputClientConfig {
             addr: SocketAddr::from(([127, 0, 0, 1], 8080)),
             endpoint: OpenAiEndpoint::Completions,
             model: "ferrite-local".to_owned(),
-            prompt: "hello world".to_owned(),
+            prompts: vec!["hello world".to_owned()],
             assistant_context: None,
             follow_up: None,
             prompt_cache_key: None,
@@ -269,7 +325,7 @@ impl Default for ThroughputClientConfig {
             stop: None,
             requests: 3,
             concurrency: 1,
-            max_tokens: 1,
+            max_token_budgets: vec![1],
             stream: false,
             stream_usage: false,
             rss_pid: None,
@@ -362,5 +418,5 @@ fn parse_endpoint(value: OsString) -> Result<OpenAiEndpoint, ClientConfigError> 
 
 /// Returns the command-line usage string for the throughput client.
 pub fn usage() -> &'static str {
-    "usage: ferrite-openai-throughput [--addr 127.0.0.1:8080] [--endpoint completions|chat-completions] [--model ferrite-local] [--prompt 'hello world'] [--assistant-context TEXT --follow-up TEXT] [--prompt-cache-key KEY] [--prompt-cache-trace] [--stop STOP] [--requests 3] [--concurrency 1] [--max-tokens 1] [--stream] [--stream-usage] [--rss-pid PID] [--rss-idle-ms 2000] [--api-key local-secret]"
+    "usage: ferrite-openai-throughput [--addr 127.0.0.1:8080] [--endpoint completions|chat-completions] [--model ferrite-local] [--prompt 'hello world']... [--assistant-context TEXT --follow-up TEXT] [--prompt-cache-key KEY] [--prompt-cache-trace] [--stop STOP] [--requests 3] [--concurrency 1] [--max-tokens 1]... [--stream] [--stream-usage] [--rss-pid PID] [--rss-idle-ms 2000] [--api-key local-secret]"
 }

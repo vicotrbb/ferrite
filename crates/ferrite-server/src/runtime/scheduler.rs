@@ -1,8 +1,10 @@
 use super::{
-    GeneratedText, GenerationControl, GenerationFinishReason, GenerationFinishSource,
-    InferenceEngine, RuntimeError, TokenTextBuffer,
+    GeneratedText, GenerationCacheOptions, GenerationControl, GenerationFinishReason,
+    GenerationFinishSource, InferenceEngine, PromptCacheLookup, PromptCacheTrace, RuntimeError,
+    TokenTextBuffer,
 };
 use crate::openai::stop_filter::StopSequenceFilter;
+use ferrite_inference::prefix_cache::PrefixCacheKey;
 use ferrite_inference::scalar::{
     accept_token_contexts_batch, accept_token_ids_batch, ScalarLlamaSession,
 };
@@ -23,6 +25,7 @@ const BATCH_ADMISSION_WINDOW: Duration = Duration::from_millis(5);
 pub struct BatchScheduler {
     sender: SyncSender<ScheduledJob>,
     max_batch_streams: usize,
+    max_queued_jobs: usize,
 }
 
 impl BatchScheduler {
@@ -30,8 +33,17 @@ impl BatchScheduler {
         engine: Arc<InferenceEngine>,
         max_batch_streams: usize,
     ) -> Result<Self, RuntimeError> {
+        Self::start_with_queue(engine, max_batch_streams, max_batch_streams.max(1))
+    }
+
+    pub fn start_with_queue(
+        engine: Arc<InferenceEngine>,
+        max_batch_streams: usize,
+        max_queued_jobs: usize,
+    ) -> Result<Self, RuntimeError> {
         let max_batch_streams = max_batch_streams.max(1);
-        let (sender, receiver) = mpsc::sync_channel(max_batch_streams * 2);
+        let max_queued_jobs = max_queued_jobs.max(1);
+        let (sender, receiver) = mpsc::sync_channel(max_queued_jobs);
         thread::Builder::new()
             .name("ferrite-batch-scheduler".to_owned())
             .spawn(move || scheduler_loop(engine, receiver, max_batch_streams))
@@ -41,6 +53,7 @@ impl BatchScheduler {
         Ok(Self {
             sender,
             max_batch_streams,
+            max_queued_jobs,
         })
     }
 
@@ -48,11 +61,16 @@ impl BatchScheduler {
         self.max_batch_streams
     }
 
+    pub fn max_queued_jobs(&self) -> usize {
+        self.max_queued_jobs
+    }
+
     pub fn submit(
         &self,
         prompt: String,
         max_tokens: usize,
         stop_sequences: Vec<String>,
+        cache_options: GenerationCacheOptions,
     ) -> Result<tokio_mpsc::Receiver<BatchedGenerationEvent>, RuntimeError> {
         let (events, receiver) = tokio_mpsc::channel(EVENT_CHANNEL_CAPACITY);
         self.sender
@@ -60,6 +78,7 @@ impl BatchScheduler {
                 prompt,
                 max_tokens,
                 stop_sequences,
+                cache_options,
                 events,
             })
             .map_err(|error| match error {
@@ -82,6 +101,7 @@ struct ScheduledJob {
     prompt: String,
     max_tokens: usize,
     stop_sequences: Vec<String>,
+    cache_options: GenerationCacheOptions,
     events: tokio_mpsc::Sender<BatchedGenerationEvent>,
 }
 
@@ -91,6 +111,12 @@ struct PreparedJob<'model> {
     events: tokio_mpsc::Sender<BatchedGenerationEvent>,
     stop_sequences: Vec<String>,
     prompt_token_ids: Vec<usize>,
+    prefix_cache_key: PrefixCacheKey,
+    cache_options: GenerationCacheOptions,
+    prompt_cache_trace: Option<PromptCacheTrace>,
+    cached_prompt_tokens: usize,
+    prefill_start: usize,
+    cache_store_needed: bool,
     max_tokens: usize,
     first_token_id: Option<usize>,
 }
@@ -107,14 +133,70 @@ impl<'model> PreparedJob<'model> {
         if job.max_tokens == 0 {
             return Err(RuntimeError::new("max tokens must be greater than zero"));
         }
+        engine.validate_kv_capacity(prompt_token_ids.len(), job.max_tokens)?;
+
+        let prefix_cache_key =
+            engine.prefix_cache_key_for_tokens(&prompt_token_ids, &job.cache_options);
+        let mut session = engine.start_session()?;
+        let mut prompt_cache_trace = None;
+        let mut cached_prompt_tokens = 0;
+        let mut prefill_start = 0;
+        let mut first_token_id = None;
+        let mut cache_store_needed = job.cache_options.prefix_cache_enabled();
+        if job.cache_options.prefix_cache_enabled() {
+            let lookup = engine.prefix_cache_lookup(&prefix_cache_key)?;
+            if job.cache_options.prompt_cache_trace_enabled() {
+                prompt_cache_trace = Some(lookup.to_trace(&prefix_cache_key, true));
+            }
+            if let Some(cached) = lookup.into_value() {
+                session
+                    .restore_cache_snapshot(cached.snapshot())
+                    .map_err(|error| {
+                        RuntimeError::new(format!("failed to restore prompt cache: {error}"))
+                    })?;
+                cached_prompt_tokens = cached.snapshot().cached_token_count();
+                prefill_start = cached_prompt_tokens;
+                if prefill_start == prompt_token_ids.len() {
+                    first_token_id = cached.next_token_id();
+                    cache_store_needed = first_token_id.is_none();
+                    if first_token_id.is_none() {
+                        prefill_start = prefill_start.checked_sub(1).ok_or_else(|| {
+                            RuntimeError::new(
+                                "prefix cache hit cannot recover a token for an empty prompt",
+                            )
+                        })?;
+                        cached_prompt_tokens = prefill_start;
+                        session.truncate_cache(prefill_start).map_err(|error| {
+                            RuntimeError::new(format!(
+                                "failed to truncate prompt cache for greedy recovery: {error}"
+                            ))
+                        })?;
+                    }
+                }
+            }
+        } else if job.cache_options.prompt_cache_trace_enabled() {
+            prompt_cache_trace = Some(PromptCacheTrace::new(
+                false,
+                prefix_cache_key.namespace().map(str::to_owned),
+                prefix_cache_key.prefix_token_count(),
+                prefix_cache_key.prefix_token_hash(),
+                PromptCacheLookup::Disabled,
+            ));
+        }
 
         Ok(Self {
-            session: Some(engine.start_session()?),
+            session: Some(session),
             events: job.events,
             stop_sequences: job.stop_sequences,
             prompt_token_ids,
+            prefix_cache_key,
+            cache_options: job.cache_options,
+            prompt_cache_trace,
+            cached_prompt_tokens,
+            prefill_start,
+            cache_store_needed,
             max_tokens: job.max_tokens,
-            first_token_id: None,
+            first_token_id,
         })
     }
 
@@ -128,6 +210,8 @@ impl<'model> PreparedJob<'model> {
             pending_events: VecDeque::new(),
             stop_filter: StopSequenceFilter::new(self.stop_sequences),
             prompt_tokens: self.prompt_token_ids.len(),
+            cached_prompt_tokens: self.cached_prompt_tokens,
+            prompt_cache_trace: self.prompt_cache_trace,
             remaining_tokens: self.max_tokens,
             decode_input_token_id: None,
             generated_token_ids: Vec::with_capacity(self.max_tokens),
@@ -148,6 +232,8 @@ struct ActiveJob<'model> {
     pending_events: VecDeque<BatchedGenerationEvent>,
     stop_filter: StopSequenceFilter,
     prompt_tokens: usize,
+    cached_prompt_tokens: usize,
+    prompt_cache_trace: Option<PromptCacheTrace>,
     remaining_tokens: usize,
     decode_input_token_id: Option<usize>,
     generated_token_ids: Vec<usize>,
@@ -165,7 +251,7 @@ impl<'model> ActiveJob<'model> {
     ) -> Result<(), RuntimeError> {
         self.generated_token_ids.push(token_id);
         self.remaining_tokens = self.remaining_tokens.saturating_sub(1);
-        if Some(token_id) == engine.tokenizer.eos_token_id() {
+        if engine.tokenizer.is_end_of_generation_token(token_id) {
             return self.finish(
                 engine,
                 GenerationFinishReason::Stop,
@@ -257,7 +343,9 @@ impl<'model> ActiveJob<'model> {
             finish_reason,
         )
         .with_finish_source(finish_source)
-        .with_token_id_chunks(std::mem::take(&mut self.token_id_chunks))?;
+        .with_token_id_chunks(std::mem::take(&mut self.token_id_chunks))?
+        .with_cached_prompt_tokens(self.cached_prompt_tokens)?
+        .with_optional_prompt_cache_trace(self.prompt_cache_trace.take())?;
         self.pending_events
             .push_back(BatchedGenerationEvent::Finished(generated));
         self.decode_input_token_id = None;
@@ -443,6 +531,9 @@ fn admit_jobs<'model>(
 ) {
     let mut prepared = Vec::with_capacity(jobs.len());
     for job in jobs {
+        if job.events.is_closed() {
+            continue;
+        }
         let error_sender = job.events.clone();
         match PreparedJob::new(engine, job) {
             Ok(job) => prepared.push(job),
@@ -465,8 +556,39 @@ fn admit_jobs<'model>(
         return;
     }
 
-    for job in prepared {
+    for mut job in prepared {
+        if job.events.is_closed() {
+            continue;
+        }
         let error_sender = job.events.clone();
+        if job.cache_options.prefix_cache_enabled() && job.cache_store_needed {
+            let cache_result = (|| {
+                let first_token_id = job.first_token_id.ok_or_else(|| {
+                    RuntimeError::new(
+                        "batch scheduler invariant failed: cached prefill produced no token",
+                    )
+                })?;
+                let snapshot = job
+                    .session
+                    .as_mut()
+                    .ok_or_else(|| {
+                        RuntimeError::new(
+                            "batch scheduler invariant failed: cached prefill session is missing",
+                        )
+                    })?
+                    .cache_snapshot()
+                    .map_err(|error| RuntimeError::new(error.to_string()))?;
+                engine.store_prefix_cache_greedy_value(
+                    job.prefix_cache_key.clone(),
+                    snapshot,
+                    first_token_id,
+                )
+            })();
+            if let Err(error) = cache_result {
+                let _ = error_sender.blocking_send(BatchedGenerationEvent::Failed(error));
+                continue;
+            }
+        }
         match job.into_active(engine) {
             Ok(job) => active.push(job),
             Err(error) => {
@@ -481,9 +603,14 @@ fn prefill_jobs(jobs: &mut [PreparedJob<'_>]) -> Result<(), RuntimeError> {
         .iter()
         .map(|job| job.prompt_token_ids.as_slice())
         .collect::<Vec<_>>();
-    let prompt_groups = equal_prompt_groups(&prompt_token_ids);
+    let cache_options = jobs
+        .iter()
+        .map(|job| &job.cache_options)
+        .collect::<Vec<_>>();
+    let prompt_groups = equal_prompt_groups(&prompt_token_ids, &cache_options);
     let representatives = prompt_groups
         .iter()
+        .filter(|group| group_has_open_receiver(jobs, group))
         .filter_map(|group| group.first().copied())
         .collect::<Vec<_>>();
     let max_prompt_len = representatives
@@ -495,14 +622,24 @@ fn prefill_jobs(jobs: &mut [PreparedJob<'_>]) -> Result<(), RuntimeError> {
         let context_indices = representatives
             .iter()
             .copied()
-            .filter(|index| position + 1 < jobs[*index].prompt_token_ids.len())
+            .filter(|index| {
+                representative_has_open_receiver(jobs, &prompt_groups, *index)
+                    && jobs[*index].first_token_id.is_none()
+                    && position >= jobs[*index].prefill_start
+                    && position + 1 < jobs[*index].prompt_token_ids.len()
+            })
             .collect::<Vec<_>>();
         advance_prefill_contexts(jobs, &context_indices, position)?;
 
         let final_indices = representatives
             .iter()
             .copied()
-            .filter(|index| position + 1 == jobs[*index].prompt_token_ids.len())
+            .filter(|index| {
+                representative_has_open_receiver(jobs, &prompt_groups, *index)
+                    && jobs[*index].first_token_id.is_none()
+                    && position >= jobs[*index].prefill_start
+                    && position + 1 == jobs[*index].prompt_token_ids.len()
+            })
             .collect::<Vec<_>>();
         advance_prefill_finals(jobs, &final_indices, position)?;
     }
@@ -511,10 +648,16 @@ fn prefill_jobs(jobs: &mut [PreparedJob<'_>]) -> Result<(), RuntimeError> {
     Ok(())
 }
 
-fn equal_prompt_groups(prompts: &[&[usize]]) -> Vec<Vec<usize>> {
+fn equal_prompt_groups(
+    prompts: &[&[usize]],
+    cache_options: &[&GenerationCacheOptions],
+) -> Vec<Vec<usize>> {
+    debug_assert_eq!(prompts.len(), cache_options.len());
     let mut groups = Vec::<Vec<usize>>::new();
     for (index, prompt) in prompts.iter().enumerate() {
-        if let Some(group) = groups.iter_mut().find(|group| prompts[group[0]] == *prompt) {
+        if let Some(group) = groups.iter_mut().find(|group| {
+            prompts[group[0]] == *prompt && cache_options[group[0]] == cache_options[index]
+        }) {
             group.push(index);
         } else {
             groups.push(vec![index]);
@@ -523,11 +666,29 @@ fn equal_prompt_groups(prompts: &[&[usize]]) -> Vec<Vec<usize>> {
     groups
 }
 
+fn group_has_open_receiver(jobs: &[PreparedJob<'_>], group: &[usize]) -> bool {
+    group.iter().any(|index| !jobs[*index].events.is_closed())
+}
+
+fn representative_has_open_receiver(
+    jobs: &[PreparedJob<'_>],
+    groups: &[Vec<usize>],
+    representative: usize,
+) -> bool {
+    groups
+        .iter()
+        .find(|group| group.first() == Some(&representative))
+        .is_some_and(|group| group_has_open_receiver(jobs, group))
+}
+
 fn restore_equal_prompt_sessions(
     jobs: &mut [PreparedJob<'_>],
     prompt_groups: Vec<Vec<usize>>,
 ) -> Result<(), RuntimeError> {
     for group in prompt_groups {
+        if !group_has_open_receiver(jobs, &group) {
+            continue;
+        }
         let Some((&representative, duplicates)) = group.split_first() else {
             continue;
         };
@@ -547,6 +708,9 @@ fn restore_equal_prompt_sessions(
             .map_err(|error| RuntimeError::new(error.to_string()))?;
 
         for index in duplicates {
+            if jobs[*index].events.is_closed() {
+                continue;
+            }
             jobs[*index]
                 .session
                 .as_mut()
@@ -636,15 +800,80 @@ fn restore_prefill_sessions<'model>(
 
 #[cfg(test)]
 mod tests {
-    use super::equal_prompt_groups;
+    use super::{equal_prompt_groups, BatchScheduler, BatchedGenerationEvent};
+    use crate::runtime::{
+        GenerationCacheOptions, GenerationFinishReason, GenerationFinishSource, InferenceEngine,
+    };
+    use std::sync::Arc;
 
     #[test]
     fn groups_equal_prompts_by_first_arrival() {
         let prompts: [&[usize]; 5] = [&[1, 2], &[3], &[1, 2], &[4, 5], &[3]];
+        let options: [GenerationCacheOptions; 5] =
+            std::array::from_fn(|_| GenerationCacheOptions::default());
+        let option_refs = options.iter().collect::<Vec<_>>();
 
         assert_eq!(
-            equal_prompt_groups(&prompts),
+            equal_prompt_groups(&prompts, &option_refs),
             [vec![0, 2], vec![1, 4], vec![3]]
         );
+    }
+
+    #[test]
+    fn isolates_equal_prompts_across_cache_namespaces() {
+        let prompts: [&[usize]; 3] = [&[1, 2], &[1, 2], &[1, 2]];
+        let options = [
+            GenerationCacheOptions::from_namespace(Some("tenant-a".to_owned()))
+                .with_prefix_cache_enabled(true),
+            GenerationCacheOptions::from_namespace(Some("tenant-b".to_owned()))
+                .with_prefix_cache_enabled(true),
+            GenerationCacheOptions::from_namespace(Some("tenant-a".to_owned()))
+                .with_prefix_cache_enabled(true),
+        ];
+        let option_refs = options.iter().collect::<Vec<_>>();
+
+        assert_eq!(
+            equal_prompt_groups(&prompts, &option_refs),
+            [vec![0, 2], vec![1]]
+        );
+    }
+
+    #[test]
+    fn scheduler_stops_on_explicit_eot_token() -> Result<(), Box<dyn std::error::Error>> {
+        let model_path = std::env::temp_dir().join(format!(
+            "ferrite-scheduler-eot-fixture-{}.gguf",
+            std::process::id()
+        ));
+        std::fs::write(
+            &model_path,
+            ferrite_fixtures::scalar_llama_f32_gguf_fixture_with_eot_token_id(2),
+        )?;
+        let engine = Arc::new(InferenceEngine::load(&model_path)?);
+        std::fs::remove_file(&model_path)?;
+        let scheduler = BatchScheduler::start(engine, 1)?;
+        let mut events = scheduler.submit(
+            "hello".to_owned(),
+            4,
+            Vec::new(),
+            GenerationCacheOptions::default(),
+        )?;
+
+        let generated = match events.blocking_recv() {
+            Some(BatchedGenerationEvent::Finished(generated)) => generated,
+            Some(BatchedGenerationEvent::Token { text, token_ids }) => {
+                return Err(format!(
+                    "terminal EOT became visible: text={text:?}, token_ids={token_ids:?}"
+                )
+                .into());
+            }
+            Some(BatchedGenerationEvent::Failed(error)) => return Err(error.into()),
+            None => return Err("scheduler closed before finishing generation".into()),
+        };
+
+        assert_eq!(generated.finish_reason(), GenerationFinishReason::Stop);
+        assert_eq!(generated.finish_source(), GenerationFinishSource::Eos);
+        assert_eq!(generated.completion_tokens(), 1);
+        assert_eq!(generated.text(), "");
+        Ok(())
     }
 }

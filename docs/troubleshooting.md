@@ -5,7 +5,7 @@
 Check the first explicit error. Common causes are:
 
 - GGUF version is not 3.
-- `general.architecture` is not `llama` or `qwen2`.
+- `general.architecture` is not `llama`, `qwen2`, or `phi3`.
 - A required tensor is missing, duplicated, misaligned, or has the wrong shape.
 - A tensor uses an unsupported encoding.
 - Model metadata has an invalid head, RoPE, context, or feed-forward layout.
@@ -38,9 +38,23 @@ memory-bandwidth contention.
 
 ## A request reports unsupported fields
 
-Ferrite rejects options that request behavior it does not implement. Remove
-sampling, tool, audio, structured-output, or other non-neutral options. See
-[OpenAI API compatibility](openai-api.md).
+Ferrite rejects options that request behavior it does not implement. Check the
+error `param` before removing a field. Sampling, ChatML function calls,
+JSON-object mode, and non-streaming Responses text each have documented narrow
+forms; audio, multimodal data, hosted tools, and non-neutral Responses state do
+not. See [OpenAI API compatibility](openai-api.md).
+
+## Built-in model acquisition fails
+
+Confirm that `curl` is installed and HTTPS access to the pinned model source is
+allowed. A failed transfer leaves a `.partial` file for the next invocation to
+resume. Do not rename a partial file into place. Ferrite publishes the final
+artifact only after its exact byte size and SHA-256 match.
+
+If a stale acquisition lock remains after a terminated process, the error
+reports its exact path. Confirm no acquisition process is active before
+removing only that `.acquire.lock` file. Use `--offline` when network access is
+prohibited; an absent or corrupted cache entry will then fail explicitly.
 
 ## Performance is much lower than a recorded result
 
@@ -58,14 +72,18 @@ medians.
 
 ## `--kv-backend locus` fails
 
-Build the CLI with the feature:
+Build the selected binary with the feature:
 
 ```sh
 cargo build --release --locked -p ferrite-cli --features locus-kv
+cargo build --release --locked -p ferrite-server --features locus-kv
 ```
 
-Then verify that `--kv-max-tokens` is large enough for prompt and generated
-tokens. Omit it to use Ferrite's workload-based sizing.
+For the CLI, verify that `--kv-max-tokens` is large enough for prompt and
+generated tokens, or omit it to use workload-based sizing. The server requires
+an explicit `--kv-max-tokens` value and rejects requests whose prompt plus
+worst-case decode state cannot fit. The error is a configured-capacity failure,
+not permission to fall back to unbounded vector storage.
 
 ## A real-model test is ignored
 

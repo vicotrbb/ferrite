@@ -13,7 +13,7 @@ const REAL_MODEL_ID: &str = "qwen2.5-1.5b-q8_0";
 
 #[tokio::test]
 #[ignore = "requires local Qwen2.5-1.5B Q8_0 GGUF model artifact"]
-async fn live_http_server_queues_behind_32_token_qwen_1_5b_q8_stream(
+async fn live_http_server_queues_behind_qwen_1_5b_q8_stream_with_32_token_limit(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let server = support::LiveServer::start_with_existing_model_configured(
         REAL_MODEL_ID,
@@ -73,8 +73,8 @@ async fn live_http_server_queues_behind_32_token_qwen_1_5b_q8_stream(
         ["holder_stream", "queued_chat", "queued_completion"],
         "unexpected finish order"
     );
-    assert_qwen_1_5b_q8_32_token_chat_stream_response(&holder_response)?;
-    assert_qwen_1_5b_q8_32_token_chat_response(&queued_chat_response)?;
+    assert_qwen_1_5b_q8_chat_stream_with_32_token_limit_response(&holder_response)?;
+    assert_qwen_1_5b_q8_chat_with_32_token_limit_response(&queued_chat_response)?;
     assert_qwen_1_5b_q8_completion_response(&queued_completion_response)?;
     Ok(())
 }
@@ -95,7 +95,7 @@ fn spawn_labeled_request(
     })
 }
 
-fn assert_qwen_1_5b_q8_32_token_chat_stream_response(
+fn assert_qwen_1_5b_q8_chat_stream_with_32_token_limit_response(
     response: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     assert!(
@@ -114,13 +114,13 @@ fn assert_qwen_1_5b_q8_32_token_chat_stream_response(
         "missing chat stream chunk: {response}"
     );
     assert!(
-        response.contains("\"finish_reason\":\"length\""),
-        "missing length terminal chunk: {response}"
+        response.contains("\"finish_reason\":\"stop\""),
+        "missing stop terminal chunk: {response}"
     );
     Ok(())
 }
 
-fn assert_qwen_1_5b_q8_32_token_chat_response(
+fn assert_qwen_1_5b_q8_chat_with_32_token_limit_response(
     response: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     assert!(
@@ -130,16 +130,14 @@ fn assert_qwen_1_5b_q8_32_token_chat_response(
     let body = response_json(response)?;
     assert_eq!(body["object"], "chat.completion");
     assert_eq!(body["model"], REAL_MODEL_ID);
-    assert_eq!(body["choices"][0]["finish_reason"], "length");
-    assert!(
-        body["choices"][0]["message"]["content"]
-            .as_str()
-            .is_some_and(|content| !content.is_empty()),
-        "unexpected response body: {body}"
+    assert_eq!(body["choices"][0]["finish_reason"], "stop");
+    assert_eq!(
+        body["choices"][0]["message"]["content"],
+        "Hello! How can I help you today?"
     );
-    assert_eq!(body["usage"]["prompt_tokens"], 8);
-    assert_eq!(body["usage"]["completion_tokens"], 32);
-    assert_eq!(body["usage"]["total_tokens"], 40);
+    assert_eq!(body["usage"]["prompt_tokens"], 31);
+    assert_eq!(body["usage"]["completion_tokens"], 10);
+    assert_eq!(body["usage"]["total_tokens"], 41);
     Ok(())
 }
 

@@ -1,7 +1,9 @@
-use super::{Matrix, MatrixData, QuantizedBytes};
+use super::{Matrix, MatrixBytes, MatrixData};
 use crate::scalar::{
+    dense16::{validate_bf16_values, validate_f16_values},
     q4_k::validate_q4_k_finite_scales,
     q5_0::validate_q5_0_finite_scales,
+    q5_k::{q5_k_storage_bytes, validate_q5_k_finite_scales, Q5_K_BLOCK_VALUES},
     q6_k::validate_q6_k_finite_scales,
     q8_0::validate_q8_0_finite_scales,
     quantized::{
@@ -45,6 +47,80 @@ impl Matrix {
         })
     }
 
+    /// Creates an F16 matrix from GGML row-major little-endian bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the shape overflows, the byte length does not
+    /// match `rows * cols * 2`, or any decoded value is non-finite.
+    pub fn from_f16_row_major_bytes(
+        rows: usize,
+        cols: usize,
+        data: Vec<u8>,
+    ) -> Result<Self, InferenceError> {
+        Self::from_f16_storage(rows, cols, MatrixBytes::Owned(data))
+    }
+
+    pub(in crate::scalar) fn from_f16_mapped_bytes(
+        rows: usize,
+        cols: usize,
+        file: MappedModelFile,
+        range: Range<usize>,
+    ) -> Result<Self, InferenceError> {
+        Self::from_f16_storage(rows, cols, MatrixBytes::mapped(file, range)?)
+    }
+
+    fn from_f16_storage(
+        rows: usize,
+        cols: usize,
+        data: MatrixBytes,
+    ) -> Result<Self, InferenceError> {
+        validate_dense16_shape("F16", rows, cols, data.len())?;
+        validate_f16_values(data.as_slice())?;
+        Ok(Self {
+            rows,
+            cols,
+            data: MatrixData::F16(data),
+        })
+    }
+
+    /// Creates a BF16 matrix from GGML row-major little-endian bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the shape overflows, the byte length does not
+    /// match `rows * cols * 2`, or any decoded value is non-finite.
+    pub fn from_bf16_row_major_bytes(
+        rows: usize,
+        cols: usize,
+        data: Vec<u8>,
+    ) -> Result<Self, InferenceError> {
+        Self::from_bf16_storage(rows, cols, MatrixBytes::Owned(data))
+    }
+
+    pub(in crate::scalar) fn from_bf16_mapped_bytes(
+        rows: usize,
+        cols: usize,
+        file: MappedModelFile,
+        range: Range<usize>,
+    ) -> Result<Self, InferenceError> {
+        Self::from_bf16_storage(rows, cols, MatrixBytes::mapped(file, range)?)
+    }
+
+    fn from_bf16_storage(
+        rows: usize,
+        cols: usize,
+        data: MatrixBytes,
+    ) -> Result<Self, InferenceError> {
+        validate_dense16_shape("BF16", rows, cols, data.len())?;
+        validate_bf16_values(data.as_slice())?;
+        Ok(Self {
+            rows,
+            cols,
+            data: MatrixData::BF16(data),
+        })
+    }
+
     /// Creates a `Q8_0` matrix from GGML row-major block bytes.
     ///
     /// # Errors
@@ -56,7 +132,7 @@ impl Matrix {
         cols: usize,
         data: Vec<u8>,
     ) -> Result<Self, InferenceError> {
-        Self::from_q8_0_storage(rows, cols, QuantizedBytes::Owned(data))
+        Self::from_q8_0_storage(rows, cols, MatrixBytes::Owned(data))
     }
 
     pub(in crate::scalar) fn from_q8_0_mapped_bytes(
@@ -65,13 +141,13 @@ impl Matrix {
         file: MappedModelFile,
         range: Range<usize>,
     ) -> Result<Self, InferenceError> {
-        Self::from_q8_0_storage(rows, cols, QuantizedBytes::mapped(file, range)?)
+        Self::from_q8_0_storage(rows, cols, MatrixBytes::mapped(file, range)?)
     }
 
     fn from_q8_0_storage(
         rows: usize,
         cols: usize,
-        data: QuantizedBytes,
+        data: MatrixBytes,
     ) -> Result<Self, InferenceError> {
         if !cols.is_multiple_of(Q8_0_BLOCK_VALUES) {
             return Err(InferenceError::new(format!(
@@ -108,7 +184,7 @@ impl Matrix {
         cols: usize,
         data: Vec<u8>,
     ) -> Result<Self, InferenceError> {
-        Self::from_q5_0_storage(rows, cols, QuantizedBytes::Owned(data))
+        Self::from_q5_0_storage(rows, cols, MatrixBytes::Owned(data))
     }
 
     pub(in crate::scalar) fn from_q5_0_mapped_bytes(
@@ -117,13 +193,13 @@ impl Matrix {
         file: MappedModelFile,
         range: Range<usize>,
     ) -> Result<Self, InferenceError> {
-        Self::from_q5_0_storage(rows, cols, QuantizedBytes::mapped(file, range)?)
+        Self::from_q5_0_storage(rows, cols, MatrixBytes::mapped(file, range)?)
     }
 
     fn from_q5_0_storage(
         rows: usize,
         cols: usize,
-        data: QuantizedBytes,
+        data: MatrixBytes,
     ) -> Result<Self, InferenceError> {
         if !cols.is_multiple_of(Q5_0_BLOCK_VALUES) {
             return Err(InferenceError::new(format!(
@@ -149,6 +225,58 @@ impl Matrix {
         })
     }
 
+    /// Creates a `Q5_K` matrix from GGML row-major block bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the shape is not block-aligned, byte size does
+    /// not match the shape, arithmetic overflows, or a scale is non-finite.
+    pub fn from_q5_k_row_major_bytes(
+        rows: usize,
+        cols: usize,
+        data: Vec<u8>,
+    ) -> Result<Self, InferenceError> {
+        Self::from_q5_k_storage(rows, cols, MatrixBytes::Owned(data))
+    }
+
+    pub(in crate::scalar) fn from_q5_k_mapped_bytes(
+        rows: usize,
+        cols: usize,
+        file: MappedModelFile,
+        range: Range<usize>,
+    ) -> Result<Self, InferenceError> {
+        Self::from_q5_k_storage(rows, cols, MatrixBytes::mapped(file, range)?)
+    }
+
+    fn from_q5_k_storage(
+        rows: usize,
+        cols: usize,
+        data: MatrixBytes,
+    ) -> Result<Self, InferenceError> {
+        if !cols.is_multiple_of(Q5_K_BLOCK_VALUES) {
+            return Err(InferenceError::new(format!(
+                "Q5_K matrix columns {cols} must be divisible by {Q5_K_BLOCK_VALUES}"
+            )));
+        }
+        let value_count = rows
+            .checked_mul(cols)
+            .ok_or_else(|| InferenceError::new("Q5_K matrix value count overflow"))?;
+        let expected = q5_k_storage_bytes(value_count)?;
+        if data.len() != expected {
+            return Err(InferenceError::new(format!(
+                "Q5_K matrix byte length {} does not match shape {rows}x{cols}",
+                data.len()
+            )));
+        }
+        validate_q5_k_finite_scales(data.as_slice())?;
+
+        Ok(Self {
+            rows,
+            cols,
+            data: MatrixData::Q5K(data),
+        })
+    }
+
     /// Creates a `Q4_K` matrix from GGML row-major block bytes.
     ///
     /// # Errors
@@ -160,7 +288,7 @@ impl Matrix {
         cols: usize,
         data: Vec<u8>,
     ) -> Result<Self, InferenceError> {
-        Self::from_q4_k_storage(rows, cols, QuantizedBytes::Owned(data))
+        Self::from_q4_k_storage(rows, cols, MatrixBytes::Owned(data))
     }
 
     pub(in crate::scalar) fn from_q4_k_mapped_bytes(
@@ -169,13 +297,13 @@ impl Matrix {
         file: MappedModelFile,
         range: Range<usize>,
     ) -> Result<Self, InferenceError> {
-        Self::from_q4_k_storage(rows, cols, QuantizedBytes::mapped(file, range)?)
+        Self::from_q4_k_storage(rows, cols, MatrixBytes::mapped(file, range)?)
     }
 
     fn from_q4_k_storage(
         rows: usize,
         cols: usize,
-        data: QuantizedBytes,
+        data: MatrixBytes,
     ) -> Result<Self, InferenceError> {
         let value_count = rows
             .checked_mul(cols)
@@ -207,7 +335,7 @@ impl Matrix {
         cols: usize,
         data: Vec<u8>,
     ) -> Result<Self, InferenceError> {
-        Self::from_q6_k_storage(rows, cols, QuantizedBytes::Owned(data))
+        Self::from_q6_k_storage(rows, cols, MatrixBytes::Owned(data))
     }
 
     pub(in crate::scalar) fn from_q6_k_mapped_bytes(
@@ -216,13 +344,13 @@ impl Matrix {
         file: MappedModelFile,
         range: Range<usize>,
     ) -> Result<Self, InferenceError> {
-        Self::from_q6_k_storage(rows, cols, QuantizedBytes::mapped(file, range)?)
+        Self::from_q6_k_storage(rows, cols, MatrixBytes::mapped(file, range)?)
     }
 
     fn from_q6_k_storage(
         rows: usize,
         cols: usize,
-        data: QuantizedBytes,
+        data: MatrixBytes,
     ) -> Result<Self, InferenceError> {
         let value_count = rows
             .checked_mul(cols)
@@ -242,4 +370,22 @@ impl Matrix {
             data: MatrixData::Q6K(data),
         })
     }
+}
+
+fn validate_dense16_shape(
+    label: &str,
+    rows: usize,
+    cols: usize,
+    actual_bytes: usize,
+) -> Result<(), InferenceError> {
+    let expected = rows
+        .checked_mul(cols)
+        .and_then(|values| values.checked_mul(2))
+        .ok_or_else(|| InferenceError::new(format!("{label} matrix byte length overflow")))?;
+    if actual_bytes != expected {
+        return Err(InferenceError::new(format!(
+            "{label} matrix byte length {actual_bytes} does not match shape {rows}x{cols}"
+        )));
+    }
+    Ok(())
 }

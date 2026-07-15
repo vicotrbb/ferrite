@@ -15,10 +15,30 @@ pub fn scalar_llama_f32_gguf_fixture() -> Vec<u8> {
     scalar_llama_gguf_fixture(GGML_TYPE_F32, true, None)
 }
 
+/// Builds the minimal dense F32 Llama fixture with an explicit context length.
+#[must_use]
+pub fn scalar_llama_f32_gguf_fixture_with_context_length(context_length: u64) -> Vec<u8> {
+    scalar_llama_gguf_fixture_with_context_length(GGML_TYPE_F32, true, None, context_length)
+}
+
 /// Builds the dense F32 fixture with an explicit tokenizer EOS token ID.
 #[must_use]
 pub fn scalar_llama_f32_gguf_fixture_with_eos_token_id(eos_token_id: u64) -> Vec<u8> {
-    scalar_llama_gguf_fixture(GGML_TYPE_F32, true, Some(eos_token_id))
+    scalar_llama_gguf_fixture(
+        GGML_TYPE_F32,
+        true,
+        Some(("tokenizer.ggml.eos_token_id", eos_token_id)),
+    )
+}
+
+/// Builds the dense F32 fixture with an explicit tokenizer EOT token ID.
+#[must_use]
+pub fn scalar_llama_f32_gguf_fixture_with_eot_token_id(eot_token_id: u64) -> Vec<u8> {
+    scalar_llama_gguf_fixture(
+        GGML_TYPE_F32,
+        true,
+        Some(("tokenizer.ggml.eot_token_id", eot_token_id)),
+    )
 }
 
 /// Builds an F32 fixture whose output projection shares token embeddings.
@@ -58,7 +78,7 @@ pub fn scalar_llama_q8_0_gguf_fixture() -> Vec<u8> {
     push_u64(&mut bytes, 13);
     push_kv_string(&mut bytes, "general.architecture", "llama");
     push_kv_u64(&mut bytes, "general.alignment", alignment);
-    push_kv_u64(&mut bytes, "llama.context_length", 1);
+    push_kv_u64(&mut bytes, "llama.context_length", 128);
     push_kv_u64(&mut bytes, "llama.embedding_length", 32);
     push_kv_u64(&mut bytes, "llama.block_count", 1);
     push_kv_u64(&mut bytes, "llama.feed_forward_length", 32);
@@ -106,7 +126,7 @@ pub fn scalar_llama_q5_0_gguf_fixture() -> Vec<u8> {
     push_u64(&mut bytes, 13);
     push_kv_string(&mut bytes, "general.architecture", "llama");
     push_kv_u64(&mut bytes, "general.alignment", alignment);
-    push_kv_u64(&mut bytes, "llama.context_length", 1);
+    push_kv_u64(&mut bytes, "llama.context_length", 128);
     push_kv_u64(&mut bytes, "llama.embedding_length", 32);
     push_kv_u64(&mut bytes, "llama.block_count", 1);
     push_kv_u64(&mut bytes, "llama.feed_forward_length", 32);
@@ -154,7 +174,7 @@ pub fn scalar_llama_q4_k_gguf_fixture() -> Vec<u8> {
     push_u64(&mut bytes, 13);
     push_kv_string(&mut bytes, "general.architecture", "llama");
     push_kv_u64(&mut bytes, "general.alignment", alignment);
-    push_kv_u64(&mut bytes, "llama.context_length", 1);
+    push_kv_u64(&mut bytes, "llama.context_length", 128);
     push_kv_u64(&mut bytes, "llama.embedding_length", 64);
     push_kv_u64(&mut bytes, "llama.block_count", 1);
     push_kv_u64(&mut bytes, "llama.feed_forward_length", 64);
@@ -206,7 +226,7 @@ pub fn scalar_llama_q6_k_gguf_fixture() -> Vec<u8> {
     push_u64(&mut bytes, 13);
     push_kv_string(&mut bytes, "general.architecture", "llama");
     push_kv_u64(&mut bytes, "general.alignment", alignment);
-    push_kv_u64(&mut bytes, "llama.context_length", 1);
+    push_kv_u64(&mut bytes, "llama.context_length", 128);
     push_kv_u64(&mut bytes, "llama.embedding_length", 64);
     push_kv_u64(&mut bytes, "llama.block_count", 1);
     push_kv_u64(&mut bytes, "llama.feed_forward_length", 64);
@@ -242,7 +262,21 @@ pub fn scalar_llama_q6_k_gguf_fixture() -> Vec<u8> {
 fn scalar_llama_gguf_fixture(
     tensor_type: u32,
     include_output_weight: bool,
-    eos_token_id: Option<u64>,
+    end_token: Option<(&str, u64)>,
+) -> Vec<u8> {
+    scalar_llama_gguf_fixture_with_context_length(
+        tensor_type,
+        include_output_weight,
+        end_token,
+        128,
+    )
+}
+
+fn scalar_llama_gguf_fixture_with_context_length(
+    tensor_type: u32,
+    include_output_weight: bool,
+    end_token: Option<(&str, u64)>,
+    context_length: u64,
 ) -> Vec<u8> {
     let alignment = 64u64;
     let mut tensors = vec![
@@ -335,10 +369,10 @@ fn scalar_llama_gguf_fixture(
     bytes.extend_from_slice(b"GGUF");
     push_u32(&mut bytes, 3);
     push_u64(&mut bytes, tensors.len() as u64);
-    push_u64(&mut bytes, if eos_token_id.is_some() { 14 } else { 13 });
+    push_u64(&mut bytes, if end_token.is_some() { 14 } else { 13 });
     push_kv_string(&mut bytes, "general.architecture", "llama");
     push_kv_u64(&mut bytes, "general.alignment", alignment);
-    push_kv_u64(&mut bytes, "llama.context_length", 1);
+    push_kv_u64(&mut bytes, "llama.context_length", context_length);
     push_kv_u64(&mut bytes, "llama.embedding_length", 2);
     push_kv_u64(&mut bytes, "llama.block_count", 1);
     push_kv_u64(&mut bytes, "llama.feed_forward_length", 2);
@@ -353,8 +387,8 @@ fn scalar_llama_gguf_fixture(
         "tokenizer.ggml.tokens",
         &["<unk>", "hello", "winner"],
     );
-    if let Some(eos_token_id) = eos_token_id {
-        push_kv_u64(&mut bytes, "tokenizer.ggml.eos_token_id", eos_token_id);
+    if let Some((metadata_key, token_id)) = end_token {
+        push_kv_u64(&mut bytes, metadata_key, token_id);
     }
 
     for tensor in &tensors {

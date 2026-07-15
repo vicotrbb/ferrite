@@ -1,0 +1,5454 @@
+{
+  "schema_version": 2,
+  "status": "accepted",
+  "started_utc": "2026-07-14T06:24:29Z",
+  "initial_started_utc": "2026-07-14T06:03:44Z",
+  "host": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+  "logical_cores": 15,
+  "host_identity": {
+    "hostname": "Mac.localdomain",
+    "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+    "machine": "arm64",
+    "cpu": "Apple M5 Pro",
+    "physical_cores": 15,
+    "logical_cores": 15,
+    "ram_bytes": 25769803776,
+    "python": "3.14.6",
+    "python_implementation": "CPython"
+  },
+  "source_tree_sha256": "0ad64c972cf33004577e5dbbc21d23cb03d48800aec03656cd1f56c67ff6e03f",
+  "model_path": "/Users/victorbona/Code/OpenSource/ferrite/target/models/qwen2.5-1.5b-instruct-q8_0.gguf",
+  "model_sha256": "d7efb072e7724d25048a4fda0a3e10b04bdef5d06b1403a1c93bd9f1240a63c8",
+  "prompt_sha256": "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9",
+  "config": {
+    "prompt": "hello world",
+    "request_mode": "chat",
+    "max_tokens": 32,
+    "threads": 10,
+    "repetitions": 3,
+    "max_load_per_core": 0.25,
+    "max_background_process_cpu_percent": 50.0,
+    "allow_early_stop": true,
+    "performance_comparable": false
+  },
+  "ferrite_server": {
+    "path": "/Users/victorbona/Code/OpenSource/ferrite/target/release/ferrite-server",
+    "sha256": "cfce3116099e46b5bbe873d4f179bf17b874dc3d5fbe680876dbd5aeaddbf15a"
+  },
+  "llama_cpp": {
+    "server_path": "/Users/victorbona/Code/OpenSource/ferrite/target/llama.cpp/build-cpu/bin/llama-server",
+    "server_sha256": "6cac476d991456828f28638759245ca8c28cf733486a2efa27d8a8f33e029147",
+    "expected_revision": "6eddde06a4f25d55d538b5d15628dcc2b6882147",
+    "version": "version: 9992 (6eddde06)\nbuilt with AppleClang 21.0.0.21000101 for Darwin arm64"
+  },
+  "resume_identity": {
+    "source_tree_sha256": "0ad64c972cf33004577e5dbbc21d23cb03d48800aec03656cd1f56c67ff6e03f",
+    "host": {
+      "hostname": "Mac.localdomain",
+      "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+      "machine": "arm64",
+      "cpu": "Apple M5 Pro",
+      "physical_cores": 15,
+      "logical_cores": 15,
+      "ram_bytes": 25769803776,
+      "python": "3.14.6",
+      "python_implementation": "CPython"
+    },
+    "model_path": "/Users/victorbona/Code/OpenSource/ferrite/target/models/qwen2.5-1.5b-instruct-q8_0.gguf",
+    "model_sha256": "d7efb072e7724d25048a4fda0a3e10b04bdef5d06b1403a1c93bd9f1240a63c8",
+    "prompt_sha256": "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9",
+    "config": {
+      "prompt": "hello world",
+      "request_mode": "chat",
+      "max_tokens": 32,
+      "threads": 10,
+      "repetitions": 3,
+      "max_load_per_core": 0.25,
+      "max_background_process_cpu_percent": 50.0,
+      "allow_early_stop": true,
+      "performance_comparable": false
+    },
+    "ferrite_server": {
+      "path": "/Users/victorbona/Code/OpenSource/ferrite/target/release/ferrite-server",
+      "sha256": "cfce3116099e46b5bbe873d4f179bf17b874dc3d5fbe680876dbd5aeaddbf15a"
+    },
+    "llama_cpp": {
+      "path": "/Users/victorbona/Code/OpenSource/ferrite/target/llama.cpp/build-cpu/bin/llama-server",
+      "sha256": "6cac476d991456828f28638759245ca8c28cf733486a2efa27d8a8f33e029147",
+      "expected_revision": "6eddde06a4f25d55d538b5d15628dcc2b6882147",
+      "version": "version: 9992 (6eddde06)\nbuilt with AppleClang 21.0.0.21000101 for Darwin arm64"
+    },
+    "numerical_policy": {
+      "sha256": "132047ab719211aa38811b8320cc25726ece1f762c069b3895040389c2e7f28d",
+      "policy_id": "ferrite-qwen2.5-1.5b-chat-near-ties-v1",
+      "case_id": "qwen2.5-1.5b-q8-hello-long-chat"
+    }
+  },
+  "resume_chain": [
+    "/Users/victorbona/Code/OpenSource/ferrite/scripts/evals/2026-07-14-060344-qwen2.5-1.5b-instruct-q8_0-chat-llama-cpp-reference.json",
+    "/Users/victorbona/Code/OpenSource/ferrite/scripts/evals/2026-07-14-060408-qwen2.5-1.5b-instruct-q8_0-chat-llama-cpp-reference.json",
+    "/Users/victorbona/Code/OpenSource/ferrite/scripts/evals/2026-07-14-060932-qwen2.5-1.5b-instruct-q8_0-chat-llama-cpp-reference.json",
+    "/Users/victorbona/Code/OpenSource/ferrite/scripts/evals/2026-07-14-061236-qwen2.5-1.5b-instruct-q8_0-chat-llama-cpp-reference.json",
+    "/Users/victorbona/Code/OpenSource/ferrite/scripts/evals/2026-07-14-061624-qwen2.5-1.5b-instruct-q8_0-chat-llama-cpp-reference.json",
+    "/Users/victorbona/Code/OpenSource/ferrite/scripts/evals/2026-07-14-061650-qwen2.5-1.5b-instruct-q8_0-chat-llama-cpp-reference.json",
+    "/Users/victorbona/Code/OpenSource/ferrite/scripts/evals/2026-07-14-061709-qwen2.5-1.5b-instruct-q8_0-chat-llama-cpp-reference.json",
+    "/Users/victorbona/Code/OpenSource/ferrite/scripts/evals/2026-07-14-062237-qwen2.5-1.5b-instruct-q8_0-chat-llama-cpp-reference.json",
+    "/Users/victorbona/Code/OpenSource/ferrite/scripts/evals/2026-07-14-062247-qwen2.5-1.5b-instruct-q8_0-chat-llama-cpp-reference.json",
+    "/Users/victorbona/Code/OpenSource/ferrite/scripts/evals/2026-07-14-062318-qwen2.5-1.5b-instruct-q8_0-chat-llama-cpp-reference.json",
+    "/Users/victorbona/Code/OpenSource/ferrite/scripts/evals/2026-07-14-062332-qwen2.5-1.5b-instruct-q8_0-chat-llama-cpp-reference.json",
+    "/Users/victorbona/Code/OpenSource/ferrite/scripts/evals/2026-07-14-062344-qwen2.5-1.5b-instruct-q8_0-chat-llama-cpp-reference.json"
+  ],
+  "attempts": [
+    {
+      "repetition": 1,
+      "attempt": 1,
+      "order": [
+        "ferrite",
+        "llama_cpp"
+      ],
+      "results": {
+        "ferrite": {
+          "token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            1492,
+            498,
+            3351,
+            30
+          ],
+          "token_count": 9,
+          "token_chunk_count": 9,
+          "all_token_chunks_nonempty": true,
+          "content_sha256": "fda564ba3f7a0f028106d468420f674898ed99ac5bf2765ac9586206e39d73c5",
+          "content_bytes": 32,
+          "total_elapsed_ms": 1776.629,
+          "usage": {
+            "prompt_tokens": 31,
+            "completion_tokens": 10
+          },
+          "finish_reason": "stop",
+          "time_to_first_token_ms": 1365.421,
+          "inter_chunk_latency_ms_p50": 45.287,
+          "inter_chunk_latency_ms_p95": 46.757,
+          "post_first_chunk_tokens_per_second": 21.88549,
+          "runtime_emitted_token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            1492,
+            498,
+            3351,
+            30
+          ],
+          "suppressed_terminal_token_ids": 0,
+          "request": {
+            "model": "eval",
+            "messages": [
+              {
+                "role": "user",
+                "content": "hello world"
+              }
+            ],
+            "max_completion_tokens": 32,
+            "stream": true,
+            "stream_options": {
+              "include_usage": true,
+              "include_obfuscation": false
+            },
+            "temperature": 0,
+            "top_k": 0,
+            "top_p": 1,
+            "min_p": 0,
+            "repetition_penalty": 1,
+            "presence_penalty": 0,
+            "frequency_penalty": 0,
+            "seed": 0,
+            "return_token_ids": true
+          },
+          "command": [
+            "/Users/victorbona/Code/OpenSource/ferrite/target/release/ferrite-server",
+            "--model",
+            "/Users/victorbona/Code/OpenSource/ferrite/target/models/qwen2.5-1.5b-instruct-q8_0.gguf",
+            "--model-id",
+            "eval",
+            "--bind",
+            "127.0.0.1:62970",
+            "--default-max-tokens",
+            "32",
+            "--hard-max-tokens",
+            "32",
+            "--threads",
+            "10"
+          ],
+          "request_mode": "chat",
+          "steady_rss_before_bytes": 1988526080,
+          "request_rss_peak_bytes": 1989754880,
+          "request_rss_mean_bytes": 1978676072,
+          "request_cpu_mean_percent": 313.1,
+          "request_cpu_peak_percent": 378.3,
+          "preflight": {
+            "timestamp_utc": "2026-07-14T06:03:44Z",
+            "logical_cores": 15,
+            "load_average_1m": 2.98681640625,
+            "load_average_5m": 3.3720703125,
+            "load_average_15m": 3.736328125,
+            "load_per_core_1m": 0.19912109375,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 197.7,
+            "max_background_process_cpu_percent": 38.9,
+            "top_background_cpu_processes": [
+              {
+                "pid": 458,
+                "cpu_percent": 38.9,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 11552,
+                "cpu_percent": 29.6,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 80015,
+                "cpu_percent": 21.7,
+                "command": "plugin-container"
+              },
+              {
+                "pid": 490,
+                "cpu_percent": 14.4,
+                "command": "airportd"
+              },
+              {
+                "pid": 6146,
+                "cpu_percent": 13.9,
+                "command": "proactived"
+              }
+            ]
+          },
+          "postflight": {
+            "timestamp_utc": "2026-07-14T06:03:49Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.06787109375,
+            "load_average_5m": 3.38232421875,
+            "load_average_15m": 3.73779296875,
+            "load_per_core_1m": 0.20452473958333334,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 196.7,
+            "max_background_process_cpu_percent": 75.6,
+            "top_background_cpu_processes": [
+              {
+                "pid": 80001,
+                "cpu_percent": 75.6,
+                "command": "plugin-container"
+              },
+              {
+                "pid": 11552,
+                "cpu_percent": 46.7,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 458,
+                "cpu_percent": 37.2,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 9.3,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 5.0,
+                "command": "Codex (Renderer)"
+              }
+            ]
+          },
+          "postflight_rejection_reasons": [
+            "background process CPU 75.6% exceeds 50.0% (plugin-container pid 80001)"
+          ]
+        }
+      }
+    },
+    {
+      "repetition": 1,
+      "attempt": 2,
+      "order": [
+        "ferrite",
+        "llama_cpp"
+      ],
+      "results": {
+        "ferrite": {
+          "token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            1492,
+            498,
+            3351,
+            30
+          ],
+          "token_count": 9,
+          "token_chunk_count": 9,
+          "all_token_chunks_nonempty": true,
+          "content_sha256": "fda564ba3f7a0f028106d468420f674898ed99ac5bf2765ac9586206e39d73c5",
+          "content_bytes": 32,
+          "total_elapsed_ms": 1756.538,
+          "usage": {
+            "prompt_tokens": 31,
+            "completion_tokens": 10
+          },
+          "finish_reason": "stop",
+          "time_to_first_token_ms": 1351.038,
+          "inter_chunk_latency_ms_p50": 44.928,
+          "inter_chunk_latency_ms_p95": 45.719,
+          "post_first_chunk_tokens_per_second": 22.212427,
+          "runtime_emitted_token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            1492,
+            498,
+            3351,
+            30
+          ],
+          "suppressed_terminal_token_ids": 0,
+          "request": {
+            "model": "eval",
+            "messages": [
+              {
+                "role": "user",
+                "content": "hello world"
+              }
+            ],
+            "max_completion_tokens": 32,
+            "stream": true,
+            "stream_options": {
+              "include_usage": true,
+              "include_obfuscation": false
+            },
+            "temperature": 0,
+            "top_k": 0,
+            "top_p": 1,
+            "min_p": 0,
+            "repetition_penalty": 1,
+            "presence_penalty": 0,
+            "frequency_penalty": 0,
+            "seed": 0,
+            "return_token_ids": true
+          },
+          "command": [
+            "/Users/victorbona/Code/OpenSource/ferrite/target/release/ferrite-server",
+            "--model",
+            "/Users/victorbona/Code/OpenSource/ferrite/target/models/qwen2.5-1.5b-instruct-q8_0.gguf",
+            "--model-id",
+            "eval",
+            "--bind",
+            "127.0.0.1:63114",
+            "--default-max-tokens",
+            "32",
+            "--hard-max-tokens",
+            "32",
+            "--threads",
+            "10"
+          ],
+          "request_mode": "chat",
+          "steady_rss_before_bytes": 1958133760,
+          "request_rss_peak_bytes": 1964146688,
+          "request_rss_mean_bytes": 1962560394,
+          "request_cpu_mean_percent": 311.4,
+          "request_cpu_peak_percent": 363.0,
+          "preflight": {
+            "timestamp_utc": "2026-07-14T06:09:10Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.560546875,
+            "load_average_5m": 4.509765625,
+            "load_average_15m": 4.353515625,
+            "load_per_core_1m": 0.23736979166666666,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 163.9,
+            "max_background_process_cpu_percent": 35.8,
+            "top_background_cpu_processes": [
+              {
+                "pid": 458,
+                "cpu_percent": 35.8,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 11552,
+                "cpu_percent": 31.8,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 61422,
+                "cpu_percent": 22.0,
+                "command": "Cursor Helper (Renderer)"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 14.8,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 9.5,
+                "command": "Codex (Renderer)"
+              }
+            ]
+          },
+          "postflight": {
+            "timestamp_utc": "2026-07-14T06:09:17Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.6279296875,
+            "load_average_5m": 4.4921875,
+            "load_average_15m": 4.3486328125,
+            "load_per_core_1m": 0.24186197916666666,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 116.3,
+            "max_background_process_cpu_percent": 52.4,
+            "top_background_cpu_processes": [
+              {
+                "pid": 11552,
+                "cpu_percent": 52.4,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 458,
+                "cpu_percent": 33.7,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 8.2,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 3.6,
+                "command": "Codex (Renderer)"
+              },
+              {
+                "pid": 467,
+                "cpu_percent": 3.5,
+                "command": "coreaudiod"
+              }
+            ]
+          },
+          "postflight_rejection_reasons": [
+            "background process CPU 52.4% exceeds 50.0% (OrbStack Helper pid 11552)"
+          ]
+        }
+      }
+    },
+    {
+      "repetition": 1,
+      "attempt": 3,
+      "order": [
+        "ferrite",
+        "llama_cpp"
+      ],
+      "results": {
+        "ferrite": {
+          "token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            1492,
+            498,
+            3351,
+            30
+          ],
+          "token_count": 9,
+          "token_chunk_count": 9,
+          "all_token_chunks_nonempty": true,
+          "content_sha256": "fda564ba3f7a0f028106d468420f674898ed99ac5bf2765ac9586206e39d73c5",
+          "content_bytes": 32,
+          "total_elapsed_ms": 1819.737,
+          "usage": {
+            "prompt_tokens": 31,
+            "completion_tokens": 10
+          },
+          "finish_reason": "stop",
+          "time_to_first_token_ms": 1378.352,
+          "inter_chunk_latency_ms_p50": 44.918,
+          "inter_chunk_latency_ms_p95": 71.126,
+          "post_first_chunk_tokens_per_second": 20.388875,
+          "runtime_emitted_token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            1492,
+            498,
+            3351,
+            30
+          ],
+          "suppressed_terminal_token_ids": 0,
+          "request": {
+            "model": "eval",
+            "messages": [
+              {
+                "role": "user",
+                "content": "hello world"
+              }
+            ],
+            "max_completion_tokens": 32,
+            "stream": true,
+            "stream_options": {
+              "include_usage": true,
+              "include_obfuscation": false
+            },
+            "temperature": 0,
+            "top_k": 0,
+            "top_p": 1,
+            "min_p": 0,
+            "repetition_penalty": 1,
+            "presence_penalty": 0,
+            "frequency_penalty": 0,
+            "seed": 0,
+            "return_token_ids": true
+          },
+          "command": [
+            "/Users/victorbona/Code/OpenSource/ferrite/target/release/ferrite-server",
+            "--model",
+            "/Users/victorbona/Code/OpenSource/ferrite/target/models/qwen2.5-1.5b-instruct-q8_0.gguf",
+            "--model-id",
+            "eval",
+            "--bind",
+            "127.0.0.1:63179",
+            "--default-max-tokens",
+            "32",
+            "--hard-max-tokens",
+            "32",
+            "--threads",
+            "10"
+          ],
+          "request_mode": "chat",
+          "steady_rss_before_bytes": 1967718400,
+          "request_rss_peak_bytes": 1970569216,
+          "request_rss_mean_bytes": 1964783814,
+          "request_cpu_mean_percent": 308.6,
+          "request_cpu_peak_percent": 360.9,
+          "preflight": {
+            "timestamp_utc": "2026-07-14T06:12:18Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.71923828125,
+            "load_average_5m": 4.38525390625,
+            "load_average_15m": 4.3466796875,
+            "load_per_core_1m": 0.24794921875,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 131.5,
+            "max_background_process_cpu_percent": 46.7,
+            "top_background_cpu_processes": [
+              {
+                "pid": 11552,
+                "cpu_percent": 46.7,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 458,
+                "cpu_percent": 33.3,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 19.5,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 9.0,
+                "command": "Codex (Renderer)"
+              },
+              {
+                "pid": 467,
+                "cpu_percent": 4.5,
+                "command": "coreaudiod"
+              }
+            ]
+          },
+          "postflight": {
+            "timestamp_utc": "2026-07-14T06:12:24Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.50146484375,
+            "load_average_5m": 4.32861328125,
+            "load_average_15m": 4.32666015625,
+            "load_per_core_1m": 0.23343098958333333,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 243.9,
+            "max_background_process_cpu_percent": 143.4,
+            "top_background_cpu_processes": [
+              {
+                "pid": 11552,
+                "cpu_percent": 143.4,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 458,
+                "cpu_percent": 41.6,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 80024,
+                "cpu_percent": 16.1,
+                "command": "plugin-container"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 13.9,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 7.3,
+                "command": "Codex (Renderer)"
+              }
+            ]
+          },
+          "postflight_rejection_reasons": [
+            "background process CPU 143.4% exceeds 50.0% (OrbStack Helper pid 11552)"
+          ]
+        }
+      }
+    },
+    {
+      "repetition": 1,
+      "attempt": 4,
+      "order": [
+        "ferrite",
+        "llama_cpp"
+      ],
+      "results": {
+        "ferrite": {
+          "token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            1492,
+            498,
+            3351,
+            30
+          ],
+          "token_count": 9,
+          "token_chunk_count": 9,
+          "all_token_chunks_nonempty": true,
+          "content_sha256": "fda564ba3f7a0f028106d468420f674898ed99ac5bf2765ac9586206e39d73c5",
+          "content_bytes": 32,
+          "total_elapsed_ms": 1755.684,
+          "usage": {
+            "prompt_tokens": 31,
+            "completion_tokens": 10
+          },
+          "finish_reason": "stop",
+          "time_to_first_token_ms": 1348.802,
+          "inter_chunk_latency_ms_p50": 45.084,
+          "inter_chunk_latency_ms_p95": 45.526,
+          "post_first_chunk_tokens_per_second": 22.171986,
+          "runtime_emitted_token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            1492,
+            498,
+            3351,
+            30
+          ],
+          "suppressed_terminal_token_ids": 0,
+          "request": {
+            "model": "eval",
+            "messages": [
+              {
+                "role": "user",
+                "content": "hello world"
+              }
+            ],
+            "max_completion_tokens": 32,
+            "stream": true,
+            "stream_options": {
+              "include_usage": true,
+              "include_obfuscation": false
+            },
+            "temperature": 0,
+            "top_k": 0,
+            "top_p": 1,
+            "min_p": 0,
+            "repetition_penalty": 1,
+            "presence_penalty": 0,
+            "frequency_penalty": 0,
+            "seed": 0,
+            "return_token_ids": true
+          },
+          "command": [
+            "/Users/victorbona/Code/OpenSource/ferrite/target/release/ferrite-server",
+            "--model",
+            "/Users/victorbona/Code/OpenSource/ferrite/target/models/qwen2.5-1.5b-instruct-q8_0.gguf",
+            "--model-id",
+            "eval",
+            "--bind",
+            "127.0.0.1:63188",
+            "--default-max-tokens",
+            "32",
+            "--hard-max-tokens",
+            "32",
+            "--threads",
+            "10"
+          ],
+          "request_mode": "chat",
+          "steady_rss_before_bytes": 1983594496,
+          "request_rss_peak_bytes": 1984626688,
+          "request_rss_mean_bytes": 1979689369,
+          "request_cpu_mean_percent": 310.8,
+          "request_cpu_peak_percent": 375.7,
+          "preflight": {
+            "timestamp_utc": "2026-07-14T06:12:37Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.2421875,
+            "load_average_5m": 4.22998046875,
+            "load_average_15m": 4.29150390625,
+            "load_per_core_1m": 0.21614583333333334,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 113.7,
+            "max_background_process_cpu_percent": 39.1,
+            "top_background_cpu_processes": [
+              {
+                "pid": 458,
+                "cpu_percent": 39.1,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 11552,
+                "cpu_percent": 31.9,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 9.9,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 4.5,
+                "command": "Codex (Renderer)"
+              },
+              {
+                "pid": 91502,
+                "cpu_percent": 3.6,
+                "command": "codex"
+              }
+            ]
+          },
+          "postflight": {
+            "timestamp_utc": "2026-07-14T06:12:41Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.2421875,
+            "load_average_5m": 4.22998046875,
+            "load_average_15m": 4.29150390625,
+            "load_per_core_1m": 0.21614583333333334,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 97.9,
+            "max_background_process_cpu_percent": 33.8,
+            "top_background_cpu_processes": [
+              {
+                "pid": 458,
+                "cpu_percent": 33.8,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 11552,
+                "cpu_percent": 24.1,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 7.9,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 71309,
+                "cpu_percent": 6.1,
+                "command": "plugin-container"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 6.0,
+                "command": "Codex (Renderer)"
+              }
+            ]
+          },
+          "postflight_rejection_reasons": []
+        },
+        "llama_cpp": {
+          "token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            7789,
+            498,
+            3351,
+            30
+          ],
+          "token_count": 9,
+          "token_chunk_count": 9,
+          "all_token_chunks_nonempty": true,
+          "content_sha256": "cd153d3c18e782c4f4b3ceec574adccc8e68bc557110b0bc263b01e09bfcc8ef",
+          "content_bytes": 34,
+          "total_elapsed_ms": 151.347,
+          "usage": {
+            "prompt_tokens": 31,
+            "completion_tokens": 10
+          },
+          "finish_reason": "stop",
+          "time_to_first_token_ms": 48.414,
+          "inter_chunk_latency_ms_p50": 11.535,
+          "inter_chunk_latency_ms_p95": 12.339,
+          "post_first_chunk_tokens_per_second": 89.169608,
+          "runtime_emitted_token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            7789,
+            498,
+            3351,
+            30,
+            151645
+          ],
+          "suppressed_terminal_token_ids": 1,
+          "request": {
+            "prompt": "<|im_start|>system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>\n<|im_start|>user\nhello world<|im_end|>\n<|im_start|>assistant\n",
+            "n_predict": 32,
+            "stream": true,
+            "cache_prompt": false,
+            "return_tokens": true,
+            "timings_per_token": true,
+            "temperature": 0.0,
+            "top_k": 0,
+            "top_p": 1.0,
+            "min_p": 0.0,
+            "typical_p": 1.0,
+            "repeat_penalty": 1.0,
+            "presence_penalty": 0.0,
+            "frequency_penalty": 0.0,
+            "dry_multiplier": 0.0,
+            "seed": 0,
+            "samplers": [
+              "temperature"
+            ],
+            "parse_special": true
+          },
+          "command": [
+            "/Users/victorbona/Code/OpenSource/ferrite/target/llama.cpp/build-cpu/bin/llama-server",
+            "--model",
+            "/Users/victorbona/Code/OpenSource/ferrite/target/models/qwen2.5-1.5b-instruct-q8_0.gguf",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "63233",
+            "--threads",
+            "10",
+            "--threads-batch",
+            "10",
+            "--parallel",
+            "1",
+            "--n-gpu-layers",
+            "0",
+            "--no-warmup",
+            "--no-cont-batching",
+            "--cache-ram",
+            "0",
+            "--no-cache-prompt",
+            "--jinja"
+          ],
+          "request_mode": "chat",
+          "template_request": {
+            "messages": [
+              {
+                "role": "user",
+                "content": "hello world"
+              }
+            ],
+            "add_generation_prompt": true
+          },
+          "rendered_prompt_sha256": "7bd7e8a55a4705a16e8c00b5def95f5ee380d59899128301e25babaca8fb260f",
+          "rendered_prompt_bytes": 159,
+          "steady_rss_before_bytes": 4274946048,
+          "request_rss_peak_bytes": 4282449920,
+          "request_rss_mean_bytes": 4281955123,
+          "request_cpu_mean_percent": 921.0,
+          "request_cpu_peak_percent": 937.0,
+          "preflight": {
+            "timestamp_utc": "2026-07-14T06:14:42Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.5869140625,
+            "load_average_5m": 4.0595703125,
+            "load_average_15m": 4.21240234375,
+            "load_per_core_1m": 0.23912760416666667,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 141.2,
+            "max_background_process_cpu_percent": 46.2,
+            "top_background_cpu_processes": [
+              {
+                "pid": 458,
+                "cpu_percent": 46.2,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 11552,
+                "cpu_percent": 43.1,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 20.0,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 12.6,
+                "command": "Codex (Renderer)"
+              },
+              {
+                "pid": 467,
+                "cpu_percent": 4.4,
+                "command": "coreaudiod"
+              }
+            ]
+          },
+          "postflight": {
+            "timestamp_utc": "2026-07-14T06:14:44Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.5869140625,
+            "load_average_5m": 4.0595703125,
+            "load_average_15m": 4.21240234375,
+            "load_per_core_1m": 0.23912760416666667,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 176.3,
+            "max_background_process_cpu_percent": 38.5,
+            "top_background_cpu_processes": [
+              {
+                "pid": 458,
+                "cpu_percent": 38.5,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 11552,
+                "cpu_percent": 33.4,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 91502,
+                "cpu_percent": 33.3,
+                "command": "codex"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 25.8,
+                "command": "Codex (Renderer)"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 13.4,
+                "command": "Codex (Service)"
+              }
+            ]
+          },
+          "postflight_rejection_reasons": []
+        }
+      }
+    },
+    {
+      "repetition": 2,
+      "attempt": 1,
+      "order": [
+        "llama_cpp",
+        "ferrite"
+      ],
+      "results": {
+        "llama_cpp": {
+          "token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            7789,
+            498,
+            3351,
+            30
+          ],
+          "token_count": 9,
+          "token_chunk_count": 9,
+          "all_token_chunks_nonempty": true,
+          "content_sha256": "cd153d3c18e782c4f4b3ceec574adccc8e68bc557110b0bc263b01e09bfcc8ef",
+          "content_bytes": 34,
+          "total_elapsed_ms": 170.751,
+          "usage": {
+            "prompt_tokens": 31,
+            "completion_tokens": 10
+          },
+          "finish_reason": "stop",
+          "time_to_first_token_ms": 49.887,
+          "inter_chunk_latency_ms_p50": 13.547,
+          "inter_chunk_latency_ms_p95": 15.448,
+          "post_first_chunk_tokens_per_second": 76.524634,
+          "runtime_emitted_token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            7789,
+            498,
+            3351,
+            30,
+            151645
+          ],
+          "suppressed_terminal_token_ids": 1,
+          "request": {
+            "prompt": "<|im_start|>system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>\n<|im_start|>user\nhello world<|im_end|>\n<|im_start|>assistant\n",
+            "n_predict": 32,
+            "stream": true,
+            "cache_prompt": false,
+            "return_tokens": true,
+            "timings_per_token": true,
+            "temperature": 0.0,
+            "top_k": 0,
+            "top_p": 1.0,
+            "min_p": 0.0,
+            "typical_p": 1.0,
+            "repeat_penalty": 1.0,
+            "presence_penalty": 0.0,
+            "frequency_penalty": 0.0,
+            "dry_multiplier": 0.0,
+            "seed": 0,
+            "samplers": [
+              "temperature"
+            ],
+            "parse_special": true
+          },
+          "command": [
+            "/Users/victorbona/Code/OpenSource/ferrite/target/llama.cpp/build-cpu/bin/llama-server",
+            "--model",
+            "/Users/victorbona/Code/OpenSource/ferrite/target/models/qwen2.5-1.5b-instruct-q8_0.gguf",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "63265",
+            "--threads",
+            "10",
+            "--threads-batch",
+            "10",
+            "--parallel",
+            "1",
+            "--n-gpu-layers",
+            "0",
+            "--no-warmup",
+            "--no-cont-batching",
+            "--cache-ram",
+            "0",
+            "--no-cache-prompt",
+            "--jinja"
+          ],
+          "request_mode": "chat",
+          "template_request": {
+            "messages": [
+              {
+                "role": "user",
+                "content": "hello world"
+              }
+            ],
+            "add_generation_prompt": true
+          },
+          "rendered_prompt_sha256": "7bd7e8a55a4705a16e8c00b5def95f5ee380d59899128301e25babaca8fb260f",
+          "rendered_prompt_bytes": 159,
+          "steady_rss_before_bytes": 4278468608,
+          "request_rss_peak_bytes": 4285005824,
+          "request_rss_mean_bytes": 4282227097,
+          "request_cpu_mean_percent": 887.4,
+          "request_cpu_peak_percent": 921.4,
+          "preflight": {
+            "timestamp_utc": "2026-07-14T06:16:00Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.5849609375,
+            "load_average_5m": 3.97802734375,
+            "load_average_15m": 4.16748046875,
+            "load_per_core_1m": 0.23899739583333332,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 230.9,
+            "max_background_process_cpu_percent": 47.7,
+            "top_background_cpu_processes": [
+              {
+                "pid": 11552,
+                "cpu_percent": 47.7,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 458,
+                "cpu_percent": 47.5,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 32.4,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 80001,
+                "cpu_percent": 22.9,
+                "command": "plugin-container"
+              },
+              {
+                "pid": 20252,
+                "cpu_percent": 20.6,
+                "command": "plugin-container"
+              }
+            ]
+          },
+          "postflight": {
+            "timestamp_utc": "2026-07-14T06:16:03Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.9384765625,
+            "load_average_5m": 4.04443359375,
+            "load_average_15m": 4.189453125,
+            "load_per_core_1m": 0.2625651041666667,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 215.2,
+            "max_background_process_cpu_percent": 77.8,
+            "top_background_cpu_processes": [
+              {
+                "pid": 11552,
+                "cpu_percent": 77.8,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 80015,
+                "cpu_percent": 46.5,
+                "command": "plugin-container"
+              },
+              {
+                "pid": 458,
+                "cpu_percent": 33.4,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 10.5,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 8.4,
+                "command": "Codex (Renderer)"
+              }
+            ]
+          },
+          "postflight_rejection_reasons": [
+            "background process CPU 77.8% exceeds 50.0% (OrbStack Helper pid 11552)"
+          ]
+        }
+      }
+    },
+    {
+      "repetition": 2,
+      "attempt": 2,
+      "order": [
+        "llama_cpp",
+        "ferrite"
+      ],
+      "results": {
+        "llama_cpp": {
+          "token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            7789,
+            498,
+            3351,
+            30
+          ],
+          "token_count": 9,
+          "token_chunk_count": 9,
+          "all_token_chunks_nonempty": true,
+          "content_sha256": "cd153d3c18e782c4f4b3ceec574adccc8e68bc557110b0bc263b01e09bfcc8ef",
+          "content_bytes": 34,
+          "total_elapsed_ms": 180.892,
+          "usage": {
+            "prompt_tokens": 31,
+            "completion_tokens": 10
+          },
+          "finish_reason": "stop",
+          "time_to_first_token_ms": 54.279,
+          "inter_chunk_latency_ms_p50": 12.983,
+          "inter_chunk_latency_ms_p95": 15.356,
+          "post_first_chunk_tokens_per_second": 77.97138,
+          "runtime_emitted_token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            7789,
+            498,
+            3351,
+            30,
+            151645
+          ],
+          "suppressed_terminal_token_ids": 1,
+          "request": {
+            "prompt": "<|im_start|>system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>\n<|im_start|>user\nhello world<|im_end|>\n<|im_start|>assistant\n",
+            "n_predict": 32,
+            "stream": true,
+            "cache_prompt": false,
+            "return_tokens": true,
+            "timings_per_token": true,
+            "temperature": 0.0,
+            "top_k": 0,
+            "top_p": 1.0,
+            "min_p": 0.0,
+            "typical_p": 1.0,
+            "repeat_penalty": 1.0,
+            "presence_penalty": 0.0,
+            "frequency_penalty": 0.0,
+            "dry_multiplier": 0.0,
+            "seed": 0,
+            "samplers": [
+              "temperature"
+            ],
+            "parse_special": true
+          },
+          "command": [
+            "/Users/victorbona/Code/OpenSource/ferrite/target/llama.cpp/build-cpu/bin/llama-server",
+            "--model",
+            "/Users/victorbona/Code/OpenSource/ferrite/target/models/qwen2.5-1.5b-instruct-q8_0.gguf",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "63289",
+            "--threads",
+            "10",
+            "--threads-batch",
+            "10",
+            "--parallel",
+            "1",
+            "--n-gpu-layers",
+            "0",
+            "--no-warmup",
+            "--no-cont-batching",
+            "--cache-ram",
+            "0",
+            "--no-cache-prompt",
+            "--jinja"
+          ],
+          "request_mode": "chat",
+          "template_request": {
+            "messages": [
+              {
+                "role": "user",
+                "content": "hello world"
+              }
+            ],
+            "add_generation_prompt": true
+          },
+          "rendered_prompt_sha256": "7bd7e8a55a4705a16e8c00b5def95f5ee380d59899128301e25babaca8fb260f",
+          "rendered_prompt_bytes": 159,
+          "steady_rss_before_bytes": 4267360256,
+          "request_rss_peak_bytes": 4274536448,
+          "request_rss_mean_bytes": 4273930240,
+          "request_cpu_mean_percent": 908.2,
+          "request_cpu_peak_percent": 916.1,
+          "preflight": {
+            "timestamp_utc": "2026-07-14T06:16:40Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.64794921875,
+            "load_average_5m": 3.97119140625,
+            "load_average_15m": 4.15576171875,
+            "load_per_core_1m": 0.24319661458333333,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 170.1,
+            "max_background_process_cpu_percent": 46.1,
+            "top_background_cpu_processes": [
+              {
+                "pid": 458,
+                "cpu_percent": 46.1,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 21310,
+                "cpu_percent": 39.9,
+                "command": "deleted_helper"
+              },
+              {
+                "pid": 11552,
+                "cpu_percent": 29.9,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 28.1,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 8.8,
+                "command": "Codex (Renderer)"
+              }
+            ]
+          },
+          "postflight": {
+            "timestamp_utc": "2026-07-14T06:16:43Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.67578125,
+            "load_average_5m": 3.97119140625,
+            "load_average_15m": 4.15478515625,
+            "load_per_core_1m": 0.24505208333333334,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 470.1,
+            "max_background_process_cpu_percent": 56.6,
+            "top_background_cpu_processes": [
+              {
+                "pid": 11552,
+                "cpu_percent": 56.6,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 1331,
+                "cpu_percent": 45.5,
+                "command": "mobileassetd"
+              },
+              {
+                "pid": 458,
+                "cpu_percent": 34.9,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 21469,
+                "cpu_percent": 30.9,
+                "command": "appstoreagent"
+              },
+              {
+                "pid": 21533,
+                "cpu_percent": 29.4,
+                "command": "amsengagementd"
+              }
+            ]
+          },
+          "postflight_rejection_reasons": [
+            "background process CPU 56.6% exceeds 50.0% (OrbStack Helper pid 11552)"
+          ]
+        }
+      }
+    },
+    {
+      "repetition": 2,
+      "attempt": 3,
+      "order": [
+        "llama_cpp",
+        "ferrite"
+      ],
+      "results": {
+        "llama_cpp": {
+          "token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            7789,
+            498,
+            3351,
+            30
+          ],
+          "token_count": 9,
+          "token_chunk_count": 9,
+          "all_token_chunks_nonempty": true,
+          "content_sha256": "cd153d3c18e782c4f4b3ceec574adccc8e68bc557110b0bc263b01e09bfcc8ef",
+          "content_bytes": 34,
+          "total_elapsed_ms": 135.17,
+          "usage": {
+            "prompt_tokens": 31,
+            "completion_tokens": 10
+          },
+          "finish_reason": "stop",
+          "time_to_first_token_ms": 52.295,
+          "inter_chunk_latency_ms_p50": 9.172,
+          "inter_chunk_latency_ms_p95": 9.597,
+          "post_first_chunk_tokens_per_second": 108.119006,
+          "runtime_emitted_token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            7789,
+            498,
+            3351,
+            30,
+            151645
+          ],
+          "suppressed_terminal_token_ids": 1,
+          "request": {
+            "prompt": "<|im_start|>system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>\n<|im_start|>user\nhello world<|im_end|>\n<|im_start|>assistant\n",
+            "n_predict": 32,
+            "stream": true,
+            "cache_prompt": false,
+            "return_tokens": true,
+            "timings_per_token": true,
+            "temperature": 0.0,
+            "top_k": 0,
+            "top_p": 1.0,
+            "min_p": 0.0,
+            "typical_p": 1.0,
+            "repeat_penalty": 1.0,
+            "presence_penalty": 0.0,
+            "frequency_penalty": 0.0,
+            "dry_multiplier": 0.0,
+            "seed": 0,
+            "samplers": [
+              "temperature"
+            ],
+            "parse_special": true
+          },
+          "command": [
+            "/Users/victorbona/Code/OpenSource/ferrite/target/llama.cpp/build-cpu/bin/llama-server",
+            "--model",
+            "/Users/victorbona/Code/OpenSource/ferrite/target/models/qwen2.5-1.5b-instruct-q8_0.gguf",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "63300",
+            "--threads",
+            "10",
+            "--threads-batch",
+            "10",
+            "--parallel",
+            "1",
+            "--n-gpu-layers",
+            "0",
+            "--no-warmup",
+            "--no-cont-batching",
+            "--cache-ram",
+            "0",
+            "--no-cache-prompt",
+            "--jinja"
+          ],
+          "request_mode": "chat",
+          "template_request": {
+            "messages": [
+              {
+                "role": "user",
+                "content": "hello world"
+              }
+            ],
+            "add_generation_prompt": true
+          },
+          "rendered_prompt_sha256": "7bd7e8a55a4705a16e8c00b5def95f5ee380d59899128301e25babaca8fb260f",
+          "rendered_prompt_bytes": 159,
+          "steady_rss_before_bytes": 4211638272,
+          "request_rss_peak_bytes": 4224090112,
+          "request_rss_mean_bytes": 4223332352,
+          "request_cpu_mean_percent": 919.0,
+          "request_cpu_peak_percent": 1094.5,
+          "preflight": {
+            "timestamp_utc": "2026-07-14T06:16:51Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.46142578125,
+            "load_average_5m": 3.92138671875,
+            "load_average_15m": 4.13623046875,
+            "load_per_core_1m": 0.23076171875,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 99.7,
+            "max_background_process_cpu_percent": 32.8,
+            "top_background_cpu_processes": [
+              {
+                "pid": 458,
+                "cpu_percent": 32.8,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 11552,
+                "cpu_percent": 30.9,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 8.5,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 3.9,
+                "command": "Codex (Renderer)"
+              },
+              {
+                "pid": 467,
+                "cpu_percent": 3.6,
+                "command": "coreaudiod"
+              }
+            ]
+          },
+          "postflight": {
+            "timestamp_utc": "2026-07-14T06:16:53Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.58447265625,
+            "load_average_5m": 3.93896484375,
+            "load_average_15m": 4.14111328125,
+            "load_per_core_1m": 0.23896484375,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 198.1,
+            "max_background_process_cpu_percent": 83.7,
+            "top_background_cpu_processes": [
+              {
+                "pid": 11552,
+                "cpu_percent": 83.7,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 458,
+                "cpu_percent": 49.3,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 15.7,
+                "command": "Codex (Renderer)"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 10.0,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 21989,
+                "cpu_percent": 5.9,
+                "command": "Keychain Circle Notification"
+              }
+            ]
+          },
+          "postflight_rejection_reasons": [
+            "background process CPU 83.7% exceeds 50.0% (OrbStack Helper pid 11552)"
+          ]
+        }
+      }
+    },
+    {
+      "repetition": 2,
+      "attempt": 4,
+      "order": [
+        "llama_cpp",
+        "ferrite"
+      ],
+      "results": {
+        "llama_cpp": {
+          "token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            7789,
+            498,
+            3351,
+            30
+          ],
+          "token_count": 9,
+          "token_chunk_count": 9,
+          "all_token_chunks_nonempty": true,
+          "content_sha256": "cd153d3c18e782c4f4b3ceec574adccc8e68bc557110b0bc263b01e09bfcc8ef",
+          "content_bytes": 34,
+          "total_elapsed_ms": 137.682,
+          "usage": {
+            "prompt_tokens": 31,
+            "completion_tokens": 10
+          },
+          "finish_reason": "stop",
+          "time_to_first_token_ms": 54.133,
+          "inter_chunk_latency_ms_p50": 9.216,
+          "inter_chunk_latency_ms_p95": 9.864,
+          "post_first_chunk_tokens_per_second": 107.772171,
+          "runtime_emitted_token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            7789,
+            498,
+            3351,
+            30,
+            151645
+          ],
+          "suppressed_terminal_token_ids": 1,
+          "request": {
+            "prompt": "<|im_start|>system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>\n<|im_start|>user\nhello world<|im_end|>\n<|im_start|>assistant\n",
+            "n_predict": 32,
+            "stream": true,
+            "cache_prompt": false,
+            "return_tokens": true,
+            "timings_per_token": true,
+            "temperature": 0.0,
+            "top_k": 0,
+            "top_p": 1.0,
+            "min_p": 0.0,
+            "typical_p": 1.0,
+            "repeat_penalty": 1.0,
+            "presence_penalty": 0.0,
+            "frequency_penalty": 0.0,
+            "dry_multiplier": 0.0,
+            "seed": 0,
+            "samplers": [
+              "temperature"
+            ],
+            "parse_special": true
+          },
+          "command": [
+            "/Users/victorbona/Code/OpenSource/ferrite/target/llama.cpp/build-cpu/bin/llama-server",
+            "--model",
+            "/Users/victorbona/Code/OpenSource/ferrite/target/models/qwen2.5-1.5b-instruct-q8_0.gguf",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "63512",
+            "--threads",
+            "10",
+            "--threads-batch",
+            "10",
+            "--parallel",
+            "1",
+            "--n-gpu-layers",
+            "0",
+            "--no-warmup",
+            "--no-cont-batching",
+            "--cache-ram",
+            "0",
+            "--no-cache-prompt",
+            "--jinja"
+          ],
+          "request_mode": "chat",
+          "template_request": {
+            "messages": [
+              {
+                "role": "user",
+                "content": "hello world"
+              }
+            ],
+            "add_generation_prompt": true
+          },
+          "rendered_prompt_sha256": "7bd7e8a55a4705a16e8c00b5def95f5ee380d59899128301e25babaca8fb260f",
+          "rendered_prompt_bytes": 159,
+          "steady_rss_before_bytes": 4281008128,
+          "request_rss_peak_bytes": 4287856640,
+          "request_rss_mean_bytes": 4286877696,
+          "request_cpu_mean_percent": 940.1,
+          "request_cpu_peak_percent": 995.0,
+          "preflight": {
+            "timestamp_utc": "2026-07-14T06:22:11Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.20703125,
+            "load_average_5m": 4.6669921875,
+            "load_average_15m": 4.53125,
+            "load_per_core_1m": 0.21380208333333334,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 146.5,
+            "max_background_process_cpu_percent": 38.3,
+            "top_background_cpu_processes": [
+              {
+                "pid": 458,
+                "cpu_percent": 38.3,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 11552,
+                "cpu_percent": 32.8,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 3035,
+                "cpu_percent": 27.6,
+                "command": "plugin-container"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 17.1,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 10.0,
+                "command": "Codex (Renderer)"
+              }
+            ]
+          },
+          "postflight": {
+            "timestamp_utc": "2026-07-14T06:22:14Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.2705078125,
+            "load_average_5m": 4.65576171875,
+            "load_average_15m": 4.52783203125,
+            "load_per_core_1m": 0.21803385416666668,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 177.8,
+            "max_background_process_cpu_percent": 73.3,
+            "top_background_cpu_processes": [
+              {
+                "pid": 11552,
+                "cpu_percent": 73.3,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 458,
+                "cpu_percent": 37.6,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 10.9,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 27694,
+                "cpu_percent": 10.7,
+                "command": "seserviced"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 6.8,
+                "command": "Codex (Renderer)"
+              }
+            ]
+          },
+          "postflight_rejection_reasons": [
+            "background process CPU 73.3% exceeds 50.0% (OrbStack Helper pid 11552)"
+          ]
+        }
+      }
+    },
+    {
+      "repetition": 2,
+      "attempt": 5,
+      "order": [
+        "llama_cpp",
+        "ferrite"
+      ],
+      "results": {
+        "llama_cpp": {
+          "token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            7789,
+            498,
+            3351,
+            30
+          ],
+          "token_count": 9,
+          "token_chunk_count": 9,
+          "all_token_chunks_nonempty": true,
+          "content_sha256": "cd153d3c18e782c4f4b3ceec574adccc8e68bc557110b0bc263b01e09bfcc8ef",
+          "content_bytes": 34,
+          "total_elapsed_ms": 134.028,
+          "usage": {
+            "prompt_tokens": 31,
+            "completion_tokens": 10
+          },
+          "finish_reason": "stop",
+          "time_to_first_token_ms": 49.219,
+          "inter_chunk_latency_ms_p50": 9.385,
+          "inter_chunk_latency_ms_p95": 9.773,
+          "post_first_chunk_tokens_per_second": 105.852426,
+          "runtime_emitted_token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            7789,
+            498,
+            3351,
+            30,
+            151645
+          ],
+          "suppressed_terminal_token_ids": 1,
+          "request": {
+            "prompt": "<|im_start|>system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>\n<|im_start|>user\nhello world<|im_end|>\n<|im_start|>assistant\n",
+            "n_predict": 32,
+            "stream": true,
+            "cache_prompt": false,
+            "return_tokens": true,
+            "timings_per_token": true,
+            "temperature": 0.0,
+            "top_k": 0,
+            "top_p": 1.0,
+            "min_p": 0.0,
+            "typical_p": 1.0,
+            "repeat_penalty": 1.0,
+            "presence_penalty": 0.0,
+            "frequency_penalty": 0.0,
+            "dry_multiplier": 0.0,
+            "seed": 0,
+            "samplers": [
+              "temperature"
+            ],
+            "parse_special": true
+          },
+          "command": [
+            "/Users/victorbona/Code/OpenSource/ferrite/target/llama.cpp/build-cpu/bin/llama-server",
+            "--model",
+            "/Users/victorbona/Code/OpenSource/ferrite/target/models/qwen2.5-1.5b-instruct-q8_0.gguf",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "63527",
+            "--threads",
+            "10",
+            "--threads-batch",
+            "10",
+            "--parallel",
+            "1",
+            "--n-gpu-layers",
+            "0",
+            "--no-warmup",
+            "--no-cont-batching",
+            "--cache-ram",
+            "0",
+            "--no-cache-prompt",
+            "--jinja"
+          ],
+          "request_mode": "chat",
+          "template_request": {
+            "messages": [
+              {
+                "role": "user",
+                "content": "hello world"
+              }
+            ],
+            "add_generation_prompt": true
+          },
+          "rendered_prompt_sha256": "7bd7e8a55a4705a16e8c00b5def95f5ee380d59899128301e25babaca8fb260f",
+          "rendered_prompt_bytes": 159,
+          "steady_rss_before_bytes": 4263903232,
+          "request_rss_peak_bytes": 4274077696,
+          "request_rss_mean_bytes": 4273483776,
+          "request_cpu_mean_percent": 928.1,
+          "request_cpu_peak_percent": 987.2,
+          "preflight": {
+            "timestamp_utc": "2026-07-14T06:22:37Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.3330078125,
+            "load_average_5m": 4.55517578125,
+            "load_average_15m": 4.494140625,
+            "load_per_core_1m": 0.22220052083333333,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 89.1,
+            "max_background_process_cpu_percent": 29.9,
+            "top_background_cpu_processes": [
+              {
+                "pid": 11552,
+                "cpu_percent": 29.9,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 458,
+                "cpu_percent": 28.8,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 7.9,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 4.4,
+                "command": "Codex (Renderer)"
+              },
+              {
+                "pid": 467,
+                "cpu_percent": 3.6,
+                "command": "coreaudiod"
+              }
+            ]
+          },
+          "postflight": {
+            "timestamp_utc": "2026-07-14T06:22:40Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.3330078125,
+            "load_average_5m": 4.55517578125,
+            "load_average_15m": 4.494140625,
+            "load_per_core_1m": 0.22220052083333333,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 141.7,
+            "max_background_process_cpu_percent": 53.6,
+            "top_background_cpu_processes": [
+              {
+                "pid": 11552,
+                "cpu_percent": 53.6,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 458,
+                "cpu_percent": 37.5,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 16.1,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 7.9,
+                "command": "Codex (Renderer)"
+              },
+              {
+                "pid": 467,
+                "cpu_percent": 4.6,
+                "command": "coreaudiod"
+              }
+            ]
+          },
+          "postflight_rejection_reasons": [
+            "background process CPU 53.6% exceeds 50.0% (OrbStack Helper pid 11552)"
+          ]
+        }
+      }
+    },
+    {
+      "repetition": 2,
+      "attempt": 6,
+      "order": [
+        "llama_cpp",
+        "ferrite"
+      ],
+      "results": {
+        "llama_cpp": {
+          "token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            7789,
+            498,
+            3351,
+            30
+          ],
+          "token_count": 9,
+          "token_chunk_count": 9,
+          "all_token_chunks_nonempty": true,
+          "content_sha256": "cd153d3c18e782c4f4b3ceec574adccc8e68bc557110b0bc263b01e09bfcc8ef",
+          "content_bytes": 34,
+          "total_elapsed_ms": 141.363,
+          "usage": {
+            "prompt_tokens": 31,
+            "completion_tokens": 10
+          },
+          "finish_reason": "stop",
+          "time_to_first_token_ms": 57.182,
+          "inter_chunk_latency_ms_p50": 9.028,
+          "inter_chunk_latency_ms_p95": 9.972,
+          "post_first_chunk_tokens_per_second": 108.202968,
+          "runtime_emitted_token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            7789,
+            498,
+            3351,
+            30,
+            151645
+          ],
+          "suppressed_terminal_token_ids": 1,
+          "request": {
+            "prompt": "<|im_start|>system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>\n<|im_start|>user\nhello world<|im_end|>\n<|im_start|>assistant\n",
+            "n_predict": 32,
+            "stream": true,
+            "cache_prompt": false,
+            "return_tokens": true,
+            "timings_per_token": true,
+            "temperature": 0.0,
+            "top_k": 0,
+            "top_p": 1.0,
+            "min_p": 0.0,
+            "typical_p": 1.0,
+            "repeat_penalty": 1.0,
+            "presence_penalty": 0.0,
+            "frequency_penalty": 0.0,
+            "dry_multiplier": 0.0,
+            "seed": 0,
+            "samplers": [
+              "temperature"
+            ],
+            "parse_special": true
+          },
+          "command": [
+            "/Users/victorbona/Code/OpenSource/ferrite/target/llama.cpp/build-cpu/bin/llama-server",
+            "--model",
+            "/Users/victorbona/Code/OpenSource/ferrite/target/models/qwen2.5-1.5b-instruct-q8_0.gguf",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "63539",
+            "--threads",
+            "10",
+            "--threads-batch",
+            "10",
+            "--parallel",
+            "1",
+            "--n-gpu-layers",
+            "0",
+            "--no-warmup",
+            "--no-cont-batching",
+            "--cache-ram",
+            "0",
+            "--no-cache-prompt",
+            "--jinja"
+          ],
+          "request_mode": "chat",
+          "template_request": {
+            "messages": [
+              {
+                "role": "user",
+                "content": "hello world"
+              }
+            ],
+            "add_generation_prompt": true
+          },
+          "rendered_prompt_sha256": "7bd7e8a55a4705a16e8c00b5def95f5ee380d59899128301e25babaca8fb260f",
+          "rendered_prompt_bytes": 159,
+          "steady_rss_before_bytes": 4241702912,
+          "request_rss_peak_bytes": 4253974528,
+          "request_rss_mean_bytes": 4252876800,
+          "request_cpu_mean_percent": 976.0,
+          "request_cpu_peak_percent": 1038.4,
+          "preflight": {
+            "timestamp_utc": "2026-07-14T06:22:47Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.12744140625,
+            "load_average_5m": 4.470703125,
+            "load_average_15m": 4.46484375,
+            "load_per_core_1m": 0.20849609375,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 97.1,
+            "max_background_process_cpu_percent": 37.7,
+            "top_background_cpu_processes": [
+              {
+                "pid": 458,
+                "cpu_percent": 37.7,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 11552,
+                "cpu_percent": 29.3,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 8.0,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 5.2,
+                "command": "Codex (Renderer)"
+              },
+              {
+                "pid": 467,
+                "cpu_percent": 3.3,
+                "command": "coreaudiod"
+              }
+            ]
+          },
+          "postflight": {
+            "timestamp_utc": "2026-07-14T06:22:50Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.12744140625,
+            "load_average_5m": 4.470703125,
+            "load_average_15m": 4.46484375,
+            "load_per_core_1m": 0.20849609375,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 117.4,
+            "max_background_process_cpu_percent": 44.9,
+            "top_background_cpu_processes": [
+              {
+                "pid": 11552,
+                "cpu_percent": 44.9,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 458,
+                "cpu_percent": 34.1,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 10.1,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 6.9,
+                "command": "Codex (Renderer)"
+              },
+              {
+                "pid": 467,
+                "cpu_percent": 4.2,
+                "command": "coreaudiod"
+              }
+            ]
+          },
+          "postflight_rejection_reasons": []
+        },
+        "ferrite": {
+          "token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            1492,
+            498,
+            3351,
+            30
+          ],
+          "token_count": 9,
+          "token_chunk_count": 9,
+          "all_token_chunks_nonempty": true,
+          "content_sha256": "fda564ba3f7a0f028106d468420f674898ed99ac5bf2765ac9586206e39d73c5",
+          "content_bytes": 32,
+          "total_elapsed_ms": 1749.948,
+          "usage": {
+            "prompt_tokens": 31,
+            "completion_tokens": 10
+          },
+          "finish_reason": "stop",
+          "time_to_first_token_ms": 1340.09,
+          "inter_chunk_latency_ms_p50": 45.231,
+          "inter_chunk_latency_ms_p95": 46.439,
+          "post_first_chunk_tokens_per_second": 22.01255,
+          "runtime_emitted_token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            1492,
+            498,
+            3351,
+            30
+          ],
+          "suppressed_terminal_token_ids": 0,
+          "request": {
+            "model": "eval",
+            "messages": [
+              {
+                "role": "user",
+                "content": "hello world"
+              }
+            ],
+            "max_completion_tokens": 32,
+            "stream": true,
+            "stream_options": {
+              "include_usage": true,
+              "include_obfuscation": false
+            },
+            "temperature": 0,
+            "top_k": 0,
+            "top_p": 1,
+            "min_p": 0,
+            "repetition_penalty": 1,
+            "presence_penalty": 0,
+            "frequency_penalty": 0,
+            "seed": 0,
+            "return_token_ids": true
+          },
+          "command": [
+            "/Users/victorbona/Code/OpenSource/ferrite/target/release/ferrite-server",
+            "--model",
+            "/Users/victorbona/Code/OpenSource/ferrite/target/models/qwen2.5-1.5b-instruct-q8_0.gguf",
+            "--model-id",
+            "eval",
+            "--bind",
+            "127.0.0.1:63548",
+            "--default-max-tokens",
+            "32",
+            "--hard-max-tokens",
+            "32",
+            "--threads",
+            "10"
+          ],
+          "request_mode": "chat",
+          "steady_rss_before_bytes": 1988329472,
+          "request_rss_peak_bytes": 1990508544,
+          "request_rss_mean_bytes": 1988095726,
+          "request_cpu_mean_percent": 310.2,
+          "request_cpu_peak_percent": 380.0,
+          "preflight": {
+            "timestamp_utc": "2026-07-14T06:22:50Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.12744140625,
+            "load_average_5m": 4.470703125,
+            "load_average_15m": 4.46484375,
+            "load_per_core_1m": 0.20849609375,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 117.4,
+            "max_background_process_cpu_percent": 44.9,
+            "top_background_cpu_processes": [
+              {
+                "pid": 11552,
+                "cpu_percent": 44.9,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 458,
+                "cpu_percent": 34.1,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 10.1,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 6.9,
+                "command": "Codex (Renderer)"
+              },
+              {
+                "pid": 467,
+                "cpu_percent": 4.2,
+                "command": "coreaudiod"
+              }
+            ]
+          },
+          "postflight": {
+            "timestamp_utc": "2026-07-14T06:22:54Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.1171875,
+            "load_average_5m": 4.44580078125,
+            "load_average_15m": 4.4560546875,
+            "load_per_core_1m": 0.2078125,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 102.0,
+            "max_background_process_cpu_percent": 42.1,
+            "top_background_cpu_processes": [
+              {
+                "pid": 11552,
+                "cpu_percent": 42.1,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 458,
+                "cpu_percent": 30.2,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 7.7,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 5.9,
+                "command": "Codex (Renderer)"
+              },
+              {
+                "pid": 467,
+                "cpu_percent": 3.5,
+                "command": "coreaudiod"
+              }
+            ]
+          },
+          "postflight_rejection_reasons": []
+        }
+      }
+    },
+    {
+      "repetition": 3,
+      "attempt": 1,
+      "order": [
+        "ferrite",
+        "llama_cpp"
+      ],
+      "results": {
+        "ferrite": {
+          "token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            1492,
+            498,
+            3351,
+            30
+          ],
+          "token_count": 9,
+          "token_chunk_count": 9,
+          "all_token_chunks_nonempty": true,
+          "content_sha256": "fda564ba3f7a0f028106d468420f674898ed99ac5bf2765ac9586206e39d73c5",
+          "content_bytes": 32,
+          "total_elapsed_ms": 1761.601,
+          "usage": {
+            "prompt_tokens": 31,
+            "completion_tokens": 10
+          },
+          "finish_reason": "stop",
+          "time_to_first_token_ms": 1350.836,
+          "inter_chunk_latency_ms_p50": 45.549,
+          "inter_chunk_latency_ms_p95": 46.528,
+          "post_first_chunk_tokens_per_second": 21.940382,
+          "runtime_emitted_token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            1492,
+            498,
+            3351,
+            30
+          ],
+          "suppressed_terminal_token_ids": 0,
+          "request": {
+            "model": "eval",
+            "messages": [
+              {
+                "role": "user",
+                "content": "hello world"
+              }
+            ],
+            "max_completion_tokens": 32,
+            "stream": true,
+            "stream_options": {
+              "include_usage": true,
+              "include_obfuscation": false
+            },
+            "temperature": 0,
+            "top_k": 0,
+            "top_p": 1,
+            "min_p": 0,
+            "repetition_penalty": 1,
+            "presence_penalty": 0,
+            "frequency_penalty": 0,
+            "seed": 0,
+            "return_token_ids": true
+          },
+          "command": [
+            "/Users/victorbona/Code/OpenSource/ferrite/target/release/ferrite-server",
+            "--model",
+            "/Users/victorbona/Code/OpenSource/ferrite/target/models/qwen2.5-1.5b-instruct-q8_0.gguf",
+            "--model-id",
+            "eval",
+            "--bind",
+            "127.0.0.1:63553",
+            "--default-max-tokens",
+            "32",
+            "--hard-max-tokens",
+            "32",
+            "--threads",
+            "10"
+          ],
+          "request_mode": "chat",
+          "steady_rss_before_bytes": 1988427776,
+          "request_rss_peak_bytes": 1990623232,
+          "request_rss_mean_bytes": 1988262324,
+          "request_cpu_mean_percent": 311.5,
+          "request_cpu_peak_percent": 354.6,
+          "preflight": {
+            "timestamp_utc": "2026-07-14T06:22:54Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.1171875,
+            "load_average_5m": 4.44580078125,
+            "load_average_15m": 4.4560546875,
+            "load_per_core_1m": 0.2078125,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 89.2,
+            "max_background_process_cpu_percent": 31.5,
+            "top_background_cpu_processes": [
+              {
+                "pid": 458,
+                "cpu_percent": 31.5,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 11552,
+                "cpu_percent": 28.1,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 8.2,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 5.4,
+                "command": "Codex (Renderer)"
+              },
+              {
+                "pid": 467,
+                "cpu_percent": 3.7,
+                "command": "coreaudiod"
+              }
+            ]
+          },
+          "postflight": {
+            "timestamp_utc": "2026-07-14T06:22:58Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.267578125,
+            "load_average_5m": 4.45458984375,
+            "load_average_15m": 4.458984375,
+            "load_per_core_1m": 0.21783854166666666,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 137.8,
+            "max_background_process_cpu_percent": 34.0,
+            "top_background_cpu_processes": [
+              {
+                "pid": 458,
+                "cpu_percent": 34.0,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 11552,
+                "cpu_percent": 27.5,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 29426,
+                "cpu_percent": 23.3,
+                "command": "biomesyncd"
+              },
+              {
+                "pid": 29419,
+                "cpu_percent": 7.9,
+                "command": "Keychain Circle Notification"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 7.8,
+                "command": "Codex (Service)"
+              }
+            ]
+          },
+          "postflight_rejection_reasons": []
+        },
+        "llama_cpp": {
+          "token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            7789,
+            498,
+            3351,
+            30
+          ],
+          "token_count": 9,
+          "token_chunk_count": 9,
+          "all_token_chunks_nonempty": true,
+          "content_sha256": "cd153d3c18e782c4f4b3ceec574adccc8e68bc557110b0bc263b01e09bfcc8ef",
+          "content_bytes": 34,
+          "total_elapsed_ms": 183.563,
+          "usage": {
+            "prompt_tokens": 31,
+            "completion_tokens": 10
+          },
+          "finish_reason": "stop",
+          "time_to_first_token_ms": 57.16,
+          "inter_chunk_latency_ms_p50": 12.183,
+          "inter_chunk_latency_ms_p95": 19.332,
+          "post_first_chunk_tokens_per_second": 70.608042,
+          "runtime_emitted_token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            7789,
+            498,
+            3351,
+            30,
+            151645
+          ],
+          "suppressed_terminal_token_ids": 1,
+          "request": {
+            "prompt": "<|im_start|>system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>\n<|im_start|>user\nhello world<|im_end|>\n<|im_start|>assistant\n",
+            "n_predict": 32,
+            "stream": true,
+            "cache_prompt": false,
+            "return_tokens": true,
+            "timings_per_token": true,
+            "temperature": 0.0,
+            "top_k": 0,
+            "top_p": 1.0,
+            "min_p": 0.0,
+            "typical_p": 1.0,
+            "repeat_penalty": 1.0,
+            "presence_penalty": 0.0,
+            "frequency_penalty": 0.0,
+            "dry_multiplier": 0.0,
+            "seed": 0,
+            "samplers": [
+              "temperature"
+            ],
+            "parse_special": true
+          },
+          "command": [
+            "/Users/victorbona/Code/OpenSource/ferrite/target/llama.cpp/build-cpu/bin/llama-server",
+            "--model",
+            "/Users/victorbona/Code/OpenSource/ferrite/target/models/qwen2.5-1.5b-instruct-q8_0.gguf",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "63558",
+            "--threads",
+            "10",
+            "--threads-batch",
+            "10",
+            "--parallel",
+            "1",
+            "--n-gpu-layers",
+            "0",
+            "--no-warmup",
+            "--no-cont-batching",
+            "--cache-ram",
+            "0",
+            "--no-cache-prompt",
+            "--jinja"
+          ],
+          "request_mode": "chat",
+          "template_request": {
+            "messages": [
+              {
+                "role": "user",
+                "content": "hello world"
+              }
+            ],
+            "add_generation_prompt": true
+          },
+          "rendered_prompt_sha256": "7bd7e8a55a4705a16e8c00b5def95f5ee380d59899128301e25babaca8fb260f",
+          "rendered_prompt_bytes": 159,
+          "steady_rss_before_bytes": 4249976832,
+          "request_rss_peak_bytes": 4261691392,
+          "request_rss_mean_bytes": 4261229363,
+          "request_cpu_mean_percent": 850.5,
+          "request_cpu_peak_percent": 954.6,
+          "preflight": {
+            "timestamp_utc": "2026-07-14T06:22:58Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.267578125,
+            "load_average_5m": 4.45458984375,
+            "load_average_15m": 4.458984375,
+            "load_per_core_1m": 0.21783854166666666,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 120.8,
+            "max_background_process_cpu_percent": 31.6,
+            "top_background_cpu_processes": [
+              {
+                "pid": 458,
+                "cpu_percent": 31.6,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 11552,
+                "cpu_percent": 27.0,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 29426,
+                "cpu_percent": 14.3,
+                "command": "biomesyncd"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 7.8,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 29419,
+                "cpu_percent": 5.1,
+                "command": "Keychain Circle Notification"
+              }
+            ]
+          },
+          "postflight": {
+            "timestamp_utc": "2026-07-14T06:23:01Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.267578125,
+            "load_average_5m": 4.45458984375,
+            "load_average_15m": 4.458984375,
+            "load_per_core_1m": 0.21783854166666666,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 279.5,
+            "max_background_process_cpu_percent": 78.7,
+            "top_background_cpu_processes": [
+              {
+                "pid": 11552,
+                "cpu_percent": 78.7,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 41.7,
+                "command": "Codex (Renderer)"
+              },
+              {
+                "pid": 29426,
+                "cpu_percent": 35.3,
+                "command": "biomesyncd"
+              },
+              {
+                "pid": 458,
+                "cpu_percent": 34.8,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 1350,
+                "cpu_percent": 19.2,
+                "command": "BiomeAgent"
+              }
+            ]
+          },
+          "postflight_rejection_reasons": [
+            "background process CPU 78.7% exceeds 50.0% (OrbStack Helper pid 11552)"
+          ]
+        }
+      }
+    },
+    {
+      "repetition": 3,
+      "attempt": 2,
+      "order": [
+        "ferrite",
+        "llama_cpp"
+      ],
+      "results": {
+        "ferrite": {
+          "token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            1492,
+            498,
+            3351,
+            30
+          ],
+          "token_count": 9,
+          "token_chunk_count": 9,
+          "all_token_chunks_nonempty": true,
+          "content_sha256": "fda564ba3f7a0f028106d468420f674898ed99ac5bf2765ac9586206e39d73c5",
+          "content_bytes": 32,
+          "total_elapsed_ms": 1758.018,
+          "usage": {
+            "prompt_tokens": 31,
+            "completion_tokens": 10
+          },
+          "finish_reason": "stop",
+          "time_to_first_token_ms": 1352.59,
+          "inter_chunk_latency_ms_p50": 45.04,
+          "inter_chunk_latency_ms_p95": 45.726,
+          "post_first_chunk_tokens_per_second": 22.248748,
+          "runtime_emitted_token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            1492,
+            498,
+            3351,
+            30
+          ],
+          "suppressed_terminal_token_ids": 0,
+          "request": {
+            "model": "eval",
+            "messages": [
+              {
+                "role": "user",
+                "content": "hello world"
+              }
+            ],
+            "max_completion_tokens": 32,
+            "stream": true,
+            "stream_options": {
+              "include_usage": true,
+              "include_obfuscation": false
+            },
+            "temperature": 0,
+            "top_k": 0,
+            "top_p": 1,
+            "min_p": 0,
+            "repetition_penalty": 1,
+            "presence_penalty": 0,
+            "frequency_penalty": 0,
+            "seed": 0,
+            "return_token_ids": true
+          },
+          "command": [
+            "/Users/victorbona/Code/OpenSource/ferrite/target/release/ferrite-server",
+            "--model",
+            "/Users/victorbona/Code/OpenSource/ferrite/target/models/qwen2.5-1.5b-instruct-q8_0.gguf",
+            "--model-id",
+            "eval",
+            "--bind",
+            "127.0.0.1:63578",
+            "--default-max-tokens",
+            "32",
+            "--hard-max-tokens",
+            "32",
+            "--threads",
+            "10"
+          ],
+          "request_mode": "chat",
+          "steady_rss_before_bytes": 1988509696,
+          "request_rss_peak_bytes": 1991950336,
+          "request_rss_mean_bytes": 1990625689,
+          "request_cpu_mean_percent": 310.3,
+          "request_cpu_peak_percent": 367.2,
+          "preflight": {
+            "timestamp_utc": "2026-07-14T06:23:18Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.052734375,
+            "load_average_5m": 4.3271484375,
+            "load_average_15m": 4.412109375,
+            "load_per_core_1m": 0.203515625,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 106.7,
+            "max_background_process_cpu_percent": 41.7,
+            "top_background_cpu_processes": [
+              {
+                "pid": 11552,
+                "cpu_percent": 41.7,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 458,
+                "cpu_percent": 34.7,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 7.4,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 4.3,
+                "command": "Codex (Renderer)"
+              },
+              {
+                "pid": 467,
+                "cpu_percent": 3.4,
+                "command": "coreaudiod"
+              }
+            ]
+          },
+          "postflight": {
+            "timestamp_utc": "2026-07-14T06:23:22Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.28857421875,
+            "load_average_5m": 4.3544921875,
+            "load_average_15m": 4.42138671875,
+            "load_per_core_1m": 0.21923828125,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 112.1,
+            "max_background_process_cpu_percent": 46.4,
+            "top_background_cpu_processes": [
+              {
+                "pid": 11552,
+                "cpu_percent": 46.4,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 458,
+                "cpu_percent": 35.6,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 7.5,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 4.1,
+                "command": "Codex (Renderer)"
+              },
+              {
+                "pid": 467,
+                "cpu_percent": 3.4,
+                "command": "coreaudiod"
+              }
+            ]
+          },
+          "postflight_rejection_reasons": []
+        },
+        "llama_cpp": {
+          "token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            7789,
+            498,
+            3351,
+            30
+          ],
+          "token_count": 9,
+          "token_chunk_count": 9,
+          "all_token_chunks_nonempty": true,
+          "content_sha256": "cd153d3c18e782c4f4b3ceec574adccc8e68bc557110b0bc263b01e09bfcc8ef",
+          "content_bytes": 34,
+          "total_elapsed_ms": 134.858,
+          "usage": {
+            "prompt_tokens": 31,
+            "completion_tokens": 10
+          },
+          "finish_reason": "stop",
+          "time_to_first_token_ms": 51.226,
+          "inter_chunk_latency_ms_p50": 9.31,
+          "inter_chunk_latency_ms_p95": 10.694,
+          "post_first_chunk_tokens_per_second": 105.028972,
+          "runtime_emitted_token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            7789,
+            498,
+            3351,
+            30,
+            151645
+          ],
+          "suppressed_terminal_token_ids": 1,
+          "request": {
+            "prompt": "<|im_start|>system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>\n<|im_start|>user\nhello world<|im_end|>\n<|im_start|>assistant\n",
+            "n_predict": 32,
+            "stream": true,
+            "cache_prompt": false,
+            "return_tokens": true,
+            "timings_per_token": true,
+            "temperature": 0.0,
+            "top_k": 0,
+            "top_p": 1.0,
+            "min_p": 0.0,
+            "typical_p": 1.0,
+            "repeat_penalty": 1.0,
+            "presence_penalty": 0.0,
+            "frequency_penalty": 0.0,
+            "dry_multiplier": 0.0,
+            "seed": 0,
+            "samplers": [
+              "temperature"
+            ],
+            "parse_special": true
+          },
+          "command": [
+            "/Users/victorbona/Code/OpenSource/ferrite/target/llama.cpp/build-cpu/bin/llama-server",
+            "--model",
+            "/Users/victorbona/Code/OpenSource/ferrite/target/models/qwen2.5-1.5b-instruct-q8_0.gguf",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "63589",
+            "--threads",
+            "10",
+            "--threads-batch",
+            "10",
+            "--parallel",
+            "1",
+            "--n-gpu-layers",
+            "0",
+            "--no-warmup",
+            "--no-cont-batching",
+            "--cache-ram",
+            "0",
+            "--no-cache-prompt",
+            "--jinja"
+          ],
+          "request_mode": "chat",
+          "template_request": {
+            "messages": [
+              {
+                "role": "user",
+                "content": "hello world"
+              }
+            ],
+            "add_generation_prompt": true
+          },
+          "rendered_prompt_sha256": "7bd7e8a55a4705a16e8c00b5def95f5ee380d59899128301e25babaca8fb260f",
+          "rendered_prompt_bytes": 159,
+          "steady_rss_before_bytes": 4269703168,
+          "request_rss_peak_bytes": 4279205888,
+          "request_rss_mean_bytes": 4277675622,
+          "request_cpu_mean_percent": 937.9,
+          "request_cpu_peak_percent": 1037.0,
+          "preflight": {
+            "timestamp_utc": "2026-07-14T06:23:22Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.28857421875,
+            "load_average_5m": 4.3544921875,
+            "load_average_15m": 4.42138671875,
+            "load_per_core_1m": 0.21923828125,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 95.9,
+            "max_background_process_cpu_percent": 33.8,
+            "top_background_cpu_processes": [
+              {
+                "pid": 458,
+                "cpu_percent": 33.8,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 11552,
+                "cpu_percent": 32.1,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 7.5,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 3.7,
+                "command": "Codex (Renderer)"
+              },
+              {
+                "pid": 467,
+                "cpu_percent": 3.6,
+                "command": "coreaudiod"
+              }
+            ]
+          },
+          "postflight": {
+            "timestamp_utc": "2026-07-14T06:23:25Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.28857421875,
+            "load_average_5m": 4.3544921875,
+            "load_average_15m": 4.42138671875,
+            "load_per_core_1m": 0.21923828125,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 143.6,
+            "max_background_process_cpu_percent": 60.5,
+            "top_background_cpu_processes": [
+              {
+                "pid": 11552,
+                "cpu_percent": 60.5,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 458,
+                "cpu_percent": 42.0,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 11.1,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 8.8,
+                "command": "Codex (Renderer)"
+              },
+              {
+                "pid": 467,
+                "cpu_percent": 4.2,
+                "command": "coreaudiod"
+              }
+            ]
+          },
+          "postflight_rejection_reasons": [
+            "background process CPU 60.5% exceeds 50.0% (OrbStack Helper pid 11552)"
+          ]
+        }
+      }
+    },
+    {
+      "repetition": 3,
+      "attempt": 3,
+      "order": [
+        "ferrite",
+        "llama_cpp"
+      ],
+      "results": {
+        "ferrite": {
+          "token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            1492,
+            498,
+            3351,
+            30
+          ],
+          "token_count": 9,
+          "token_chunk_count": 9,
+          "all_token_chunks_nonempty": true,
+          "content_sha256": "fda564ba3f7a0f028106d468420f674898ed99ac5bf2765ac9586206e39d73c5",
+          "content_bytes": 32,
+          "total_elapsed_ms": 1773.281,
+          "usage": {
+            "prompt_tokens": 31,
+            "completion_tokens": 10
+          },
+          "finish_reason": "stop",
+          "time_to_first_token_ms": 1359.177,
+          "inter_chunk_latency_ms_p50": 45.072,
+          "inter_chunk_latency_ms_p95": 52.851,
+          "post_first_chunk_tokens_per_second": 21.692915,
+          "runtime_emitted_token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            1492,
+            498,
+            3351,
+            30
+          ],
+          "suppressed_terminal_token_ids": 0,
+          "request": {
+            "model": "eval",
+            "messages": [
+              {
+                "role": "user",
+                "content": "hello world"
+              }
+            ],
+            "max_completion_tokens": 32,
+            "stream": true,
+            "stream_options": {
+              "include_usage": true,
+              "include_obfuscation": false
+            },
+            "temperature": 0,
+            "top_k": 0,
+            "top_p": 1,
+            "min_p": 0,
+            "repetition_penalty": 1,
+            "presence_penalty": 0,
+            "frequency_penalty": 0,
+            "seed": 0,
+            "return_token_ids": true
+          },
+          "command": [
+            "/Users/victorbona/Code/OpenSource/ferrite/target/release/ferrite-server",
+            "--model",
+            "/Users/victorbona/Code/OpenSource/ferrite/target/models/qwen2.5-1.5b-instruct-q8_0.gguf",
+            "--model-id",
+            "eval",
+            "--bind",
+            "127.0.0.1:63601",
+            "--default-max-tokens",
+            "32",
+            "--hard-max-tokens",
+            "32",
+            "--threads",
+            "10"
+          ],
+          "request_mode": "chat",
+          "steady_rss_before_bytes": 1988411392,
+          "request_rss_peak_bytes": 1991917568,
+          "request_rss_mean_bytes": 1990615859,
+          "request_cpu_mean_percent": 312.1,
+          "request_cpu_peak_percent": 379.6,
+          "preflight": {
+            "timestamp_utc": "2026-07-14T06:23:32Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.490234375,
+            "load_average_5m": 4.359375,
+            "load_average_15m": 4.421875,
+            "load_per_core_1m": 0.23268229166666668,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 110.7,
+            "max_background_process_cpu_percent": 33.3,
+            "top_background_cpu_processes": [
+              {
+                "pid": 458,
+                "cpu_percent": 33.3,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 11552,
+                "cpu_percent": 29.2,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 13.3,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 6.0,
+                "command": "Codex (Renderer)"
+              },
+              {
+                "pid": 467,
+                "cpu_percent": 3.6,
+                "command": "coreaudiod"
+              }
+            ]
+          },
+          "postflight": {
+            "timestamp_utc": "2026-07-14T06:23:37Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.53076171875,
+            "load_average_5m": 4.35302734375,
+            "load_average_15m": 4.4189453125,
+            "load_per_core_1m": 0.23538411458333333,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 223.1,
+            "max_background_process_cpu_percent": 62.9,
+            "top_background_cpu_processes": [
+              {
+                "pid": 31087,
+                "cpu_percent": 62.9,
+                "command": "BackgroundShortcutRunner"
+              },
+              {
+                "pid": 30982,
+                "cpu_percent": 36.7,
+                "command": "siriactionsd"
+              },
+              {
+                "pid": 458,
+                "cpu_percent": 31.3,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 11552,
+                "cpu_percent": 30.5,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 19183,
+                "cpu_percent": 20.6,
+                "command": "spotlightknowledged.updater"
+              }
+            ]
+          },
+          "postflight_rejection_reasons": [
+            "background process CPU 62.9% exceeds 50.0% (BackgroundShortcutRunner pid 31087)"
+          ]
+        }
+      }
+    },
+    {
+      "repetition": 3,
+      "attempt": 4,
+      "order": [
+        "ferrite",
+        "llama_cpp"
+      ],
+      "results": {
+        "ferrite": {
+          "token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            1492,
+            498,
+            3351,
+            30
+          ],
+          "token_count": 9,
+          "token_chunk_count": 9,
+          "all_token_chunks_nonempty": true,
+          "content_sha256": "fda564ba3f7a0f028106d468420f674898ed99ac5bf2765ac9586206e39d73c5",
+          "content_bytes": 32,
+          "total_elapsed_ms": 1776.092,
+          "usage": {
+            "prompt_tokens": 31,
+            "completion_tokens": 10
+          },
+          "finish_reason": "stop",
+          "time_to_first_token_ms": 1361.669,
+          "inter_chunk_latency_ms_p50": 45.648,
+          "inter_chunk_latency_ms_p95": 48.008,
+          "post_first_chunk_tokens_per_second": 21.698394,
+          "runtime_emitted_token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            1492,
+            498,
+            3351,
+            30
+          ],
+          "suppressed_terminal_token_ids": 0,
+          "request": {
+            "model": "eval",
+            "messages": [
+              {
+                "role": "user",
+                "content": "hello world"
+              }
+            ],
+            "max_completion_tokens": 32,
+            "stream": true,
+            "stream_options": {
+              "include_usage": true,
+              "include_obfuscation": false
+            },
+            "temperature": 0,
+            "top_k": 0,
+            "top_p": 1,
+            "min_p": 0,
+            "repetition_penalty": 1,
+            "presence_penalty": 0,
+            "frequency_penalty": 0,
+            "seed": 0,
+            "return_token_ids": true
+          },
+          "command": [
+            "/Users/victorbona/Code/OpenSource/ferrite/target/release/ferrite-server",
+            "--model",
+            "/Users/victorbona/Code/OpenSource/ferrite/target/models/qwen2.5-1.5b-instruct-q8_0.gguf",
+            "--model-id",
+            "eval",
+            "--bind",
+            "127.0.0.1:63611",
+            "--default-max-tokens",
+            "32",
+            "--hard-max-tokens",
+            "32",
+            "--threads",
+            "10"
+          ],
+          "request_mode": "chat",
+          "steady_rss_before_bytes": 1988444160,
+          "request_rss_peak_bytes": 1991901184,
+          "request_rss_mean_bytes": 1990564679,
+          "request_cpu_mean_percent": 311.1,
+          "request_cpu_peak_percent": 367.6,
+          "preflight": {
+            "timestamp_utc": "2026-07-14T06:23:59Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.74658203125,
+            "load_average_5m": 4.35888671875,
+            "load_average_15m": 4.4189453125,
+            "load_per_core_1m": 0.24977213541666668,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 122.3,
+            "max_background_process_cpu_percent": 39.7,
+            "top_background_cpu_processes": [
+              {
+                "pid": 458,
+                "cpu_percent": 39.7,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 11552,
+                "cpu_percent": 28.9,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 14.4,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 10.9,
+                "command": "Codex (Renderer)"
+              },
+              {
+                "pid": 91502,
+                "cpu_percent": 5.1,
+                "command": "codex"
+              }
+            ]
+          },
+          "postflight": {
+            "timestamp_utc": "2026-07-14T06:24:03Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.7666015625,
+            "load_average_5m": 4.3525390625,
+            "load_average_15m": 4.416015625,
+            "load_per_core_1m": 0.2511067708333333,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 118.8,
+            "max_background_process_cpu_percent": 45.6,
+            "top_background_cpu_processes": [
+              {
+                "pid": 11552,
+                "cpu_percent": 45.6,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 458,
+                "cpu_percent": 34.6,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 9.8,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 5.0,
+                "command": "Codex (Renderer)"
+              },
+              {
+                "pid": 31978,
+                "cpu_percent": 4.1,
+                "command": "plugin-container"
+              }
+            ]
+          },
+          "postflight_rejection_reasons": []
+        },
+        "llama_cpp": {
+          "token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            7789,
+            498,
+            3351,
+            30
+          ],
+          "token_count": 9,
+          "token_chunk_count": 9,
+          "all_token_chunks_nonempty": true,
+          "content_sha256": "cd153d3c18e782c4f4b3ceec574adccc8e68bc557110b0bc263b01e09bfcc8ef",
+          "content_bytes": 34,
+          "total_elapsed_ms": 133.396,
+          "usage": {
+            "prompt_tokens": 31,
+            "completion_tokens": 10
+          },
+          "finish_reason": "stop",
+          "time_to_first_token_ms": 48.34,
+          "inter_chunk_latency_ms_p50": 9.219,
+          "inter_chunk_latency_ms_p95": 10.257,
+          "post_first_chunk_tokens_per_second": 107.293259,
+          "runtime_emitted_token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            7789,
+            498,
+            3351,
+            30,
+            151645
+          ],
+          "suppressed_terminal_token_ids": 1,
+          "request": {
+            "prompt": "<|im_start|>system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>\n<|im_start|>user\nhello world<|im_end|>\n<|im_start|>assistant\n",
+            "n_predict": 32,
+            "stream": true,
+            "cache_prompt": false,
+            "return_tokens": true,
+            "timings_per_token": true,
+            "temperature": 0.0,
+            "top_k": 0,
+            "top_p": 1.0,
+            "min_p": 0.0,
+            "typical_p": 1.0,
+            "repeat_penalty": 1.0,
+            "presence_penalty": 0.0,
+            "frequency_penalty": 0.0,
+            "dry_multiplier": 0.0,
+            "seed": 0,
+            "samplers": [
+              "temperature"
+            ],
+            "parse_special": true
+          },
+          "command": [
+            "/Users/victorbona/Code/OpenSource/ferrite/target/llama.cpp/build-cpu/bin/llama-server",
+            "--model",
+            "/Users/victorbona/Code/OpenSource/ferrite/target/models/qwen2.5-1.5b-instruct-q8_0.gguf",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "63628",
+            "--threads",
+            "10",
+            "--threads-batch",
+            "10",
+            "--parallel",
+            "1",
+            "--n-gpu-layers",
+            "0",
+            "--no-warmup",
+            "--no-cont-batching",
+            "--cache-ram",
+            "0",
+            "--no-cache-prompt",
+            "--jinja"
+          ],
+          "request_mode": "chat",
+          "template_request": {
+            "messages": [
+              {
+                "role": "user",
+                "content": "hello world"
+              }
+            ],
+            "add_generation_prompt": true
+          },
+          "rendered_prompt_sha256": "7bd7e8a55a4705a16e8c00b5def95f5ee380d59899128301e25babaca8fb260f",
+          "rendered_prompt_bytes": 159,
+          "steady_rss_before_bytes": 4280582144,
+          "request_rss_peak_bytes": 4287397888,
+          "request_rss_mean_bytes": 4286369792,
+          "request_cpu_mean_percent": 944.1,
+          "request_cpu_peak_percent": 954.5,
+          "preflight": {
+            "timestamp_utc": "2026-07-14T06:24:19Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.55908203125,
+            "load_average_5m": 4.2841796875,
+            "load_average_15m": 4.390625,
+            "load_per_core_1m": 0.23727213541666667,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 136.2,
+            "max_background_process_cpu_percent": 46.8,
+            "top_background_cpu_processes": [
+              {
+                "pid": 11552,
+                "cpu_percent": 46.8,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 458,
+                "cpu_percent": 36.4,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 13.6,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 7.1,
+                "command": "Codex (Renderer)"
+              },
+              {
+                "pid": 91502,
+                "cpu_percent": 4.7,
+                "command": "codex"
+              }
+            ]
+          },
+          "postflight": {
+            "timestamp_utc": "2026-07-14T06:24:21Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.55908203125,
+            "load_average_5m": 4.2841796875,
+            "load_average_15m": 4.390625,
+            "load_per_core_1m": 0.23727213541666667,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 142.0,
+            "max_background_process_cpu_percent": 57.4,
+            "top_background_cpu_processes": [
+              {
+                "pid": 11552,
+                "cpu_percent": 57.4,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 458,
+                "cpu_percent": 44.7,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 9.9,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 9.6,
+                "command": "Codex (Renderer)"
+              },
+              {
+                "pid": 467,
+                "cpu_percent": 4.1,
+                "command": "coreaudiod"
+              }
+            ]
+          },
+          "postflight_rejection_reasons": [
+            "background process CPU 57.4% exceeds 50.0% (OrbStack Helper pid 11552)"
+          ]
+        }
+      }
+    },
+    {
+      "repetition": 3,
+      "attempt": 5,
+      "order": [
+        "ferrite",
+        "llama_cpp"
+      ],
+      "results": {
+        "ferrite": {
+          "token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            1492,
+            498,
+            3351,
+            30
+          ],
+          "token_count": 9,
+          "token_chunk_count": 9,
+          "all_token_chunks_nonempty": true,
+          "content_sha256": "fda564ba3f7a0f028106d468420f674898ed99ac5bf2765ac9586206e39d73c5",
+          "content_bytes": 32,
+          "total_elapsed_ms": 1756.656,
+          "usage": {
+            "prompt_tokens": 31,
+            "completion_tokens": 10
+          },
+          "finish_reason": "stop",
+          "time_to_first_token_ms": 1350.542,
+          "inter_chunk_latency_ms_p50": 44.955,
+          "inter_chunk_latency_ms_p95": 45.635,
+          "post_first_chunk_tokens_per_second": 22.21682,
+          "runtime_emitted_token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            1492,
+            498,
+            3351,
+            30
+          ],
+          "suppressed_terminal_token_ids": 0,
+          "request": {
+            "model": "eval",
+            "messages": [
+              {
+                "role": "user",
+                "content": "hello world"
+              }
+            ],
+            "max_completion_tokens": 32,
+            "stream": true,
+            "stream_options": {
+              "include_usage": true,
+              "include_obfuscation": false
+            },
+            "temperature": 0,
+            "top_k": 0,
+            "top_p": 1,
+            "min_p": 0,
+            "repetition_penalty": 1,
+            "presence_penalty": 0,
+            "frequency_penalty": 0,
+            "seed": 0,
+            "return_token_ids": true
+          },
+          "command": [
+            "/Users/victorbona/Code/OpenSource/ferrite/target/release/ferrite-server",
+            "--model",
+            "/Users/victorbona/Code/OpenSource/ferrite/target/models/qwen2.5-1.5b-instruct-q8_0.gguf",
+            "--model-id",
+            "eval",
+            "--bind",
+            "127.0.0.1:63641",
+            "--default-max-tokens",
+            "32",
+            "--hard-max-tokens",
+            "32",
+            "--threads",
+            "10"
+          ],
+          "request_mode": "chat",
+          "steady_rss_before_bytes": 1988493312,
+          "request_rss_peak_bytes": 1990000640,
+          "request_rss_mean_bytes": 1987071011,
+          "request_cpu_mean_percent": 309.9,
+          "request_cpu_peak_percent": 375.7,
+          "preflight": {
+            "timestamp_utc": "2026-07-14T06:24:29Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.23876953125,
+            "load_average_5m": 4.19189453125,
+            "load_average_15m": 4.3564453125,
+            "load_per_core_1m": 0.21591796875,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 118.2,
+            "max_background_process_cpu_percent": 39.3,
+            "top_background_cpu_processes": [
+              {
+                "pid": 11552,
+                "cpu_percent": 39.3,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 458,
+                "cpu_percent": 34.0,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 8.5,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 91502,
+                "cpu_percent": 7.1,
+                "command": "codex"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 6.8,
+                "command": "Codex (Renderer)"
+              }
+            ]
+          },
+          "postflight": {
+            "timestamp_utc": "2026-07-14T06:24:34Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.21923828125,
+            "load_average_5m": 4.171875,
+            "load_average_15m": 4.34814453125,
+            "load_per_core_1m": 0.21461588541666668,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 85.8,
+            "max_background_process_cpu_percent": 35.6,
+            "top_background_cpu_processes": [
+              {
+                "pid": 458,
+                "cpu_percent": 35.6,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 11552,
+                "cpu_percent": 23.1,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 7.7,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 4.3,
+                "command": "Codex (Renderer)"
+              },
+              {
+                "pid": 467,
+                "cpu_percent": 3.5,
+                "command": "coreaudiod"
+              }
+            ]
+          },
+          "postflight_rejection_reasons": []
+        },
+        "llama_cpp": {
+          "token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            7789,
+            498,
+            3351,
+            30
+          ],
+          "token_count": 9,
+          "token_chunk_count": 9,
+          "all_token_chunks_nonempty": true,
+          "content_sha256": "cd153d3c18e782c4f4b3ceec574adccc8e68bc557110b0bc263b01e09bfcc8ef",
+          "content_bytes": 34,
+          "total_elapsed_ms": 143.172,
+          "usage": {
+            "prompt_tokens": 31,
+            "completion_tokens": 10
+          },
+          "finish_reason": "stop",
+          "time_to_first_token_ms": 52.529,
+          "inter_chunk_latency_ms_p50": 9.204,
+          "inter_chunk_latency_ms_p95": 15.977,
+          "post_first_chunk_tokens_per_second": 99.041464,
+          "runtime_emitted_token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            7789,
+            498,
+            3351,
+            30,
+            151645
+          ],
+          "suppressed_terminal_token_ids": 1,
+          "request": {
+            "prompt": "<|im_start|>system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>\n<|im_start|>user\nhello world<|im_end|>\n<|im_start|>assistant\n",
+            "n_predict": 32,
+            "stream": true,
+            "cache_prompt": false,
+            "return_tokens": true,
+            "timings_per_token": true,
+            "temperature": 0.0,
+            "top_k": 0,
+            "top_p": 1.0,
+            "min_p": 0.0,
+            "typical_p": 1.0,
+            "repeat_penalty": 1.0,
+            "presence_penalty": 0.0,
+            "frequency_penalty": 0.0,
+            "dry_multiplier": 0.0,
+            "seed": 0,
+            "samplers": [
+              "temperature"
+            ],
+            "parse_special": true
+          },
+          "command": [
+            "/Users/victorbona/Code/OpenSource/ferrite/target/llama.cpp/build-cpu/bin/llama-server",
+            "--model",
+            "/Users/victorbona/Code/OpenSource/ferrite/target/models/qwen2.5-1.5b-instruct-q8_0.gguf",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "63652",
+            "--threads",
+            "10",
+            "--threads-batch",
+            "10",
+            "--parallel",
+            "1",
+            "--n-gpu-layers",
+            "0",
+            "--no-warmup",
+            "--no-cont-batching",
+            "--cache-ram",
+            "0",
+            "--no-cache-prompt",
+            "--jinja"
+          ],
+          "request_mode": "chat",
+          "template_request": {
+            "messages": [
+              {
+                "role": "user",
+                "content": "hello world"
+              }
+            ],
+            "add_generation_prompt": true
+          },
+          "rendered_prompt_sha256": "7bd7e8a55a4705a16e8c00b5def95f5ee380d59899128301e25babaca8fb260f",
+          "rendered_prompt_bytes": 159,
+          "steady_rss_before_bytes": 4254875648,
+          "request_rss_peak_bytes": 4266573824,
+          "request_rss_mean_bytes": 4265698918,
+          "request_cpu_mean_percent": 921.4,
+          "request_cpu_peak_percent": 973.5,
+          "preflight": {
+            "timestamp_utc": "2026-07-14T06:25:04Z",
+            "logical_cores": 15,
+            "load_average_1m": 2.57275390625,
+            "load_average_5m": 3.9296875,
+            "load_average_15m": 4.25341796875,
+            "load_per_core_1m": 0.17151692708333333,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 177.3,
+            "max_background_process_cpu_percent": 47.4,
+            "top_background_cpu_processes": [
+              {
+                "pid": 11552,
+                "cpu_percent": 47.4,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 458,
+                "cpu_percent": 46.2,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 29.8,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 33370,
+                "cpu_percent": 17.5,
+                "command": "plugin-container"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 11.5,
+                "command": "Codex (Renderer)"
+              }
+            ]
+          },
+          "postflight": {
+            "timestamp_utc": "2026-07-14T06:25:06Z",
+            "logical_cores": 15,
+            "load_average_1m": 2.57275390625,
+            "load_average_5m": 3.9296875,
+            "load_average_15m": 4.25341796875,
+            "load_per_core_1m": 0.17151692708333333,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 165.3,
+            "max_background_process_cpu_percent": 42.1,
+            "top_background_cpu_processes": [
+              {
+                "pid": 11552,
+                "cpu_percent": 42.1,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 458,
+                "cpu_percent": 33.3,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 33453,
+                "cpu_percent": 14.1,
+                "command": "TrialArchivingService"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 9.3,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 33456,
+                "cpu_percent": 9.0,
+                "command": "com.apple.geod"
+              }
+            ]
+          },
+          "postflight_rejection_reasons": []
+        }
+      }
+    }
+  ],
+  "runs": [
+    {
+      "repetition": 1,
+      "attempt": 4,
+      "order": [
+        "ferrite",
+        "llama_cpp"
+      ],
+      "results": {
+        "ferrite": {
+          "token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            1492,
+            498,
+            3351,
+            30
+          ],
+          "token_count": 9,
+          "token_chunk_count": 9,
+          "all_token_chunks_nonempty": true,
+          "content_sha256": "fda564ba3f7a0f028106d468420f674898ed99ac5bf2765ac9586206e39d73c5",
+          "content_bytes": 32,
+          "total_elapsed_ms": 1755.684,
+          "usage": {
+            "prompt_tokens": 31,
+            "completion_tokens": 10
+          },
+          "finish_reason": "stop",
+          "time_to_first_token_ms": 1348.802,
+          "inter_chunk_latency_ms_p50": 45.084,
+          "inter_chunk_latency_ms_p95": 45.526,
+          "post_first_chunk_tokens_per_second": 22.171986,
+          "runtime_emitted_token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            1492,
+            498,
+            3351,
+            30
+          ],
+          "suppressed_terminal_token_ids": 0,
+          "request": {
+            "model": "eval",
+            "messages": [
+              {
+                "role": "user",
+                "content": "hello world"
+              }
+            ],
+            "max_completion_tokens": 32,
+            "stream": true,
+            "stream_options": {
+              "include_usage": true,
+              "include_obfuscation": false
+            },
+            "temperature": 0,
+            "top_k": 0,
+            "top_p": 1,
+            "min_p": 0,
+            "repetition_penalty": 1,
+            "presence_penalty": 0,
+            "frequency_penalty": 0,
+            "seed": 0,
+            "return_token_ids": true
+          },
+          "command": [
+            "/Users/victorbona/Code/OpenSource/ferrite/target/release/ferrite-server",
+            "--model",
+            "/Users/victorbona/Code/OpenSource/ferrite/target/models/qwen2.5-1.5b-instruct-q8_0.gguf",
+            "--model-id",
+            "eval",
+            "--bind",
+            "127.0.0.1:63188",
+            "--default-max-tokens",
+            "32",
+            "--hard-max-tokens",
+            "32",
+            "--threads",
+            "10"
+          ],
+          "request_mode": "chat",
+          "steady_rss_before_bytes": 1983594496,
+          "request_rss_peak_bytes": 1984626688,
+          "request_rss_mean_bytes": 1979689369,
+          "request_cpu_mean_percent": 310.8,
+          "request_cpu_peak_percent": 375.7,
+          "preflight": {
+            "timestamp_utc": "2026-07-14T06:12:37Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.2421875,
+            "load_average_5m": 4.22998046875,
+            "load_average_15m": 4.29150390625,
+            "load_per_core_1m": 0.21614583333333334,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 113.7,
+            "max_background_process_cpu_percent": 39.1,
+            "top_background_cpu_processes": [
+              {
+                "pid": 458,
+                "cpu_percent": 39.1,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 11552,
+                "cpu_percent": 31.9,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 9.9,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 4.5,
+                "command": "Codex (Renderer)"
+              },
+              {
+                "pid": 91502,
+                "cpu_percent": 3.6,
+                "command": "codex"
+              }
+            ]
+          },
+          "postflight": {
+            "timestamp_utc": "2026-07-14T06:12:41Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.2421875,
+            "load_average_5m": 4.22998046875,
+            "load_average_15m": 4.29150390625,
+            "load_per_core_1m": 0.21614583333333334,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 97.9,
+            "max_background_process_cpu_percent": 33.8,
+            "top_background_cpu_processes": [
+              {
+                "pid": 458,
+                "cpu_percent": 33.8,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 11552,
+                "cpu_percent": 24.1,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 7.9,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 71309,
+                "cpu_percent": 6.1,
+                "command": "plugin-container"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 6.0,
+                "command": "Codex (Renderer)"
+              }
+            ]
+          },
+          "postflight_rejection_reasons": []
+        },
+        "llama_cpp": {
+          "token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            7789,
+            498,
+            3351,
+            30
+          ],
+          "token_count": 9,
+          "token_chunk_count": 9,
+          "all_token_chunks_nonempty": true,
+          "content_sha256": "cd153d3c18e782c4f4b3ceec574adccc8e68bc557110b0bc263b01e09bfcc8ef",
+          "content_bytes": 34,
+          "total_elapsed_ms": 151.347,
+          "usage": {
+            "prompt_tokens": 31,
+            "completion_tokens": 10
+          },
+          "finish_reason": "stop",
+          "time_to_first_token_ms": 48.414,
+          "inter_chunk_latency_ms_p50": 11.535,
+          "inter_chunk_latency_ms_p95": 12.339,
+          "post_first_chunk_tokens_per_second": 89.169608,
+          "runtime_emitted_token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            7789,
+            498,
+            3351,
+            30,
+            151645
+          ],
+          "suppressed_terminal_token_ids": 1,
+          "request": {
+            "prompt": "<|im_start|>system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>\n<|im_start|>user\nhello world<|im_end|>\n<|im_start|>assistant\n",
+            "n_predict": 32,
+            "stream": true,
+            "cache_prompt": false,
+            "return_tokens": true,
+            "timings_per_token": true,
+            "temperature": 0.0,
+            "top_k": 0,
+            "top_p": 1.0,
+            "min_p": 0.0,
+            "typical_p": 1.0,
+            "repeat_penalty": 1.0,
+            "presence_penalty": 0.0,
+            "frequency_penalty": 0.0,
+            "dry_multiplier": 0.0,
+            "seed": 0,
+            "samplers": [
+              "temperature"
+            ],
+            "parse_special": true
+          },
+          "command": [
+            "/Users/victorbona/Code/OpenSource/ferrite/target/llama.cpp/build-cpu/bin/llama-server",
+            "--model",
+            "/Users/victorbona/Code/OpenSource/ferrite/target/models/qwen2.5-1.5b-instruct-q8_0.gguf",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "63233",
+            "--threads",
+            "10",
+            "--threads-batch",
+            "10",
+            "--parallel",
+            "1",
+            "--n-gpu-layers",
+            "0",
+            "--no-warmup",
+            "--no-cont-batching",
+            "--cache-ram",
+            "0",
+            "--no-cache-prompt",
+            "--jinja"
+          ],
+          "request_mode": "chat",
+          "template_request": {
+            "messages": [
+              {
+                "role": "user",
+                "content": "hello world"
+              }
+            ],
+            "add_generation_prompt": true
+          },
+          "rendered_prompt_sha256": "7bd7e8a55a4705a16e8c00b5def95f5ee380d59899128301e25babaca8fb260f",
+          "rendered_prompt_bytes": 159,
+          "steady_rss_before_bytes": 4274946048,
+          "request_rss_peak_bytes": 4282449920,
+          "request_rss_mean_bytes": 4281955123,
+          "request_cpu_mean_percent": 921.0,
+          "request_cpu_peak_percent": 937.0,
+          "preflight": {
+            "timestamp_utc": "2026-07-14T06:14:42Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.5869140625,
+            "load_average_5m": 4.0595703125,
+            "load_average_15m": 4.21240234375,
+            "load_per_core_1m": 0.23912760416666667,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 141.2,
+            "max_background_process_cpu_percent": 46.2,
+            "top_background_cpu_processes": [
+              {
+                "pid": 458,
+                "cpu_percent": 46.2,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 11552,
+                "cpu_percent": 43.1,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 20.0,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 12.6,
+                "command": "Codex (Renderer)"
+              },
+              {
+                "pid": 467,
+                "cpu_percent": 4.4,
+                "command": "coreaudiod"
+              }
+            ]
+          },
+          "postflight": {
+            "timestamp_utc": "2026-07-14T06:14:44Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.5869140625,
+            "load_average_5m": 4.0595703125,
+            "load_average_15m": 4.21240234375,
+            "load_per_core_1m": 0.23912760416666667,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 176.3,
+            "max_background_process_cpu_percent": 38.5,
+            "top_background_cpu_processes": [
+              {
+                "pid": 458,
+                "cpu_percent": 38.5,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 11552,
+                "cpu_percent": 33.4,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 91502,
+                "cpu_percent": 33.3,
+                "command": "codex"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 25.8,
+                "command": "Codex (Renderer)"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 13.4,
+                "command": "Codex (Service)"
+              }
+            ]
+          },
+          "postflight_rejection_reasons": []
+        }
+      }
+    },
+    {
+      "repetition": 2,
+      "attempt": 6,
+      "order": [
+        "llama_cpp",
+        "ferrite"
+      ],
+      "results": {
+        "llama_cpp": {
+          "token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            7789,
+            498,
+            3351,
+            30
+          ],
+          "token_count": 9,
+          "token_chunk_count": 9,
+          "all_token_chunks_nonempty": true,
+          "content_sha256": "cd153d3c18e782c4f4b3ceec574adccc8e68bc557110b0bc263b01e09bfcc8ef",
+          "content_bytes": 34,
+          "total_elapsed_ms": 141.363,
+          "usage": {
+            "prompt_tokens": 31,
+            "completion_tokens": 10
+          },
+          "finish_reason": "stop",
+          "time_to_first_token_ms": 57.182,
+          "inter_chunk_latency_ms_p50": 9.028,
+          "inter_chunk_latency_ms_p95": 9.972,
+          "post_first_chunk_tokens_per_second": 108.202968,
+          "runtime_emitted_token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            7789,
+            498,
+            3351,
+            30,
+            151645
+          ],
+          "suppressed_terminal_token_ids": 1,
+          "request": {
+            "prompt": "<|im_start|>system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>\n<|im_start|>user\nhello world<|im_end|>\n<|im_start|>assistant\n",
+            "n_predict": 32,
+            "stream": true,
+            "cache_prompt": false,
+            "return_tokens": true,
+            "timings_per_token": true,
+            "temperature": 0.0,
+            "top_k": 0,
+            "top_p": 1.0,
+            "min_p": 0.0,
+            "typical_p": 1.0,
+            "repeat_penalty": 1.0,
+            "presence_penalty": 0.0,
+            "frequency_penalty": 0.0,
+            "dry_multiplier": 0.0,
+            "seed": 0,
+            "samplers": [
+              "temperature"
+            ],
+            "parse_special": true
+          },
+          "command": [
+            "/Users/victorbona/Code/OpenSource/ferrite/target/llama.cpp/build-cpu/bin/llama-server",
+            "--model",
+            "/Users/victorbona/Code/OpenSource/ferrite/target/models/qwen2.5-1.5b-instruct-q8_0.gguf",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "63539",
+            "--threads",
+            "10",
+            "--threads-batch",
+            "10",
+            "--parallel",
+            "1",
+            "--n-gpu-layers",
+            "0",
+            "--no-warmup",
+            "--no-cont-batching",
+            "--cache-ram",
+            "0",
+            "--no-cache-prompt",
+            "--jinja"
+          ],
+          "request_mode": "chat",
+          "template_request": {
+            "messages": [
+              {
+                "role": "user",
+                "content": "hello world"
+              }
+            ],
+            "add_generation_prompt": true
+          },
+          "rendered_prompt_sha256": "7bd7e8a55a4705a16e8c00b5def95f5ee380d59899128301e25babaca8fb260f",
+          "rendered_prompt_bytes": 159,
+          "steady_rss_before_bytes": 4241702912,
+          "request_rss_peak_bytes": 4253974528,
+          "request_rss_mean_bytes": 4252876800,
+          "request_cpu_mean_percent": 976.0,
+          "request_cpu_peak_percent": 1038.4,
+          "preflight": {
+            "timestamp_utc": "2026-07-14T06:22:47Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.12744140625,
+            "load_average_5m": 4.470703125,
+            "load_average_15m": 4.46484375,
+            "load_per_core_1m": 0.20849609375,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 97.1,
+            "max_background_process_cpu_percent": 37.7,
+            "top_background_cpu_processes": [
+              {
+                "pid": 458,
+                "cpu_percent": 37.7,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 11552,
+                "cpu_percent": 29.3,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 8.0,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 5.2,
+                "command": "Codex (Renderer)"
+              },
+              {
+                "pid": 467,
+                "cpu_percent": 3.3,
+                "command": "coreaudiod"
+              }
+            ]
+          },
+          "postflight": {
+            "timestamp_utc": "2026-07-14T06:22:50Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.12744140625,
+            "load_average_5m": 4.470703125,
+            "load_average_15m": 4.46484375,
+            "load_per_core_1m": 0.20849609375,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 117.4,
+            "max_background_process_cpu_percent": 44.9,
+            "top_background_cpu_processes": [
+              {
+                "pid": 11552,
+                "cpu_percent": 44.9,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 458,
+                "cpu_percent": 34.1,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 10.1,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 6.9,
+                "command": "Codex (Renderer)"
+              },
+              {
+                "pid": 467,
+                "cpu_percent": 4.2,
+                "command": "coreaudiod"
+              }
+            ]
+          },
+          "postflight_rejection_reasons": []
+        },
+        "ferrite": {
+          "token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            1492,
+            498,
+            3351,
+            30
+          ],
+          "token_count": 9,
+          "token_chunk_count": 9,
+          "all_token_chunks_nonempty": true,
+          "content_sha256": "fda564ba3f7a0f028106d468420f674898ed99ac5bf2765ac9586206e39d73c5",
+          "content_bytes": 32,
+          "total_elapsed_ms": 1749.948,
+          "usage": {
+            "prompt_tokens": 31,
+            "completion_tokens": 10
+          },
+          "finish_reason": "stop",
+          "time_to_first_token_ms": 1340.09,
+          "inter_chunk_latency_ms_p50": 45.231,
+          "inter_chunk_latency_ms_p95": 46.439,
+          "post_first_chunk_tokens_per_second": 22.01255,
+          "runtime_emitted_token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            1492,
+            498,
+            3351,
+            30
+          ],
+          "suppressed_terminal_token_ids": 0,
+          "request": {
+            "model": "eval",
+            "messages": [
+              {
+                "role": "user",
+                "content": "hello world"
+              }
+            ],
+            "max_completion_tokens": 32,
+            "stream": true,
+            "stream_options": {
+              "include_usage": true,
+              "include_obfuscation": false
+            },
+            "temperature": 0,
+            "top_k": 0,
+            "top_p": 1,
+            "min_p": 0,
+            "repetition_penalty": 1,
+            "presence_penalty": 0,
+            "frequency_penalty": 0,
+            "seed": 0,
+            "return_token_ids": true
+          },
+          "command": [
+            "/Users/victorbona/Code/OpenSource/ferrite/target/release/ferrite-server",
+            "--model",
+            "/Users/victorbona/Code/OpenSource/ferrite/target/models/qwen2.5-1.5b-instruct-q8_0.gguf",
+            "--model-id",
+            "eval",
+            "--bind",
+            "127.0.0.1:63548",
+            "--default-max-tokens",
+            "32",
+            "--hard-max-tokens",
+            "32",
+            "--threads",
+            "10"
+          ],
+          "request_mode": "chat",
+          "steady_rss_before_bytes": 1988329472,
+          "request_rss_peak_bytes": 1990508544,
+          "request_rss_mean_bytes": 1988095726,
+          "request_cpu_mean_percent": 310.2,
+          "request_cpu_peak_percent": 380.0,
+          "preflight": {
+            "timestamp_utc": "2026-07-14T06:22:50Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.12744140625,
+            "load_average_5m": 4.470703125,
+            "load_average_15m": 4.46484375,
+            "load_per_core_1m": 0.20849609375,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 117.4,
+            "max_background_process_cpu_percent": 44.9,
+            "top_background_cpu_processes": [
+              {
+                "pid": 11552,
+                "cpu_percent": 44.9,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 458,
+                "cpu_percent": 34.1,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 10.1,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 6.9,
+                "command": "Codex (Renderer)"
+              },
+              {
+                "pid": 467,
+                "cpu_percent": 4.2,
+                "command": "coreaudiod"
+              }
+            ]
+          },
+          "postflight": {
+            "timestamp_utc": "2026-07-14T06:22:54Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.1171875,
+            "load_average_5m": 4.44580078125,
+            "load_average_15m": 4.4560546875,
+            "load_per_core_1m": 0.2078125,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 102.0,
+            "max_background_process_cpu_percent": 42.1,
+            "top_background_cpu_processes": [
+              {
+                "pid": 11552,
+                "cpu_percent": 42.1,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 458,
+                "cpu_percent": 30.2,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 7.7,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 5.9,
+                "command": "Codex (Renderer)"
+              },
+              {
+                "pid": 467,
+                "cpu_percent": 3.5,
+                "command": "coreaudiod"
+              }
+            ]
+          },
+          "postflight_rejection_reasons": []
+        }
+      }
+    },
+    {
+      "repetition": 3,
+      "attempt": 5,
+      "order": [
+        "ferrite",
+        "llama_cpp"
+      ],
+      "results": {
+        "ferrite": {
+          "token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            1492,
+            498,
+            3351,
+            30
+          ],
+          "token_count": 9,
+          "token_chunk_count": 9,
+          "all_token_chunks_nonempty": true,
+          "content_sha256": "fda564ba3f7a0f028106d468420f674898ed99ac5bf2765ac9586206e39d73c5",
+          "content_bytes": 32,
+          "total_elapsed_ms": 1756.656,
+          "usage": {
+            "prompt_tokens": 31,
+            "completion_tokens": 10
+          },
+          "finish_reason": "stop",
+          "time_to_first_token_ms": 1350.542,
+          "inter_chunk_latency_ms_p50": 44.955,
+          "inter_chunk_latency_ms_p95": 45.635,
+          "post_first_chunk_tokens_per_second": 22.21682,
+          "runtime_emitted_token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            1492,
+            498,
+            3351,
+            30
+          ],
+          "suppressed_terminal_token_ids": 0,
+          "request": {
+            "model": "eval",
+            "messages": [
+              {
+                "role": "user",
+                "content": "hello world"
+              }
+            ],
+            "max_completion_tokens": 32,
+            "stream": true,
+            "stream_options": {
+              "include_usage": true,
+              "include_obfuscation": false
+            },
+            "temperature": 0,
+            "top_k": 0,
+            "top_p": 1,
+            "min_p": 0,
+            "repetition_penalty": 1,
+            "presence_penalty": 0,
+            "frequency_penalty": 0,
+            "seed": 0,
+            "return_token_ids": true
+          },
+          "command": [
+            "/Users/victorbona/Code/OpenSource/ferrite/target/release/ferrite-server",
+            "--model",
+            "/Users/victorbona/Code/OpenSource/ferrite/target/models/qwen2.5-1.5b-instruct-q8_0.gguf",
+            "--model-id",
+            "eval",
+            "--bind",
+            "127.0.0.1:63641",
+            "--default-max-tokens",
+            "32",
+            "--hard-max-tokens",
+            "32",
+            "--threads",
+            "10"
+          ],
+          "request_mode": "chat",
+          "steady_rss_before_bytes": 1988493312,
+          "request_rss_peak_bytes": 1990000640,
+          "request_rss_mean_bytes": 1987071011,
+          "request_cpu_mean_percent": 309.9,
+          "request_cpu_peak_percent": 375.7,
+          "preflight": {
+            "timestamp_utc": "2026-07-14T06:24:29Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.23876953125,
+            "load_average_5m": 4.19189453125,
+            "load_average_15m": 4.3564453125,
+            "load_per_core_1m": 0.21591796875,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 118.2,
+            "max_background_process_cpu_percent": 39.3,
+            "top_background_cpu_processes": [
+              {
+                "pid": 11552,
+                "cpu_percent": 39.3,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 458,
+                "cpu_percent": 34.0,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 8.5,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 91502,
+                "cpu_percent": 7.1,
+                "command": "codex"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 6.8,
+                "command": "Codex (Renderer)"
+              }
+            ]
+          },
+          "postflight": {
+            "timestamp_utc": "2026-07-14T06:24:34Z",
+            "logical_cores": 15,
+            "load_average_1m": 3.21923828125,
+            "load_average_5m": 4.171875,
+            "load_average_15m": 4.34814453125,
+            "load_per_core_1m": 0.21461588541666668,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 85.8,
+            "max_background_process_cpu_percent": 35.6,
+            "top_background_cpu_processes": [
+              {
+                "pid": 458,
+                "cpu_percent": 35.6,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 11552,
+                "cpu_percent": 23.1,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 7.7,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 4.3,
+                "command": "Codex (Renderer)"
+              },
+              {
+                "pid": 467,
+                "cpu_percent": 3.5,
+                "command": "coreaudiod"
+              }
+            ]
+          },
+          "postflight_rejection_reasons": []
+        },
+        "llama_cpp": {
+          "token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            7789,
+            498,
+            3351,
+            30
+          ],
+          "token_count": 9,
+          "token_chunk_count": 9,
+          "all_token_chunks_nonempty": true,
+          "content_sha256": "cd153d3c18e782c4f4b3ceec574adccc8e68bc557110b0bc263b01e09bfcc8ef",
+          "content_bytes": 34,
+          "total_elapsed_ms": 143.172,
+          "usage": {
+            "prompt_tokens": 31,
+            "completion_tokens": 10
+          },
+          "finish_reason": "stop",
+          "time_to_first_token_ms": 52.529,
+          "inter_chunk_latency_ms_p50": 9.204,
+          "inter_chunk_latency_ms_p95": 15.977,
+          "post_first_chunk_tokens_per_second": 99.041464,
+          "runtime_emitted_token_ids": [
+            9707,
+            0,
+            2585,
+            646,
+            358,
+            7789,
+            498,
+            3351,
+            30,
+            151645
+          ],
+          "suppressed_terminal_token_ids": 1,
+          "request": {
+            "prompt": "<|im_start|>system\nYou are Qwen, created by Alibaba Cloud. You are a helpful assistant.<|im_end|>\n<|im_start|>user\nhello world<|im_end|>\n<|im_start|>assistant\n",
+            "n_predict": 32,
+            "stream": true,
+            "cache_prompt": false,
+            "return_tokens": true,
+            "timings_per_token": true,
+            "temperature": 0.0,
+            "top_k": 0,
+            "top_p": 1.0,
+            "min_p": 0.0,
+            "typical_p": 1.0,
+            "repeat_penalty": 1.0,
+            "presence_penalty": 0.0,
+            "frequency_penalty": 0.0,
+            "dry_multiplier": 0.0,
+            "seed": 0,
+            "samplers": [
+              "temperature"
+            ],
+            "parse_special": true
+          },
+          "command": [
+            "/Users/victorbona/Code/OpenSource/ferrite/target/llama.cpp/build-cpu/bin/llama-server",
+            "--model",
+            "/Users/victorbona/Code/OpenSource/ferrite/target/models/qwen2.5-1.5b-instruct-q8_0.gguf",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            "63652",
+            "--threads",
+            "10",
+            "--threads-batch",
+            "10",
+            "--parallel",
+            "1",
+            "--n-gpu-layers",
+            "0",
+            "--no-warmup",
+            "--no-cont-batching",
+            "--cache-ram",
+            "0",
+            "--no-cache-prompt",
+            "--jinja"
+          ],
+          "request_mode": "chat",
+          "template_request": {
+            "messages": [
+              {
+                "role": "user",
+                "content": "hello world"
+              }
+            ],
+            "add_generation_prompt": true
+          },
+          "rendered_prompt_sha256": "7bd7e8a55a4705a16e8c00b5def95f5ee380d59899128301e25babaca8fb260f",
+          "rendered_prompt_bytes": 159,
+          "steady_rss_before_bytes": 4254875648,
+          "request_rss_peak_bytes": 4266573824,
+          "request_rss_mean_bytes": 4265698918,
+          "request_cpu_mean_percent": 921.4,
+          "request_cpu_peak_percent": 973.5,
+          "preflight": {
+            "timestamp_utc": "2026-07-14T06:25:04Z",
+            "logical_cores": 15,
+            "load_average_1m": 2.57275390625,
+            "load_average_5m": 3.9296875,
+            "load_average_15m": 4.25341796875,
+            "load_per_core_1m": 0.17151692708333333,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 177.3,
+            "max_background_process_cpu_percent": 47.4,
+            "top_background_cpu_processes": [
+              {
+                "pid": 11552,
+                "cpu_percent": 47.4,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 458,
+                "cpu_percent": 46.2,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 29.8,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 33370,
+                "cpu_percent": 17.5,
+                "command": "plugin-container"
+              },
+              {
+                "pid": 91527,
+                "cpu_percent": 11.5,
+                "command": "Codex (Renderer)"
+              }
+            ]
+          },
+          "postflight": {
+            "timestamp_utc": "2026-07-14T06:25:06Z",
+            "logical_cores": 15,
+            "load_average_1m": 2.57275390625,
+            "load_average_5m": 3.9296875,
+            "load_average_15m": 4.25341796875,
+            "load_per_core_1m": 0.17151692708333333,
+            "ferrite_processes": [],
+            "process_observation_available": true,
+            "thermal_status": [
+              "Note: No thermal warning level has been recorded",
+              "Note: No performance warning level has been recorded",
+              "Note: No CPU power status has been recorded"
+            ],
+            "background_process_cpu_total_percent": 165.3,
+            "max_background_process_cpu_percent": 42.1,
+            "top_background_cpu_processes": [
+              {
+                "pid": 11552,
+                "cpu_percent": 42.1,
+                "command": "OrbStack Helper"
+              },
+              {
+                "pid": 458,
+                "cpu_percent": 33.3,
+                "command": "WindowServer"
+              },
+              {
+                "pid": 33453,
+                "cpu_percent": 14.1,
+                "command": "TrialArchivingService"
+              },
+              {
+                "pid": 91383,
+                "cpu_percent": 9.3,
+                "command": "Codex (Service)"
+              },
+              {
+                "pid": 33456,
+                "cpu_percent": 9.0,
+                "command": "com.apple.geod"
+              }
+            ]
+          },
+          "postflight_rejection_reasons": []
+        }
+      }
+    }
+  ],
+  "resumed_from": "/Users/victorbona/Code/OpenSource/ferrite/scripts/evals/2026-07-14-062344-qwen2.5-1.5b-instruct-q8_0-chat-llama-cpp-reference.json",
+  "numerical_policy": {
+    "path": "/Users/victorbona/Code/OpenSource/ferrite/scripts/numerical-policies/qwen2.5-1.5b-chat-near-ties-v1.json",
+    "sha256": "132047ab719211aa38811b8320cc25726ece1f762c069b3895040389c2e7f28d",
+    "policy_id": "ferrite-qwen2.5-1.5b-chat-near-ties-v1",
+    "review_status": "reviewed",
+    "case": {
+      "case_id": "qwen2.5-1.5b-q8-hello-long-chat",
+      "model_sha256": "d7efb072e7724d25048a4fda0a3e10b04bdef5d06b1403a1c93bd9f1240a63c8",
+      "prompt_sha256": "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9",
+      "request_mode": "chat",
+      "max_tokens": 32,
+      "llama_cpp_revision": "6eddde06a4f25d55d538b5d15628dcc2b6882147",
+      "rendered_prompt_sha256": "7bd7e8a55a4705a16e8c00b5def95f5ee380d59899128301e25babaca8fb260f",
+      "prompt_tokens": 31,
+      "expected_finish_reason": "stop",
+      "expected_ferrite_token_ids": [
+        9707,
+        0,
+        2585,
+        646,
+        358,
+        1492,
+        498,
+        3351,
+        30
+      ],
+      "expected_llama_cpp_token_ids": [
+        9707,
+        0,
+        2585,
+        646,
+        358,
+        7789,
+        498,
+        3351,
+        30
+      ],
+      "expected_ferrite_runtime_emitted_token_ids": [
+        9707,
+        0,
+        2585,
+        646,
+        358,
+        1492,
+        498,
+        3351,
+        30
+      ],
+      "expected_llama_cpp_runtime_emitted_token_ids": [
+        9707,
+        0,
+        2585,
+        646,
+        358,
+        7789,
+        498,
+        3351,
+        30,
+        151645
+      ],
+      "first_divergence_index": 5,
+      "recorded_absolute_logit_gap": 0.00079,
+      "recorded_ferrite_candidates": [
+        {
+          "token_id": 1492,
+          "text": "help",
+          "logit": 28.966488
+        },
+        {
+          "token_id": 7789,
+          "text": "assist",
+          "logit": 28.965698
+        }
+      ],
+      "decision": "accept_exact_recorded_near_tie_trace"
+    }
+  },
+  "summary": {
+    "runtimes": {
+      "ferrite": {
+        "repetitions": 3,
+        "stable_token_ids": true,
+        "all_token_budgets_complete": false,
+        "all_token_counts_within_budget": true,
+        "metrics": {
+          "time_to_first_token_ms": {
+            "count": 3,
+            "min": 1340.09,
+            "median": 1348.802,
+            "max": 1350.542
+          },
+          "inter_chunk_latency_ms_p50": {
+            "count": 3,
+            "min": 44.955,
+            "median": 45.084,
+            "max": 45.231
+          },
+          "inter_chunk_latency_ms_p95": {
+            "count": 3,
+            "min": 45.526,
+            "median": 45.635,
+            "max": 46.439
+          },
+          "post_first_chunk_tokens_per_second": {
+            "count": 3,
+            "min": 22.01255,
+            "median": 22.171986,
+            "max": 22.21682
+          },
+          "steady_rss_before_bytes": {
+            "count": 3,
+            "min": 1983594496,
+            "median": 1988329472,
+            "max": 1988493312
+          },
+          "request_rss_peak_bytes": {
+            "count": 3,
+            "min": 1984626688,
+            "median": 1990000640,
+            "max": 1990508544
+          },
+          "request_cpu_mean_percent": {
+            "count": 3,
+            "min": 309.9,
+            "median": 310.2,
+            "max": 310.8
+          }
+        }
+      },
+      "llama_cpp": {
+        "repetitions": 3,
+        "stable_token_ids": true,
+        "all_token_budgets_complete": false,
+        "all_token_counts_within_budget": true,
+        "metrics": {
+          "time_to_first_token_ms": {
+            "count": 3,
+            "min": 48.414,
+            "median": 52.529,
+            "max": 57.182
+          },
+          "inter_chunk_latency_ms_p50": {
+            "count": 3,
+            "min": 9.028,
+            "median": 9.204,
+            "max": 11.535
+          },
+          "inter_chunk_latency_ms_p95": {
+            "count": 3,
+            "min": 9.972,
+            "median": 12.339,
+            "max": 15.977
+          },
+          "post_first_chunk_tokens_per_second": {
+            "count": 3,
+            "min": 89.169608,
+            "median": 99.041464,
+            "max": 108.202968
+          },
+          "steady_rss_before_bytes": {
+            "count": 3,
+            "min": 4241702912,
+            "median": 4254875648,
+            "max": 4274946048
+          },
+          "request_rss_peak_bytes": {
+            "count": 3,
+            "min": 4253974528,
+            "median": 4266573824,
+            "max": 4282449920
+          },
+          "request_cpu_mean_percent": {
+            "count": 3,
+            "min": 921.0,
+            "median": 921.4,
+            "max": 976.0
+          }
+        }
+      }
+    },
+    "comparison": {
+      "repetitions": 3,
+      "all_exact_token_id_pairs_match": false,
+      "all_prompt_token_counts_match": true,
+      "all_completion_token_counts_match": true,
+      "all_finish_reasons_match": true,
+      "allow_early_stop": true,
+      "reviewed_numerical_policy_match": true,
+      "numerical_policy_case_id": "qwen2.5-1.5b-q8-hello-long-chat",
+      "accepted_under": "reviewed_numerical_policy",
+      "accepted": true
+    }
+  },
+  "finished_utc": "2026-07-14T06:25:06Z"
+}

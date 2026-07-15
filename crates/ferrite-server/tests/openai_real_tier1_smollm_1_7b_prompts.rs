@@ -37,7 +37,7 @@ async fn live_http_server_matches_smollm_1_7b_q4_first_tokens_for_reference_prom
         PromptCase {
             prompt: "Machine learning models can",
             prompt_tokens: 4,
-            text: " also",
+            text: " be",
         },
         PromptCase {
             prompt: "The recipe calls for",

@@ -36,7 +36,7 @@ async fn live_http_server_applies_stop_sequences_with_real_tier1_model(
     assert_eq!(completion_body["usage"]["completion_tokens"], 1);
 
     let chat_body = format!(
-        r#"{{"model":"{REAL_MODEL_ID}","messages":[{{"role":"user","content":"hello world"}}],"max_completion_tokens":1,"stop":"你"}}"#
+        r#"{{"model":"{REAL_MODEL_ID}","messages":[{{"role":"user","content":"hello world"}}],"max_completion_tokens":1,"stop":"Hello"}}"#
     );
     let chat_response = send_http_request(
         server.addr(),
@@ -77,7 +77,7 @@ async fn live_http_server_streams_stop_sequences_with_real_tier1_model(
     assert_stop_completion_stream(&completion_response)?;
 
     let chat_body = format!(
-        r#"{{"model":"{REAL_MODEL_ID}","messages":[{{"role":"user","content":"hello world"}}],"max_completion_tokens":1,"stream":true,"stop":"你"}}"#
+        r#"{{"model":"{REAL_MODEL_ID}","messages":[{{"role":"user","content":"hello world"}}],"max_completion_tokens":1,"stream":true,"stop":"Hello"}}"#
     );
     let chat_response = send_http_request(
         server.addr(),

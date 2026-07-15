@@ -44,8 +44,9 @@ cancellation, CORS, queue, cache, and third-party client changes require HTTP
 tests in addition to inference tests.
 
 OpenAI compatibility does not imply complete API parity. Tool execution,
-multimodal generation, audio, hosted files, fine tuning, embeddings, and the
-Responses API remain unsupported until explicitly designed and tested.
+multimodal generation, audio, hosted files, fine tuning, and embeddings remain
+unsupported. ADR 0016 later added bounded Chat tool-call interchange,
+JSON-object generation, and a non-streaming text subset of the Responses API.
 
 ## Alternatives considered
 

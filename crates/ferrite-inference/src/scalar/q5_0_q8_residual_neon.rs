@@ -58,7 +58,7 @@ pub(super) fn neon_q5_0_q8_residual_mul_vec_prequantized(
             "invalid Q5_0 x residual-Q8 matrix byte length",
         ));
     }
-    if rows >= 2 && std::arch::is_aarch64_feature_detected!("i8mm") {
+    if rows >= 2 && crate::scalar::CpuKernelCapabilities::detect().i8mm() {
         return Ok(neon_q5_0_q8_residual_mul_vec_i8mm(
             bytes, rows, row_bytes, activation,
         ));
@@ -104,7 +104,7 @@ pub(super) fn neon_q5_0_q8_residual_mul_vec_pair(
     let activation = BlockQ8Residual::quantize_blocks(vector)?;
     let mut left_values = vec![0.0; rows];
     let mut right_values = vec![0.0; rows];
-    let use_i8mm = std::arch::is_aarch64_feature_detected!("i8mm");
+    let use_i8mm = crate::scalar::CpuKernelCapabilities::detect().i8mm();
     left_values
         .par_iter_mut()
         .zip(right_values.par_iter_mut())
@@ -412,7 +412,7 @@ mod tests {
 
     #[test]
     fn i8mm_block_pair_matches_two_sdot_block_dots() -> Result<(), InferenceError> {
-        if !std::arch::is_aarch64_feature_detected!("i8mm") {
+        if !crate::scalar::CpuKernelCapabilities::detect().i8mm() {
             return Ok(());
         }
         let left = patterned_matrix(1, 17);

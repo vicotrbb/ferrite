@@ -1,4 +1,4 @@
-use super::routes::router;
+use super::routes::{router, MAX_OPENAI_REQUEST_BODY_BYTES};
 use crate::state::ServerState;
 use axum::{
     body::{to_bytes, Body},
@@ -41,6 +41,25 @@ async fn completions_endpoint_returns_openai_error_for_missing_json_content_type
 }
 
 #[tokio::test]
+async fn completions_endpoint_rejects_body_beyond_explicit_limit(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let app = router(ServerState::new("fixture-model".to_owned()));
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/completions")
+        .header("content-type", "application/json")
+        .body(Body::from("x".repeat(MAX_OPENAI_REQUEST_BODY_BYTES + 1)))?;
+    let response = app.oneshot(request).await?;
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    let body = to_json(response.into_body()).await?;
+    assert_eq!(body["error"]["type"], "invalid_request_error");
+    let message = body["error"]["message"].as_str().unwrap_or_default();
+    assert_eq!(message, "Failed to buffer the request body");
+    Ok(())
+}
+
+#[tokio::test]
 async fn completions_endpoint_returns_openai_error_for_wrong_method(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let app = router(ServerState::new("fixture-model".to_owned()));
@@ -67,7 +86,7 @@ async fn unknown_openai_route_returns_openai_error_body() -> Result<(), Box<dyn 
     let app = router(ServerState::new("fixture-model".to_owned()));
     let request = Request::builder()
         .method("GET")
-        .uri("/v1/responses")
+        .uri("/v1/not-a-ferrite-route")
         .body(Body::empty())?;
     let response = app.oneshot(request).await?;
 
@@ -78,7 +97,7 @@ async fn unknown_openai_route_returns_openai_error_body() -> Result<(), Box<dyn 
     assert!(body["error"]["message"]
         .as_str()
         .unwrap_or_default()
-        .contains("/v1/responses"));
+        .contains("/v1/not-a-ferrite-route"));
     Ok(())
 }
 

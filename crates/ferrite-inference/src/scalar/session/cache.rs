@@ -67,7 +67,7 @@ impl<'a> ScalarLlamaSession<'a> {
         Ok(())
     }
 
-    #[cfg(feature = "locus-kv")]
+    #[cfg(all(feature = "locus-kv", unix))]
     /// Returns the Locus pool allocation count when this session uses Locus.
     pub fn locus_pool_allocation_count(&self) -> Option<u64> {
         match &self.store {

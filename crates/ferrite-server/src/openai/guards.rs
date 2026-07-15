@@ -1,6 +1,6 @@
 use super::{
     error::OpenAiHttpError,
-    schema::{ChatCompletionRequest, CompletionRequest},
+    schema::{ChatCompletionRequest, CompletionRequest, ResponsesRequest},
 };
 use crate::{limits::TokenLimitError, state::ServerState};
 use std::sync::Arc;
@@ -30,6 +30,20 @@ pub(super) fn ensure_supported_chat_request(
 
     Err(unsupported_field_error(
         "unsupported chat completion field(s)",
+        &unsupported,
+    ))
+}
+
+pub(super) fn ensure_supported_responses_request(
+    request: &ResponsesRequest,
+) -> Result<(), OpenAiHttpError> {
+    let unsupported = request.unsupported_fields();
+    if unsupported.is_empty() {
+        return Ok(());
+    }
+
+    Err(unsupported_field_error(
+        "unsupported responses field(s)",
         &unsupported,
     ))
 }

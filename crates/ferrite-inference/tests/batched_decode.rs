@@ -1,6 +1,10 @@
-use ferrite_fixtures::{scalar_llama_q5_0_gguf_fixture, scalar_llama_q8_0_gguf_fixture};
+use ferrite_fixtures::{
+    scalar_llama_q4_k_gguf_fixture, scalar_llama_q5_0_gguf_fixture, scalar_llama_q6_k_gguf_fixture,
+    scalar_llama_q8_0_gguf_fixture,
+};
 use ferrite_inference::scalar::{
-    accept_token_contexts_batch, accept_token_ids_batch, ScalarLlamaModel,
+    accept_token_contexts_batch, accept_token_ids_batch, KernelProvider, ScalarExecutionOptions,
+    ScalarLlamaModel,
 };
 use ferrite_model::gguf::parse_gguf;
 use std::error::Error;
@@ -97,6 +101,57 @@ fn batched_step_rejects_sessions_from_different_models() -> Result<(), Box<dyn E
         Err(error) => error,
     };
     assert!(error.to_string().contains("same model"));
+    Ok(())
+}
+
+#[test]
+fn portable_provider_preserves_quantized_token_decisions() -> Result<(), Box<dyn Error>> {
+    for fixture in [
+        scalar_llama_q4_k_gguf_fixture(),
+        scalar_llama_q5_0_gguf_fixture(),
+        scalar_llama_q6_k_gguf_fixture(),
+        scalar_llama_q8_0_gguf_fixture(),
+    ] {
+        let model = model_from(&fixture)?;
+        let mut automatic = model.start_session();
+        let mut portable = model.start_session_with_options(
+            ScalarExecutionOptions::default().with_kernel_provider(KernelProvider::Portable),
+        )?;
+
+        assert_eq!(
+            automatic.accept_prompt(&[0])?.token_id,
+            portable.accept_prompt(&[0])?.token_id
+        );
+        for step in 0..8 {
+            assert_eq!(
+                automatic.accept_token_id(0)?,
+                portable.accept_token_id(0)?,
+                "provider token decision diverged at step {step}"
+            );
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn batched_step_rejects_mixed_kernel_providers() -> Result<(), Box<dyn Error>> {
+    let fixture = scalar_llama_q5_0_gguf_fixture();
+    let model = model_from(&fixture)?;
+    let mut sessions = [
+        model.start_session(),
+        model.start_session_with_options(
+            ScalarExecutionOptions::default().with_kernel_provider(KernelProvider::Portable),
+        )?,
+    ];
+    for session in &mut sessions {
+        session.accept_prompt(&[0])?;
+    }
+
+    let error = match accept_token_ids_batch(&mut sessions, &[0, 0]) {
+        Ok(_) => return Err("mixed kernel providers must not share one batch".into()),
+        Err(error) => error,
+    };
+    assert!(error.to_string().contains("execution options"));
     Ok(())
 }
 

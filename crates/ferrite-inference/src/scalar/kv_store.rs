@@ -1,4 +1,4 @@
-#[cfg(feature = "locus-kv")]
+#[cfg(all(feature = "locus-kv", unix))]
 pub(in crate::scalar) mod locus;
 
 use super::session::ScalarLlamaSessionSnapshot;
@@ -9,7 +9,7 @@ use super::InferenceError;
 #[derive(Debug)]
 pub(in crate::scalar) enum KvCacheStore {
     Vec(VecKvStore),
-    #[cfg(feature = "locus-kv")]
+    #[cfg(all(feature = "locus-kv", unix))]
     Locus(locus::LocusKvStore),
 }
 
@@ -25,7 +25,7 @@ impl KvCacheStore {
     ) -> Result<Self, InferenceError> {
         match backend {
             super::options::KvBackend::Vec => Ok(Self::new_vec(layer_count, head_kv_dim)),
-            #[cfg(feature = "locus-kv")]
+            #[cfg(all(feature = "locus-kv", unix))]
             super::options::KvBackend::Locus {
                 tokens_per_block,
                 max_tokens,
@@ -35,9 +35,9 @@ impl KvCacheStore {
                 tokens_per_block,
                 max_tokens,
             )?)),
-            #[cfg(not(feature = "locus-kv"))]
+            #[cfg(not(all(feature = "locus-kv", unix)))]
             super::options::KvBackend::Locus { .. } => Err(InferenceError::new(
-                "locus kv backend requested but the `locus-kv` feature is not enabled",
+                "locus kv backend requested but the `locus-kv` feature is not enabled on a supported Unix target",
             )),
         }
     }
@@ -45,7 +45,7 @@ impl KvCacheStore {
     pub(in crate::scalar) fn layer_len(&self, layer: usize) -> usize {
         match self {
             KvCacheStore::Vec(store) => store.layer_len(layer),
-            #[cfg(feature = "locus-kv")]
+            #[cfg(all(feature = "locus-kv", unix))]
             KvCacheStore::Locus(store) => store.layer_len(layer),
         }
     }
@@ -58,7 +58,7 @@ impl KvCacheStore {
     ) -> Result<(), InferenceError> {
         match self {
             KvCacheStore::Vec(store) => store.push(layer, key, value),
-            #[cfg(feature = "locus-kv")]
+            #[cfg(all(feature = "locus-kv", unix))]
             KvCacheStore::Locus(store) => store.push(layer, key, value),
         }
     }
@@ -70,7 +70,7 @@ impl KvCacheStore {
     ) -> Result<&[f32], InferenceError> {
         match self {
             KvCacheStore::Vec(store) => store.key(layer, position),
-            #[cfg(feature = "locus-kv")]
+            #[cfg(all(feature = "locus-kv", unix))]
             KvCacheStore::Locus(store) => store.key(layer, position),
         }
     }
@@ -82,7 +82,7 @@ impl KvCacheStore {
     ) -> Result<&[f32], InferenceError> {
         match self {
             KvCacheStore::Vec(store) => store.value(layer, position),
-            #[cfg(feature = "locus-kv")]
+            #[cfg(all(feature = "locus-kv", unix))]
             KvCacheStore::Locus(store) => store.value(layer, position),
         }
     }
@@ -90,7 +90,7 @@ impl KvCacheStore {
     pub(in crate::scalar) fn truncate(&mut self, token_count: usize) -> Result<(), InferenceError> {
         match self {
             KvCacheStore::Vec(store) => store.truncate(token_count),
-            #[cfg(feature = "locus-kv")]
+            #[cfg(all(feature = "locus-kv", unix))]
             KvCacheStore::Locus(store) => store.truncate(token_count),
         }
     }
@@ -98,7 +98,7 @@ impl KvCacheStore {
     pub(in crate::scalar) fn kv_cache_bytes(&self) -> u128 {
         match self {
             KvCacheStore::Vec(store) => store.kv_cache_bytes(),
-            #[cfg(feature = "locus-kv")]
+            #[cfg(all(feature = "locus-kv", unix))]
             KvCacheStore::Locus(store) => store.kv_cache_bytes(),
         }
     }
@@ -109,7 +109,7 @@ impl KvCacheStore {
     ) -> Result<ScalarLlamaSessionSnapshot, InferenceError> {
         match self {
             KvCacheStore::Vec(store) => store.snapshot(cached_token_count),
-            #[cfg(feature = "locus-kv")]
+            #[cfg(all(feature = "locus-kv", unix))]
             KvCacheStore::Locus(store) => store.snapshot(cached_token_count),
         }
     }
@@ -120,7 +120,7 @@ impl KvCacheStore {
     ) -> Result<(), InferenceError> {
         match self {
             KvCacheStore::Vec(store) => store.restore(snapshot),
-            #[cfg(feature = "locus-kv")]
+            #[cfg(all(feature = "locus-kv", unix))]
             KvCacheStore::Locus(store) => store.restore(snapshot),
         }
     }
@@ -291,7 +291,7 @@ mod tests {
         Ok(())
     }
 
-    #[cfg(feature = "locus-kv")]
+    #[cfg(all(feature = "locus-kv", unix))]
     #[test]
     fn build_from_backend_selects_locus() -> Result<(), crate::scalar::InferenceError> {
         use crate::scalar::options::KvBackend;
@@ -340,7 +340,7 @@ mod tests {
         Ok(())
     }
 
-    #[cfg(not(feature = "locus-kv"))]
+    #[cfg(not(all(feature = "locus-kv", unix)))]
     #[test]
     fn from_backend_locus_without_feature_errors() -> Result<(), InferenceError> {
         use crate::scalar::options::KvBackend;
@@ -359,7 +359,7 @@ mod tests {
         Ok(())
     }
 
-    #[cfg(feature = "locus-kv")]
+    #[cfg(all(feature = "locus-kv", unix))]
     #[test]
     fn vec_and_locus_backends_store_identical_bytes() -> Result<(), InferenceError> {
         use crate::scalar::options::KvBackend;

@@ -1,6 +1,6 @@
 use ferrite_fixtures::{
     scalar_llama_f32_gguf_fixture, scalar_llama_f32_gguf_fixture_with_eos_token_id,
-    scalar_llama_q4_k_gguf_fixture,
+    scalar_llama_f32_gguf_fixture_with_eot_token_id, scalar_llama_q4_k_gguf_fixture,
 };
 use std::error::Error;
 use std::ffi::OsString;
@@ -28,6 +28,14 @@ pub(crate) fn write_fixture_model_with_eos_token_id(
 ) -> Result<PathBuf, Box<dyn Error>> {
     write_fixture_model_bytes(scalar_llama_f32_gguf_fixture_with_eos_token_id(
         eos_token_id,
+    ))
+}
+
+pub(crate) fn write_fixture_model_with_eot_token_id(
+    eot_token_id: u64,
+) -> Result<PathBuf, Box<dyn Error>> {
+    write_fixture_model_bytes(scalar_llama_f32_gguf_fixture_with_eot_token_id(
+        eot_token_id,
     ))
 }
 

@@ -6,19 +6,7 @@ pub(super) fn apply_stop_sequences(
         return generated;
     };
     let text = generated.text()[..stop_index].to_owned();
-    let token_texts = if text.is_empty() {
-        Vec::new()
-    } else {
-        vec![text.clone()]
-    };
-    crate::runtime::GeneratedText::with_finish_reason(
-        text,
-        generated.prompt_tokens(),
-        generated.completion_tokens(),
-        token_texts,
-        crate::runtime::GenerationFinishReason::Stop,
-    )
-    .with_finish_source(crate::runtime::GenerationFinishSource::StopSequence)
+    generated.with_filtered_stop_text(text)
 }
 
 fn first_stop_index(text: &str, stop_sequences: &[String]) -> Option<usize> {
@@ -120,5 +108,36 @@ mod tests {
             stop_prefix_suffix_len("hello μ", &[String::from("μ-stop")]),
             "μ".len()
         );
+    }
+
+    #[test]
+    fn applying_stop_text_preserves_cache_accounting() -> Result<(), Box<dyn std::error::Error>> {
+        let trace = crate::runtime::PromptCacheTrace::new(
+            true,
+            Some("tenant-a".to_owned()),
+            2,
+            17,
+            crate::runtime::PromptCacheLookup::ExactHit,
+        )
+        .with_shared_prefix_tokens(2);
+        let generated = crate::runtime::GeneratedText::new(
+            "winner stop hidden".to_owned(),
+            2,
+            3,
+            vec!["winner stop hidden".to_owned()],
+        )
+        .with_cached_prompt_tokens(2)?
+        .with_prompt_cache_trace(trace.clone())?;
+
+        let filtered = apply_stop_sequences(generated, &[" stop".to_owned()]);
+
+        assert_eq!(filtered.text(), "winner");
+        assert_eq!(filtered.cached_prompt_tokens(), 2);
+        assert_eq!(filtered.prompt_cache_trace(), Some(&trace));
+        assert_eq!(
+            filtered.finish_source(),
+            crate::runtime::GenerationFinishSource::StopSequence
+        );
+        Ok(())
     }
 }

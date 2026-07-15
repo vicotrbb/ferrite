@@ -50,6 +50,8 @@ mod response_shape_tests;
 #[cfg(test)]
 mod response_stream_shape_tests;
 #[cfg(test)]
+mod responses_tests;
+#[cfg(test)]
 mod route_streaming_tests;
 #[cfg(test)]
 mod routes_tests;

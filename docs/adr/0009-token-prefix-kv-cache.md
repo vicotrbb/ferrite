@@ -2,7 +2,7 @@
 
 Date: 2026-07-02
 
-Status: Accepted as an experimental feature
+Status: Accepted as an experimental feature; scheduler restriction superseded by ADR 0013
 
 ## Context
 
@@ -48,6 +48,8 @@ tests.
 
 The feature remains off by default while model coverage and long-context
 evidence expand.
+
+ADR 0013 later unified cache-enabled greedy requests with continuous batching.
 
 ## Alternatives considered
 

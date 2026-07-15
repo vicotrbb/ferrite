@@ -31,6 +31,7 @@ async fn completions_endpoint_streams_openai_sse_chunks() -> Result<(), Box<dyn 
     assert!(body.contains("data: {\"id\":\"cmpl-ferrite-"));
     assert!(body.contains("\"object\":\"text_completion\""));
     assert!(body.contains("\"text\":\"winner\""));
+    assert!(body.contains("\"token_ids\":["));
     assert!(body.contains("data: [DONE]"));
     Ok(())
 }
@@ -61,6 +62,22 @@ async fn completions_endpoint_streams_echo_prompt_when_requested(
         .find("\"text\":\"winner\"")
         .ok_or("missing generated token")?;
     assert!(prompt_position < generated_position, "{body}");
+    let events = body
+        .lines()
+        .filter_map(|line| line.strip_prefix("data: "))
+        .filter(|line| *line != "[DONE]")
+        .map(serde_json::from_str::<serde_json::Value>)
+        .collect::<Result<Vec<_>, _>>()?;
+    let echo_event = events
+        .iter()
+        .find(|event| event["choices"][0]["text"] == "hello")
+        .ok_or("missing echo event")?;
+    assert!(echo_event["choices"][0].get("token_ids").is_none());
+    let generated_event = events
+        .iter()
+        .find(|event| event["choices"][0]["text"] == "winner")
+        .ok_or("missing generated event")?;
+    assert!(generated_event["choices"][0]["token_ids"].is_array());
     assert!(body.contains("data: [DONE]"));
     Ok(())
 }
@@ -70,10 +87,10 @@ async fn completions_endpoint_stream_reports_cached_tokens_when_experimental_pre
 ) -> Result<(), Box<dyn std::error::Error>> {
     let model_path = write_fixture_model()?;
     let engine = InferenceEngine::load(&model_path)?;
-    let app = router(
-        ServerState::with_engine("fixture-model".to_owned(), engine)
-            .with_prefix_cache_enabled(true),
-    );
+    let state = ServerState::with_engine("fixture-model".to_owned(), engine)
+        .with_prefix_cache_enabled(true)
+        .with_batched_decode(2)?;
+    let app = router(state);
     let request_body = r#"{"model":"fixture-model","prompt":"hello","prompt_cache_key":"tenant-a:completion-stream-1","max_tokens":1,"stream":true,"stream_options":{"include_usage":true}}"#;
 
     let first_response = app
@@ -137,6 +154,31 @@ async fn chat_endpoint_streams_openai_sse_chunks() -> Result<(), Box<dyn std::er
 }
 
 #[tokio::test]
+async fn sampled_completion_stream_is_seeded_and_bypasses_greedy_batch_admission(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let model_path = write_fixture_model()?;
+    let engine = InferenceEngine::load(&model_path)?;
+    let state =
+        ServerState::with_engine("fixture-model".to_owned(), engine).with_batched_decode(1)?;
+    let held_batch_permit = state
+        .try_acquire_batch_admission_permit()
+        .ok_or("expected batch admission permit")?;
+    let app = router(state);
+
+    let first = sampled_completion_stream_body(app.clone()).await?;
+    let second = sampled_completion_stream_body(app).await?;
+    drop(held_batch_permit);
+    remove_fixture_model(&model_path)?;
+
+    assert_eq!(
+        completion_stream_signature(&first)?,
+        completion_stream_signature(&second)?
+    );
+    assert!(first.contains("data: [DONE]"));
+    Ok(())
+}
+
+#[tokio::test]
 async fn batched_completion_streams_match_default_path_under_parallel_load(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let model_path = write_fixture_model()?;
@@ -170,6 +212,9 @@ async fn batched_stream_releases_admission_permit_when_response_body_is_dropped(
     let engine = InferenceEngine::load(&model_path)?;
     let state =
         ServerState::with_engine("fixture-model".to_owned(), engine).with_batched_decode(1)?;
+    let held_queue_permit = state
+        .try_acquire_batch_admission_permit()
+        .ok_or("expected spare batch admission permit")?;
     let app = router(state.clone());
     let response = app.oneshot(completion_stream_request(128)?).await?;
     assert_eq!(response.status(), StatusCode::OK);
@@ -188,6 +233,7 @@ async fn batched_stream_releases_admission_permit_when_response_body_is_dropped(
         tokio::time::sleep(Duration::from_millis(10)).await;
     }
 
+    drop(held_queue_permit);
     remove_fixture_model(&model_path)?;
     Ok(())
 }
@@ -215,6 +261,7 @@ async fn completion_stream_helper_emits_tokens_from_generation_callback(
     let body = to_text(response.into_body()).await?;
 
     assert!(body.contains("\"text\":\"winner\""));
+    assert!(body.contains("\"token_ids\":["));
     assert!(body.contains("data: [DONE]"));
     Ok(())
 }
@@ -294,6 +341,25 @@ async fn completion_stream_body(
     Ok(body)
 }
 
+async fn sampled_completion_stream_body(
+    app: axum::Router,
+) -> Result<String, Box<dyn std::error::Error>> {
+    let request = Request::builder()
+        .method("POST")
+        .uri("/v1/completions")
+        .header("content-type", "application/json")
+        .body(Body::from(
+            r#"{"model":"fixture-model","prompt":"hello","max_tokens":4,"stream":true,"temperature":1,"top_k":2,"seed":42,"stream_options":{"include_usage":true}}"#,
+        ))?;
+    let response = app.oneshot(request).await?;
+    let status = response.status();
+    let body = to_text(response.into_body()).await?;
+    if status != StatusCode::OK {
+        return Err(format!("sampled completion stream returned {status}: {body}").into());
+    }
+    Ok(body)
+}
+
 fn completion_stream_signature(
     body: &str,
 ) -> Result<Vec<serde_json::Value>, Box<dyn std::error::Error>> {
@@ -305,6 +371,7 @@ fn completion_stream_signature(
             Ok(serde_json::json!({
                 "text": event["choices"][0]["text"],
                 "finish_reason": event["choices"][0]["finish_reason"],
+                "token_ids": event["choices"][0]["token_ids"],
                 "usage": event["usage"],
             }))
         })

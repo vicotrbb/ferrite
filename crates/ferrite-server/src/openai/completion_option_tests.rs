@@ -19,7 +19,24 @@ async fn completions_endpoint_accepts_neutral_sampling_options(
 #[tokio::test]
 async fn completions_endpoint_accepts_openai_default_temperature(
 ) -> Result<(), Box<dyn std::error::Error>> {
-    assert_completion_option_is_accepted(r#""temperature":1"#).await
+    assert_completion_option_is_accepted(r#""temperature":1,"top_k":1"#).await
+}
+
+#[tokio::test]
+async fn completions_endpoint_applies_logit_bias() -> Result<(), Box<dyn std::error::Error>> {
+    let body =
+        accepted_completion_option_response(r#""temperature":0,"logit_bias":{"1":100}"#).await?;
+    assert_eq!(body["choices"][0]["text"], "hello");
+    Ok(())
+}
+
+#[tokio::test]
+async fn completions_endpoint_accepts_extended_sampling_controls(
+) -> Result<(), Box<dyn std::error::Error>> {
+    assert_completion_option_is_accepted(
+        r#""temperature":0.8,"top_k":1,"top_p":0.9,"min_p":0.05,"repetition_penalty":1.1,"presence_penalty":0.2,"frequency_penalty":-0.2,"seed":42"#,
+    )
+    .await
 }
 
 #[tokio::test]

@@ -70,8 +70,7 @@ fn bf16_values_from_le_bytes(name: &str, slice: &[u8]) -> Result<Vec<f32>, Infer
 
     let mut values = Vec::with_capacity(slice.len() / 2);
     for chunk in slice.chunks_exact(2) {
-        let bits = u32::from(u16::from_le_bytes([chunk[0], chunk[1]])) << 16;
-        values.push(f32::from_bits(bits));
+        values.push(bf16_bits_to_f32(u16::from_le_bytes([chunk[0], chunk[1]])));
     }
     validate_dense_values_finite(name, &values)?;
     Ok(values)
@@ -227,7 +226,11 @@ fn q4_k_scale_min(index: usize, scales: &[u8]) -> (u8, u8) {
     }
 }
 
-fn f16_bits_to_f32(bits: u16) -> f32 {
+pub(super) fn bf16_bits_to_f32(bits: u16) -> f32 {
+    f32::from_bits(u32::from(bits) << 16)
+}
+
+pub(super) fn f16_bits_to_f32(bits: u16) -> f32 {
     let sign = ((bits & 0x8000) as u32) << 16;
     let exponent = ((bits >> 10) & 0x1f) as u32;
     let mantissa = (bits & 0x03ff) as u32;

@@ -6,6 +6,11 @@ pub struct StreamingUsageSummary {
     total_tokens: u64,
     finish_source: Option<String>,
     prompt_cache_trace: Option<StreamingPromptCacheTraceSummary>,
+    cohort_request_count: usize,
+    cohort_prompt_tokens: u64,
+    cohort_cached_prompt_tokens: u64,
+    cohort_completion_tokens: u64,
+    cohort_total_tokens: u64,
 }
 
 impl StreamingUsageSummary {
@@ -17,11 +22,17 @@ impl StreamingUsageSummary {
             total_tokens,
             finish_source: None,
             prompt_cache_trace: None,
+            cohort_request_count: 1,
+            cohort_prompt_tokens: prompt_tokens,
+            cohort_cached_prompt_tokens: 0,
+            cohort_completion_tokens: completion_tokens,
+            cohort_total_tokens: total_tokens,
         }
     }
 
     pub fn with_cached_prompt_tokens(mut self, cached_prompt_tokens: u64) -> Self {
         self.cached_prompt_tokens = cached_prompt_tokens;
+        self.cohort_cached_prompt_tokens = cached_prompt_tokens;
         self
     }
 
@@ -72,6 +83,50 @@ impl StreamingUsageSummary {
         self.prompt_cache_trace.as_ref()
     }
 
+    pub fn cohort_request_count(&self) -> usize {
+        self.cohort_request_count
+    }
+
+    pub fn cohort_prompt_tokens(&self) -> u64 {
+        self.cohort_prompt_tokens
+    }
+
+    pub fn cohort_cached_prompt_tokens(&self) -> u64 {
+        self.cohort_cached_prompt_tokens
+    }
+
+    pub fn cohort_completion_tokens(&self) -> u64 {
+        self.cohort_completion_tokens
+    }
+
+    pub fn cohort_total_tokens(&self) -> u64 {
+        self.cohort_total_tokens
+    }
+
+    pub(super) fn accumulate(&mut self, other: &Self) -> Result<(), String> {
+        self.cohort_request_count = self
+            .cohort_request_count
+            .checked_add(other.cohort_request_count)
+            .ok_or_else(|| "streaming usage request count overflow".to_owned())?;
+        self.cohort_prompt_tokens = self
+            .cohort_prompt_tokens
+            .checked_add(other.cohort_prompt_tokens)
+            .ok_or_else(|| "streaming usage prompt token count overflow".to_owned())?;
+        self.cohort_cached_prompt_tokens = self
+            .cohort_cached_prompt_tokens
+            .checked_add(other.cohort_cached_prompt_tokens)
+            .ok_or_else(|| "streaming usage cached token count overflow".to_owned())?;
+        self.cohort_completion_tokens = self
+            .cohort_completion_tokens
+            .checked_add(other.cohort_completion_tokens)
+            .ok_or_else(|| "streaming usage completion token count overflow".to_owned())?;
+        self.cohort_total_tokens = self
+            .cohort_total_tokens
+            .checked_add(other.cohort_total_tokens)
+            .ok_or_else(|| "streaming usage total token count overflow".to_owned())?;
+        Ok(())
+    }
+
     fn from_value(value: serde_json::Value) -> Option<Self> {
         if value.is_null() {
             return None;
@@ -93,6 +148,14 @@ impl StreamingUsageSummary {
             prompt_cache_trace: prompt_details
                 .and_then(|details| details.get("ferrite_cache"))
                 .and_then(StreamingPromptCacheTraceSummary::from_value),
+            cohort_request_count: 1,
+            cohort_prompt_tokens: value.get("prompt_tokens")?.as_u64()?,
+            cohort_cached_prompt_tokens: prompt_details
+                .and_then(|details| details.get("cached_tokens"))
+                .and_then(serde_json::Value::as_u64)
+                .unwrap_or(0),
+            cohort_completion_tokens: value.get("completion_tokens")?.as_u64()?,
+            cohort_total_tokens: value.get("total_tokens")?.as_u64()?,
         })
     }
 }

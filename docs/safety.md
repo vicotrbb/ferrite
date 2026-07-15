@@ -42,6 +42,22 @@ Malformed GGUF data, invalid API input, unsupported tensor formats, capacity
 limits, and poisoned synchronization state return errors. They must not cross
 an unsafe boundary with unchecked assumptions.
 
+Input-sized GGUF and rendered-prompt buffers apply hard count or byte limits
+and use fallible capacity reservation. The optional Locus KV backend returns a
+capacity error and does not fall back to unbounded vector allocation. Ferrite
+does not claim recovery after global process allocator exhaustion outside these
+bounded paths.
+
+Built-in model acquisition uses an immutable registry entry, HTTPS-only
+redirect policy, partial-file resume, exact size and SHA-256 verification,
+atomic publication, read-only final files, and symbolic-link rejection. An
+explicit model path never causes a download.
+
+Generated function calls are untrusted response data. Ferrite bounds and
+parses their JSON envelopes, but never validates application authorization or
+executes the named function. The caller must validate arguments against its
+own schema and policy before performing an action.
+
 Panic, `unwrap`, and `expect` are denied by Clippy for workspace code. Tests can
 use assertion panics as part of the Rust test contract.
 

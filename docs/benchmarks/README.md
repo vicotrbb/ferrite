@@ -5,6 +5,12 @@ experiments that still inform Ferrite's current architecture.
 
 - [`2026-07-06-locus-kv-backend.md`](2026-07-06-locus-kv-backend.md) records
   the optional block-pool KV backend contract and its proven scope.
+- [`2026-07-14 Phi-3 Vec versus Locus diagnostic`](../../scripts/evals/2026-07-14-101356-phi3-vec-locus-kv-soak-diagnostic.md)
+  records the rejected Vec soak and the bounded-backend hypothesis that still
+  requires a normal clean repeated acceptance artifact.
+- [`2026-07-14 bounded embedding row decode`](2026-07-14-bounded-embedding-row-decode.md)
+  records the rejected whole-matrix decode, the bounded block-window fix, exact
+  trace retention, and the diagnostic-only memory result.
 - [`2026-07-09-concurrent-serving-phase1.md`](2026-07-09-concurrent-serving-phase1.md)
   records concurrent serving and batching evidence.
 - [`2026-07-10-oss-quality-hardening.md`](2026-07-10-oss-quality-hardening.md)

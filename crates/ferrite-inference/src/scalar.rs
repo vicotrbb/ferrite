@@ -1,6 +1,8 @@
 mod attention;
+mod dense16;
 mod float;
 mod kernel_check;
+mod kernels;
 mod kv_store;
 mod loader;
 mod math;
@@ -40,6 +42,7 @@ mod q5_0_avx2;
 mod q5_0_neon;
 #[cfg(target_arch = "aarch64")]
 mod q5_0_q8_residual_neon;
+mod q5_k;
 mod q6_k;
 #[cfg(target_arch = "x86_64")]
 mod q6_k_avx2;
@@ -82,6 +85,7 @@ mod session;
 mod tensor;
 mod validation;
 
+pub use kernels::{CpuKernelCapabilities, KernelProvider};
 pub use math::{argmax, rms_norm};
 pub use matrix::{Matrix, MatrixStorageKind};
 pub use options::{
@@ -95,6 +99,15 @@ pub use session::{
     accept_token_contexts_batch, accept_token_ids_batch, PromptEvaluationControl,
     PromptEvaluationLocation, ScalarLlamaSession, ScalarLlamaSessionSnapshot,
 };
+
+/// Architecture-neutral name for mutable scalar generation state.
+pub type ScalarTransformerSession<'a> = ScalarLlamaSession<'a>;
+
+/// Architecture-neutral name for an owned scalar KV-cache snapshot.
+pub type ScalarTransformerSessionSnapshot = ScalarLlamaSessionSnapshot;
+
+/// Architecture-neutral name for tied or untied output projection weights.
+pub type ScalarTransformerOutputWeights = ScalarLlamaOutputWeights;
 
 use ferrite_model::gguf::{GgufError, GgufFile};
 use ferrite_model::model_file::MappedModelFile;
@@ -128,6 +141,9 @@ pub struct ScalarLlamaConfig {
     pub rms_norm_epsilon: f32,
 }
 
+/// Architecture-neutral name for the normalized scalar transformer config.
+pub type ScalarTransformerConfig = ScalarLlamaConfig;
+
 #[derive(Clone, Debug, PartialEq)]
 /// All model weights required by the scalar transformer runtime.
 pub struct ScalarLlamaWeights {
@@ -140,6 +156,9 @@ pub struct ScalarLlamaWeights {
     /// Transformer block weights in execution order.
     pub layers: Vec<ScalarLlamaLayerWeights>,
 }
+
+/// Architecture-neutral name for normalized scalar transformer weights.
+pub type ScalarTransformerWeights = ScalarLlamaWeights;
 
 #[derive(Clone, Debug, PartialEq)]
 /// Weights and optional projection biases for one transformer block.
@@ -170,12 +189,23 @@ pub struct ScalarLlamaLayerWeights {
     pub ffn_down: Matrix,
 }
 
+/// Architecture-neutral name for one normalized transformer layer.
+pub type ScalarTransformerLayerWeights = ScalarLlamaLayerWeights;
+
 #[derive(Clone, Debug, PartialEq)]
 /// An immutable transformer model prepared for CPU inference.
 pub struct ScalarLlamaModel {
     config: ScalarLlamaConfig,
     weights: ScalarLlamaWeights,
+    context_length: Option<usize>,
 }
+
+/// Architecture-neutral name for a CPU transformer model.
+///
+/// The historical `ScalarLlamaModel` name remains available for source
+/// compatibility. GGUF loader adapters normalize Llama, Qwen2, and Phi-3
+/// tensor layouts before constructing this shared execution model.
+pub type ScalarTransformerModel = ScalarLlamaModel;
 
 impl ScalarLlamaModel {
     /// Validates and constructs a model from typed configuration and weights.
@@ -190,7 +220,11 @@ impl ScalarLlamaModel {
     ) -> Result<Self, InferenceError> {
         validate_config(&config)?;
         validate_weights(&config, &weights)?;
-        Ok(Self { config, weights })
+        Ok(Self {
+            config,
+            weights,
+            context_length: None,
+        })
     }
 
     /// Evaluates one token as a one-token prompt and returns the next token.
@@ -229,6 +263,12 @@ impl ScalarLlamaModel {
         options: ScalarExecutionOptions,
     ) -> Result<ScalarLlamaSession<'_>, InferenceError> {
         ScalarLlamaSession::new_with_options(self, options)
+    }
+
+    /// Returns the GGUF-declared context length when the model was loaded from
+    /// an artifact. Models constructed from typed test weights have no limit.
+    pub fn context_length(&self) -> Option<usize> {
+        self.context_length
     }
 
     /// Returns the byte count of physical model tensor storage.
@@ -295,7 +335,7 @@ impl ScalarLlamaModel {
     /// storage encoding, byte ranges, or numeric validation fails.
     pub fn from_gguf_scalar(file: &GgufFile, bytes: &[u8]) -> Result<Self, InferenceError> {
         let (config, weights) = loader::load_scalar(file, bytes)?;
-        Self::new(config, weights)
+        Self::new(config, weights)?.with_gguf_context_length(file)
     }
 
     /// Loads supported scalar and quantized weights from a mapped GGUF file.
@@ -313,7 +353,16 @@ impl ScalarLlamaModel {
         mapped: &MappedModelFile,
     ) -> Result<Self, InferenceError> {
         let (config, weights) = loader::load_scalar_mapped(file, mapped)?;
-        Self::new(config, weights)
+        Self::new(config, weights)?.with_gguf_context_length(file)
+    }
+
+    fn with_gguf_context_length(mut self, file: &GgufFile) -> Result<Self, InferenceError> {
+        let model = file.model_config()?.into_transformer();
+        self.context_length =
+            Some(usize::try_from(model.context_length).map_err(|_error| {
+                InferenceError::new("model context length does not fit in usize")
+            })?);
+        Ok(self)
     }
 
     fn apply_rope_to_heads(

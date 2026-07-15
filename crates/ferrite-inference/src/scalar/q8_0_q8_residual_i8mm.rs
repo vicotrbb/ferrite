@@ -197,7 +197,7 @@ mod tests {
 
     #[test]
     fn i8mm_block_pair_matches_scalar_residual_dots() -> Result<(), InferenceError> {
-        if !std::arch::is_aarch64_feature_detected!("i8mm") {
+        if !crate::scalar::CpuKernelCapabilities::detect().i8mm() {
             return Ok(());
         }
         let left = patterned_block(17);

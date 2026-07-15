@@ -32,7 +32,7 @@ async fn live_http_server_streams_smollm_1_7b_q4_first_tokens_for_reference_prom
         },
         PromptCase {
             prompt: "Machine learning models can",
-            text: " also",
+            text: " be",
         },
         PromptCase {
             prompt: "The recipe calls for",
@@ -115,12 +115,12 @@ fn assert_smollm_stream_response(
     );
     let stop_events = events
         .iter()
-        .filter(|event| event["choices"][0]["finish_reason"] == "stop")
+        .filter(|event| event["choices"][0]["finish_reason"] == "length")
         .collect::<Vec<_>>();
     assert_eq!(
         stop_events.len(),
         1,
-        "expected exactly one terminal stream chunk"
+        "expected exactly one length terminal stream chunk"
     );
     assert_eq!(stop_events[0]["choices"][0]["text"], "");
     Ok(())

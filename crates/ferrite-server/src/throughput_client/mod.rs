@@ -44,21 +44,17 @@ impl ThroughputResult {
 pub async fn run_completion_benchmark(
     config: &ThroughputClientConfig,
 ) -> Result<ThroughputResult, Box<dyn Error>> {
-    let request_body = request_body(config);
     let endpoint = config.endpoint();
     let stream = config.stream();
     let started = Instant::now();
     let (run, rss) = if let Some(pid) = config.rss_pid() {
         let (run, rss) = RssSummary::sample_around(pid, config.rss_idle_delay(), async {
-            run_requests(config, &request_body, endpoint, stream).await
+            run_requests(config, endpoint, stream).await
         })
         .await?;
         (run, Some(rss))
     } else {
-        (
-            run_requests(config, &request_body, endpoint, stream).await?,
-            None,
-        )
+        (run_requests(config, endpoint, stream).await?, None)
     };
 
     Ok(ThroughputResult {
@@ -84,35 +80,48 @@ struct RequestRun {
 
 async fn run_requests(
     config: &ThroughputClientConfig,
-    request_body: &str,
     endpoint: OpenAiEndpoint,
     stream: bool,
 ) -> Result<RequestRun, Box<dyn Error>> {
     let mut completed_requests = 0;
     let mut streaming_finish = None;
-    let mut streaming_timing = None;
+    let mut streaming_timings = Vec::new();
     let mut streaming_text = None;
     let mut streaming_token_ids = None;
     let mut all_streaming_token_id_traces_match = true;
-    let mut streaming_usage = None;
+    let mut prompt_token_id_traces = vec![None; config.prompts().len()];
+    let mut all_prompt_token_id_traces_stable = true;
+    let mut streaming_usage: Option<StreamingUsageSummary> = None;
 
     while completed_requests < config.requests() {
         let batch_size = config
             .concurrency()
             .min(config.requests().saturating_sub(completed_requests));
         let mut tasks = Vec::with_capacity(batch_size);
-        for _ in 0..batch_size {
-            let request_body = request_body.to_owned();
+        for offset in 0..batch_size {
+            let request_index = completed_requests + offset;
+            let prompt_index = request_index % config.prompts().len();
+            let requested_max_tokens = config.max_tokens_for_request(request_index);
+            let request_body = request_body_for_request(config, request_index);
             let api_key = config.api_key().to_owned();
             let addr = config.addr();
-            tasks.push(tokio::spawn(async move {
-                http::send_openai_request(addr, &api_key, endpoint.path(), request_body.as_bytes())
+            tasks.push((
+                prompt_index,
+                requested_max_tokens,
+                tokio::spawn(async move {
+                    http::send_openai_request(
+                        addr,
+                        &api_key,
+                        endpoint.path(),
+                        request_body.as_bytes(),
+                    )
                     .await
                     .map_err(|error| error.to_string())
-            }));
+                }),
+            ));
         }
 
-        for task in tasks {
+        for (prompt_index, requested_max_tokens, task) in tasks {
             let response = task
                 .await
                 .map_err(|error| std::io::Error::other(format!("request task failed: {error}")))?
@@ -129,11 +138,14 @@ async fn run_requests(
             let response_usage = response.streaming_usage();
             validate_streaming_token_count(
                 config,
+                requested_max_tokens,
                 response_finish.as_ref(),
                 response_usage.as_ref(),
             )?;
-            if stream && streaming_timing.is_none() {
-                streaming_timing = response.streaming_timing();
+            if stream {
+                if let Some(timing) = response.streaming_timing() {
+                    streaming_timings.push(timing);
+                }
             }
             if stream && streaming_finish.is_none() {
                 streaming_finish = response_finish;
@@ -142,14 +154,28 @@ async fn run_requests(
                 streaming_text = response_text;
             }
             if stream {
+                accumulate_prompt_token_id_trace(
+                    &mut prompt_token_id_traces,
+                    prompt_index,
+                    response_token_ids.as_ref(),
+                    &mut all_prompt_token_id_traces_stable,
+                );
                 accumulate_streaming_token_id_trace(
                     &mut streaming_token_ids,
                     response_token_ids,
                     &mut all_streaming_token_id_traces_match,
                 );
             }
-            if stream && streaming_usage.is_none() {
-                streaming_usage = response_usage;
+            if stream {
+                if let Some(response_usage) = response_usage {
+                    if let Some(summary) = &mut streaming_usage {
+                        summary
+                            .accumulate(&response_usage)
+                            .map_err(std::io::Error::other)?;
+                    } else {
+                        streaming_usage = Some(response_usage);
+                    }
+                }
             }
             completed_requests += 1;
         }
@@ -157,16 +183,39 @@ async fn run_requests(
 
     if let Some(summary) = &mut streaming_token_ids {
         summary.set_all_request_traces_match(all_streaming_token_id_traces_match);
+        all_prompt_token_id_traces_stable &= prompt_token_id_traces.iter().all(Option::is_some);
+        summary
+            .set_prompt_token_id_traces(prompt_token_id_traces, all_prompt_token_id_traces_stable);
     }
 
     Ok(RequestRun {
         completed_requests,
         streaming_finish,
-        streaming_timing,
+        streaming_timing: StreamingTimingSummary::from_request_summaries(&streaming_timings),
         streaming_text,
         streaming_token_ids,
         streaming_usage,
     })
+}
+
+fn accumulate_prompt_token_id_trace(
+    prompt_traces: &mut [Option<Vec<u64>>],
+    prompt_index: usize,
+    response: Option<&StreamingTokenIdsSummary>,
+    all_stable: &mut bool,
+) {
+    let response_trace = response
+        .and_then(StreamingTokenIdsSummary::token_id_trace)
+        .map(<[u64]>::to_vec);
+    let Some(response_trace) = response_trace else {
+        *all_stable = false;
+        return;
+    };
+
+    match &prompt_traces[prompt_index] {
+        Some(expected) => *all_stable &= expected == &response_trace,
+        None => prompt_traces[prompt_index] = Some(response_trace),
+    }
 }
 
 fn accumulate_streaming_token_id_trace(
@@ -202,6 +251,21 @@ pub fn format_result(config: &ThroughputClientConfig, result: ThroughputResult) 
         result.elapsed.as_millis(),
         result.requests_per_second()
     );
+    if config.prompts().len() > 1 {
+        output.push_str(&format!(
+            "\nopenai_http_configured_prompts={}\nopenai_http_distinct_prompts={}\nopenai_http_prompt_assignment=round_robin",
+            config.prompts().len(),
+            config.distinct_prompt_count(),
+        ));
+    }
+    if config.max_token_budgets().len() > 1 {
+        output.push_str(&format!(
+            "\nopenai_http_configured_max_token_budgets={}\nopenai_http_distinct_max_token_budgets={}\nopenai_http_max_token_budgets={}\nopenai_http_max_token_assignment=round_robin",
+            config.max_token_budgets().len(),
+            config.distinct_max_token_budget_count(),
+            format_usize_list(config.max_token_budgets()),
+        ));
+    }
     if let Some(summary) = result.streaming_timing {
         output.push_str(&format!(
             "\nstreaming_token_events={}\nstreaming_time_to_first_token_ms={}\nstreaming_total_elapsed_ms={}\nstreaming_tokens_per_second={:.6}\nstreaming_token_latency_min_ms={}\nstreaming_token_latency_p50_ms={}\nstreaming_token_latency_p95_ms={}\nstreaming_token_latency_max_ms={}",
@@ -214,6 +278,14 @@ pub fn format_result(config: &ThroughputClientConfig, result: ThroughputResult) 
             summary.p95_token_latency().as_millis(),
             summary.max_token_latency().as_millis(),
         ));
+        if summary.request_count() > 1 {
+            output.push_str(&format!(
+                "\nstreaming_timed_requests={}\nstreaming_time_to_first_token_p50_ms={}\nstreaming_time_to_first_token_p95_ms={}",
+                summary.request_count(),
+                summary.p50_time_to_first_token().as_millis(),
+                summary.p95_time_to_first_token().as_millis(),
+            ));
+        }
     }
     if let Some(finish) = &result.streaming_finish {
         output.push_str(&format!("\nstreaming_finish_reason={}", finish.reason()));
@@ -238,6 +310,16 @@ pub fn format_result(config: &ThroughputClientConfig, result: ThroughputResult) 
         if let Some(matches) = token_ids.all_request_traces_match() {
             output.push_str(&format!("\nstreaming_all_token_id_traces_match={matches}"));
         }
+        if let Some(traces) = token_ids.prompt_token_id_traces() {
+            if let Ok(encoded) = serde_json::to_string(traces) {
+                output.push_str(&format!("\nstreaming_prompt_token_id_traces={encoded}"));
+            }
+        }
+        if let Some(stable) = token_ids.all_prompt_traces_stable() {
+            output.push_str(&format!(
+                "\nstreaming_all_prompt_token_id_traces_stable={stable}"
+            ));
+        }
     }
     if let Some(usage) = result.streaming_usage {
         output.push_str(&format!(
@@ -249,6 +331,16 @@ pub fn format_result(config: &ThroughputClientConfig, result: ThroughputResult) 
         ));
         if let Some(finish_source) = usage.finish_source() {
             output.push_str(&format!("\nstreaming_usage_finish_source={finish_source}"));
+        }
+        if usage.cohort_request_count() > 1 {
+            output.push_str(&format!(
+                "\nstreaming_usage_request_count={}\nstreaming_usage_prompt_tokens_total={}\nstreaming_usage_cached_prompt_tokens_total={}\nstreaming_usage_completion_tokens_total={}\nstreaming_usage_total_tokens_total={}",
+                usage.cohort_request_count(),
+                usage.cohort_prompt_tokens(),
+                usage.cohort_cached_prompt_tokens(),
+                usage.cohort_completion_tokens(),
+                usage.cohort_total_tokens(),
+            ));
         }
         if let Some(trace) = usage.prompt_cache_trace() {
             output.push_str(&format!(
@@ -283,8 +375,17 @@ fn format_u64_list(values: &[u64]) -> String {
         .join(",")
 }
 
+fn format_usize_list(values: &[usize]) -> String {
+    values
+        .iter()
+        .map(usize::to_string)
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
 fn validate_streaming_token_count(
     config: &ThroughputClientConfig,
+    requested_max_tokens: usize,
     finish: Option<&StreamingFinishSummary>,
     usage: Option<&StreamingUsageSummary>,
 ) -> Result<(), Box<dyn Error>> {
@@ -299,11 +400,11 @@ fn validate_streaming_token_count(
         return Ok(());
     };
 
-    if finish.reason() == "length" && usage.completion_tokens() != config.max_tokens() as u64 {
+    if finish.reason() == "length" && usage.completion_tokens() != requested_max_tokens as u64 {
         return Err(format!(
             "streaming usage completion_tokens {} did not match requested max_tokens {}",
             usage.completion_tokens(),
-            config.max_tokens()
+            requested_max_tokens
         )
         .into());
     }
@@ -311,14 +412,44 @@ fn validate_streaming_token_count(
     Ok(())
 }
 
-fn request_body(config: &ThroughputClientConfig) -> String {
+#[cfg(test)]
+fn request_body_for_prompt(config: &ThroughputClientConfig, prompt: &str) -> String {
+    request_body_for_prompt_and_max_tokens(config, prompt, config.max_tokens())
+}
+
+fn request_body_for_request(config: &ThroughputClientConfig, request_index: usize) -> String {
+    request_body_for_prompt_and_max_tokens(
+        config,
+        config.prompt_for_request(request_index),
+        config.max_tokens_for_request(request_index),
+    )
+}
+
+fn request_body_for_prompt_and_max_tokens(
+    config: &ThroughputClientConfig,
+    prompt: &str,
+    max_tokens: usize,
+) -> String {
     match config.endpoint() {
-        OpenAiEndpoint::Completions => completion_request_body(config),
-        OpenAiEndpoint::ChatCompletions => chat_completion_request_body(config),
+        OpenAiEndpoint::Completions => {
+            completion_request_body_for_prompt_and_max_tokens(config, prompt, max_tokens)
+        }
+        OpenAiEndpoint::ChatCompletions => {
+            chat_completion_request_body_for_prompt_and_max_tokens(config, prompt, max_tokens)
+        }
     }
 }
 
-fn completion_request_body(config: &ThroughputClientConfig) -> String {
+#[cfg(test)]
+fn completion_request_body_for_prompt(config: &ThroughputClientConfig, prompt: &str) -> String {
+    completion_request_body_for_prompt_and_max_tokens(config, prompt, config.max_tokens())
+}
+
+fn completion_request_body_for_prompt_and_max_tokens(
+    config: &ThroughputClientConfig,
+    prompt: &str,
+    max_tokens: usize,
+) -> String {
     let stop = stop_field(config);
     let prompt_cache_key = prompt_cache_key_field(config);
     let stream = stream_field(config);
@@ -326,12 +457,16 @@ fn completion_request_body(config: &ThroughputClientConfig) -> String {
     format!(
         r#"{{"model":{},"prompt":{},"max_tokens":{}{stop}{prompt_cache_key}{stream}{stream_options}}}"#,
         serde_json::Value::String(config.model().to_owned()),
-        serde_json::Value::String(config.prompt().to_owned()),
-        config.max_tokens()
+        serde_json::Value::String(prompt.to_owned()),
+        max_tokens
     )
 }
 
-fn chat_completion_request_body(config: &ThroughputClientConfig) -> String {
+fn chat_completion_request_body_for_prompt_and_max_tokens(
+    config: &ThroughputClientConfig,
+    prompt: &str,
+    max_tokens: usize,
+) -> String {
     let stop = stop_field(config);
     let prompt_cache_key = prompt_cache_key_field(config);
     let prompt_cache_trace = prompt_cache_trace_field(config);
@@ -340,22 +475,22 @@ fn chat_completion_request_body(config: &ThroughputClientConfig) -> String {
     format!(
         r#"{{"model":{},"messages":{},"max_tokens":{}{stop}{prompt_cache_key}{prompt_cache_trace}{stream}{stream_options}}}"#,
         serde_json::Value::String(config.model().to_owned()),
-        chat_messages(config),
-        config.max_tokens()
+        chat_messages(config, prompt),
+        max_tokens
     )
 }
 
-fn chat_messages(config: &ThroughputClientConfig) -> String {
+fn chat_messages(config: &ThroughputClientConfig, prompt: &str) -> String {
     match (config.assistant_context(), config.follow_up()) {
         (Some(assistant_context), Some(follow_up)) => format!(
             r#"[{{"role":"user","content":{}}},{{"role":"assistant","content":{}}},{{"role":"user","content":{}}}]"#,
-            serde_json::Value::String(config.prompt().to_owned()),
+            serde_json::Value::String(prompt.to_owned()),
             serde_json::Value::String(assistant_context.to_owned()),
             serde_json::Value::String(follow_up.to_owned())
         ),
         _ => format!(
             r#"[{{"role":"user","content":{}}}]"#,
-            serde_json::Value::String(config.prompt().to_owned())
+            serde_json::Value::String(prompt.to_owned())
         ),
     }
 }

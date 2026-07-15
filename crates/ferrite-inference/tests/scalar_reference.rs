@@ -4,6 +4,7 @@ use ferrite_fixtures::{
     scalar_llama_bf16_gguf_fixture, scalar_llama_f16_gguf_fixture, scalar_llama_f32_gguf_fixture,
     scalar_llama_q4_k_gguf_fixture, scalar_llama_q5_0_gguf_fixture, scalar_llama_q6_k_gguf_fixture,
     scalar_llama_q8_0_gguf_fixture, scalar_llama_tied_output_f32_gguf_fixture,
+    scalar_phi3_f32_gguf_fixture,
 };
 use ferrite_inference::scalar::{
     apply_rope, argmax, rms_norm, Matrix, ScalarExecutionOptions, ScalarLlamaModel,
@@ -21,6 +22,17 @@ use support::models::{
     model_with_rms_norm_epsilon, model_with_rope_freq_base, prompt_causal_attention_model,
     value_bias_model,
 };
+
+#[test]
+fn loads_phi3_fused_projections_into_common_execution_weights() -> Result<(), Box<dyn Error>> {
+    let bytes = scalar_phi3_f32_gguf_fixture();
+    let file = parse_gguf(&bytes)?;
+    let model = ScalarLlamaModel::from_gguf_scalar(&file, &bytes)?;
+
+    assert_eq!(model.context_length(), Some(4096));
+    assert_eq!(model.next_token(2)?.token_id, 1);
+    Ok(())
+}
 
 #[test]
 fn rms_norm_uses_scalar_root_mean_square_reference() -> Result<(), Box<dyn Error>> {

@@ -1,3 +1,5 @@
+use super::kernels::{KernelDispatch, KernelProvider};
+
 /// Selects the KV-cache storage backend for a scalar session.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum KvBackend {
@@ -199,6 +201,7 @@ impl Q8KActivationMatvecRole {
 ///
 /// Defaults preserve the proven execution path and the nested-vector KV store.
 pub struct ScalarExecutionOptions {
+    kernel_provider: KernelProvider,
     q8_k_activation_matvec_policy: Q8KActivationMatvecPolicy,
     q8_k_activation_matvec_roles: Q8KActivationMatvecRoleMask,
     compare_q8_k_activation_matvec: bool,
@@ -206,6 +209,22 @@ pub struct ScalarExecutionOptions {
 }
 
 impl ScalarExecutionOptions {
+    /// Selects the built-in CPU kernel provider.
+    #[must_use]
+    pub fn with_kernel_provider(mut self, provider: KernelProvider) -> Self {
+        self.kernel_provider = provider;
+        self
+    }
+
+    /// Returns the selected built-in CPU kernel provider.
+    pub fn kernel_provider(self) -> KernelProvider {
+        self.kernel_provider
+    }
+
+    pub(in crate::scalar) fn kernel_dispatch(self) -> KernelDispatch {
+        KernelDispatch::detect(self.kernel_provider)
+    }
+
     /// Enables or disables the legacy parity-scoped `Q8_K` activation policy.
     #[must_use]
     pub fn with_q8_k_activation_matvec(mut self, enabled: bool) -> Self {
@@ -324,7 +343,18 @@ impl ScalarExecutionOptions {
 
 #[cfg(test)]
 mod tests {
-    use super::{Q8KActivationMatvecPolicy, Q8KActivationMatvecRole, ScalarExecutionOptions};
+    use super::{
+        KernelProvider, Q8KActivationMatvecPolicy, Q8KActivationMatvecRole, ScalarExecutionOptions,
+    };
+
+    #[test]
+    fn default_kernel_provider_is_automatic_and_can_be_overridden() {
+        let default = ScalarExecutionOptions::default();
+        let portable = default.with_kernel_provider(KernelProvider::Portable);
+
+        assert_eq!(default.kernel_provider(), KernelProvider::Auto);
+        assert_eq!(portable.kernel_provider(), KernelProvider::Portable);
+    }
 
     #[test]
     fn default_policy_keeps_q8_k_activation_matvec_disabled() {

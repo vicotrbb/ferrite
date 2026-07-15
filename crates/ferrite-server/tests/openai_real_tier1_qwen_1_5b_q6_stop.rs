@@ -43,7 +43,7 @@ async fn live_http_server_applies_stop_sequences_with_qwen_1_5b_q6_model(
     assert_stop_completion_stream(&completion_stream_response)?;
 
     let chat_body = format!(
-        r#"{{"model":"{REAL_MODEL_ID}","messages":[{{"role":"user","content":"hello world"}}],"max_completion_tokens":1,"stop":"你"}}"#
+        r#"{{"model":"{REAL_MODEL_ID}","messages":[{{"role":"user","content":"hello world"}}],"max_completion_tokens":1,"stop":"Hello"}}"#
     );
     let chat_response = send_http_request(
         server.addr(),
@@ -55,7 +55,7 @@ async fn live_http_server_applies_stop_sequences_with_qwen_1_5b_q6_model(
     assert_stop_chat_response(&chat_response, qwen_1_5b_q6_stop_expectation())?;
 
     let chat_stream_body = format!(
-        r#"{{"model":"{REAL_MODEL_ID}","messages":[{{"role":"user","content":"hello world"}}],"max_completion_tokens":1,"stream":true,"stop":"你"}}"#
+        r#"{{"model":"{REAL_MODEL_ID}","messages":[{{"role":"user","content":"hello world"}}],"max_completion_tokens":1,"stream":true,"stop":"Hello"}}"#
     );
     let chat_stream_response = send_http_request(
         server.addr(),
@@ -72,7 +72,7 @@ fn qwen_1_5b_q6_stop_expectation() -> StopSequenceExpectation {
     StopSequenceExpectation {
         model_id: REAL_MODEL_ID,
         completion_prompt_tokens: 2,
-        chat_prompt_tokens: 8,
+        chat_prompt_tokens: 31,
     }
 }
 

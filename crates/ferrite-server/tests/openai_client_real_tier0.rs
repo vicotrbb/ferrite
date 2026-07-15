@@ -8,7 +8,7 @@ use support::openai_client::{
 const DEFAULT_MODEL_PATH: &str = "target/models/SmolLM2-135M-Instruct-Q4_K_M.gguf";
 const REAL_MODEL_ID: &str = "smollm2-135m";
 const COMPLETION_TEXT: &str = ".";
-const CHAT_CONTENT: &str = "\n";
+const CHAT_CONTENT: &str = "Hello";
 
 #[tokio::test]
 #[ignore = "requires local Tier 0 GGUF model artifact"]

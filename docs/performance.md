@@ -59,6 +59,10 @@ target/release/ferrite \
   --benchmark-runs 128
 ```
 
+To isolate dispatch from model semantics, repeat a correctness run with
+`--kernel-provider portable`. This is a diagnostic oracle, not a recommended
+performance setting.
+
 ## 4. Opt into residual I8MM only on supported Arm CPUs
 
 On aarch64 CPUs with FEAT_I8MM, the residual activation path can reduce decode
@@ -138,9 +142,9 @@ harness evaluates them in separate invocations instead of silently changing a
 requested policy.
 
 The harness writes JSON and Markdown under `scripts/evals/` and records TTFT,
-decode throughput, token latency, RSS, CPU, commands, model SHA-256, complete
-ordered server token-ID traces, cohort parity, host, Rust version, commit,
-branch, and dirty-tree state.
+request-cohort TTFT p50 and p95, decode throughput, token latency, RSS, CPU,
+commands, model SHA-256, complete ordered per-prompt server token-ID traces,
+cohort parity, host, Rust version, commit, branch, and dirty-tree state.
 
 ## 7. Promotion rule for optimizations
 

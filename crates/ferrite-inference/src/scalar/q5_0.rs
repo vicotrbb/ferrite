@@ -3,7 +3,7 @@
     reason = "audited SIMD half conversion is isolated in this quantization module"
 )]
 
-use super::{float::f16_bits_to_f32, InferenceError};
+use super::{float::f16_bits_to_f32, InferenceError, ScalarExecutionOptions};
 
 pub(super) const Q5_0_BLOCK_VALUES: usize = 32;
 pub(super) const Q5_0_BLOCK_BYTES: usize = 22;
@@ -48,6 +48,7 @@ pub(super) fn validate_q5_0_finite_scales(bytes: &[u8]) -> Result<(), InferenceE
     Ok(())
 }
 
+#[cfg(test)]
 pub(super) fn q5_0_mul_vec(
     bytes: &[u8],
     rows: usize,
@@ -57,10 +58,20 @@ pub(super) fn q5_0_mul_vec(
     Ok(q5_0_mul_vec_with_backend(bytes, rows, cols, vector)?.values)
 }
 
+pub(super) fn q5_0_mul_vec_with_options(
+    bytes: &[u8],
+    rows: usize,
+    cols: usize,
+    vector: &[f32],
+    options: ScalarExecutionOptions,
+) -> Result<Vec<f32>, InferenceError> {
+    Ok(q5_0_mul_vec_with_backend_and_options(bytes, rows, cols, vector, options)?.values)
+}
+
 /// Multiplies two same-shaped `Q5_0` matrices by one activation vector while
 /// exposing both independent dot products to each worker. Per-matrix block
 /// order is unchanged, so results are bit-identical to two standalone calls.
-#[cfg(target_arch = "aarch64")]
+#[cfg(all(test, target_arch = "aarch64"))]
 pub(super) fn q5_0_mul_vec_pair(
     left: &[u8],
     right: &[u8],
@@ -68,12 +79,31 @@ pub(super) fn q5_0_mul_vec_pair(
     cols: usize,
     vector: &[f32],
 ) -> Result<(Vec<f32>, Vec<f32>), InferenceError> {
+    q5_0_mul_vec_pair_with_options(
+        left,
+        right,
+        rows,
+        cols,
+        vector,
+        ScalarExecutionOptions::default(),
+    )
+}
+
+#[cfg(target_arch = "aarch64")]
+pub(super) fn q5_0_mul_vec_pair_with_options(
+    left: &[u8],
+    right: &[u8],
+    rows: usize,
+    cols: usize,
+    vector: &[f32],
+    options: ScalarExecutionOptions,
+) -> Result<(Vec<f32>, Vec<f32>), InferenceError> {
     validate_q5_0_mul_vec(left, rows, cols, vector)?;
     validate_q5_0_mul_vec(right, rows, cols, vector)?;
 
     #[cfg(target_arch = "aarch64")]
     {
-        if std::arch::is_aarch64_feature_detected!("neon") {
+        if options.kernel_dispatch().neon() {
             return Ok(super::q5_0_neon::neon_q5_0_mul_vec_pair(
                 left, right, rows, cols, vector,
             ));
@@ -85,17 +115,34 @@ pub(super) fn q5_0_mul_vec_pair(
     Ok((left, right))
 }
 
+#[cfg(test)]
 pub(super) fn q5_0_mul_vec_with_backend(
     bytes: &[u8],
     rows: usize,
     cols: usize,
     vector: &[f32],
 ) -> Result<Q5_0MatVecOutput, InferenceError> {
+    q5_0_mul_vec_with_backend_and_options(
+        bytes,
+        rows,
+        cols,
+        vector,
+        ScalarExecutionOptions::default(),
+    )
+}
+
+fn q5_0_mul_vec_with_backend_and_options(
+    bytes: &[u8],
+    rows: usize,
+    cols: usize,
+    vector: &[f32],
+    options: ScalarExecutionOptions,
+) -> Result<Q5_0MatVecOutput, InferenceError> {
     validate_q5_0_mul_vec(bytes, rows, cols, vector)?;
 
     #[cfg(target_arch = "aarch64")]
     {
-        if std::arch::is_aarch64_feature_detected!("neon") {
+        if options.kernel_dispatch().neon() {
             return Ok(super::q5_0_neon::neon_q5_0_mul_vec(
                 bytes, rows, cols, vector,
             ));
@@ -103,7 +150,7 @@ pub(super) fn q5_0_mul_vec_with_backend(
     }
     #[cfg(target_arch = "x86_64")]
     {
-        if std::arch::is_x86_feature_detected!("avx2") {
+        if options.kernel_dispatch().avx2() {
             return Ok(super::q5_0_avx2::avx2_q5_0_mul_vec(
                 bytes, rows, cols, vector,
             ));
@@ -118,13 +165,13 @@ pub(super) fn q5_0_mul_vec_with_backend(
 #[cfg(target_arch = "aarch64")]
 pub(super) const Q5_0_MAX_BATCH: usize = 8;
 
-/// Batched matvec across several activation vectors. Each stream's output
-/// is bit-identical to a `q5_0_mul_vec` call with that vector.
-pub(super) fn q5_0_mul_vec_batch(
+/// Batched matvec across several activation vectors using one provider policy.
+pub(super) fn q5_0_mul_vec_batch_with_options(
     bytes: &[u8],
     rows: usize,
     cols: usize,
     vectors: &[&[f32]],
+    options: ScalarExecutionOptions,
 ) -> Result<Vec<Vec<f32>>, InferenceError> {
     let Some(first) = vectors.first() else {
         return Ok(Vec::new());
@@ -141,7 +188,7 @@ pub(super) fn q5_0_mul_vec_batch(
 
     #[cfg(target_arch = "aarch64")]
     {
-        if std::arch::is_aarch64_feature_detected!("neon") {
+        if options.kernel_dispatch().neon() {
             let mut outputs = Vec::with_capacity(vectors.len());
             for chunk in vectors.chunks(Q5_0_MAX_BATCH) {
                 outputs.extend(super::q5_0_neon::neon_q5_0_mul_vec_batch(
@@ -154,7 +201,7 @@ pub(super) fn q5_0_mul_vec_batch(
 
     vectors
         .iter()
-        .map(|vector| q5_0_mul_vec(bytes, rows, cols, vector))
+        .map(|vector| q5_0_mul_vec_with_options(bytes, rows, cols, vector, options))
         .collect()
 }
 

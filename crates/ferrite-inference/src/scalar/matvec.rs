@@ -3,7 +3,7 @@
     reason = "audited architecture-specific SIMD intrinsics are isolated in this module"
 )]
 
-use super::{math::dot, InferenceError};
+use super::{kernels::KernelDispatch, math::dot, InferenceError, ScalarExecutionOptions};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum F32MatVecBackend {
@@ -26,11 +26,32 @@ impl F32MatVecOutput {
     }
 }
 
+#[cfg(test)]
 pub(super) fn f32_mul_vec(
     rows: usize,
     cols: usize,
     data: &[f32],
     vector: &[f32],
+) -> Result<F32MatVecOutput, InferenceError> {
+    f32_mul_vec_with_options(rows, cols, data, vector, ScalarExecutionOptions::default())
+}
+
+pub(super) fn f32_mul_vec_with_options(
+    rows: usize,
+    cols: usize,
+    data: &[f32],
+    vector: &[f32],
+    options: ScalarExecutionOptions,
+) -> Result<F32MatVecOutput, InferenceError> {
+    f32_mul_vec_with_dispatch(rows, cols, data, vector, options.kernel_dispatch())
+}
+
+fn f32_mul_vec_with_dispatch(
+    rows: usize,
+    cols: usize,
+    data: &[f32],
+    vector: &[f32],
+    dispatch: KernelDispatch,
 ) -> Result<F32MatVecOutput, InferenceError> {
     if vector.len() != cols {
         return Err(InferenceError::new(format!(
@@ -55,13 +76,13 @@ pub(super) fn f32_mul_vec(
 
     #[cfg(target_arch = "aarch64")]
     {
-        if std::arch::is_aarch64_feature_detected!("neon") {
+        if dispatch.neon() {
             return Ok(aarch64::neon_f32_mul_vec(rows, cols, data, vector));
         }
     }
     #[cfg(target_arch = "x86_64")]
     {
-        if std::arch::is_x86_feature_detected!("avx2") {
+        if dispatch.avx2() {
             return Ok(x86_64::avx2_f32_mul_vec(rows, cols, data, vector));
         }
     }
@@ -130,7 +151,7 @@ mod tests {
             &[1.0, -1.0, 2.0, -2.0, 0.5, -0.5, 1.5, -1.5],
         )?;
 
-        let expected_backend = if std::arch::is_x86_feature_detected!("avx2") {
+        let expected_backend = if crate::scalar::CpuKernelCapabilities::detect().avx2() {
             F32MatVecBackend::X86_64Avx2
         } else {
             F32MatVecBackend::Scalar

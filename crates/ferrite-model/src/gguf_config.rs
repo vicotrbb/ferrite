@@ -6,6 +6,46 @@ pub enum ModelArchitecture {
     /// The Qwen2 transformer family, including Qwen2.5 models that use this
     /// GGUF architecture identifier.
     Qwen2,
+    /// The Microsoft Phi-3 dense decoder family.
+    Phi3,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// How an architecture stores its attention projection weights in GGUF.
+pub enum AttentionProjectionLayout {
+    /// Query, key, and value use separate matrices.
+    Separate,
+    /// Query, key, and value are consecutive row ranges in one matrix.
+    FusedQkv,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// How an architecture stores its gated feed-forward input projections.
+pub enum FeedForwardProjectionLayout {
+    /// Gate and up projections use separate matrices.
+    Separate,
+    /// Gate and up projections are consecutive row ranges in one matrix.
+    FusedGateUp,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Pairing used by the architecture's rotary position encoding.
+pub enum RotaryPairing {
+    /// Pair adjacent coordinates after GGUF conversion.
+    Adjacent,
+    /// Pair matching coordinates from the two halves of the rotary span.
+    SplitHalf,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Stable execution-facing description of architecture-specific GGUF layout.
+pub struct ArchitectureExecution {
+    /// Attention projection storage layout.
+    pub attention: AttentionProjectionLayout,
+    /// Feed-forward projection storage layout.
+    pub feed_forward: FeedForwardProjectionLayout,
+    /// Rotary coordinate pairing.
+    pub rotary_pairing: RotaryPairing,
 }
 
 impl ModelArchitecture {
@@ -13,6 +53,7 @@ impl ModelArchitecture {
         match value {
             "llama" => Some(Self::Llama),
             "qwen2" => Some(Self::Qwen2),
+            "phi3" => Some(Self::Phi3),
             _ => None,
         }
     }
@@ -21,11 +62,36 @@ impl ModelArchitecture {
         match self {
             Self::Llama => "llama",
             Self::Qwen2 => "qwen2",
+            Self::Phi3 => "phi3",
         }
     }
 
     pub(crate) fn metadata_prefix(self) -> &'static str {
         self.metadata_value()
+    }
+
+    /// Returns the normalized execution layout for this architecture.
+    ///
+    /// Loader adapters use this boundary to turn architecture-specific GGUF
+    /// tensors into the common transformer weights consumed by inference.
+    pub fn execution(self) -> ArchitectureExecution {
+        match self {
+            Self::Llama => ArchitectureExecution {
+                attention: AttentionProjectionLayout::Separate,
+                feed_forward: FeedForwardProjectionLayout::Separate,
+                rotary_pairing: RotaryPairing::Adjacent,
+            },
+            Self::Qwen2 => ArchitectureExecution {
+                attention: AttentionProjectionLayout::Separate,
+                feed_forward: FeedForwardProjectionLayout::Separate,
+                rotary_pairing: RotaryPairing::SplitHalf,
+            },
+            Self::Phi3 => ArchitectureExecution {
+                attention: AttentionProjectionLayout::FusedQkv,
+                feed_forward: FeedForwardProjectionLayout::FusedGateUp,
+                rotary_pairing: RotaryPairing::SplitHalf,
+            },
+        }
     }
 }
 
@@ -36,6 +102,24 @@ pub enum ModelConfig {
     Llama(TransformerConfig),
     /// A Qwen2-family model configuration.
     Qwen2(TransformerConfig),
+    /// A Phi-3-family model configuration.
+    Phi3(TransformerConfig),
+}
+
+impl ModelConfig {
+    /// Returns the architecture-independent transformer configuration.
+    pub fn transformer(&self) -> &TransformerConfig {
+        match self {
+            Self::Llama(config) | Self::Qwen2(config) | Self::Phi3(config) => config,
+        }
+    }
+
+    /// Consumes the architecture wrapper and returns its transformer config.
+    pub fn into_transformer(self) -> TransformerConfig {
+        match self {
+            Self::Llama(config) | Self::Qwen2(config) | Self::Phi3(config) => config,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]

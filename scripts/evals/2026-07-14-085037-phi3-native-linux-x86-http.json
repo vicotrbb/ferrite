@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "status": "accepted",
+  "finished_utc": "2026-07-14T08:50:37Z",
+  "claim_scope": "Native Linux x86_64 release-mode correctness only. Build time, test time, and live resource samples are not performance evidence.",
+  "source": {
+    "commit": "33a11d0be6e2417a145d9aea5033a6430be4163d",
+    "branch": "main",
+    "dirty": true,
+    "source_tree_sha256": "a2b6bfa7b659e283de239029a80fa8c0a3581f1d812bc34a74d35823c0cb8651",
+    "archive_sha256": "5fa60ba2bff82aeaa3c0a2ce8fc865e75415d1b78129e9ddbb190b75ca03a455",
+    "archive_entries": 354,
+    "archive_policy": "Existing tracked and non-ignored untracked files, excluding scripts/evals, target, Git metadata, environment files, GGUF and safetensors files, partial downloads, and deleted index entries."
+  },
+  "platform": {
+    "node": "homelab-02",
+    "os": "NixOS 24.05",
+    "kernel": "Linux 6.6.68 x86_64",
+    "cpu": "Intel(R) N100",
+    "logical_cores": 4,
+    "physical_cores": 4,
+    "threads_per_core": 1,
+    "observed_features": [
+      "avx2",
+      "avx_vnni"
+    ],
+    "rustc": "rustc 1.96.1 (31fca3adb 2026-06-26)",
+    "cargo": "cargo 1.96.1 (356927216 2026-06-26)",
+    "container_image": "rust:1.96.1-bookworm@sha256:a339861ae23e9abb272cea45dfafde21760d2ce6577a70f8a926153677902663"
+  },
+  "resource_bounds": {
+    "cpu_request": "3",
+    "cpu_limit": "3",
+    "memory_request": "8Gi",
+    "memory_limit": "8Gi",
+    "ephemeral_storage_request": "12Gi",
+    "ephemeral_storage_limit": "12Gi",
+    "pod_restarts": 0
+  },
+  "model": {
+    "id": "phi3-mini-4k-instruct-q4",
+    "source": "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf",
+    "revision": "a64113399c2f6b8ad3e11c394733a2ddadaa7f33",
+    "license": "MIT",
+    "filename": "Phi-3-mini-4k-instruct-q4.gguf",
+    "bytes": 2393231072,
+    "sha256": "8a83c7fb9049a9b2e92266fa7ad04933bb53aa1e85136b7b30f1b8000ff2edef",
+    "mode": "0444"
+  },
+  "command": [
+    "cargo",
+    "test",
+    "--release",
+    "--locked",
+    "-p",
+    "ferrite-server",
+    "--all-features",
+    "--test",
+    "openai_real_phi3",
+    "--",
+    "--ignored",
+    "--test-threads=1"
+  ],
+  "environment": {
+    "FERRITE_PHI3_MODEL": "/tmp/Phi-3-mini-4k-instruct-q4.gguf"
+  },
+  "result": {
+    "exit_code": 0,
+    "passed": 1,
+    "failed": 0,
+    "ignored": 0,
+    "test_seconds": 77.35,
+    "release_build_seconds": 135,
+    "target_tree_bytes": 474848745,
+    "test_log_bytes": 9207,
+    "test_log_sha256": "9b645704eecf73133dd9ccd4e813b0231a85a3048b3b707c6f5b26056f39a394",
+    "raw_result_tail": [
+      "running 1 test",
+      "test live_phi3_chat_stops_on_model_native_end_token ... ok",
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 77.35s"
+    ]
+  },
+  "assertions": [
+    "The exact pinned model size and SHA-256 are rechecked by the test.",
+    "Non-streaming Chat Completions returns visible content ' Steel' and finish_reason stop.",
+    "Streaming Chat Completions returns visible token IDs 2443 and 295 and terminates with one stop event.",
+    "Phi-3 terminal token 32007 contributes to completion usage but is not exposed in visible content.",
+    "Both routes report 10 prompt tokens, 3 completion tokens, 13 total tokens, and finish source eos."
+  ],
+  "diagnostic_samples": {
+    "during_test_cpu_millicores": 2747,
+    "during_test_memory_mib": 3435,
+    "note": "One live sample only. It is not a peak or a clean performance measurement."
+  },
+  "postflight": {
+    "homelab_01_ready": true,
+    "homelab_02_ready": true,
+    "pod_ready": true,
+    "pod_restarts": 0,
+    "inference_or_build_processes_remaining": false
+  },
+  "infrastructure_notes": [
+    "The Kubernetes control plane restarted repeatedly during the initial model transfer.",
+    "The public model bytes were then copied over a temporary LAN-only HTTP server bound to 192.168.50.113 and independently verified in the pod before use.",
+    "The temporary server was stopped before hashing, compilation, or test execution.",
+    "The test ran detached inside the bounded pod, so later API interruptions could not alter its process lifetime or exit marker.",
+    "The node is shared. No throughput, TTFT, RSS, energy, or build-speed claim follows from this artifact."
+  ]
+}

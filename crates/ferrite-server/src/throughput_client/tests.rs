@@ -28,6 +28,146 @@ fn parses_minimal_completion_benchmark_config() -> Result<(), Box<dyn std::error
 }
 
 #[test]
+fn parses_repeatable_prompts_with_round_robin_assignment() -> Result<(), Box<dyn std::error::Error>>
+{
+    let config = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--prompt"),
+        OsString::from("first"),
+        OsString::from("--prompt"),
+        OsString::from("second"),
+        OsString::from("--prompt"),
+        OsString::from("first"),
+        OsString::from("--requests"),
+        OsString::from("6"),
+    ])?;
+
+    assert_eq!(config.prompts(), ["first", "second", "first"]);
+    assert_eq!(config.prompt(), "first");
+    assert_eq!(config.prompt_for_request(0), "first");
+    assert_eq!(config.prompt_for_request(1), "second");
+    assert_eq!(config.prompt_for_request(3), "first");
+    assert_eq!(config.prompt_for_request(4), "second");
+    assert_eq!(config.distinct_prompt_count(), 2);
+    Ok(())
+}
+
+#[test]
+fn rejects_more_prompts_than_requests() {
+    let result = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--prompt"),
+        OsString::from("first"),
+        OsString::from("--prompt"),
+        OsString::from("second"),
+        OsString::from("--requests"),
+        OsString::from("1"),
+    ]);
+
+    assert!(result.is_err());
+}
+
+#[test]
+fn parses_repeatable_max_token_budgets_with_round_robin_assignment(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let config = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--max-tokens"),
+        OsString::from("4"),
+        OsString::from("--max-tokens"),
+        OsString::from("16"),
+        OsString::from("--max-tokens"),
+        OsString::from("4"),
+        OsString::from("--requests"),
+        OsString::from("6"),
+    ])?;
+
+    assert_eq!(config.max_token_budgets(), [4, 16, 4]);
+    assert_eq!(config.max_tokens(), 4);
+    assert_eq!(config.max_tokens_for_request(0), 4);
+    assert_eq!(config.max_tokens_for_request(1), 16);
+    assert_eq!(config.max_tokens_for_request(4), 16);
+    assert_eq!(config.distinct_max_token_budget_count(), 2);
+    Ok(())
+}
+
+#[test]
+fn rejects_mismatched_repeated_prompt_and_token_budget_counts() {
+    let result = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--prompt"),
+        OsString::from("first"),
+        OsString::from("--prompt"),
+        OsString::from("second"),
+        OsString::from("--max-tokens"),
+        OsString::from("4"),
+        OsString::from("--max-tokens"),
+        OsString::from("8"),
+        OsString::from("--max-tokens"),
+        OsString::from("16"),
+        OsString::from("--requests"),
+        OsString::from("3"),
+    ]);
+
+    assert!(result.is_err());
+}
+
+#[test]
+fn builds_request_body_for_each_configured_prompt_and_token_budget(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let config = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--model"),
+        OsString::from("fixture-model"),
+        OsString::from("--prompt"),
+        OsString::from("short"),
+        OsString::from("--prompt"),
+        OsString::from("long"),
+        OsString::from("--max-tokens"),
+        OsString::from("2"),
+        OsString::from("--max-tokens"),
+        OsString::from("8"),
+        OsString::from("--requests"),
+        OsString::from("2"),
+    ])?;
+
+    assert_eq!(
+        request_body_for_request(&config, 0),
+        r#"{"model":"fixture-model","prompt":"short","max_tokens":2}"#
+    );
+    assert_eq!(
+        request_body_for_request(&config, 1),
+        r#"{"model":"fixture-model","prompt":"long","max_tokens":8}"#
+    );
+    Ok(())
+}
+
+#[test]
+fn builds_request_body_for_each_configured_prompt() -> Result<(), Box<dyn std::error::Error>> {
+    let config = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--model"),
+        OsString::from("fixture-model"),
+        OsString::from("--prompt"),
+        OsString::from("first"),
+        OsString::from("--prompt"),
+        OsString::from("second"),
+        OsString::from("--requests"),
+        OsString::from("2"),
+    ])?;
+
+    assert_eq!(
+        request_body_for_prompt(&config, config.prompt_for_request(0)),
+        r#"{"model":"fixture-model","prompt":"first","max_tokens":1}"#
+    );
+    assert_eq!(
+        request_body_for_prompt(&config, config.prompt_for_request(1)),
+        r#"{"model":"fixture-model","prompt":"second","max_tokens":1}"#
+    );
+    Ok(())
+}
+
+#[test]
 fn builds_openai_compatible_completion_request_body() -> Result<(), Box<dyn std::error::Error>> {
     let config = ThroughputClientConfig::parse([
         OsString::from("ferrite-openai-throughput"),
@@ -42,7 +182,7 @@ fn builds_openai_compatible_completion_request_body() -> Result<(), Box<dyn std:
     ])?;
 
     assert_eq!(
-        completion_request_body(&config),
+        completion_request_body_for_prompt(&config, config.prompt()),
         r#"{"model":"fixture-model","prompt":"measure this","max_tokens":2}"#
     );
     Ok(())
@@ -64,7 +204,7 @@ fn builds_openai_compatible_completion_stop_request_body() -> Result<(), Box<dyn
     ])?;
 
     assert_eq!(
-        completion_request_body(&config),
+        completion_request_body_for_prompt(&config, config.prompt()),
         r####"{"model":"fixture-model","prompt":"measure this","max_tokens":2,"stop":"###"}"####
     );
     Ok(())
@@ -89,7 +229,7 @@ fn builds_openai_compatible_completion_prompt_cache_key_request_body(
 
     assert_eq!(config.prompt_cache_key(), Some("benchy:completion-smoke"));
     assert_eq!(
-        completion_request_body(&config),
+        completion_request_body_for_prompt(&config, config.prompt()),
         r#"{"model":"fixture-model","prompt":"measure this","max_tokens":2,"prompt_cache_key":"benchy:completion-smoke"}"#
     );
     Ok(())
@@ -123,7 +263,7 @@ fn builds_openai_compatible_chat_completion_request_body() -> Result<(), Box<dyn
     ])?;
 
     assert_eq!(
-        request_body(&config),
+        request_body_for_prompt(&config, config.prompt()),
         r#"{"model":"fixture-model","messages":[{"role":"user","content":"measure this"}],"max_tokens":2}"#
     );
     Ok(())
@@ -146,7 +286,7 @@ fn builds_openai_compatible_chat_stop_request_body() -> Result<(), Box<dyn std::
     ])?;
 
     assert_eq!(
-        request_body(&config),
+        request_body_for_prompt(&config, config.prompt()),
         r####"{"model":"fixture-model","messages":[{"role":"user","content":"measure this"}],"max_tokens":2,"stop":"###"}"####
     );
     Ok(())
@@ -171,7 +311,7 @@ fn builds_openai_compatible_chat_prompt_cache_key_request_body(
 
     assert_eq!(config.prompt_cache_key(), Some("benchy:smoke"));
     assert_eq!(
-        request_body(&config),
+        request_body_for_prompt(&config, config.prompt()),
         r#"{"model":"fixture-model","messages":[{"role":"user","content":"measure this"}],"max_tokens":2,"prompt_cache_key":"benchy:smoke"}"#
     );
     Ok(())
@@ -197,7 +337,7 @@ fn builds_chat_request_body_with_ferrite_cache_trace_metadata(
 
     assert!(config.prompt_cache_trace());
     assert_eq!(
-        request_body(&config),
+        request_body_for_prompt(&config, config.prompt()),
         r#"{"model":"fixture-model","messages":[{"role":"user","content":"measure this"}],"max_tokens":2,"prompt_cache_key":"benchy:smoke","metadata":{"ferrite_cache_trace":"true"}}"#
     );
     Ok(())
@@ -286,6 +426,28 @@ fn detects_divergent_streaming_token_id_traces() {
 }
 
 #[test]
+fn tracks_token_id_traces_per_prompt() {
+    let summary = |id| {
+        StreamingTokenIdsSummary::from_sse_body(&format!(
+            "data: {{\"choices\":[{{\"delta\":{{\"content\":\"a\"}},\"token_ids\":[{id}],\"finish_reason\":null}}]}}\n\n"
+        ))
+    };
+    let mut traces = vec![None, None];
+    let mut all_stable = true;
+    let first = summary(7);
+    let second = summary(11);
+
+    accumulate_prompt_token_id_trace(&mut traces, 0, first.as_ref(), &mut all_stable);
+    accumulate_prompt_token_id_trace(&mut traces, 1, second.as_ref(), &mut all_stable);
+    accumulate_prompt_token_id_trace(&mut traces, 0, first.as_ref(), &mut all_stable);
+    assert!(all_stable);
+    assert_eq!(traces, [Some(vec![7]), Some(vec![11])]);
+
+    accumulate_prompt_token_id_trace(&mut traces, 1, first.as_ref(), &mut all_stable);
+    assert!(!all_stable);
+}
+
+#[test]
 fn retains_streaming_text_chunks_from_sse_body() -> Result<(), Box<dyn std::error::Error>> {
     let body = concat!(
         "data: {\"choices\":[{\"delta\":{\"role\":\"assistant\"},\"finish_reason\":null}]}\n\n",
@@ -333,7 +495,7 @@ fn builds_openai_compatible_second_turn_chat_request_body() -> Result<(), Box<dy
     ])?;
 
     assert_eq!(
-        request_body(&config),
+        request_body_for_prompt(&config, config.prompt()),
         r#"{"model":"fixture-model","messages":[{"role":"user","content":"first question"},{"role":"assistant","content":"first answer"},{"role":"user","content":"second question"}],"max_tokens":2}"#
     );
     Ok(())
@@ -527,7 +689,7 @@ fn builds_openai_compatible_streaming_completion_request_body(
     ])?;
 
     assert_eq!(
-        request_body(&config),
+        request_body_for_prompt(&config, config.prompt()),
         r#"{"model":"fixture-model","prompt":"measure this","max_tokens":2,"stream":true}"#
     );
     Ok(())
@@ -549,7 +711,7 @@ fn builds_openai_compatible_streaming_completion_usage_request_body(
     ])?;
 
     assert_eq!(
-        request_body(&config),
+        request_body_for_prompt(&config, config.prompt()),
         r#"{"model":"fixture-model","prompt":"measure this","max_tokens":2,"stream":true,"stream_options":{"include_usage":true}}"#
     );
     Ok(())
@@ -572,7 +734,7 @@ fn builds_openai_compatible_streaming_chat_completion_request_body(
     ])?;
 
     assert_eq!(
-        request_body(&config),
+        request_body_for_prompt(&config, config.prompt()),
         r#"{"model":"fixture-model","messages":[{"role":"user","content":"measure this"}],"max_tokens":2,"stream":true}"#
     );
     Ok(())
@@ -596,7 +758,7 @@ fn builds_openai_compatible_streaming_chat_usage_request_body(
     ])?;
 
     assert_eq!(
-        request_body(&config),
+        request_body_for_prompt(&config, config.prompt()),
         r#"{"model":"fixture-model","messages":[{"role":"user","content":"measure this"}],"max_tokens":2,"stream":true,"stream_options":{"include_usage":true}}"#
     );
     Ok(())
@@ -660,6 +822,73 @@ fn formats_streaming_timing_summary() -> Result<(), Box<dyn std::error::Error>> 
 }
 
 #[test]
+fn formats_cohort_ttft_percentiles() -> Result<(), Box<dyn std::error::Error>> {
+    let config = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--stream"),
+    ])?;
+    let summaries = [100_u64, 250, 150, 400]
+        .into_iter()
+        .map(|milliseconds| {
+            StreamingTimingSummary::from_event_offsets(&[
+                Duration::from_millis(milliseconds),
+                Duration::from_millis(milliseconds + 10),
+            ])
+            .ok_or("two event offsets should produce a timing summary")
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let result = ThroughputResult {
+        completed_requests: 4,
+        elapsed: Duration::from_millis(500),
+        streaming_finish: None,
+        streaming_timing: StreamingTimingSummary::from_request_summaries(&summaries),
+        streaming_text: None,
+        streaming_token_ids: None,
+        streaming_usage: None,
+        rss: None,
+    };
+
+    let formatted = format_result(&config, result);
+    assert!(formatted.contains("streaming_timed_requests=4"));
+    assert!(formatted.contains("streaming_time_to_first_token_p50_ms=150"));
+    assert!(formatted.contains("streaming_time_to_first_token_p95_ms=400"));
+    Ok(())
+}
+
+#[test]
+fn formats_per_prompt_token_id_traces() -> Result<(), Box<dyn std::error::Error>> {
+    let config = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--prompt"),
+        OsString::from("first"),
+        OsString::from("--prompt"),
+        OsString::from("second"),
+        OsString::from("--requests"),
+        OsString::from("2"),
+        OsString::from("--stream"),
+    ])?;
+    let mut token_ids = StreamingTokenIdsSummary::new(2, 2, 3);
+    token_ids.set_prompt_token_id_traces(vec![Some(vec![7, 11]), Some(vec![13])], true);
+    let result = ThroughputResult {
+        completed_requests: 2,
+        elapsed: Duration::from_millis(400),
+        streaming_finish: None,
+        streaming_timing: None,
+        streaming_text: None,
+        streaming_token_ids: Some(token_ids),
+        streaming_usage: None,
+        rss: None,
+    };
+
+    let formatted = format_result(&config, result);
+    assert!(formatted.contains("openai_http_configured_prompts=2"));
+    assert!(formatted.contains("openai_http_distinct_prompts=2"));
+    assert!(formatted.contains("streaming_prompt_token_id_traces=[[7,11],[13]]"));
+    assert!(formatted.contains("streaming_all_prompt_token_id_traces_stable=true"));
+    Ok(())
+}
+
+#[test]
 fn formats_streaming_usage_summary() -> Result<(), Box<dyn std::error::Error>> {
     let config = ThroughputClientConfig::parse([
         OsString::from("ferrite-openai-throughput"),
@@ -683,6 +912,42 @@ fn formats_streaming_usage_summary() -> Result<(), Box<dyn std::error::Error>> {
         format_result(&config, result),
         "openai_http_addr=127.0.0.1:8080\nopenai_http_endpoint=/v1/chat/completions\nopenai_http_model=ferrite-local\nopenai_http_max_tokens=1\nopenai_http_configured_requests=3\nopenai_http_concurrency=1\nopenai_http_stream=true\nopenai_http_stream_usage=true\nopenai_http_streaming_chat_completion_requests=1\nelapsed_ms=400\nrequests_per_second=2.500000\nstreaming_usage_prompt_tokens=8\nstreaming_usage_cached_prompt_tokens=5\nstreaming_usage_completion_tokens=32\nstreaming_usage_total_tokens=40"
     );
+    Ok(())
+}
+
+#[test]
+fn formats_mixed_token_budgets_and_aggregate_streaming_usage(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let config = ThroughputClientConfig::parse([
+        OsString::from("ferrite-openai-throughput"),
+        OsString::from("--stream"),
+        OsString::from("--stream-usage"),
+        OsString::from("--max-tokens"),
+        OsString::from("2"),
+        OsString::from("--max-tokens"),
+        OsString::from("8"),
+        OsString::from("--requests"),
+        OsString::from("2"),
+    ])?;
+    let mut usage = StreamingUsageSummary::new(4, 2, 6);
+    usage.accumulate(&StreamingUsageSummary::new(5, 8, 13))?;
+    let result = ThroughputResult {
+        completed_requests: 2,
+        elapsed: Duration::from_millis(400),
+        streaming_finish: None,
+        streaming_timing: None,
+        streaming_text: None,
+        streaming_token_ids: None,
+        streaming_usage: Some(usage),
+        rss: None,
+    };
+
+    let formatted = format_result(&config, result);
+    assert!(formatted.contains("openai_http_max_token_budgets=2,8"));
+    assert!(formatted.contains("streaming_usage_request_count=2"));
+    assert!(formatted.contains("streaming_usage_prompt_tokens_total=9"));
+    assert!(formatted.contains("streaming_usage_completion_tokens_total=10"));
+    assert!(formatted.contains("streaming_usage_total_tokens_total=19"));
     Ok(())
 }
 
@@ -885,6 +1150,7 @@ fn accepts_length_streaming_usage_matching_requested_max_tokens(
 
     validate_streaming_token_count(
         &config,
+        32,
         Some(&StreamingFinishSummary::new("length")),
         Some(&usage),
     )?;
@@ -905,6 +1171,7 @@ fn rejects_length_streaming_usage_below_requested_max_tokens(
 
     let result = validate_streaming_token_count(
         &config,
+        32,
         Some(&StreamingFinishSummary::new("length")),
         Some(&usage),
     );
@@ -932,6 +1199,7 @@ fn accepts_stop_streaming_usage_below_requested_max_tokens(
 
     validate_streaming_token_count(
         &config,
+        32,
         Some(&StreamingFinishSummary::new("stop")),
         Some(&usage),
     )?;

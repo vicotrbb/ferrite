@@ -1,4 +1,4 @@
-#![cfg(feature = "locus-kv")]
+#![cfg(all(feature = "locus-kv", unix))]
 
 use ferrite_fixtures::scalar_llama_f32_gguf_fixture;
 use ferrite_inference::scalar::{

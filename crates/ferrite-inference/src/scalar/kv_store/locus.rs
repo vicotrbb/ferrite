@@ -142,6 +142,15 @@ impl LocusKvStore {
         key: Vec<f32>,
         value: Vec<f32>,
     ) -> Result<(), InferenceError> {
+        self.push_slices(layer, &key, &value)
+    }
+
+    fn push_slices(
+        &mut self,
+        layer: usize,
+        key: &[f32],
+        value: &[f32],
+    ) -> Result<(), InferenceError> {
         if key.len() != self.head_kv_dim || value.len() != self.head_kv_dim {
             return Err(InferenceError::new(format!(
                 "locus kv push expects head_kv_dim {}, got key {} value {}",
@@ -158,8 +167,8 @@ impl LocusKvStore {
         }
         let position = self.layer_len(layer);
         self.ensure_block(layer, position)?;
-        self.write_block(true, layer, position, &key)?;
-        self.write_block(false, layer, position, &value)?;
+        self.write_block(true, layer, position, key)?;
+        self.write_block(false, layer, position, value)?;
         if let Some(len) = self.layer_len.get_mut(layer) {
             *len += 1;
         }
@@ -270,13 +279,18 @@ impl LocusKvStore {
                 self.layer_count()
             )));
         }
-        // Free everything, then re-push all positions (cold path).
+        // Free everything, then copy borrowed snapshot rows directly into the
+        // mapped pool. Cloning the full snapshot here would create one
+        // prompt-sized heap allocation per restored duplicate session.
         self.truncate(0)?;
-        let keys = snapshot.layer_keys_owned();
-        let values = snapshot.layer_values_owned();
-        for (layer, (layer_keys, layer_values)) in keys.into_iter().zip(values).enumerate() {
-            for (key, value) in layer_keys.into_iter().zip(layer_values) {
-                self.push(layer, key, value)?;
+        for (layer, (layer_keys, layer_values)) in snapshot
+            .layer_keys()
+            .iter()
+            .zip(snapshot.layer_values())
+            .enumerate()
+        {
+            for (key, value) in layer_keys.iter().zip(layer_values) {
+                self.push_slices(layer, key, value)?;
             }
         }
         Ok(())

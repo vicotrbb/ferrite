@@ -9,7 +9,7 @@ use tokio::sync::Mutex;
 const DEFAULT_MODEL_PATH: &str = "target/models/qwen2.5-1.5b-instruct-q8_0.gguf";
 const REAL_MODEL_ID: &str = "qwen2.5-1.5b-q8_0";
 const COMPLETION_TEXT: &str = "\n";
-const CHAT_CONTENT: &str = "你好";
+const CHAT_CONTENT: &str = "Hello";
 static REAL_MODEL_TEST_LOCK: Mutex<()> = Mutex::const_new(());
 
 #[tokio::test]

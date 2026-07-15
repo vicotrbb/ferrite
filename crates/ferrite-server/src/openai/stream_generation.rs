@@ -10,6 +10,7 @@ use crate::runtime::{
     GenerationFinishSource, PromptEvaluationControl,
 };
 use axum::response::Response;
+use ferrite_inference::sampling::SamplingConfig;
 use std::cell::RefCell;
 use std::sync::Arc;
 use tokio::sync::OwnedSemaphorePermit;
@@ -19,6 +20,7 @@ pub(super) struct CompletionStreamOptions {
     include_usage: bool,
     include_obfuscation: bool,
     echo_prompt: Option<String>,
+    sampling: SamplingConfig,
 }
 
 impl CompletionStreamOptions {
@@ -32,11 +34,17 @@ impl CompletionStreamOptions {
             include_usage,
             include_obfuscation,
             echo_prompt: None,
+            sampling: SamplingConfig::default(),
         }
     }
 
     pub(super) fn with_echo_prompt(mut self, prompt: Option<String>) -> Self {
         self.echo_prompt = prompt;
+        self
+    }
+
+    pub(super) fn with_sampling(mut self, sampling: SamplingConfig) -> Self {
+        self.sampling = sampling;
         self
     }
 }
@@ -46,6 +54,7 @@ pub(super) struct ChatStreamOptions {
     include_usage: bool,
     include_obfuscation: bool,
     service_tier: Option<&'static str>,
+    sampling: SamplingConfig,
 }
 
 impl ChatStreamOptions {
@@ -60,7 +69,13 @@ impl ChatStreamOptions {
             include_usage,
             include_obfuscation,
             service_tier,
+            sampling: SamplingConfig::default(),
         }
+    }
+
+    pub(super) fn with_sampling(mut self, sampling: SamplingConfig) -> Self {
+        self.sampling = sampling;
+        self
     }
 }
 
@@ -83,16 +98,24 @@ pub(super) fn completion_stream_response(
         .map(|prompt| context.token(prompt))
         .collect();
     let token_context = context.clone();
+    let include_token_ids = options.stop_sequences.is_empty();
     stream_generated_text(
         StreamGenerationInput::new(
             engine,
             prompt,
             max_tokens,
+            options.sampling,
             options.stop_sequences,
             initial_chunks,
         )
         .with_cache_options(cache_options),
-        move |piece, _token_ids| token_context.token(piece.to_owned()),
+        move |piece, token_ids| {
+            if include_token_ids {
+                token_context.token_with_ids(piece.to_owned(), token_ids.unwrap_or(&[]))
+            } else {
+                token_context.token(piece.to_owned())
+            }
+        },
         move |generated| {
             let mut chunks = vec![context.finish(generated.finish_reason())];
             if include_usage {
@@ -110,6 +133,7 @@ pub(super) fn completion_batched_stream_response(
     prompt: String,
     max_tokens: usize,
     options: CompletionStreamOptions,
+    cache_options: GenerationCacheOptions,
     permit: OwnedSemaphorePermit,
 ) -> Result<Response, OpenAiHttpError> {
     let include_usage = options.include_usage;
@@ -122,13 +146,21 @@ pub(super) fn completion_batched_stream_response(
         .map(|prompt| context.token(prompt))
         .collect();
     let token_context = context.clone();
+    let include_token_ids = options.stop_sequences.is_empty();
     stream_batched_generated_text(
         scheduler,
         prompt,
         max_tokens,
         options.stop_sequences,
+        cache_options,
         initial_chunks,
-        move |piece, _token_ids| token_context.token(piece.to_owned()),
+        move |piece, token_ids| {
+            if include_token_ids {
+                token_context.token_with_ids(piece.to_owned(), token_ids.unwrap_or(&[]))
+            } else {
+                token_context.token(piece.to_owned())
+            }
+        },
         move |generated| {
             let mut chunks = vec![context.finish(generated.finish_reason())];
             if include_usage {
@@ -161,6 +193,7 @@ pub(super) fn chat_stream_response(
             engine,
             prompt,
             max_tokens,
+            options.sampling,
             options.stop_sequences,
             vec![context.role()],
         )
@@ -189,6 +222,7 @@ pub(super) fn chat_batched_stream_response(
     prompt: String,
     max_tokens: usize,
     options: ChatStreamOptions,
+    cache_options: GenerationCacheOptions,
     permit: OwnedSemaphorePermit,
 ) -> Result<Response, OpenAiHttpError> {
     let include_usage = options.include_usage;
@@ -203,6 +237,7 @@ pub(super) fn chat_batched_stream_response(
         prompt,
         max_tokens,
         options.stop_sequences,
+        cache_options,
         vec![context.role()],
         move |piece, token_ids| {
             if include_token_ids {
@@ -231,6 +266,7 @@ fn stream_batched_generated_text<T>(
     prompt: String,
     max_tokens: usize,
     stop_sequences: Vec<String>,
+    cache_options: GenerationCacheOptions,
     initial_chunks: Vec<T>,
     mut token_chunk: impl FnMut(&str, Option<&[usize]>) -> T + Send + 'static,
     final_chunks: impl FnOnce(&crate::runtime::GeneratedText) -> Vec<T> + Send + 'static,
@@ -240,7 +276,7 @@ where
     T: serde::Serialize + Send + 'static,
 {
     let mut events = scheduler
-        .submit(prompt, max_tokens, stop_sequences)
+        .submit(prompt, max_tokens, stop_sequences, cache_options)
         .map_err(|error| OpenAiHttpError::internal(error.to_string()))?;
     let (sender, response) = streaming::channel_response();
     tokio::task::spawn_blocking(move || {
@@ -330,6 +366,7 @@ struct StreamGenerationInput<T> {
     engine: Arc<crate::runtime::InferenceEngine>,
     prompt: String,
     max_tokens: usize,
+    sampling: SamplingConfig,
     stop_sequences: Vec<String>,
     cache_options: GenerationCacheOptions,
     initial_chunks: Vec<T>,
@@ -340,6 +377,7 @@ impl<T> StreamGenerationInput<T> {
         engine: Arc<crate::runtime::InferenceEngine>,
         prompt: String,
         max_tokens: usize,
+        sampling: SamplingConfig,
         stop_sequences: Vec<String>,
         initial_chunks: Vec<T>,
     ) -> Self {
@@ -347,6 +385,7 @@ impl<T> StreamGenerationInput<T> {
             engine,
             prompt,
             max_tokens,
+            sampling,
             stop_sequences,
             cache_options: GenerationCacheOptions::default(),
             initial_chunks,
@@ -399,6 +438,7 @@ where
                 .generate_with_stage_callbacks_and_cache_options(
                     &input.prompt,
                     input.max_tokens,
+                    input.sampling,
                     input.cache_options,
                     || {
                         lifecycle

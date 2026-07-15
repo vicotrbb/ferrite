@@ -18,5 +18,8 @@ path = "src/lib.rs"
 [dependencies]
 memmap2.workspace = true
 
+[dev-dependencies]
+ferrite-fixtures.workspace = true
+
 [lints]
 workspace = true

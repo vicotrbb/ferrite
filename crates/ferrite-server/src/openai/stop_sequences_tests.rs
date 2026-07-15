@@ -75,6 +75,7 @@ async fn completions_stream_endpoint_applies_string_stop_sequence(
 
     assert!(body.contains("\"text\":\"win\""), "{body}");
     assert!(!body.contains("\"text\":\"winner\""), "{body}");
+    assert!(!body.contains("\"token_ids\""), "{body}");
     assert!(body.contains("\"finish_reason\":\"stop\""), "{body}");
     assert!(body.contains("data: [DONE]"), "{body}");
     Ok(())
@@ -92,6 +93,7 @@ async fn completions_stream_endpoint_flushes_chunks_when_stop_sequence_does_not_
     let text_chunks = completion_text_chunks(&events);
     assert_eq!(text_chunks.len(), 2, "{body}");
     assert_eq!(text_chunks[0], "winner");
+    assert!(!body.contains("\"token_ids\""), "{body}");
     assert!(
         events
             .iter()

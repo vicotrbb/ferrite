@@ -1,6 +1,6 @@
 use super::{
     chat_content::ChatContent, function_options::is_no_function_call,
-    message_metadata::is_optional_string, tool_options::is_empty_tools,
+    message_metadata::is_optional_string, tool_options::ChatToolCall,
     unsupported::UnsupportedFields,
 };
 use serde::{Deserialize, Deserializer};
@@ -18,7 +18,7 @@ pub struct ChatMessage {
     #[serde(default)]
     tool_call_id: Option<Value>,
     #[serde(default)]
-    tool_calls: Option<Value>,
+    tool_calls: Option<Vec<ChatToolCall>>,
     #[serde(default)]
     function_call: Option<Value>,
     #[serde(default)]
@@ -51,8 +51,7 @@ impl ChatMessage {
         }
     }
 
-    #[cfg(test)]
-    pub fn new(role: ChatRole, content: impl Into<String>) -> Self {
+    pub(crate) fn new(role: ChatRole, content: impl Into<String>) -> Self {
         Self {
             role,
             content: Some(ChatContent::from_text(content)),
@@ -74,13 +73,21 @@ impl ChatMessage {
         self.content.as_ref().map_or("", ChatContent::text)
     }
 
+    pub(crate) fn tool_calls(&self) -> &[ChatToolCall] {
+        self.tool_calls.as_deref().unwrap_or_default()
+    }
+
+    pub(crate) fn tool_call_id(&self) -> Option<&str> {
+        self.tool_call_id.as_ref().and_then(Value::as_str)
+    }
+
     pub(super) fn unsupported_fields(&self) -> Vec<String> {
         UnsupportedFields::new()
             .with_present("messages.role", self.role == ChatRole::Unknown)
             .with_present("messages.content", !self.content_matches_role())
             .with_present("messages.name", !self.name_matches_role())
             .with_present("messages.tool_call_id", !self.tool_call_id_matches_role())
-            .with_present("messages.tool_calls", !is_empty_tools(&self.tool_calls))
+            .with_present("messages.tool_calls", !self.tool_calls_match_role())
             .with_present(
                 "messages.function_call",
                 !is_no_function_call(&self.function_call),
@@ -113,6 +120,15 @@ impl ChatMessage {
 
     fn tool_message_missing_tool_call_id(&self) -> bool {
         self.role == ChatRole::Tool && self.tool_call_id.is_none()
+    }
+
+    fn tool_calls_match_role(&self) -> bool {
+        match self.tool_calls.as_deref() {
+            None | Some([]) => true,
+            Some(calls) => {
+                self.role == ChatRole::Assistant && calls.iter().all(ChatToolCall::is_valid)
+            }
+        }
     }
 
     fn tool_call_id_matches_role(&self) -> bool {

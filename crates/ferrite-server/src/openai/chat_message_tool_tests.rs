@@ -8,35 +8,7 @@ use serde_json::Value;
 use tower::ServiceExt;
 
 #[tokio::test]
-async fn chat_endpoint_rejects_message_tool_call_fields() -> Result<(), Box<dyn std::error::Error>>
-{
-    let body = post_chat(
-        r#"{
-            "model":"fixture-model",
-            "messages":[{
-                "role":"assistant",
-                "content":"hello",
-                "tool_calls":[{
-                    "id":"call_1",
-                    "type":"function",
-                    "function":{"name":"lookup","arguments":"{}"}
-                }]
-            }]
-        }"#,
-    )
-    .await?;
-
-    assert_eq!(body.status, StatusCode::BAD_REQUEST);
-    assert_eq!(body.json["error"]["type"], "invalid_request_error");
-    assert!(body.json["error"]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("messages.tool_calls"));
-    Ok(())
-}
-
-#[tokio::test]
-async fn chat_endpoint_rejects_message_tool_call_fields_without_content(
+async fn chat_endpoint_accepts_valid_message_tool_call_history_before_engine_requirement(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat(
         r#"{
@@ -48,6 +20,36 @@ async fn chat_endpoint_rejects_message_tool_call_fields_without_content(
                     "type":"function",
                     "function":{"name":"lookup","arguments":"{}"}
                 }]
+            },{
+                "role":"tool",
+                "content":"{\"result\":\"ok\"}",
+                "tool_call_id":"call_1"
+            },{
+                "role":"user",
+                "content":"summarize the result"
+            }]
+        }"#,
+    )
+    .await?;
+
+    assert_eq!(body.status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(body.json["error"]["type"], "server_error");
+    Ok(())
+}
+
+#[tokio::test]
+async fn chat_endpoint_rejects_malformed_message_tool_call_arguments(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let body = post_chat(
+        r#"{
+            "model":"fixture-model",
+            "messages":[{
+                "role":"assistant",
+                "tool_calls":[{
+                    "id":"call_1",
+                    "type":"function",
+                    "function":{"name":"lookup","arguments":"not-json"}
+                }]
             }]
         }"#,
     )
@@ -57,7 +59,7 @@ async fn chat_endpoint_rejects_message_tool_call_fields_without_content(
     assert_eq!(body.json["error"]["type"], "invalid_request_error");
     let message = body.json["error"]["message"].as_str().unwrap_or_default();
     assert!(message.contains("messages.tool_calls"), "{message}");
-    assert!(!message.contains("malformed JSON"), "{message}");
+    assert!(!message.contains("malformed request JSON"), "{message}");
     Ok(())
 }
 

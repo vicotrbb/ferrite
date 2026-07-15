@@ -12,6 +12,8 @@
 
 /// Token-level identity and budgeted metadata for prefix caching.
 pub mod prefix_cache;
+/// Per-request greedy and probabilistic token sampling.
+pub mod sampling;
 /// Model loading, tensor kernels, sessions, profiling, and generation output.
 pub mod scalar;
 /// Process-wide inference worker-pool configuration.

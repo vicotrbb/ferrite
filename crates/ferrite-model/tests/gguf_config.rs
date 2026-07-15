@@ -391,3 +391,40 @@ fn derives_qwen2_config_from_qwen2_metadata() -> Result<(), Box<dyn Error>> {
     assert_eq!(config.gqa_ratio(), Some(7));
     Ok(())
 }
+
+#[test]
+fn derives_phi3_config_and_execution_layout() -> Result<(), Box<dyn Error>> {
+    let bytes = ferrite_fixtures::scalar_phi3_f32_gguf_fixture();
+    let file = parse_gguf(&bytes)?;
+
+    let ModelConfig::Phi3(config) = file.model_config()? else {
+        return Err(io::Error::other("expected phi3 config").into());
+    };
+
+    assert_eq!(config.architecture, ModelArchitecture::Phi3);
+    assert_eq!(config.context_length, 4096);
+    assert_eq!(config.embedding_length, 4);
+    assert_eq!(config.block_count, 1);
+    assert_eq!(config.feed_forward_length, 4);
+    assert_eq!(config.attention_head_count, 1);
+    assert_eq!(config.attention_head_count_kv, 1);
+    assert_eq!(config.key_length, 4);
+    assert_eq!(config.value_length, 4);
+    assert_eq!(config.rope_dimension_count, 4);
+    assert_eq!(config.attention_layer_norm_rms_epsilon, Some(1.0e-5));
+
+    let execution = config.architecture.execution();
+    assert_eq!(
+        execution.attention,
+        ferrite_model::gguf::AttentionProjectionLayout::FusedQkv
+    );
+    assert_eq!(
+        execution.feed_forward,
+        ferrite_model::gguf::FeedForwardProjectionLayout::FusedGateUp
+    );
+    assert_eq!(
+        execution.rotary_pairing,
+        ferrite_model::gguf::RotaryPairing::SplitHalf
+    );
+    Ok(())
+}

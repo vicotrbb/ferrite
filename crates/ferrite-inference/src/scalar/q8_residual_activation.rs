@@ -94,7 +94,7 @@ impl BlockQ8Residual {
                 ));
             }
             scales[pass] = scale;
-            if std::arch::is_aarch64_feature_detected!("neon") {
+            if crate::scalar::CpuKernelCapabilities::detect().neon() {
                 // SAFETY: the runtime check establishes NEON support and both
                 // arrays contain exactly 32 values processed in 8-lane chunks.
                 unsafe {

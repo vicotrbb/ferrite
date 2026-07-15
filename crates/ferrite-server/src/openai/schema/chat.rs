@@ -2,22 +2,21 @@ use super::{
     chat_message::ChatMessage,
     chat_messages::deserialize_chat_messages,
     function_options::{is_empty_functions, is_neutral_function_call},
-    logit_bias::is_neutral_logit_bias,
     metadata::is_valid_metadata,
     modalities::is_text_only_modalities,
     model_id::deserialize_model_id,
-    neutral_options::{is_neutral_bool, is_neutral_number, is_neutral_number_in, is_optional_bool},
+    neutral_options::{is_neutral_bool, is_neutral_number, is_optional_bool},
     prompt_cache_key::is_prompt_cache_key,
     reasoning_effort::is_no_reasoning_effort,
-    response_format::is_neutral_response_format,
+    response_format::{is_supported_response_format, response_format_kind, ResponseFormatKind},
     safety_identifier::is_safety_identifier,
-    seed::is_seed,
+    sampling_options::{sampling_config, SamplingOptionError},
     service_tier::{is_local_service_tier, response_service_tier},
     stop_sequences::{is_supported_stop_sequences, stop_sequences},
     stream_flag::StreamFlag,
     stream_options::StreamOptions,
     token_limit::RequestTokenLimit,
-    tool_options::{is_empty_tools, is_neutral_parallel_tool_calls, is_no_tool_choice},
+    tool_options::{ToolConfiguration, ToolOptionError},
     unsupported::UnsupportedFields,
     user_identifier::is_user_identifier,
 };
@@ -64,7 +63,13 @@ pub struct ChatCompletionRequest {
     #[serde(default)]
     temperature: Option<Value>,
     #[serde(default)]
+    top_k: Option<Value>,
+    #[serde(default)]
     top_p: Option<Value>,
+    #[serde(default)]
+    min_p: Option<Value>,
+    #[serde(default)]
+    repetition_penalty: Option<Value>,
     #[serde(default)]
     n: Option<Value>,
     #[serde(default)]
@@ -152,6 +157,30 @@ impl ChatCompletionRequest {
         stop_sequences(&self.stop)
     }
 
+    pub(crate) fn requests_json_object(&self) -> bool {
+        response_format_kind(&self.response_format) == ResponseFormatKind::JsonObject
+    }
+
+    pub(crate) fn tool_configuration(&self) -> Result<ToolConfiguration, ToolOptionError> {
+        ToolConfiguration::from_request(&self.tools, &self.tool_choice, &self.parallel_tool_calls)
+    }
+
+    pub(crate) fn sampling_config(
+        &self,
+    ) -> Result<ferrite_inference::sampling::SamplingConfig, SamplingOptionError> {
+        sampling_config(
+            &self.temperature,
+            &self.top_k,
+            &self.top_p,
+            &self.min_p,
+            &self.repetition_penalty,
+            &self.frequency_penalty,
+            &self.presence_penalty,
+            &self.logit_bias,
+            &self.seed,
+        )
+    }
+
     pub fn cache_options(&self) -> crate::runtime::GenerationCacheOptions {
         crate::runtime::GenerationCacheOptions::from_namespace(
             self.prompt_cache_key
@@ -164,15 +193,6 @@ impl ChatCompletionRequest {
 
     pub fn unsupported_fields(&self) -> Vec<String> {
         let mut fields = UnsupportedFields::new()
-            .with_present("tools", !is_empty_tools(&self.tools))
-            .with_present(
-                "tool_choice",
-                !is_no_tool_choice(&self.tool_choice, &self.tools),
-            )
-            .with_present(
-                "parallel_tool_calls",
-                !is_neutral_parallel_tool_calls(&self.parallel_tool_calls, &self.tools),
-            )
             .with_present("functions", !is_empty_functions(&self.functions))
             .with_present(
                 "function_call",
@@ -180,7 +200,7 @@ impl ChatCompletionRequest {
             )
             .with_present(
                 "response_format",
-                !is_neutral_response_format(&self.response_format),
+                !is_supported_response_format(&self.response_format),
             )
             .with_present("modalities", !is_text_only_modalities(&self.modalities))
             .with_present("audio", self.audio.is_some())
@@ -194,26 +214,11 @@ impl ChatCompletionRequest {
                 "max_completion_tokens",
                 self.max_completion_tokens.is_malformed(),
             )
-            .with_present(
-                "temperature",
-                !is_neutral_number_in(&self.temperature, &[0.0, 1.0]),
-            )
-            .with_present("top_p", !is_neutral_number(&self.top_p, 1.0))
             .with_present("n", !is_neutral_number(&self.n, 1.0))
             .with_present("stop", !is_supported_stop_sequences(&self.stop))
-            .with_present(
-                "presence_penalty",
-                !is_neutral_number(&self.presence_penalty, 0.0),
-            )
-            .with_present(
-                "frequency_penalty",
-                !is_neutral_number(&self.frequency_penalty, 0.0),
-            )
-            .with_present("logit_bias", !is_neutral_logit_bias(&self.logit_bias))
             .with_present("logprobs", !is_neutral_bool(&self.logprobs, false))
             .with_present("top_logprobs", self.top_logprobs.is_some())
             .with_present("user", !is_user_identifier(&self.user))
-            .with_present("seed", !is_seed(&self.seed))
             .with_present("store", !is_neutral_bool(&self.store, false))
             .with_present("metadata", !is_valid_metadata(&self.metadata))
             .with_present(

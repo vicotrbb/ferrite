@@ -1078,7 +1078,7 @@ fn formats_long_chat_disconnect_probe_result() {
 
     assert_eq!(
         format_disconnect_probe_result(&result),
-        "long_chat_disconnect_probe_aborted_after_generated_event=true\nlong_chat_disconnect_probe_reconnect_completed=true\nlong_chat_disconnect_probe_reconnect_generated_event=true\nlong_chat_disconnect_probe_reconnect_started_new_generation=true\nlong_chat_disconnect_probe_max_tokens=256"
+        "long_chat_disconnect_probe_aborted_after_generated_event=true\nlong_chat_disconnect_probe_reconnect_completed=true\nlong_chat_disconnect_probe_reconnect_generated_event=true\nlong_chat_disconnect_probe_reconnect_started_new_generation=true\nlong_chat_disconnect_probe_reconnect_attempts=1\nlong_chat_disconnect_probe_disconnect_to_reconnect_admission_ms=0\nlong_chat_disconnect_probe_disconnect_to_reconnect_first_generated_event_ms=0\nlong_chat_disconnect_probe_disconnect_to_reconnect_completion_ms=0\nlong_chat_disconnect_probe_max_tokens=256"
     );
 }
 
@@ -1092,7 +1092,7 @@ fn formats_long_chat_queue_probe_result() {
 
     assert_eq!(
         format_queue_probe_result(&result),
-        "long_chat_queue_probe_holder_prompt_cache_key=tenant-a:thread-1\nlong_chat_queue_probe_contender_prompt_cache_key=tenant-b:thread-1\nlong_chat_queue_probe_holder_started_streaming=true\nlong_chat_queue_probe_holder_completed=true\nlong_chat_queue_probe_contender_status=200\nlong_chat_queue_probe_contender_completed=true\nlong_chat_queue_probe_contender_generated_event=true\nlong_chat_queue_probe_contender_started_after_holder=true\nlong_chat_queue_probe_max_tokens=64"
+        "long_chat_queue_probe_holder_prompt_cache_key=tenant-a:thread-1\nlong_chat_queue_probe_contender_prompt_cache_key=tenant-b:thread-1\nlong_chat_queue_probe_holder_started_streaming=true\nlong_chat_queue_probe_holder_completed=true\nlong_chat_queue_probe_contender_status=200\nlong_chat_queue_probe_contender_completed=true\nlong_chat_queue_probe_contender_generated_event=true\nlong_chat_queue_probe_contender_started_after_holder=true\nlong_chat_queue_probe_contender_admission_latency_ms=0\nlong_chat_queue_probe_contender_time_to_first_generated_event_ms=0\nlong_chat_queue_probe_contender_total_elapsed_ms=0\nlong_chat_queue_probe_max_tokens=64"
     );
 }
 

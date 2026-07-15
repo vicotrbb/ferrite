@@ -2,7 +2,7 @@
 
 Date: 2026-07-09
 
-Status: Accepted and implemented as opt-in policies
+Status: Accepted and implemented as opt-in policies; eligibility superseded by ADR 0013
 
 ## Context
 
@@ -43,6 +43,9 @@ fairness responsibilities.
 
 Default behavior remains serial. Operators must choose latency or aggregate
 throughput based on machine-specific evidence.
+
+ADR 0013 later extended the scheduler to non-streaming, prefix-cache, and
+cache-trace fused-greedy requests and added an explicit waiting-queue limit.
 
 ## Alternatives considered
 

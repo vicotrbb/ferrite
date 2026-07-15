@@ -8,7 +8,7 @@ const REAL_MODEL_ID: &str = "qwen2.5-1.5b-q8_0";
 
 #[tokio::test]
 #[ignore = "requires local Qwen2.5-1.5B Q8_0 GGUF model artifact"]
-async fn live_http_server_streams_32_token_chat_with_qwen_1_5b_q8_model(
+async fn live_http_server_streams_chat_with_32_token_limit_and_qwen_1_5b_q8_model(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let server =
         support::LiveServer::start_with_existing_model(REAL_MODEL_ID, qwen_1_5b_q8_model_path()?)
@@ -69,19 +69,19 @@ fn assert_long_chat_stream_response(response: &str) -> Result<(), Box<dyn std::e
     );
 
     let generated_content = content_chunks.join("");
-    assert!(
-        !generated_content.is_empty(),
-        "expected generated content: {events:?}"
+    assert_eq!(
+        generated_content, "Hello! How can I help you today?",
+        "unexpected deterministic generated content: {events:?}"
     );
 
     let terminal_chunks = events
         .iter()
-        .filter(|event| event["choices"][0]["finish_reason"] == "length")
+        .filter(|event| event["choices"][0]["finish_reason"] == "stop")
         .collect::<Vec<_>>();
     assert_eq!(
         terminal_chunks.len(),
         1,
-        "expected exactly one length terminal chunk"
+        "expected exactly one stop terminal chunk"
     );
     assert!(
         terminal_chunks[0]["choices"][0]["delta"]["content"].is_null(),

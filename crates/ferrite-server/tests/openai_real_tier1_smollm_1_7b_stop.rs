@@ -64,7 +64,7 @@ fn smollm_1_7b_q4_stop_expectation() -> StopSequenceExpectation {
     StopSequenceExpectation {
         model_id: REAL_MODEL_ID,
         completion_prompt_tokens: 2,
-        chat_prompt_tokens: 9,
+        chat_prompt_tokens: 32,
     }
 }
 
@@ -90,7 +90,7 @@ fn chat_stop_body(stream: bool) -> String {
         ],
         "max_completion_tokens": 1,
         "stream": stream,
-        "stop": "1",
+        "stop": "Hello",
     })
     .to_string()
 }

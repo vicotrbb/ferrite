@@ -84,7 +84,7 @@ impl BlockQ8K {
 
         let mut qs = [0i8; Q8_K_BLOCK_VALUES];
         #[cfg(target_arch = "aarch64")]
-        if std::arch::is_aarch64_feature_detected!("neon") {
+        if crate::scalar::CpuKernelCapabilities::detect().neon() {
             // SAFETY: the runtime check establishes NEON support and the
             // input/output slices both contain exactly 256 values.
             unsafe { quantize_neon(values, inverse_scale, &mut qs) };

@@ -81,7 +81,7 @@ async fn live_http_server_chats_with_qwen_1_5b_q8_model() -> Result<(), Box<dyn 
 
 #[tokio::test]
 #[ignore = "requires local Qwen2.5-1.5B Q8_0 GGUF model artifact"]
-async fn live_http_server_chats_32_tokens_with_qwen_1_5b_q8_model(
+async fn live_http_server_chats_with_32_token_limit_and_qwen_1_5b_q8_model(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let model_path = qwen_1_5b_q8_model_path()?;
     let server = support::LiveServer::start_with_existing_model(REAL_MODEL_ID, model_path).await?;
@@ -96,7 +96,7 @@ async fn live_http_server_chats_32_tokens_with_qwen_1_5b_q8_model(
     )
     .await?;
 
-    assert_qwen_1_5b_q8_32_token_chat_response(&response)?;
+    assert_qwen_1_5b_q8_chat_with_32_token_limit_response(&response)?;
     Ok(())
 }
 
@@ -218,14 +218,14 @@ fn assert_qwen_1_5b_q8_chat_response(response: &str) -> Result<(), Box<dyn std::
     let body = response_json(response)?;
     assert_eq!(body["object"], "chat.completion");
     assert_eq!(body["model"], REAL_MODEL_ID);
-    assert_eq!(body["choices"][0]["message"]["content"], "你好");
-    assert_eq!(body["usage"]["prompt_tokens"], 8);
+    assert_eq!(body["choices"][0]["message"]["content"], "Hello");
+    assert_eq!(body["usage"]["prompt_tokens"], 31);
     assert_eq!(body["usage"]["completion_tokens"], 1);
-    assert_eq!(body["usage"]["total_tokens"], 9);
+    assert_eq!(body["usage"]["total_tokens"], 32);
     Ok(())
 }
 
-fn assert_qwen_1_5b_q8_32_token_chat_response(
+fn assert_qwen_1_5b_q8_chat_with_32_token_limit_response(
     response: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     assert!(
@@ -236,16 +236,14 @@ fn assert_qwen_1_5b_q8_32_token_chat_response(
     assert_eq!(body["object"], "chat.completion");
     assert_eq!(body["model"], REAL_MODEL_ID);
     assert_eq!(body["choices"][0]["message"]["role"], "assistant");
-    assert_eq!(body["choices"][0]["finish_reason"], "length");
-    assert!(
-        body["choices"][0]["message"]["content"]
-            .as_str()
-            .is_some_and(|content| !content.is_empty()),
-        "unexpected response body: {body}"
+    assert_eq!(body["choices"][0]["finish_reason"], "stop");
+    assert_eq!(
+        body["choices"][0]["message"]["content"],
+        "Hello! How can I help you today?"
     );
-    assert_eq!(body["usage"]["prompt_tokens"], 8);
-    assert_eq!(body["usage"]["completion_tokens"], 32);
-    assert_eq!(body["usage"]["total_tokens"], 40);
+    assert_eq!(body["usage"]["prompt_tokens"], 31);
+    assert_eq!(body["usage"]["completion_tokens"], 10);
+    assert_eq!(body["usage"]["total_tokens"], 41);
     Ok(())
 }
 
@@ -263,7 +261,7 @@ fn assert_qwen_1_5b_q8_chat_stream_response(response: &str) {
     assert!(response.contains("data: {\"id\":\"chatcmpl-ferrite-"));
     assert!(response.contains("\"object\":\"chat.completion.chunk\""));
     assert!(response.contains("\"model\":\"qwen2.5-1.5b-q8_0\""));
-    assert!(response.contains("\"delta\":{\"content\":\"你好\"}"));
+    assert!(response.contains("\"delta\":{\"content\":\"Hello\"}"));
     assert!(response.contains("data: [DONE]"));
 }
 

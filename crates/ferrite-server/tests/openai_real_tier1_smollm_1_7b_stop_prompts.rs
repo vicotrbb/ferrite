@@ -80,7 +80,7 @@ fn completion_stop_cases() -> [CompletionStopCase; 6] {
         CompletionStopCase {
             prompt: "Machine learning models can",
             prompt_tokens: 4,
-            stop: " also",
+            stop: " be",
         },
         CompletionStopCase {
             prompt: "The recipe calls for",

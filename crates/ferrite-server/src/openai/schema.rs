@@ -11,7 +11,6 @@ mod completion_response;
 mod completion_stream;
 mod function_options;
 mod id;
-mod logit_bias;
 mod message_metadata;
 mod metadata;
 mod modalities;
@@ -20,8 +19,9 @@ mod neutral_options;
 mod prompt_cache_key;
 mod reasoning_effort;
 mod response_format;
+mod responses;
 mod safety_identifier;
-mod seed;
+mod sampling_options;
 mod service_tier;
 mod stop_sequences;
 mod stream_flag;
@@ -42,6 +42,7 @@ pub use chat_stream::{ChatCompletionStreamChunk, ChatCompletionStreamContext};
 pub use completion::CompletionRequest;
 pub use completion_response::CompletionResponse;
 pub use completion_stream::{CompletionStreamChunk, CompletionStreamContext};
+pub use responses::{ResponsesRequest, ResponsesResponse};
 
 use std::time::{SystemTime, UNIX_EPOCH};
 

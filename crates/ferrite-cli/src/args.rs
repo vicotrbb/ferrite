@@ -1,11 +1,17 @@
-use ferrite_inference::scalar::Q8KActivationMatvecRole;
+use ferrite_inference::{
+    sampling::SamplingConfig,
+    scalar::{KernelProvider, Q8KActivationMatvecRole},
+};
+use std::collections::BTreeMap;
 use std::error::Error;
 use std::ffi::OsString;
 use std::io;
 use std::path::PathBuf;
 
 pub struct CliArgs {
-    pub model_path: PathBuf,
+    pub model: ModelSource,
+    pub model_cache: Option<PathBuf>,
+    pub offline: bool,
     pub prompt: PromptSource,
     pub expected_token_id: Option<usize>,
     pub expected_generated_token_ids: Option<Vec<usize>>,
@@ -24,8 +30,17 @@ pub struct CliArgs {
     pub kv_backend: CliKvBackend,
     pub kv_tokens_per_block: usize,
     pub kv_max_tokens: Option<usize>,
+    pub kernel_provider: KernelProvider,
     pub threads: Option<usize>,
     pub benchmark_batch_streams: Option<usize>,
+    pub sampling: SamplingConfig,
+    pub stop_token_ids: Vec<usize>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ModelSource {
+    Path(PathBuf),
+    BuiltIn(String),
 }
 
 pub enum PromptSource {
@@ -51,6 +66,9 @@ impl CliKvBackend {
 
 pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dyn Error>> {
     let mut model_path = None;
+    let mut model_id = None;
+    let mut model_cache = None;
+    let mut offline = false;
     let mut prompt = None;
     let mut prompt_token_ids = None;
     let mut expected_token_id = None;
@@ -70,8 +88,12 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
     let mut kv_backend = CliKvBackend::Vec;
     let mut kv_tokens_per_block = None;
     let mut kv_max_tokens = None;
+    let mut kernel_provider = KernelProvider::Auto;
     let mut threads = None;
     let mut benchmark_batch_streams = None;
+    let mut sampling = SamplingConfig::default();
+    let mut sampling_requested = false;
+    let mut stop_token_ids = Vec::new();
     let mut iter = args.into_iter();
     let _program = iter.next();
 
@@ -83,6 +105,15 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
         match flag {
             "--model" => {
                 model_path = Some(PathBuf::from(next_value(&mut iter, "--model")?));
+            }
+            "--model-id" => {
+                model_id = Some(os_string_to_string(next_value(&mut iter, "--model-id")?)?);
+            }
+            "--model-cache" => {
+                model_cache = Some(PathBuf::from(next_value(&mut iter, "--model-cache")?));
+            }
+            "--offline" => {
+                offline = true;
             }
             "--prompt" => {
                 prompt = Some(os_string_to_string(next_value(&mut iter, "--prompt")?)?);
@@ -117,6 +148,12 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
                     "--threads",
                 )?);
             }
+            "--kernel-provider" => {
+                let value = os_string_to_string(next_value(&mut iter, "--kernel-provider")?)?;
+                kernel_provider = KernelProvider::parse(&value).map_err(|error| {
+                    io::Error::other(format!("invalid --kernel-provider: {error}"))
+                })?;
+            }
             "--benchmark-batch-streams" => {
                 benchmark_batch_streams = Some(parse_nonzero_usize(
                     next_value(&mut iter, "--benchmark-batch-streams")?,
@@ -140,6 +177,62 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
                     next_value(&mut iter, "--top-logits")?,
                     "--top-logits",
                 )?);
+            }
+            "--temperature" => {
+                sampling_requested = true;
+                sampling = sampling.with_temperature(parse_f32(
+                    next_value(&mut iter, "--temperature")?,
+                    "--temperature",
+                )?);
+            }
+            "--top-k" => {
+                sampling_requested = true;
+                let top_k = parse_usize(next_value(&mut iter, "--top-k")?, "--top-k")?;
+                sampling = sampling.with_top_k((top_k > 0).then_some(top_k));
+            }
+            "--top-p" => {
+                sampling_requested = true;
+                sampling =
+                    sampling.with_top_p(parse_f32(next_value(&mut iter, "--top-p")?, "--top-p")?);
+            }
+            "--min-p" => {
+                sampling_requested = true;
+                sampling =
+                    sampling.with_min_p(parse_f32(next_value(&mut iter, "--min-p")?, "--min-p")?);
+            }
+            "--repetition-penalty" => {
+                sampling_requested = true;
+                sampling = sampling.with_repetition_penalty(parse_f32(
+                    next_value(&mut iter, "--repetition-penalty")?,
+                    "--repetition-penalty",
+                )?);
+            }
+            "--frequency-penalty" => {
+                sampling_requested = true;
+                sampling = sampling.with_frequency_penalty(parse_f32(
+                    next_value(&mut iter, "--frequency-penalty")?,
+                    "--frequency-penalty",
+                )?);
+            }
+            "--presence-penalty" => {
+                sampling_requested = true;
+                sampling = sampling.with_presence_penalty(parse_f32(
+                    next_value(&mut iter, "--presence-penalty")?,
+                    "--presence-penalty",
+                )?);
+            }
+            "--logit-bias" => {
+                sampling_requested = true;
+                sampling = sampling
+                    .with_logit_bias(parse_logit_bias(next_value(&mut iter, "--logit-bias")?)?);
+            }
+            "--seed" => {
+                sampling_requested = true;
+                sampling = sampling
+                    .with_seed(Some(parse_i64(next_value(&mut iter, "--seed")?, "--seed")?));
+            }
+            "--stop-token-ids" => {
+                stop_token_ids = parse_token_ids(next_value(&mut iter, "--stop-token-ids")?)?;
             }
             "--stream" => {
                 stream = true;
@@ -216,6 +309,8 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
         stream,
         expected_generated_token_ids: expected_generated_token_ids.as_deref(),
         prompt_token_ids: prompt_token_ids.as_deref(),
+        sampling_requested,
+        has_stop_token_ids: !stop_token_ids.is_empty(),
     })?;
     if experimental_q8_k_activation_matvec && experimental_residual_q8_activation_matvec {
         return Err(io::Error::other(
@@ -225,9 +320,21 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
     }
 
     let kv_tokens_per_block = kv_tokens_per_block.unwrap_or(16);
+    sampling
+        .validate()
+        .map_err(|error| io::Error::other(format!("invalid sampling arguments: {error}")))?;
+
+    let model = model_source(model_path, model_id)?;
+    if (model_cache.is_some() || offline) && !matches!(model, ModelSource::BuiltIn(_)) {
+        return Err(
+            io::Error::other("--model-cache and --offline require a built-in --model-id").into(),
+        );
+    }
 
     Ok(CliArgs {
-        model_path: model_path.ok_or_else(|| io::Error::other("missing --model argument"))?,
+        model,
+        model_cache,
+        offline,
         prompt: prompt_source(prompt, prompt_token_ids)?,
         expected_token_id,
         expected_generated_token_ids,
@@ -246,9 +353,27 @@ pub fn parse(args: impl IntoIterator<Item = OsString>) -> Result<CliArgs, Box<dy
         kv_backend,
         kv_tokens_per_block,
         kv_max_tokens,
+        kernel_provider,
         threads,
         benchmark_batch_streams,
+        sampling,
+        stop_token_ids,
     })
+}
+
+fn model_source(
+    model_path: Option<PathBuf>,
+    model_id: Option<String>,
+) -> Result<ModelSource, Box<dyn Error>> {
+    match (model_path, model_id) {
+        (Some(path), None) => Ok(ModelSource::Path(path)),
+        (None, Some(id)) if !id.trim().is_empty() => Ok(ModelSource::BuiltIn(id)),
+        (None, Some(_)) => Err(io::Error::other("--model-id must not be empty").into()),
+        (None, None) => Err(io::Error::other("missing --model or --model-id argument").into()),
+        (Some(_), Some(_)) => {
+            Err(io::Error::other("use either --model or --model-id, not both").into())
+        }
+    }
 }
 
 struct ModeValidation<'a> {
@@ -261,6 +386,8 @@ struct ModeValidation<'a> {
     stream: bool,
     expected_generated_token_ids: Option<&'a [usize]>,
     prompt_token_ids: Option<&'a [usize]>,
+    sampling_requested: bool,
+    has_stop_token_ids: bool,
 }
 
 struct Q8KActivationModeValidation {
@@ -299,6 +426,13 @@ fn validate_modes(validation: ModeValidation<'_>) -> Result<(), Box<dyn Error>> 
     if validation.expected_generated_token_ids.is_some() && validation.generate_tokens.is_none() {
         return Err(
             io::Error::other("use --expect-generated-token-ids with --generate-tokens").into(),
+        );
+    }
+    if (validation.sampling_requested || validation.has_stop_token_ids)
+        && validation.generate_tokens.is_none()
+    {
+        return Err(
+            io::Error::other("use sampling and stop-token options with --generate-tokens").into(),
         );
     }
     if validation.profile_benchmark_token && validation.benchmark_runs.is_none() {
@@ -381,6 +515,43 @@ fn parse_nonzero_u64(value: OsString, flag: &str) -> Result<u64, Box<dyn Error>>
     Ok(value)
 }
 
+fn parse_i64(value: OsString, flag: &str) -> Result<i64, Box<dyn Error>> {
+    let value = os_string_to_string(value)?;
+    value
+        .parse::<i64>()
+        .map_err(|error| io::Error::other(format!("{flag} must be an i64: {error}")).into())
+}
+
+fn parse_f32(value: OsString, flag: &str) -> Result<f32, Box<dyn Error>> {
+    let value = os_string_to_string(value)?;
+    value
+        .parse::<f32>()
+        .map_err(|error| io::Error::other(format!("{flag} must be an f32: {error}")).into())
+}
+
+fn parse_logit_bias(value: OsString) -> Result<BTreeMap<usize, f32>, Box<dyn Error>> {
+    let value = os_string_to_string(value)?;
+    let mut biases = BTreeMap::new();
+    if value.is_empty() {
+        return Ok(biases);
+    }
+    for entry in value.split(',') {
+        let (token_id, bias) = entry.split_once(':').ok_or_else(|| {
+            io::Error::other("--logit-bias entries must use token_id:bias syntax")
+        })?;
+        let token_id = token_id.parse::<usize>().map_err(|error| {
+            io::Error::other(format!(
+                "logit bias token id {token_id:?} is invalid: {error}"
+            ))
+        })?;
+        let bias = bias.parse::<f32>().map_err(|error| {
+            io::Error::other(format!("logit bias value {bias:?} is invalid: {error}"))
+        })?;
+        biases.insert(token_id, bias);
+    }
+    Ok(biases)
+}
+
 fn parse_token_ids(value: OsString) -> Result<Vec<usize>, Box<dyn Error>> {
     let value = os_string_to_string(value)?;
     let mut token_ids = Vec::new();
@@ -399,7 +570,7 @@ fn parse_token_ids(value: OsString) -> Result<Vec<usize>, Box<dyn Error>> {
 }
 
 pub(crate) fn usage() -> &'static str {
-    "usage: ferrite --model <path.gguf> (--prompt <text> | --prompt-token-ids <id[,id...]>) [--threads <count>] [--expect-token-id <id>] [--top-logits <count>] [--profile-next-token] [--generate-tokens <count>] [--expect-generated-token-ids <id[,id...]>] [--stream] [--benchmark-runs <count>] [--benchmark-batch-streams <count>] [--benchmark-tokenization-runs <count>] [--profile-benchmark-token] [--sleep-after-load-ms <ms>] [--experimental-q8-k-activation-matvec | --experimental-residual-q8-activation-matvec] [--experimental-q8-k-activation-roles <role[,role...]>] [--compare-q8-k-activation-matvec] [--kv-backend <vec|locus>] [--kv-tokens-per-block <count>] [--kv-max-tokens <count>]"
+    "usage: ferrite (--model <path.gguf> | --model-id <built-in-id>) [--model-cache <directory>] [--offline] (--prompt <text> | --prompt-token-ids <id[,id...]>) [--threads <count>] [--kernel-provider <auto|portable>] [--expect-token-id <id>] [--top-logits <count>] [--profile-next-token] [--generate-tokens <count>] [--expect-generated-token-ids <id[,id...]>] [--temperature <0..2>] [--top-k <count>] [--top-p <0..1>] [--min-p <0..1>] [--repetition-penalty <positive>] [--frequency-penalty <-2..2>] [--presence-penalty <-2..2>] [--logit-bias <id:bias[,id:bias...]>] [--seed <i64>] [--stop-token-ids <id[,id...]>] [--stream] [--benchmark-runs <count>] [--benchmark-batch-streams <count>] [--benchmark-tokenization-runs <count>] [--profile-benchmark-token] [--sleep-after-load-ms <ms>] [--experimental-q8-k-activation-matvec | --experimental-residual-q8-activation-matvec] [--experimental-q8-k-activation-roles <role[,role...]>] [--compare-q8-k-activation-matvec] [--kv-backend <vec|locus>] [--kv-tokens-per-block <count>] [--kv-max-tokens <count>]"
 }
 
 #[cfg(test)]
@@ -444,8 +615,45 @@ mod tests {
         ])?;
 
         assert_eq!(args.kv_backend, super::CliKvBackend::Vec);
+        assert_eq!(
+            args.kernel_provider,
+            ferrite_inference::scalar::KernelProvider::Auto
+        );
         assert_eq!(args.kv_tokens_per_block, 16);
         assert_eq!(args.kv_max_tokens, None);
+        Ok(())
+    }
+
+    #[test]
+    fn parses_and_validates_kernel_provider() -> Result<(), Box<dyn Error>> {
+        let args = parse([
+            OsString::from("ferrite"),
+            OsString::from("--model"),
+            OsString::from("model.gguf"),
+            OsString::from("--prompt"),
+            OsString::from("hello"),
+            OsString::from("--kernel-provider"),
+            OsString::from("portable"),
+        ])?;
+        assert_eq!(
+            args.kernel_provider,
+            ferrite_inference::scalar::KernelProvider::Portable
+        );
+
+        let result = parse([
+            OsString::from("ferrite"),
+            OsString::from("--model"),
+            OsString::from("model.gguf"),
+            OsString::from("--prompt"),
+            OsString::from("hello"),
+            OsString::from("--kernel-provider"),
+            OsString::from("unsafe-native"),
+        ]);
+        let error = match result {
+            Ok(_) => return Err(io::Error::other("unknown kernel provider must fail").into()),
+            Err(error) => error,
+        };
+        assert!(error.to_string().contains("auto, portable"));
         Ok(())
     }
 
@@ -509,6 +717,121 @@ mod tests {
             error.to_string().contains("kv-backend"),
             "unexpected error: {error}"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn parses_sampling_and_stop_token_options() -> Result<(), Box<dyn Error>> {
+        let args = parse(
+            [
+                "ferrite",
+                "--model",
+                "model.gguf",
+                "--prompt",
+                "hello",
+                "--generate-tokens",
+                "8",
+                "--temperature",
+                "0.8",
+                "--top-k",
+                "40",
+                "--top-p",
+                "0.9",
+                "--min-p",
+                "0.05",
+                "--repetition-penalty",
+                "1.1",
+                "--frequency-penalty",
+                "0.2",
+                "--presence-penalty",
+                "-0.3",
+                "--logit-bias",
+                "7:1.5,9:-2",
+                "--seed",
+                "-42",
+                "--stop-token-ids",
+                "10,11",
+            ]
+            .map(OsString::from),
+        )?;
+
+        assert_eq!(args.sampling.temperature(), 0.8);
+        assert_eq!(args.sampling.top_k(), Some(40));
+        assert_eq!(args.sampling.top_p(), 0.9);
+        assert_eq!(args.sampling.min_p(), 0.05);
+        assert_eq!(args.sampling.repetition_penalty(), 1.1);
+        assert_eq!(args.sampling.frequency_penalty(), 0.2);
+        assert_eq!(args.sampling.presence_penalty(), -0.3);
+        assert_eq!(args.sampling.logit_bias().get(&7), Some(&1.5));
+        assert_eq!(args.sampling.logit_bias().get(&9), Some(&-2.0));
+        assert_eq!(args.sampling.seed(), Some(-42));
+        assert_eq!(args.stop_token_ids, [10, 11]);
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_sampling_without_generation() -> Result<(), Box<dyn Error>> {
+        let error = match parse(
+            [
+                "ferrite",
+                "--model",
+                "model.gguf",
+                "--prompt",
+                "hello",
+                "--temperature",
+                "0.8",
+            ]
+            .map(OsString::from),
+        ) {
+            Ok(_) => {
+                return Err(io::Error::other("sampling without generation should fail").into());
+            }
+            Err(error) => error,
+        };
+
+        assert!(error
+            .to_string()
+            .contains("sampling and stop-token options"));
+        Ok(())
+    }
+
+    #[test]
+    fn accepts_zero_and_rejects_negative_top_p() -> Result<(), Box<dyn Error>> {
+        let args = parse(
+            [
+                "ferrite",
+                "--model",
+                "model.gguf",
+                "--prompt",
+                "hello",
+                "--generate-tokens",
+                "1",
+                "--top-p",
+                "0",
+            ]
+            .map(OsString::from),
+        )?;
+        assert_eq!(args.sampling.top_p(), 0.0);
+
+        let error = match parse(
+            [
+                "ferrite",
+                "--model",
+                "model.gguf",
+                "--prompt",
+                "hello",
+                "--generate-tokens",
+                "1",
+                "--top-p",
+                "-0.1",
+            ]
+            .map(OsString::from),
+        ) {
+            Ok(_) => return Err(io::Error::other("negative top-p should fail").into()),
+            Err(error) => error,
+        };
+
+        assert!(error.to_string().contains("top_p"));
         Ok(())
     }
 }

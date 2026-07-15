@@ -1,9 +1,11 @@
-use crate::args::{self, CliKvBackend, PromptSource};
+use crate::args::{self, CliKvBackend, ModelSource, PromptSource};
 use crate::benchmark::profile_first_benchmark_token;
+use crate::model_acquisition::acquire_builtin_model;
 use crate::profile::{print_benchmark_token_profile, print_next_token_profile};
+use ferrite_inference::sampling::{Sampler, SamplingConfig};
 use ferrite_inference::scalar::{
-    KvBackend, NextToken, ProfiledNextToken, Q8KActivationMatvecPolicy, ScalarExecutionOptions,
-    ScalarLlamaModel, ScalarLlamaSession,
+    CpuKernelCapabilities, KernelProvider, KvBackend, NextToken, ProfiledNextToken,
+    Q8KActivationMatvecPolicy, ScalarExecutionOptions, ScalarLlamaModel, ScalarLlamaSession,
 };
 use ferrite_model::gguf::parse_gguf;
 use ferrite_model::model_file::MappedModelFile;
@@ -17,18 +19,37 @@ use std::time::{Duration, Instant};
 
 pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error>> {
     let args = args::parse(args)?;
-    #[cfg(target_arch = "aarch64")]
+    let model_path = match &args.model {
+        ModelSource::Path(path) => path.clone(),
+        ModelSource::BuiltIn(id) => {
+            let acquired = acquire_builtin_model(id, args.model_cache.as_deref(), args.offline)?;
+            let artifact = acquired.artifact();
+            println!("model_registry_id={}", artifact.id);
+            println!("model_source={}", artifact.source);
+            println!("model_revision={}", artifact.revision);
+            println!("model_license={}", artifact.license);
+            println!("model_filename={}", artifact.filename);
+            println!("model_expected_bytes={}", artifact.size);
+            println!("model_sha256={}", artifact.sha256);
+            acquired.path().to_owned()
+        }
+    };
+    let cpu_capabilities = CpuKernelCapabilities::detect();
     let use_memory_bound_pool = args.experimental_residual_q8_activation_matvec
-        && std::arch::is_aarch64_feature_detected!("i8mm");
-    #[cfg(not(target_arch = "aarch64"))]
-    let use_memory_bound_pool = false;
+        && args.kernel_provider == KernelProvider::Auto
+        && cpu_capabilities.i8mm();
     let inference_threads = if use_memory_bound_pool {
         ferrite_inference::threading::init_memory_bound_global_pool(args.threads)
     } else {
         ferrite_inference::threading::init_global_pool(args.threads)
     };
     println!("inference_threads={inference_threads}");
-    let mapped_model = map_stable_model_file(&args.model_path)?;
+    println!("kernel_provider={}", args.kernel_provider.as_str());
+    println!(
+        "cpu_features={}",
+        cpu_capabilities.detected_feature_labels()
+    );
+    let mapped_model = map_stable_model_file(&model_path)?;
     let bytes = mapped_model.as_bytes();
     let model_file_bytes = bytes.len();
     let gguf_parse_started = Instant::now();
@@ -66,6 +87,7 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
         Q8KActivationMatvecPolicy::DefaultOnly
     };
     let mut execution_options = ScalarExecutionOptions::default()
+        .with_kernel_provider(args.kernel_provider)
         .with_q8_k_activation_matvec_policy(q8_k_activation_matvec_policy)
         .with_q8_k_activation_matvec_comparison(args.compare_q8_k_activation_matvec);
     if let Some(roles) = args.experimental_q8_k_activation_roles {
@@ -125,6 +147,41 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
     );
     println!("next_token_id={}", next.token_id);
     println!("next_token={token}");
+    println!("sampling_temperature={}", args.sampling.temperature());
+    println!(
+        "sampling_top_k={}",
+        args.sampling
+            .top_k()
+            .map_or_else(|| "none".to_owned(), |value| value.to_string())
+    );
+    println!("sampling_top_p={}", args.sampling.top_p());
+    println!("sampling_min_p={}", args.sampling.min_p());
+    println!(
+        "sampling_repetition_penalty={}",
+        args.sampling.repetition_penalty()
+    );
+    println!(
+        "sampling_frequency_penalty={}",
+        args.sampling.frequency_penalty()
+    );
+    println!(
+        "sampling_presence_penalty={}",
+        args.sampling.presence_penalty()
+    );
+    println!(
+        "sampling_logit_bias_count={}",
+        args.sampling.logit_bias().len()
+    );
+    println!(
+        "sampling_seed={}",
+        args.sampling
+            .seed()
+            .map_or_else(|| "none".to_owned(), |value| value.to_string())
+    );
+    println!(
+        "sampling_fused_greedy_path={}",
+        args.sampling.uses_fused_greedy_path()
+    );
     if let Some(profile) = &profile {
         print_next_token_profile(profile);
     }
@@ -132,15 +189,38 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
         println!("top_logits={}", format_top_logits(&next.logits, count));
     }
     if let Some(count) = args.generate_tokens {
-        let generated =
-            generate_tokens(&mut session, &tokenizer, next.clone(), count, args.stream)?;
+        let generated = generate_tokens(
+            &mut session,
+            &tokenizer,
+            &prompt_token_ids,
+            next.clone(),
+            CliGenerationOptions {
+                count,
+                stream: args.stream,
+                sampling: args.sampling,
+                stop_token_ids: &args.stop_token_ids,
+            },
+        )?;
         println!("generated_cached_tokens={}", session.cached_token_count());
         println!(
             "generated_token_ids={}",
             join_token_ids(&generated.token_ids)
         );
         println!("generated_stopped_on_eos={}", generated.stopped_on_eos);
-        println!("generated_text={}", tokenizer.decode(&generated.token_ids)?);
+        println!(
+            "generated_stopped_on_stop_token={}",
+            generated.stopped_on_stop_token
+        );
+        println!(
+            "sampling_effective_seed={}",
+            generated
+                .effective_seed
+                .map_or_else(|| "none".to_owned(), |value| value.to_string())
+        );
+        println!(
+            "generated_text={}",
+            tokenizer.decode(generated.visible_token_ids())?
+        );
         if let Some(expected_token_ids) = args.expected_generated_token_ids {
             println!(
                 "expected_generated_token_ids={}",
@@ -207,7 +287,7 @@ pub fn run(args: impl IntoIterator<Item = OsString>) -> Result<(), Box<dyn Error
     );
     println!("scalar_weight_bytes={}", model.scalar_weight_bytes());
     println!("kv_cache_bytes={}", session.kv_cache_bytes());
-    #[cfg(feature = "locus-kv")]
+    #[cfg(all(feature = "locus-kv", unix))]
     if let Some(allocations) = session.locus_pool_allocation_count() {
         println!("locus_pool_allocation_count={allocations}");
     }
@@ -310,38 +390,79 @@ fn accept_prompt(
 fn generate_tokens(
     session: &mut ScalarLlamaSession<'_>,
     tokenizer: &GgufTokenizer,
+    prompt_token_ids: &[usize],
     next: NextToken,
-    count: usize,
-    stream: bool,
+    options: CliGenerationOptions<'_>,
 ) -> Result<GeneratedTokens, Box<dyn Error>> {
-    let eos_token_id = tokenizer.eos_token_id();
-    let mut token_id = next.token_id;
-    let mut token_ids = Vec::with_capacity(count);
+    let mut sampler = if options.sampling.uses_fused_greedy_path() {
+        None
+    } else {
+        let mut sampler = Sampler::new(options.sampling)?;
+        sampler.observe_all(prompt_token_ids);
+        Some(sampler)
+    };
+    let effective_seed = sampler.as_ref().map(Sampler::effective_seed);
+    let mut token_id = match sampler.as_mut() {
+        Some(sampler) => sampler.sample(&next.logits)?,
+        None => next.token_id,
+    };
+    let mut token_ids = Vec::with_capacity(options.count);
     let mut stopped_on_eos = false;
+    let mut stopped_on_stop_token = false;
 
-    for _ in 0..count {
+    for _ in 0..options.count {
         token_ids.push(token_id);
-        if stream {
+        stopped_on_eos = tokenizer.is_end_of_generation_token(token_id);
+        stopped_on_stop_token = options.stop_token_ids.contains(&token_id);
+        if options.stream {
             println!("stream_token_id={token_id}");
-            println!("stream_text={}", tokenizer.decode(&[token_id])?);
+            let text = if stopped_on_eos || stopped_on_stop_token {
+                String::new()
+            } else {
+                tokenizer.decode(&[token_id])?
+            };
+            println!("stream_text={text}");
         }
 
-        if Some(token_id) == eos_token_id {
-            stopped_on_eos = true;
+        if stopped_on_eos || stopped_on_stop_token {
             break;
         }
 
-        token_id = session.accept_token_id(token_id)?;
+        token_id = match sampler.as_mut() {
+            Some(sampler) => sampler.sample(&session.accept_token(token_id)?.logits)?,
+            None => session.accept_token_id(token_id)?,
+        };
     }
     Ok(GeneratedTokens {
         token_ids,
         stopped_on_eos,
+        stopped_on_stop_token,
+        effective_seed,
     })
+}
+
+struct CliGenerationOptions<'a> {
+    count: usize,
+    stream: bool,
+    sampling: SamplingConfig,
+    stop_token_ids: &'a [usize],
 }
 
 struct GeneratedTokens {
     token_ids: Vec<usize>,
     stopped_on_eos: bool,
+    stopped_on_stop_token: bool,
+    effective_seed: Option<u64>,
+}
+
+impl GeneratedTokens {
+    fn visible_token_ids(&self) -> &[usize] {
+        if self.stopped_on_eos || self.stopped_on_stop_token {
+            &self.token_ids[..self.token_ids.len().saturating_sub(1)]
+        } else {
+            &self.token_ids
+        }
+    }
 }
 
 fn format_top_logits(logits: &[f32], count: usize) -> String {

@@ -35,11 +35,22 @@ pub(super) fn q6_k_mul_vec(
     Ok(q6_k_mul_vec_with_backend(bytes, rows, cols, vector)?.values)
 }
 
+#[cfg(test)]
 pub(super) fn q6_k_argmax_mul_vec(
     bytes: &[u8],
     rows: usize,
     cols: usize,
     vector: &[f32],
+) -> Result<usize, InferenceError> {
+    q6_k_argmax_mul_vec_with_options(bytes, rows, cols, vector, ScalarExecutionOptions::default())
+}
+
+pub(super) fn q6_k_argmax_mul_vec_with_options(
+    bytes: &[u8],
+    rows: usize,
+    cols: usize,
+    vector: &[f32],
+    options: ScalarExecutionOptions,
 ) -> Result<usize, InferenceError> {
     validate_q6_k_mul_vec(bytes, rows, cols, vector)?;
     if rows == 0 {
@@ -48,19 +59,13 @@ pub(super) fn q6_k_argmax_mul_vec(
 
     #[cfg(target_arch = "aarch64")]
     {
-        if cols != 0
-            && cols.is_multiple_of(Q6_K_BLOCK_VALUES)
-            && std::arch::is_aarch64_feature_detected!("neon")
-        {
+        if cols != 0 && cols.is_multiple_of(Q6_K_BLOCK_VALUES) && options.kernel_dispatch().neon() {
             return super::q6_k_neon::neon_q6_k_argmax_mul_vec(bytes, rows, cols, vector);
         }
     }
     #[cfg(target_arch = "x86_64")]
     {
-        if cols != 0
-            && cols.is_multiple_of(Q6_K_BLOCK_VALUES)
-            && std::arch::is_x86_feature_detected!("avx2")
-        {
+        if cols != 0 && cols.is_multiple_of(Q6_K_BLOCK_VALUES) && options.kernel_dispatch().avx2() {
             return super::q6_k_avx2::avx2_q6_k_argmax_mul_vec(bytes, rows, cols, vector);
         }
     }
@@ -78,13 +83,13 @@ pub(super) fn q6_k_mul_vec_with_backend(
     q6_k_mul_vec_with_options(bytes, rows, cols, vector, ScalarExecutionOptions::default())
 }
 
-/// Batched matvec across several activation vectors; each stream's output
-/// is bit-identical to a default-dispatch `q6_k_mul_vec_with_options` call.
-pub(super) fn q6_k_mul_vec_batch(
+/// Batched matvec across several activation vectors using one provider policy.
+pub(super) fn q6_k_mul_vec_batch_with_options(
     bytes: &[u8],
     rows: usize,
     cols: usize,
     vectors: &[&[f32]],
+    options: ScalarExecutionOptions,
 ) -> Result<Vec<Vec<f32>>, InferenceError> {
     let Some(first) = vectors.first() else {
         return Ok(Vec::new());
@@ -93,10 +98,7 @@ pub(super) fn q6_k_mul_vec_batch(
 
     #[cfg(target_arch = "aarch64")]
     {
-        if cols != 0
-            && cols.is_multiple_of(Q6_K_BLOCK_VALUES)
-            && std::arch::is_aarch64_feature_detected!("neon")
-        {
+        if cols != 0 && cols.is_multiple_of(Q6_K_BLOCK_VALUES) && options.kernel_dispatch().neon() {
             return super::q6_k_neon::neon_q6_k_mul_vec_batch(bytes, rows, cols, vectors);
         }
     }
@@ -104,7 +106,7 @@ pub(super) fn q6_k_mul_vec_batch(
     vectors
         .iter()
         .map(|vector| {
-            q6_k_mul_vec_with_options(bytes, rows, cols, vector, ScalarExecutionOptions::default())
+            q6_k_mul_vec_with_options(bytes, rows, cols, vector, options)
                 .map(|output| output.values)
         })
         .collect()
@@ -126,7 +128,7 @@ pub(super) fn q6_k_mul_vec_with_options(
         if options.residual_q8_activation_matvec()
             && cols != 0
             && cols.is_multiple_of(Q6_K_BLOCK_VALUES)
-            && std::arch::is_aarch64_feature_detected!("i8mm")
+            && options.kernel_dispatch().i8mm()
         {
             return Ok(Q6KMatVecOutput {
                 values: super::q6_k_q8_residual_i8mm::neon_q6_k_q8_residual_i8mm_mul_vec(
@@ -138,26 +140,20 @@ pub(super) fn q6_k_mul_vec_with_options(
         if options.q8_k_activation_matvec()
             && cols != 0
             && cols.is_multiple_of(Q6_K_BLOCK_VALUES)
-            && std::arch::is_aarch64_feature_detected!("neon")
+            && options.kernel_dispatch().neon()
         {
             return Ok(Q6KMatVecOutput {
                 values: super::q6_k_q8_k_neon::neon_q6_k_q8_k_mul_vec(bytes, rows, cols, vector)?,
                 backend: Q6KMatVecBackend::Aarch64NeonQ8K,
             });
         }
-        if cols != 0
-            && cols.is_multiple_of(Q6_K_BLOCK_VALUES)
-            && std::arch::is_aarch64_feature_detected!("neon")
-        {
+        if cols != 0 && cols.is_multiple_of(Q6_K_BLOCK_VALUES) && options.kernel_dispatch().neon() {
             return super::q6_k_neon::neon_q6_k_mul_vec(bytes, rows, cols, vector);
         }
     }
     #[cfg(target_arch = "x86_64")]
     {
-        if cols != 0
-            && cols.is_multiple_of(Q6_K_BLOCK_VALUES)
-            && std::arch::is_x86_feature_detected!("avx2")
-        {
+        if cols != 0 && cols.is_multiple_of(Q6_K_BLOCK_VALUES) && options.kernel_dispatch().avx2() {
             return super::q6_k_avx2::avx2_q6_k_mul_vec(bytes, rows, cols, vector);
         }
     }
@@ -260,6 +256,10 @@ fn scalar_q6_k_argmax_mul_vec(
     cols: usize,
     vector: &[f32],
 ) -> Result<usize, InferenceError> {
+    if cols == 0 || !cols.is_multiple_of(Q6_K_BLOCK_VALUES) {
+        let output = scalar_q6_k_mul_vec(bytes, rows, cols, vector)?;
+        return super::math::argmax(&output.values);
+    }
     let blocks_per_row = cols / Q6_K_BLOCK_VALUES;
     let row_bytes = blocks_per_row
         .checked_mul(Q6_K_BLOCK_BYTES)

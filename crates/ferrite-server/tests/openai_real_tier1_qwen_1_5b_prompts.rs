@@ -83,49 +83,49 @@ fn prompt_cases() -> [PromptCase; 6] {
             prompt: "hello world",
             completion_prompt_tokens: 2,
             completion_text: "\n",
-            chat_prompt_tokens: 8,
-            chat_content: "你好",
-            chat_stream_content: "你好",
+            chat_prompt_tokens: 31,
+            chat_content: "Hello",
+            chat_stream_content: "Hello",
         },
         PromptCase {
             prompt: "The capital of France is",
             completion_prompt_tokens: 5,
             completion_text: " Paris",
-            chat_prompt_tokens: 11,
-            chat_content: " Paris",
-            chat_stream_content: " Paris",
+            chat_prompt_tokens: 34,
+            chat_content: "The",
+            chat_stream_content: "The",
         },
         PromptCase {
             prompt: "Once upon a time",
             completion_prompt_tokens: 4,
             completion_text: ",",
-            chat_prompt_tokens: 10,
-            chat_content: "1",
-            chat_stream_content: "1",
+            chat_prompt_tokens: 33,
+            chat_content: "I",
+            chat_stream_content: "I",
         },
         PromptCase {
             prompt: "Rust is a systems programming language",
             completion_prompt_tokens: 7,
             completion_text: " that",
-            chat_prompt_tokens: 12,
-            chat_content: "你说",
-            chat_stream_content: "你说",
+            chat_prompt_tokens: 36,
+            chat_content: "R",
+            chat_stream_content: "R",
         },
         PromptCase {
             prompt: "Machine learning models can",
             completion_prompt_tokens: 4,
             completion_text: " be",
-            chat_prompt_tokens: 10,
-            chat_content: "1",
-            chat_stream_content: "1",
+            chat_prompt_tokens: 33,
+            chat_content: "Machine",
+            chat_stream_content: "Machine",
         },
         PromptCase {
             prompt: "The recipe calls for",
             completion_prompt_tokens: 4,
             completion_text: " ",
-            chat_prompt_tokens: 10,
-            chat_content: "2",
-            chat_stream_content: "2",
+            chat_prompt_tokens: 33,
+            chat_content: "I",
+            chat_stream_content: "I",
         },
     ]
 }
@@ -245,12 +245,12 @@ fn assert_qwen_chat_stream_response(
     );
     let stop_events = events
         .iter()
-        .filter(|event| event["choices"][0]["finish_reason"] == "stop")
+        .filter(|event| event["choices"][0]["finish_reason"] == "length")
         .collect::<Vec<_>>();
     assert_eq!(
         stop_events.len(),
         1,
-        "expected exactly one terminal stream chunk"
+        "expected exactly one length terminal stream chunk"
     );
     assert!(
         stop_events[0]["choices"][0]["delta"]["content"].is_null(),

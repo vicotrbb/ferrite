@@ -75,10 +75,18 @@ impl ServerState {
         self
     }
 
-    /// Enables scheduler-owned continuous batching for eligible streaming
+    /// Enables scheduler-owned continuous batching for eligible fused-greedy
     /// requests. This is deliberately separate from the default inference
-    /// semaphore so enabling the experiment cannot change the legacy path.
-    pub fn with_batched_decode(mut self, max_batch_streams: usize) -> Result<Self, RuntimeError> {
+    /// semaphore used by sampling policies that require complete logits.
+    pub fn with_batched_decode(self, max_batch_streams: usize) -> Result<Self, RuntimeError> {
+        self.with_batched_decode_and_queue(max_batch_streams, max_batch_streams)
+    }
+
+    pub fn with_batched_decode_and_queue(
+        mut self,
+        max_batch_streams: usize,
+        max_queued_jobs: usize,
+    ) -> Result<Self, RuntimeError> {
         let engine = self
             .engine
             .clone()
@@ -89,8 +97,15 @@ impl ServerState {
             ));
         }
         let max_batch_streams = max_batch_streams.max(1);
-        self.batch_scheduler = Some(Arc::new(BatchScheduler::start(engine, max_batch_streams)?));
-        self.batch_admission_permits = Some(Arc::new(Semaphore::new(max_batch_streams)));
+        let max_queued_jobs = max_queued_jobs.max(1);
+        self.batch_scheduler = Some(Arc::new(BatchScheduler::start_with_queue(
+            engine,
+            max_batch_streams,
+            max_queued_jobs,
+        )?));
+        self.batch_admission_permits = Some(Arc::new(Semaphore::new(
+            max_batch_streams.saturating_add(max_queued_jobs),
+        )));
         Ok(self)
     }
 

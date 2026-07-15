@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "policy_id": "ferrite-qwen2.5-1.5b-chat-near-ties-v1",
+  "review_status": "reviewed",
+  "scope": "Two pinned Qwen2.5 1.5B chat traces with stable argmax differences below 0.001 in Ferrite logits.",
+  "rules": [
+    "This policy is not a global numerical tolerance.",
+    "Each accepted run must reproduce the exact recorded model, prompt, rendered template, llama.cpp revision, token traces, prompt count, and finish reason.",
+    "Any new divergence or changed trace is rejected and requires a new review."
+  ],
+  "cases": [
+    {
+      "case_id": "qwen2.5-1.5b-q6-rust-first-token",
+      "model_sha256": "e16d94f3b1eb243f6f6be9eee51090ef5dfd741324394fd5b6e0e425c33df5c7",
+      "prompt_sha256": "157ea07ef22b4db39cde3cc1d49c1bf0caeb821f7aa62509a70b429863ebd04a",
+      "request_mode": "chat",
+      "max_tokens": 1,
+      "llama_cpp_revision": "6eddde06a4f25d55d538b5d15628dcc2b6882147",
+      "rendered_prompt_sha256": "462304524c223872837458820840e1304cd4e66645f87e17edfd1a2a44b6b920",
+      "prompt_tokens": 36,
+      "expected_finish_reason": "length",
+      "expected_ferrite_token_ids": [9454],
+      "expected_llama_cpp_token_ids": [49],
+      "expected_ferrite_runtime_emitted_token_ids": [9454],
+      "expected_llama_cpp_runtime_emitted_token_ids": [49],
+      "first_divergence_index": 0,
+      "recorded_absolute_logit_gap": 0.000721,
+      "recorded_ferrite_candidates": [
+        {
+          "token_id": 9454,
+          "text": "Yes",
+          "logit": 22.632132
+        },
+        {
+          "token_id": 49,
+          "text": "R",
+          "logit": 22.631411
+        }
+      ],
+      "decision": "accept_exact_recorded_near_tie_trace"
+    },
+    {
+      "case_id": "qwen2.5-1.5b-q8-hello-long-chat",
+      "model_sha256": "d7efb072e7724d25048a4fda0a3e10b04bdef5d06b1403a1c93bd9f1240a63c8",
+      "prompt_sha256": "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9",
+      "request_mode": "chat",
+      "max_tokens": 32,
+      "llama_cpp_revision": "6eddde06a4f25d55d538b5d15628dcc2b6882147",
+      "rendered_prompt_sha256": "7bd7e8a55a4705a16e8c00b5def95f5ee380d59899128301e25babaca8fb260f",
+      "prompt_tokens": 31,
+      "expected_finish_reason": "stop",
+      "expected_ferrite_token_ids": [9707, 0, 2585, 646, 358, 1492, 498, 3351, 30],
+      "expected_llama_cpp_token_ids": [9707, 0, 2585, 646, 358, 7789, 498, 3351, 30],
+      "expected_ferrite_runtime_emitted_token_ids": [9707, 0, 2585, 646, 358, 1492, 498, 3351, 30],
+      "expected_llama_cpp_runtime_emitted_token_ids": [9707, 0, 2585, 646, 358, 7789, 498, 3351, 30, 151645],
+      "first_divergence_index": 5,
+      "recorded_absolute_logit_gap": 0.00079,
+      "recorded_ferrite_candidates": [
+        {
+          "token_id": 1492,
+          "text": "help",
+          "logit": 28.966488
+        },
+        {
+          "token_id": 7789,
+          "text": "assist",
+          "logit": 28.965698
+        }
+      ],
+      "decision": "accept_exact_recorded_near_tie_trace"
+    }
+  ]
+}
