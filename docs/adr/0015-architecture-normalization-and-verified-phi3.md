@@ -103,8 +103,8 @@ this decision.
   providers selected token ID 7521. All three ordered their top-five token IDs
   as 7521, 426, 8853, 421, 23230. This is one-token correctness evidence, not a
   performance result.
-- `crates/ferrite-server/tests/openai_real_phi3.rs` rehashes the pinned model
-  and checks deterministic non-streaming and streaming HTTP generation. It
+- `crates/ferrite-server/tests/real_models/openai_real_phi3.rs` rehashes the
+  pinned model and checks deterministic non-streaming and streaming HTTP generation. It
   proves that Phi-3 token 32007 (`<|end|>`) ends generation, contributes to
   usage accounting, and remains absent from visible response text. Ferrite and
   the pinned llama.cpp reference share the first two generated IDs for this

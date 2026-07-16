@@ -21,7 +21,7 @@ use ferrite_model::{
     tokenizer::{GgufTokenizer, TokenizationControl},
 };
 use json_grammar::JsonObjectConstraint;
-use prefix_cache::{fnv64_bytes, RuntimePrefixCache};
+use prefix_cache::{RuntimePrefixCache, fnv64_bytes};
 use std::{error::Error, fmt, path::Path, sync::Mutex};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -237,22 +237,21 @@ impl InferenceEngine {
         let required = prompt_tokens
             .checked_add(max_tokens.saturating_sub(1))
             .ok_or_else(|| RuntimeError::new("requested KV token count overflowed"))?;
-        if let Some(context_length) = self.model.context_length() {
-            if required > context_length {
-                return Err(RuntimeError::new(format!(
-                    "request needs capacity for {required} KV tokens but the model context length is {context_length}"
-                )));
-            }
+        if let Some(context_length) = self.model.context_length()
+            && required > context_length
+        {
+            return Err(RuntimeError::new(format!(
+                "request needs capacity for {required} KV tokens but the model context length is {context_length}"
+            )));
         }
         if let ferrite_inference::scalar::KvBackend::Locus {
             max_tokens: cap, ..
         } = self.execution_options.kv_backend()
+            && required > cap
         {
-            if required > cap {
-                return Err(RuntimeError::new(format!(
-                    "request needs capacity for {required} KV tokens but the configured Locus limit is {cap}"
-                )));
-            }
+            return Err(RuntimeError::new(format!(
+                "request needs capacity for {required} KV tokens but the configured Locus limit is {cap}"
+            )));
         }
         Ok(())
     }
@@ -1025,8 +1024,8 @@ mod tests {
     static FIXTURE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
     #[test]
-    fn generate_with_token_callback_reports_each_token_piece(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn generate_with_token_callback_reports_each_token_piece()
+    -> Result<(), Box<dyn std::error::Error>> {
         let model_path = write_fixture_model()?;
         let engine = InferenceEngine::load(&model_path)?;
         remove_fixture_model(&model_path)?;
@@ -1044,16 +1043,18 @@ mod tests {
             generated.token_id_chunks().len(),
             generated.token_texts().len()
         );
-        assert!(generated
-            .token_id_chunks()
-            .iter()
-            .all(|chunk| !chunk.is_empty()));
+        assert!(
+            generated
+                .token_id_chunks()
+                .iter()
+                .all(|chunk| !chunk.is_empty())
+        );
         Ok(())
     }
 
     #[test]
-    fn sampled_generation_is_seeded_and_isolated_per_request(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn sampled_generation_is_seeded_and_isolated_per_request()
+    -> Result<(), Box<dyn std::error::Error>> {
         let model_path = write_fixture_model()?;
         let engine = InferenceEngine::load(&model_path)?;
         remove_fixture_model(&model_path)?;
@@ -1135,8 +1136,8 @@ mod tests {
     }
 
     #[test]
-    fn generate_with_prompt_callback_cancels_before_next_prompt_token(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn generate_with_prompt_callback_cancels_before_next_prompt_token()
+    -> Result<(), Box<dyn std::error::Error>> {
         let model_path = write_fixture_model()?;
         let engine = InferenceEngine::load(&model_path)?;
         remove_fixture_model(&model_path)?;
@@ -1169,8 +1170,8 @@ mod tests {
     }
 
     #[test]
-    fn generate_with_prompt_cancellation_poll_stops_during_prompt_token_evaluation(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn generate_with_prompt_cancellation_poll_stops_during_prompt_token_evaluation()
+    -> Result<(), Box<dyn std::error::Error>> {
         let model_path = write_fixture_model()?;
         let engine = InferenceEngine::load(&model_path)?;
         remove_fixture_model(&model_path)?;
@@ -1244,8 +1245,8 @@ mod tests {
     }
 
     #[test]
-    fn generation_stage_callback_reports_prefill_setup_order(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn generation_stage_callback_reports_prefill_setup_order()
+    -> Result<(), Box<dyn std::error::Error>> {
         let model_path = write_fixture_model()?;
         let engine = InferenceEngine::load(&model_path)?;
         remove_fixture_model(&model_path)?;
@@ -1277,8 +1278,8 @@ mod tests {
     }
 
     #[test]
-    fn generation_tokenization_cancellation_stops_before_prompt_evaluation(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn generation_tokenization_cancellation_stops_before_prompt_evaluation()
+    -> Result<(), Box<dyn std::error::Error>> {
         let model_path = write_fixture_model()?;
         let engine = InferenceEngine::load(&model_path)?;
         remove_fixture_model(&model_path)?;
@@ -1337,8 +1338,8 @@ mod tests {
     }
 
     #[test]
-    fn generated_text_rejects_cached_prompt_tokens_above_prompt_tokens(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn generated_text_rejects_cached_prompt_tokens_above_prompt_tokens()
+    -> Result<(), Box<dyn std::error::Error>> {
         let error = match GeneratedText::new("winner".to_owned(), 2, 1, vec!["winner".to_owned()])
             .with_cached_prompt_tokens(3)
         {
@@ -1346,15 +1347,17 @@ mod tests {
             Err(error) => error,
         };
 
-        assert!(error
-            .to_string()
-            .contains("cached prompt tokens 3 exceed prompt tokens 2"));
+        assert!(
+            error
+                .to_string()
+                .contains("cached prompt tokens 3 exceed prompt tokens 2")
+        );
         Ok(())
     }
 
     #[test]
-    fn prefix_cache_key_uses_tokenized_prompt_and_cache_namespace(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn prefix_cache_key_uses_tokenized_prompt_and_cache_namespace()
+    -> Result<(), Box<dyn std::error::Error>> {
         let model_path = write_fixture_model()?;
         let engine = InferenceEngine::load(&model_path)?;
         remove_fixture_model(&model_path)?;
@@ -1368,10 +1371,11 @@ mod tests {
         assert_eq!(key.prefix_token_count(), 1);
         assert_eq!(key.namespace(), Some("tenant-a:thread-1"));
         assert!(key.fingerprints().model().starts_with("gguf-model-fnv64:"));
-        assert!(key
-            .fingerprints()
-            .tokenizer()
-            .starts_with("gguf-tokenizer-fnv64:"));
+        assert!(
+            key.fingerprints()
+                .tokenizer()
+                .starts_with("gguf-tokenizer-fnv64:")
+        );
         assert_eq!(key.fingerprints().template(), "runtime-rendered-prompt-v1");
         assert_eq!(
             key.fingerprints().execution(),
@@ -1399,16 +1403,18 @@ mod tests {
             automatic_key.fingerprints().execution(),
             portable_key.fingerprints().execution()
         );
-        assert!(portable_key
-            .fingerprints()
-            .execution()
-            .contains("kernels=portable"));
+        assert!(
+            portable_key
+                .fingerprints()
+                .execution()
+                .contains("kernels=portable")
+        );
         Ok(())
     }
 
     #[test]
-    fn exact_prefix_cache_reuses_prompt_snapshot_when_enabled(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn exact_prefix_cache_reuses_prompt_snapshot_when_enabled()
+    -> Result<(), Box<dyn std::error::Error>> {
         let model_path = write_fixture_model()?;
         let engine = InferenceEngine::load(&model_path)?;
         remove_fixture_model(&model_path)?;
@@ -1451,8 +1457,8 @@ mod tests {
     }
 
     #[test]
-    fn prefix_cache_eviction_keeps_active_snapshot_lease_valid(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn prefix_cache_eviction_keeps_active_snapshot_lease_valid()
+    -> Result<(), Box<dyn std::error::Error>> {
         let model_path = write_fixture_model()?;
         let engine = InferenceEngine::load(&model_path)?.with_prefix_cache_limits(1, u128::MAX)?;
         remove_fixture_model(&model_path)?;
@@ -1474,10 +1480,12 @@ mod tests {
         let mut restored = engine.start_session()?;
         restored.restore_cache_snapshot(lease.snapshot())?;
         assert_eq!(restored.cached_token_count(), 1);
-        assert!(engine
-            .prefix_cache_lookup(&hello_key)?
-            .into_value()
-            .is_none());
+        assert!(
+            engine
+                .prefix_cache_lookup(&hello_key)?
+                .into_value()
+                .is_none()
+        );
         Ok(())
     }
 
@@ -1532,8 +1540,8 @@ mod tests {
 
     #[cfg(all(feature = "locus-kv", unix))]
     #[test]
-    fn locus_kv_capacity_fails_before_partial_prompt_evaluation(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn locus_kv_capacity_fails_before_partial_prompt_evaluation()
+    -> Result<(), Box<dyn std::error::Error>> {
         let model_path = write_fixture_model()?;
         let engine = InferenceEngine::load(&model_path)?.with_execution_options(
             ScalarExecutionOptions::default().with_kv_backend(
@@ -1558,8 +1566,8 @@ mod tests {
     }
 
     #[test]
-    fn generation_rejects_requests_beyond_the_gguf_context_before_evaluation(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn generation_rejects_requests_beyond_the_gguf_context_before_evaluation()
+    -> Result<(), Box<dyn std::error::Error>> {
         let model_path = write_fixture_model()?;
         let engine = InferenceEngine::load(&model_path)?;
         remove_fixture_model(&model_path)?;
@@ -1579,8 +1587,8 @@ mod tests {
     }
 
     #[test]
-    fn sampled_generation_recovers_logits_from_greedy_cache_entry(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn sampled_generation_recovers_logits_from_greedy_cache_entry()
+    -> Result<(), Box<dyn std::error::Error>> {
         let model_path = write_fixture_model()?;
         let engine = InferenceEngine::load(&model_path)?;
         remove_fixture_model(&model_path)?;
@@ -1621,8 +1629,8 @@ mod tests {
     }
 
     #[test]
-    fn prefix_cache_reuses_longest_prompt_prefix_when_enabled(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn prefix_cache_reuses_longest_prompt_prefix_when_enabled()
+    -> Result<(), Box<dyn std::error::Error>> {
         let model_path = write_fixture_model()?;
         let engine = InferenceEngine::load(&model_path)?;
         remove_fixture_model(&model_path)?;
@@ -1645,8 +1653,8 @@ mod tests {
     }
 
     #[test]
-    fn prefix_cache_reuses_shared_prompt_prefix_when_prompts_diverge(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn prefix_cache_reuses_shared_prompt_prefix_when_prompts_diverge()
+    -> Result<(), Box<dyn std::error::Error>> {
         let model_path = write_fixture_model()?;
         let engine = InferenceEngine::load(&model_path)?;
         remove_fixture_model(&model_path)?;
@@ -1671,8 +1679,8 @@ mod tests {
     }
 
     #[test]
-    fn prefix_cache_trace_explains_shared_prompt_prefix_hit(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn prefix_cache_trace_explains_shared_prompt_prefix_hit()
+    -> Result<(), Box<dyn std::error::Error>> {
         let model_path = write_fixture_model()?;
         let engine = InferenceEngine::load(&model_path)?;
         remove_fixture_model(&model_path)?;
@@ -1701,8 +1709,8 @@ mod tests {
     }
 
     #[test]
-    fn token_text_buffer_waits_for_decodable_utf8_sequence(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn token_text_buffer_waits_for_decodable_utf8_sequence()
+    -> Result<(), Box<dyn std::error::Error>> {
         let mut buffer = TokenTextBuffer::new();
         let mut generated_token_ids = vec![13];
         let mut pieces = Vec::new();

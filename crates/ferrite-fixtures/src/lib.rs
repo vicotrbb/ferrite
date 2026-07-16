@@ -4,6 +4,11 @@
 //! crate keeps binary model assets out of Git while exercising the real parser,
 //! tokenizer, loader, and inference boundaries.
 #![deny(missing_docs)]
+#![deny(
+    clippy::doc_markdown,
+    clippy::missing_errors_doc,
+    clippy::return_self_not_must_use
+)]
 
 mod chat_llama;
 mod chat_templates;
@@ -28,4 +33,4 @@ pub use scalar_llama::{
     scalar_llama_q5_0_gguf_fixture, scalar_llama_q6_k_gguf_fixture, scalar_llama_q8_0_gguf_fixture,
     scalar_llama_tied_output_f32_gguf_fixture,
 };
-pub use scalar_phi3::{scalar_phi3_f32_gguf_fixture, PHI3_INSTRUCT_CHAT_TEMPLATE};
+pub use scalar_phi3::{PHI3_INSTRUCT_CHAT_TEMPLATE, scalar_phi3_f32_gguf_fixture};

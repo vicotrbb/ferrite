@@ -84,8 +84,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn completion_response_ids_are_unique_within_the_same_second(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn completion_response_ids_are_unique_within_the_same_second()
+    -> Result<(), Box<dyn std::error::Error>> {
         for _ in 0..1_000 {
             let first =
                 CompletionResponse::from_generation("fixture-model".to_owned(), generated());

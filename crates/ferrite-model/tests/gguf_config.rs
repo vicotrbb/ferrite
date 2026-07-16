@@ -1,6 +1,6 @@
 mod support;
 
-use ferrite_model::gguf::{parse_gguf, ModelArchitecture, ModelConfig};
+use ferrite_model::gguf::{ModelArchitecture, ModelConfig, parse_gguf};
 use std::error::Error;
 use std::io;
 use support::gguf::{
@@ -68,9 +68,11 @@ fn rejects_zero_context_length_in_model_config() -> Result<(), Box<dyn Error>> {
         Err(error) => error,
     };
 
-    assert!(error
-        .to_string()
-        .contains("llama.context_length must be greater than zero"));
+    assert!(
+        error
+            .to_string()
+            .contains("llama.context_length must be greater than zero")
+    );
     Ok(())
 }
 
@@ -86,9 +88,11 @@ fn rejects_zero_embedding_length_in_model_config() -> Result<(), Box<dyn Error>>
         Err(error) => error,
     };
 
-    assert!(error
-        .to_string()
-        .contains("llama.embedding_length must be greater than zero"));
+    assert!(
+        error
+            .to_string()
+            .contains("llama.embedding_length must be greater than zero")
+    );
     Ok(())
 }
 
@@ -104,9 +108,11 @@ fn rejects_zero_block_count_in_model_config() -> Result<(), Box<dyn Error>> {
         Err(error) => error,
     };
 
-    assert!(error
-        .to_string()
-        .contains("llama.block_count must be greater than zero"));
+    assert!(
+        error
+            .to_string()
+            .contains("llama.block_count must be greater than zero")
+    );
     Ok(())
 }
 
@@ -122,9 +128,11 @@ fn rejects_zero_feed_forward_length_in_model_config() -> Result<(), Box<dyn Erro
         Err(error) => error,
     };
 
-    assert!(error
-        .to_string()
-        .contains("llama.feed_forward_length must be greater than zero"));
+    assert!(
+        error
+            .to_string()
+            .contains("llama.feed_forward_length must be greater than zero")
+    );
     Ok(())
 }
 
@@ -140,9 +148,11 @@ fn rejects_zero_attention_key_length_in_model_config() -> Result<(), Box<dyn Err
         Err(error) => error,
     };
 
-    assert!(error
-        .to_string()
-        .contains("llama.attention.key_length must be greater than zero"));
+    assert!(
+        error
+            .to_string()
+            .contains("llama.attention.key_length must be greater than zero")
+    );
     Ok(())
 }
 
@@ -158,9 +168,11 @@ fn rejects_zero_attention_value_length_in_model_config() -> Result<(), Box<dyn E
         Err(error) => error,
     };
 
-    assert!(error
-        .to_string()
-        .contains("llama.attention.value_length must be greater than zero"));
+    assert!(
+        error
+            .to_string()
+            .contains("llama.attention.value_length must be greater than zero")
+    );
     Ok(())
 }
 
@@ -176,9 +188,11 @@ fn rejects_zero_rope_dimension_count_in_model_config() -> Result<(), Box<dyn Err
         Err(error) => error,
     };
 
-    assert!(error
-        .to_string()
-        .contains("llama.rope.dimension_count must be greater than zero"));
+    assert!(
+        error
+            .to_string()
+            .contains("llama.rope.dimension_count must be greater than zero")
+    );
     Ok(())
 }
 
@@ -215,9 +229,11 @@ fn rejects_odd_rope_dimension_count() -> Result<(), Box<dyn Error>> {
         Err(error) => error,
     };
 
-    assert!(error
-        .to_string()
-        .contains("llama.rope.dimension_count 3 must be even"));
+    assert!(
+        error
+            .to_string()
+            .contains("llama.rope.dimension_count 3 must be even")
+    );
     Ok(())
 }
 
@@ -259,9 +275,11 @@ fn rejects_non_finite_rope_freq_base() -> Result<(), Box<dyn Error>> {
             Err(error) => error,
         };
 
-        assert!(error
-            .to_string()
-            .contains("llama.rope.freq_base must be finite"));
+        assert!(
+            error
+                .to_string()
+                .contains("llama.rope.freq_base must be finite")
+        );
     }
     Ok(())
 }
@@ -282,9 +300,11 @@ fn rejects_invalid_attention_layer_norm_rms_epsilon() -> Result<(), Box<dyn Erro
             Err(error) => error,
         };
 
-        assert!(error
-            .to_string()
-            .contains("llama.attention.layer_norm_rms_epsilon must be finite and non-negative"));
+        assert!(
+            error
+                .to_string()
+                .contains("llama.attention.layer_norm_rms_epsilon must be finite and non-negative")
+        );
     }
     Ok(())
 }
@@ -301,9 +321,11 @@ fn rejects_zero_attention_head_count_in_model_config() -> Result<(), Box<dyn Err
         Err(error) => error,
     };
 
-    assert!(error
-        .to_string()
-        .contains("llama.attention.head_count must be greater than zero"));
+    assert!(
+        error
+            .to_string()
+            .contains("llama.attention.head_count must be greater than zero")
+    );
     Ok(())
 }
 
@@ -322,9 +344,11 @@ fn rejects_embedding_length_that_does_not_divide_attention_heads() -> Result<(),
         Err(error) => error,
     };
 
-    assert!(error
-        .to_string()
-        .contains("llama.embedding_length 8 must be divisible by llama.attention.head_count 3"));
+    assert!(
+        error
+            .to_string()
+            .contains("llama.embedding_length 8 must be divisible by llama.attention.head_count 3")
+    );
     Ok(())
 }
 
@@ -340,9 +364,11 @@ fn rejects_zero_attention_kv_head_count_in_model_config() -> Result<(), Box<dyn 
         Err(error) => error,
     };
 
-    assert!(error
-        .to_string()
-        .contains("llama.attention.head_count_kv must be greater than zero"));
+    assert!(
+        error
+            .to_string()
+            .contains("llama.attention.head_count_kv must be greater than zero")
+    );
     Ok(())
 }
 

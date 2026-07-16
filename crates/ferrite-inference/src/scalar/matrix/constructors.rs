@@ -1,16 +1,16 @@
 use super::{Matrix, MatrixBytes, MatrixData};
 use crate::scalar::{
+    InferenceError,
     dense16::{validate_bf16_values, validate_f16_values},
     q4_k::validate_q4_k_finite_scales,
     q5_0::validate_q5_0_finite_scales,
-    q5_k::{q5_k_storage_bytes, validate_q5_k_finite_scales, Q5_K_BLOCK_VALUES},
+    q5_k::{Q5_K_BLOCK_VALUES, q5_k_storage_bytes, validate_q5_k_finite_scales},
     q6_k::validate_q6_k_finite_scales,
     q8_0::validate_q8_0_finite_scales,
     quantized::{
-        q4_k_storage_bytes, q5_0_row_bytes, q6_k_storage_bytes, q8_0_row_bytes, Q5_0_BLOCK_VALUES,
-        Q8_0_BLOCK_VALUES,
+        Q5_0_BLOCK_VALUES, Q8_0_BLOCK_VALUES, q4_k_storage_bytes, q5_0_row_bytes,
+        q6_k_storage_bytes, q8_0_row_bytes,
     },
-    InferenceError,
 };
 use ferrite_model::model_file::MappedModelFile;
 use std::ops::Range;

@@ -37,8 +37,8 @@ async fn completions_endpoint_streams_openai_sse_chunks() -> Result<(), Box<dyn 
 }
 
 #[tokio::test]
-async fn completions_endpoint_streams_echo_prompt_when_requested(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn completions_endpoint_streams_echo_prompt_when_requested()
+-> Result<(), Box<dyn std::error::Error>> {
     let model_path = write_fixture_model()?;
     let engine = InferenceEngine::load(&model_path)?;
     let app = router(ServerState::with_engine("fixture-model".to_owned(), engine));
@@ -83,8 +83,8 @@ async fn completions_endpoint_streams_echo_prompt_when_requested(
 }
 
 #[tokio::test]
-async fn completions_endpoint_stream_reports_cached_tokens_when_experimental_prefix_cache_is_enabled(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn completions_endpoint_stream_reports_cached_tokens_when_experimental_prefix_cache_is_enabled()
+-> Result<(), Box<dyn std::error::Error>> {
     let model_path = write_fixture_model()?;
     let engine = InferenceEngine::load(&model_path)?;
     let state = ServerState::with_engine("fixture-model".to_owned(), engine)
@@ -154,8 +154,8 @@ async fn chat_endpoint_streams_openai_sse_chunks() -> Result<(), Box<dyn std::er
 }
 
 #[tokio::test]
-async fn sampled_completion_stream_is_seeded_and_bypasses_greedy_batch_admission(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn sampled_completion_stream_is_seeded_and_bypasses_greedy_batch_admission()
+-> Result<(), Box<dyn std::error::Error>> {
     let model_path = write_fixture_model()?;
     let engine = InferenceEngine::load(&model_path)?;
     let state =
@@ -179,8 +179,8 @@ async fn sampled_completion_stream_is_seeded_and_bypasses_greedy_batch_admission
 }
 
 #[tokio::test]
-async fn batched_completion_streams_match_default_path_under_parallel_load(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn batched_completion_streams_match_default_path_under_parallel_load()
+-> Result<(), Box<dyn std::error::Error>> {
     let model_path = write_fixture_model()?;
     let default_engine = InferenceEngine::load(&model_path)?;
     let default_app = router(ServerState::with_engine(
@@ -206,8 +206,8 @@ async fn batched_completion_streams_match_default_path_under_parallel_load(
 }
 
 #[tokio::test]
-async fn batched_stream_releases_admission_permit_when_response_body_is_dropped(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn batched_stream_releases_admission_permit_when_response_body_is_dropped()
+-> Result<(), Box<dyn std::error::Error>> {
     let model_path = write_fixture_model()?;
     let engine = InferenceEngine::load(&model_path)?;
     let state =
@@ -239,8 +239,8 @@ async fn batched_stream_releases_admission_permit_when_response_body_is_dropped(
 }
 
 #[tokio::test]
-async fn completion_stream_helper_emits_tokens_from_generation_callback(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn completion_stream_helper_emits_tokens_from_generation_callback()
+-> Result<(), Box<dyn std::error::Error>> {
     let model_path = write_fixture_model()?;
     let engine = InferenceEngine::load(&model_path)?;
     remove_fixture_model(&model_path)?;
@@ -267,8 +267,8 @@ async fn completion_stream_helper_emits_tokens_from_generation_callback(
 }
 
 #[tokio::test]
-async fn chat_stream_releases_inference_permit_when_response_body_is_dropped(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_stream_releases_inference_permit_when_response_body_is_dropped()
+-> Result<(), Box<dyn std::error::Error>> {
     let model_path = write_chat_fixture_model()?;
     let engine = InferenceEngine::load(&model_path)?;
     let state = ServerState::with_engine("fixture-model".to_owned(), engine);

@@ -1,7 +1,7 @@
 use super::{
-    q4_k::{q4_k_block_values, q4_k_storage_bytes, Q4_K_BLOCK_BYTES, Q4_K_BLOCK_VALUES},
-    q8_k::BlockQ8K,
     InferenceError,
+    q4_k::{Q4_K_BLOCK_BYTES, Q4_K_BLOCK_VALUES, q4_k_block_values, q4_k_storage_bytes},
+    q8_k::BlockQ8K,
 };
 
 pub(in crate::scalar) fn q4_k_q8_k_mul_vec(
@@ -80,9 +80,9 @@ pub(in crate::scalar) fn q4_k_q8_k_block_dot(
 mod tests {
     use super::{q4_k_q8_k_block_dot, q4_k_q8_k_mul_vec};
     use crate::scalar::{
-        q4_k::{q4_k_block_values, Q4_K_BLOCK_BYTES, Q4_K_BLOCK_VALUES},
-        q8_k::BlockQ8K,
         InferenceError,
+        q4_k::{Q4_K_BLOCK_BYTES, Q4_K_BLOCK_VALUES, q4_k_block_values},
+        q8_k::BlockQ8K,
     };
 
     #[test]

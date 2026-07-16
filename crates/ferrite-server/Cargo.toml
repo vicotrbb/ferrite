@@ -7,6 +7,7 @@ license.workspace = true
 repository.workspace = true
 rust-version.workspace = true
 publish = false
+autotests = false
 description = "OpenAI-compatible HTTP serving for the Ferrite inference engine"
 readme = "../../README.md"
 keywords = ["llm", "inference", "openai", "http", "server"]
@@ -19,6 +20,34 @@ path = "src/lib.rs"
 [[bin]]
 name = "ferrite-server"
 path = "src/main.rs"
+
+[[test]]
+name = "help_cli"
+path = "tests/help_cli.rs"
+
+[[test]]
+name = "long_chat_gate"
+path = "tests/long_chat_gate.rs"
+
+[[test]]
+name = "openai_clients"
+path = "tests/openai_clients.rs"
+
+[[test]]
+name = "openai_http"
+path = "tests/openai_http.rs"
+
+[[test]]
+name = "openai_http_throughput"
+path = "tests/openai_http_throughput.rs"
+
+[[test]]
+name = "real_models"
+path = "tests/real_models.rs"
+
+[[test]]
+name = "tool_metadata_cli"
+path = "tests/tool_metadata_cli.rs"
 
 [dependencies]
 axum = "0.7"

@@ -75,10 +75,10 @@ providers selected token ID 7521 and the same ordered top-five token IDs as the
 pinned llama.cpp reference. This is correctness evidence only. No throughput,
 TTFT, or memory claim is promoted without clean repeated eval artifacts.
 
-The dedicated `openai_real_phi3` release test rehashes that exact artifact and
-checks non-streaming plus streaming Chat Completions. For the prompt `Write one
-word about iron.`, Ferrite emits visible token IDs 2443 and 295, then terminal
-token ID 32007 (`<|end|>`). The response reports 10 prompt tokens, three
+The dedicated `real_models::http_phi3` release test rehashes that exact artifact
+and checks non-streaming plus streaming Chat Completions. For the prompt `Write
+one word about iron.`, Ferrite emits visible token IDs 2443 and 295, then
+terminal token ID 32007 (`<|end|>`). The response reports 10 prompt tokens, three
 completion tokens, `finish_reason=stop`, and visible content ` Steel` without
 leaking the terminal control token. The pinned llama.cpp run used the same
 10-token rendered prompt and emitted 2443, 295, 29889, then terminal 32007.

@@ -2,8 +2,8 @@ use super::stream_options_test_support::{post_loaded_chat_stream, post_loaded_co
 use axum::http::StatusCode;
 
 #[tokio::test]
-async fn completions_stream_endpoint_emits_usage_when_requested(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn completions_stream_endpoint_emits_usage_when_requested()
+-> Result<(), Box<dyn std::error::Error>> {
     let response = post_loaded_completion_stream(
         r#"{"model":"fixture-model","prompt":"hello","max_tokens":1,"stream":true,"stream_options":{"include_usage":true}}"#,
     )

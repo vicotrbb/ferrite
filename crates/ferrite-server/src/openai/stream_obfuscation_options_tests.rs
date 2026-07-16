@@ -2,8 +2,8 @@ use super::stream_options_test_support::{post_loaded_chat_stream, post_loaded_co
 use axum::http::StatusCode;
 
 #[tokio::test]
-async fn chat_stream_endpoint_accepts_disabled_obfuscation(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_stream_endpoint_accepts_disabled_obfuscation()
+-> Result<(), Box<dyn std::error::Error>> {
     let response = post_loaded_chat_stream(
         r#"{"model":"fixture-model","messages":[{"role":"user","content":"hello"}],"max_completion_tokens":1,"stream":true,"stream_options":{"include_obfuscation":false}}"#,
     )
@@ -21,8 +21,8 @@ async fn chat_stream_endpoint_accepts_disabled_obfuscation(
 }
 
 #[tokio::test]
-async fn completion_stream_endpoint_emits_obfuscation_by_default(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn completion_stream_endpoint_emits_obfuscation_by_default()
+-> Result<(), Box<dyn std::error::Error>> {
     let response = post_loaded_completion_stream(
         r#"{"model":"fixture-model","prompt":"hello","stream":true}"#,
     )
@@ -40,8 +40,8 @@ async fn completion_stream_endpoint_emits_obfuscation_by_default(
 }
 
 #[tokio::test]
-async fn chat_stream_endpoint_emits_obfuscation_by_default(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_stream_endpoint_emits_obfuscation_by_default()
+-> Result<(), Box<dyn std::error::Error>> {
     let response = post_loaded_chat_stream(
         r#"{"model":"fixture-model","messages":[{"role":"user","content":"hello"}],"max_completion_tokens":1,"stream":true}"#,
     )
@@ -59,8 +59,8 @@ async fn chat_stream_endpoint_emits_obfuscation_by_default(
 }
 
 #[tokio::test]
-async fn completion_stream_endpoint_emits_obfuscation_when_requested(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn completion_stream_endpoint_emits_obfuscation_when_requested()
+-> Result<(), Box<dyn std::error::Error>> {
     let response = post_loaded_completion_stream(
         r#"{"model":"fixture-model","prompt":"hello","stream":true,"stream_options":{"include_obfuscation":true}}"#,
     )
@@ -74,8 +74,8 @@ async fn completion_stream_endpoint_emits_obfuscation_when_requested(
 }
 
 #[tokio::test]
-async fn chat_stream_endpoint_emits_obfuscation_when_requested(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_stream_endpoint_emits_obfuscation_when_requested()
+-> Result<(), Box<dyn std::error::Error>> {
     let response = post_loaded_chat_stream(
         r#"{"model":"fixture-model","messages":[{"role":"user","content":"hello"}],"max_completion_tokens":1,"stream":true,"stream_options":{"include_obfuscation":true}}"#,
     )

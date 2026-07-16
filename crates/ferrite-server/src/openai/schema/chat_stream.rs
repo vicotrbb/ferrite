@@ -243,8 +243,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn chat_stream_context_ids_are_unique_between_streams_in_the_same_second(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn chat_stream_context_ids_are_unique_between_streams_in_the_same_second()
+    -> Result<(), Box<dyn std::error::Error>> {
         for _ in 0..1_000 {
             let first = ChatCompletionStreamContext::new("fixture-model".to_owned());
             let second = ChatCompletionStreamContext::new("fixture-model".to_owned());
@@ -273,9 +273,11 @@ mod tests {
         let context = ChatCompletionStreamContext::new("fixture-model".to_owned());
         let chunk = serde_json::to_value(context.token("hello".to_owned()))?;
 
-        assert!(chunk["obfuscation"]
-            .as_str()
-            .is_some_and(|value| !value.is_empty()));
+        assert!(
+            chunk["obfuscation"]
+                .as_str()
+                .is_some_and(|value| !value.is_empty())
+        );
         Ok(())
     }
 

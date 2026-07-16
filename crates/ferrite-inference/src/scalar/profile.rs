@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use super::{matrix::MatrixStorageKind, InferenceError, Matrix, NextToken};
+use super::{InferenceError, Matrix, NextToken, matrix::MatrixStorageKind};
 
 #[derive(Clone, Debug, PartialEq)]
 /// Timing and storage metadata for one profiled matrix-vector operation.

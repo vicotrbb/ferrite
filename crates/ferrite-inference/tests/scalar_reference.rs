@@ -7,7 +7,7 @@ use ferrite_fixtures::{
     scalar_phi3_f32_gguf_fixture,
 };
 use ferrite_inference::scalar::{
-    apply_rope, argmax, rms_norm, Matrix, ScalarExecutionOptions, ScalarLlamaModel,
+    Matrix, ScalarExecutionOptions, ScalarLlamaModel, apply_rope, argmax, rms_norm,
 };
 use ferrite_model::gguf::parse_gguf;
 use ferrite_model::model_file::MappedModelFile;
@@ -54,9 +54,11 @@ fn rms_norm_rejects_invalid_epsilon() -> Result<(), Box<dyn Error>> {
             Err(error) => error,
         };
 
-        assert!(error
-            .to_string()
-            .contains("rms_norm epsilon must be finite and non-negative"));
+        assert!(
+            error
+                .to_string()
+                .contains("rms_norm epsilon must be finite and non-negative")
+        );
     }
     Ok(())
 }
@@ -70,9 +72,11 @@ fn matrix_vector_multiply_rejects_shape_mismatch() -> Result<(), Box<dyn Error>>
         Err(error) => error,
     };
 
-    assert!(error
-        .to_string()
-        .contains("matrix columns 3 do not match vector length 2"));
+    assert!(
+        error
+            .to_string()
+            .contains("matrix columns 3 do not match vector length 2")
+    );
     Ok(())
 }
 
@@ -84,9 +88,11 @@ fn matrix_from_row_major_rejects_non_finite_values() -> Result<(), Box<dyn Error
             Err(error) => error,
         };
 
-        assert!(error
-            .to_string()
-            .contains("matrix data values must be finite"));
+        assert!(
+            error
+                .to_string()
+                .contains("matrix data values must be finite")
+        );
     }
     Ok(())
 }
@@ -101,9 +107,11 @@ fn matrix_vector_multiply_rejects_non_finite_vector_values() -> Result<(), Box<d
             Err(error) => error,
         };
 
-        assert!(error
-            .to_string()
-            .contains("matrix vector values must be finite"));
+        assert!(
+            error
+                .to_string()
+                .contains("matrix vector values must be finite")
+        );
     }
     Ok(())
 }
@@ -169,9 +177,11 @@ fn apply_rope_rejects_non_finite_frequency_base() -> Result<(), Box<dyn Error>> 
             Err(error) => error,
         };
 
-        assert!(error
-            .to_string()
-            .contains("rope frequency base must be finite"));
+        assert!(
+            error
+                .to_string()
+                .contains("rope frequency base must be finite")
+        );
     }
     Ok(())
 }
@@ -188,9 +198,11 @@ fn scalar_config_rejects_non_finite_rope_freq_base() -> Result<(), Box<dyn Error
             Err(error) => error,
         };
 
-        assert!(error
-            .to_string()
-            .contains("rope frequency base must be finite"));
+        assert!(
+            error
+                .to_string()
+                .contains("rope frequency base must be finite")
+        );
     }
     Ok(())
 }
@@ -205,9 +217,11 @@ fn scalar_config_rejects_invalid_rms_norm_epsilon() -> Result<(), Box<dyn Error>
             Err(error) => error,
         };
 
-        assert!(error
-            .to_string()
-            .contains("rms norm epsilon must be finite and non-negative"));
+        assert!(
+            error
+                .to_string()
+                .contains("rms norm epsilon must be finite and non-negative")
+        );
     }
     Ok(())
 }
@@ -222,9 +236,11 @@ fn scalar_weights_reject_non_finite_output_norm_values() -> Result<(), Box<dyn E
             Err(error) => error,
         };
 
-        assert!(error
-            .to_string()
-            .contains("output_norm values must be finite"));
+        assert!(
+            error
+                .to_string()
+                .contains("output_norm values must be finite")
+        );
     }
     Ok(())
 }
@@ -333,8 +349,8 @@ fn loads_scalar_llama_reference_weights_from_f32_gguf_fixture() -> Result<(), Bo
 }
 
 #[test]
-fn prompt_skips_unobserved_intermediate_outputs_without_changing_final_logits(
-) -> Result<(), Box<dyn Error>> {
+fn prompt_skips_unobserved_intermediate_outputs_without_changing_final_logits()
+-> Result<(), Box<dyn Error>> {
     let bytes = scalar_llama_f32_gguf_fixture();
     let gguf = parse_gguf(&bytes)?;
     let model = ScalarLlamaModel::from_gguf_scalar(&gguf, &bytes)?;

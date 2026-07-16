@@ -113,7 +113,7 @@ covering chat, completion, streaming chat, and streaming completion:
 ```sh
 FERRITE_REAL_MODEL=/tmp/SmolLM2-135M-Instruct-Q4_K_M.gguf \
   cargo test --release --locked -p ferrite-server --all-features \
-    --test openai_real_model_http -- --ignored --test-threads=1
+    --test real_models http_tier0:: -- --ignored --test-threads=1
 ```
 
 The optimized build finished in 2 minutes 18 seconds, and all four tests passed
@@ -138,7 +138,7 @@ memory, and 12 GiB ephemeral storage. This exact command passed:
 ```sh
 FERRITE_PHI3_MODEL=/tmp/Phi-3-mini-4k-instruct-q4.gguf \
   cargo test --release --locked -p ferrite-server --all-features \
-    --test openai_real_phi3 -- --ignored --test-threads=1
+    --test real_models http_phi3:: -- --ignored --test-threads=1
 ```
 
 The one test rehashed the model and exercised non-streaming plus streaming Chat

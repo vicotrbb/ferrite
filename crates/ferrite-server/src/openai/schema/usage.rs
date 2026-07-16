@@ -151,9 +151,11 @@ mod tests {
 
         let usage = serde_json::to_value(Usage::from_generation(&generated))?;
 
-        assert!(usage["prompt_tokens_details"]
-            .get("ferrite_cache")
-            .is_none());
+        assert!(
+            usage["prompt_tokens_details"]
+                .get("ferrite_cache")
+                .is_none()
+        );
         Ok(())
     }
 
@@ -188,8 +190,8 @@ mod tests {
     }
 
     #[test]
-    fn usage_sums_cached_prompt_tokens_for_multiple_generations(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn usage_sums_cached_prompt_tokens_for_multiple_generations()
+    -> Result<(), Box<dyn std::error::Error>> {
         let first = GeneratedText::new("first".to_owned(), 5, 2, vec!["first".to_owned()])
             .with_cached_prompt_tokens(3)?;
         let second = GeneratedText::new("second".to_owned(), 7, 4, vec!["second".to_owned()])

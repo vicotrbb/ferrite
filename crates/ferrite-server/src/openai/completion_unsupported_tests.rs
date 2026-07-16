@@ -2,8 +2,8 @@ use super::test_support::post_completion_json;
 use axum::http::StatusCode;
 
 #[tokio::test]
-async fn completion_endpoint_rejects_multiple_choice_request(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn completion_endpoint_rejects_multiple_choice_request()
+-> Result<(), Box<dyn std::error::Error>> {
     let body = post_completion_json(
         r#"{
             "model":"fixture-model",
@@ -15,16 +15,18 @@ async fn completion_endpoint_rejects_multiple_choice_request(
 
     assert_eq!(body.status, StatusCode::BAD_REQUEST);
     assert_eq!(body.json["error"]["type"], "invalid_request_error");
-    assert!(body.json["error"]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("n"));
+    assert!(
+        body.json["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("n")
+    );
     Ok(())
 }
 
 #[tokio::test]
-async fn completion_endpoint_rejects_multiple_best_of_candidates(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn completion_endpoint_rejects_multiple_best_of_candidates()
+-> Result<(), Box<dyn std::error::Error>> {
     let body = post_completion_json(
         r#"{
             "model":"fixture-model",
@@ -37,16 +39,18 @@ async fn completion_endpoint_rejects_multiple_best_of_candidates(
     assert_eq!(body.status, StatusCode::BAD_REQUEST);
     assert_eq!(body.json["error"]["type"], "invalid_request_error");
     assert_eq!(body.json["error"]["param"], "best_of");
-    assert!(body.json["error"]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("best_of"));
+    assert!(
+        body.json["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("best_of")
+    );
     Ok(())
 }
 
 #[tokio::test]
-async fn completion_endpoint_rejects_malformed_echo_request(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn completion_endpoint_rejects_malformed_echo_request()
+-> Result<(), Box<dyn std::error::Error>> {
     let body = post_completion_json(
         r#"{
             "model":"fixture-model",
@@ -59,10 +63,12 @@ async fn completion_endpoint_rejects_malformed_echo_request(
     assert_eq!(body.status, StatusCode::BAD_REQUEST);
     assert_eq!(body.json["error"]["type"], "invalid_request_error");
     assert_eq!(body.json["error"]["param"], "echo");
-    assert!(body.json["error"]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("echo"));
+    assert!(
+        body.json["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("echo")
+    );
     Ok(())
 }
 
@@ -80,10 +86,12 @@ async fn completion_endpoint_rejects_logprobs_request() -> Result<(), Box<dyn st
     assert_eq!(body.status, StatusCode::BAD_REQUEST);
     assert_eq!(body.json["error"]["type"], "invalid_request_error");
     assert_eq!(body.json["error"]["param"], "logprobs");
-    assert!(body.json["error"]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("logprobs"));
+    assert!(
+        body.json["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("logprobs")
+    );
     Ok(())
 }
 
@@ -135,10 +143,12 @@ async fn completion_endpoint_rejects_malformed_seed() -> Result<(), Box<dyn std:
 
     assert_eq!(body.status, StatusCode::BAD_REQUEST);
     assert_eq!(body.json["error"]["type"], "invalid_request_error");
-    assert!(body.json["error"]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("seed"));
+    assert!(
+        body.json["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("seed")
+    );
     Ok(())
 }
 
@@ -163,8 +173,8 @@ async fn completion_endpoint_rejects_malformed_max_tokens() -> Result<(), Box<dy
 }
 
 #[tokio::test]
-async fn completion_endpoint_rejects_malformed_stream_flag(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn completion_endpoint_rejects_malformed_stream_flag()
+-> Result<(), Box<dyn std::error::Error>> {
     let body = post_completion_json(
         r#"{
             "model":"fixture-model",
@@ -195,9 +205,11 @@ async fn completion_endpoint_rejects_unknown_fields() -> Result<(), Box<dyn std:
 
     assert_eq!(body.status, StatusCode::BAD_REQUEST);
     assert_eq!(body.json["error"]["type"], "invalid_request_error");
-    assert!(body.json["error"]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("unsupported_option"));
+    assert!(
+        body.json["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("unsupported_option")
+    );
     Ok(())
 }

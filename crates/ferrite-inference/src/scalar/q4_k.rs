@@ -3,7 +3,7 @@
     reason = "audited SIMD half conversion is isolated in this quantization module"
 )]
 
-use super::{float::f16_bits_to_f32, InferenceError, ScalarExecutionOptions};
+use super::{InferenceError, ScalarExecutionOptions, float::f16_bits_to_f32};
 
 pub(super) const Q4_K_BLOCK_VALUES: usize = 256;
 pub(super) const Q4_K_BLOCK_BYTES: usize = 144;

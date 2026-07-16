@@ -8,8 +8,8 @@ use axum::{
 use tower::ServiceExt;
 
 #[tokio::test]
-async fn completions_endpoint_accepts_neutral_sampling_options(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn completions_endpoint_accepts_neutral_sampling_options()
+-> Result<(), Box<dyn std::error::Error>> {
     assert_completion_option_is_accepted(
         r#""temperature":0,"top_p":1,"n":1,"presence_penalty":0,"frequency_penalty":0"#,
     )
@@ -17,8 +17,8 @@ async fn completions_endpoint_accepts_neutral_sampling_options(
 }
 
 #[tokio::test]
-async fn completions_endpoint_accepts_openai_default_temperature(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn completions_endpoint_accepts_openai_default_temperature()
+-> Result<(), Box<dyn std::error::Error>> {
     assert_completion_option_is_accepted(r#""temperature":1,"top_k":1"#).await
 }
 
@@ -31,8 +31,8 @@ async fn completions_endpoint_applies_logit_bias() -> Result<(), Box<dyn std::er
 }
 
 #[tokio::test]
-async fn completions_endpoint_accepts_extended_sampling_controls(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn completions_endpoint_accepts_extended_sampling_controls()
+-> Result<(), Box<dyn std::error::Error>> {
     assert_completion_option_is_accepted(
         r#""temperature":0.8,"top_k":1,"top_p":0.9,"min_p":0.05,"repetition_penalty":1.1,"presence_penalty":0.2,"frequency_penalty":-0.2,"seed":42"#,
     )
@@ -55,16 +55,16 @@ async fn completions_endpoint_accepts_null_echo() -> Result<(), Box<dyn std::err
 }
 
 #[tokio::test]
-async fn completions_endpoint_echoes_prompt_when_requested(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn completions_endpoint_echoes_prompt_when_requested()
+-> Result<(), Box<dyn std::error::Error>> {
     let body = accepted_completion_option_response(r#""echo":true"#).await?;
     assert_eq!(body["choices"][0]["text"], "hellowinner");
     Ok(())
 }
 
 #[tokio::test]
-async fn completions_endpoint_accepts_single_best_of_candidate(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn completions_endpoint_accepts_single_best_of_candidate()
+-> Result<(), Box<dyn std::error::Error>> {
     assert_completion_option_is_accepted(r#""best_of":1"#).await
 }
 

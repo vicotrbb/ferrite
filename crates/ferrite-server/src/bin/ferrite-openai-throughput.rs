@@ -1,7 +1,7 @@
 //! Command-line throughput and streaming-metric client for a Ferrite server.
 
 use ferrite_server::throughput_client::{
-    format_result, run_completion_benchmark, ThroughputClientConfig,
+    ThroughputClientConfig, format_result, run_completion_benchmark,
 };
 
 #[tokio::main]

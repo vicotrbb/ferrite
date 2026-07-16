@@ -5,15 +5,15 @@
 )]
 
 use super::{
+    InferenceError,
     neon_util::native_f16_bits_to_f32,
-    q4_k::{q4_k_storage_bytes, Q4_K_BLOCK_BYTES, Q4_K_BLOCK_VALUES},
+    q4_k::{Q4_K_BLOCK_BYTES, Q4_K_BLOCK_VALUES, q4_k_storage_bytes},
     q8_k::BlockQ8K,
     q8_residual_activation::BlockQ8KResidual,
-    InferenceError,
 };
 use rayon::prelude::*;
 use std::arch::aarch64::{
-    int32x4_t, int8x16_t, uint8x16_t, vaddq_s32, vaddvq_s32, vandq_u8, vdupq_n_s32, vdupq_n_u8,
+    int8x16_t, int32x4_t, uint8x16_t, vaddq_s32, vaddvq_s32, vandq_u8, vdupq_n_s32, vdupq_n_u8,
     vld1q_s8, vld1q_u8, vreinterpretq_s8_u8, vshrq_n_u8,
 };
 use std::arch::asm;

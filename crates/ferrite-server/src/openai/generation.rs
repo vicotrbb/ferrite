@@ -1,6 +1,6 @@
 use super::{
     error::OpenAiHttpError,
-    stop_filter::{apply_stop_sequences, StopSequenceFilter},
+    stop_filter::{StopSequenceFilter, apply_stop_sequences},
 };
 use crate::runtime::{
     BatchScheduler, BatchedGenerationEvent, GeneratedText, GenerationCacheOptions,

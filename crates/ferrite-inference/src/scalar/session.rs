@@ -1,8 +1,8 @@
 use super::{
+    InferenceError, NextToken, Q8KActivationMatvecRole, ScalarExecutionOptions, ScalarLlamaModel,
     attention::causal_attention,
     math::{add_assign, argmax, rms_norm, swiglu_in_place},
     profile::{ProfiledNextToken, ProfiledTokenId, ScalarMatVecComparison, ScalarProfileEvent},
-    InferenceError, NextToken, Q8KActivationMatvecRole, ScalarExecutionOptions, ScalarLlamaModel,
 };
 
 mod cache;
@@ -603,13 +603,13 @@ impl<'a> ScalarLlamaSession<'a> {
     }
 
     fn ensure_context_position_available(&self) -> Result<(), InferenceError> {
-        if let Some(context_length) = self.model.context_length {
-            if self.cached_token_count >= context_length {
-                return Err(InferenceError::new(format!(
-                    "model context length {context_length} is exhausted at token position {}",
-                    self.cached_token_count
-                )));
-            }
+        if let Some(context_length) = self.model.context_length
+            && self.cached_token_count >= context_length
+        {
+            return Err(InferenceError::new(format!(
+                "model context length {context_length} is exhausted at token position {}",
+                self.cached_token_count
+            )));
         }
         Ok(())
     }
@@ -893,14 +893,16 @@ mod tests {
             Ok(_) => {
                 return Err(InferenceError::new(
                     "overflowing projection bias should fail",
-                ))
+                ));
             }
             Err(error) => error,
         };
 
-        assert!(error
-            .to_string()
-            .contains("projection bias result must be finite"));
+        assert!(
+            error
+                .to_string()
+                .contains("projection bias result must be finite")
+        );
         assert_eq!(values, [f32::MAX]);
         Ok(())
     }

@@ -1,8 +1,8 @@
 use std::process::Command;
 
 #[test]
-fn help_exits_successfully_without_required_model_arguments(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn help_exits_successfully_without_required_model_arguments()
+-> Result<(), Box<dyn std::error::Error>> {
     let output = Command::new(env!("CARGO_BIN_EXE_ferrite"))
         .arg("--help")
         .output()?;
@@ -17,8 +17,8 @@ fn help_exits_successfully_without_required_model_arguments(
 }
 
 #[test]
-fn version_exits_successfully_without_required_model_arguments(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn version_exits_successfully_without_required_model_arguments()
+-> Result<(), Box<dyn std::error::Error>> {
     let output = Command::new(env!("CARGO_BIN_EXE_ferrite"))
         .arg("--version")
         .output()?;

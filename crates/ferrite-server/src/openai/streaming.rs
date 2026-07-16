@@ -1,7 +1,7 @@
 use super::error::OpenAiHttpError;
 use axum::response::{
-    sse::{Event, Sse},
     IntoResponse, Response,
+    sse::{Event, Sse},
 };
 use serde::Serialize;
 use std::convert::Infallible;
@@ -69,11 +69,11 @@ pub fn channel_response() -> (StreamSender, Response) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use axum::body::{to_bytes, Body};
+    use axum::body::{Body, to_bytes};
 
     #[tokio::test]
-    async fn channel_response_streams_serialized_events_and_done(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    async fn channel_response_streams_serialized_events_and_done()
+    -> Result<(), Box<dyn std::error::Error>> {
         let (sender, response) = channel_response();
         tokio::task::spawn_blocking(move || -> Result<(), OpenAiHttpError> {
             sender.send_json_blocking(&serde_json::json!({"text":"winner"}))?;

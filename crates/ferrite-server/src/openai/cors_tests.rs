@@ -2,13 +2,13 @@ use super::routes::router;
 use crate::state::ServerState;
 use axum::{
     body::Body,
-    http::{header, Request, StatusCode},
+    http::{Request, StatusCode, header},
 };
 use tower::ServiceExt;
 
 #[tokio::test]
-async fn openai_cors_preflight_does_not_require_bearer_token(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn openai_cors_preflight_does_not_require_bearer_token()
+-> Result<(), Box<dyn std::error::Error>> {
     let app = router(ServerState::new("fixture-model".to_owned()).with_api_key("local-secret"));
     let response = app
         .oneshot(
@@ -28,18 +28,22 @@ async fn openai_cors_preflight_does_not_require_bearer_token(
     assert_eq!(response.status(), StatusCode::NO_CONTENT);
     let headers = response.headers();
     assert_eq!(headers[header::ACCESS_CONTROL_ALLOW_ORIGIN], "*");
-    assert!(headers[header::ACCESS_CONTROL_ALLOW_METHODS]
-        .to_str()?
-        .contains("POST"));
-    assert!(headers[header::ACCESS_CONTROL_ALLOW_HEADERS]
-        .to_str()?
-        .contains("authorization"));
+    assert!(
+        headers[header::ACCESS_CONTROL_ALLOW_METHODS]
+            .to_str()?
+            .contains("POST")
+    );
+    assert!(
+        headers[header::ACCESS_CONTROL_ALLOW_HEADERS]
+            .to_str()?
+            .contains("authorization")
+    );
     Ok(())
 }
 
 #[tokio::test]
-async fn openai_model_retrieve_preflight_supports_provider_style_model_ids(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn openai_model_retrieve_preflight_supports_provider_style_model_ids()
+-> Result<(), Box<dyn std::error::Error>> {
     for path in [
         "/v1/models/Qwen/Qwen2.5-0.5B-Instruct-Q4_K_M",
         "/v1/models/Qwen%2FQwen2.5-0.5B-Instruct-Q4_K_M",
@@ -63,19 +67,23 @@ async fn openai_model_retrieve_preflight_supports_provider_style_model_ids(
         assert_eq!(response.status(), StatusCode::NO_CONTENT, "{path}");
         let headers = response.headers();
         assert_eq!(headers[header::ACCESS_CONTROL_ALLOW_ORIGIN], "*");
-        assert!(headers[header::ACCESS_CONTROL_ALLOW_METHODS]
-            .to_str()?
-            .contains("GET"));
-        assert!(headers[header::ACCESS_CONTROL_ALLOW_HEADERS]
-            .to_str()?
-            .contains("authorization"));
+        assert!(
+            headers[header::ACCESS_CONTROL_ALLOW_METHODS]
+                .to_str()?
+                .contains("GET")
+        );
+        assert!(
+            headers[header::ACCESS_CONTROL_ALLOW_HEADERS]
+                .to_str()?
+                .contains("authorization")
+        );
     }
     Ok(())
 }
 
 #[tokio::test]
-async fn protected_openai_routes_include_cors_response_header(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn protected_openai_routes_include_cors_response_header()
+-> Result<(), Box<dyn std::error::Error>> {
     let app = router(ServerState::new("fixture-model".to_owned()).with_api_key("local-secret"));
     let response = app
         .oneshot(

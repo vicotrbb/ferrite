@@ -2,6 +2,8 @@
 
 Date: 2026-07-10
 
+Updated: 2026-07-16
+
 ## Purpose
 
 This baseline defines Ferrite's enforceable Rust API, safety, dependency,
@@ -14,6 +16,12 @@ sources and separates stable guidance from context-dependent lint opinions.
   naming, traits, predictability, error design, metadata, and documentation.
 - [Cargo workspaces](https://doc.rust-lang.org/cargo/reference/workspaces.html)
   for shared package metadata, dependency declarations, profiles, and lints.
+- [Rust edition migration](https://doc.rust-lang.org/edition-guide/editions/transitioning-an-existing-project-to-a-new-edition.html),
+  [tail-expression scope](https://doc.rust-lang.org/edition-guide/rust-2024/temporary-tail-expr-scope.html),
+  and [`if let` scope](https://doc.rust-lang.org/edition-guide/rust-2024/temporary-if-let-scope.html)
+  for the Rust 2024 migration and explicit destructor ordering.
+- [Cargo dependency resolution](https://doc.rust-lang.org/cargo/reference/resolver.html#rust-version)
+  for resolver 3 and MSRV-aware dependency selection.
 - [Cargo manifest format](https://doc.rust-lang.org/cargo/reference/manifest.html)
   and [publishing guidance](https://doc.rust-lang.org/cargo/reference/publishing.html)
   for package contents, metadata, dependency order, and dry runs.
@@ -38,8 +46,9 @@ sources and separates stable guidance from context-dependent lint opinions.
 
 1. Pin Rust 1.96.1 for reproducible development and CI, declare Rust 1.96 as
    the MSRV, and run an explicit Rust 1.96.0 CI check.
-2. Centralize authorship, edition, license, repository, MSRV, internal paths,
-   lints, and release compiler settings in the workspace manifest.
+2. Use the Rust 2024 edition and resolver 3. Centralize authorship, edition,
+   license, repository, MSRV, internal paths, lints, and release compiler
+   settings in the workspace manifest.
 3. Deny Clippy's stable `all` and `cargo` groups, plus selected restriction
    lints that prevent production panics, debug leftovers, undocumented unsafe
    blocks, wasteful clones, and other known hazards.
@@ -64,6 +73,9 @@ sources and separates stable guidance from context-dependent lint opinions.
 11. Accept runtime optimization only with repeated-run statistics, exact or
     explicitly scoped token parity, and measured TTFT, throughput, memory, CPU,
     and tail latency.
+12. Keep Cargo integration targets bounded. Group artifact-gated real-model
+    cases into one explicit harness so routine checks compile shared server and
+    support code once, without deleting or weakening model coverage.
 
 ## Repository enforcement
 
@@ -71,4 +83,6 @@ The baseline is implemented through `rust-toolchain.toml`, workspace manifests,
 crate-level lints, release profiles, `deny.toml`, GitHub Actions,
 `scripts/check_docs.py`, `scripts/check_repo.py`, package checks, and the eval
 harness. See [ADR 0012](../adr/0012-open-source-quality-baseline.md) for the
-durable decision and [evaluation](../evaluation.md) for exact commands.
+baseline, [ADR 0020](../adr/0020-rust-2024-and-bounded-test-harnesses.md) for
+the current edition and test layout, and [evaluation](../evaluation.md) for
+exact commands.

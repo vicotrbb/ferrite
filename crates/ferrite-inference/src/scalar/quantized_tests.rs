@@ -1,22 +1,22 @@
-#[cfg(target_arch = "aarch64")]
-use super::q4_k::q4_k_mul_vec_with_options;
-use super::q4_k::{accumulate_q4_k_block, q4_k_mul_vec};
-#[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
-use super::q4_k::{q4_k_mul_vec_with_backend, Q4KMatVecBackend};
-use super::q5_0::q5_0_mul_vec;
-#[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
-use super::q5_0::{q5_0_mul_vec_with_backend, Q5_0MatVecBackend};
-#[cfg(target_arch = "aarch64")]
-use super::q6_k::q6_k_mul_vec_with_options;
-use super::q6_k::{accumulate_q6_k_block, decode_q6_k_values, q6_k_argmax_mul_vec, q6_k_mul_vec};
-#[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
-use super::q6_k::{q6_k_mul_vec_with_backend, Q6KMatVecBackend};
-use super::q8_0::{q8_0_argmax_mul_vec, q8_0_argmax_mul_vec_batch, q8_0_mul_vec};
-#[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
-use super::q8_0::{q8_0_mul_vec_with_backend, Q8_0MatVecBackend};
 use super::InferenceError;
 #[cfg(target_arch = "aarch64")]
 use super::ScalarExecutionOptions;
+#[cfg(target_arch = "aarch64")]
+use super::q4_k::q4_k_mul_vec_with_options;
+#[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
+use super::q4_k::{Q4KMatVecBackend, q4_k_mul_vec_with_backend};
+use super::q4_k::{accumulate_q4_k_block, q4_k_mul_vec};
+use super::q5_0::q5_0_mul_vec;
+#[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
+use super::q5_0::{Q5_0MatVecBackend, q5_0_mul_vec_with_backend};
+#[cfg(target_arch = "aarch64")]
+use super::q6_k::q6_k_mul_vec_with_options;
+#[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
+use super::q6_k::{Q6KMatVecBackend, q6_k_mul_vec_with_backend};
+use super::q6_k::{accumulate_q6_k_block, decode_q6_k_values, q6_k_argmax_mul_vec, q6_k_mul_vec};
+#[cfg(any(target_arch = "aarch64", target_arch = "x86_64"))]
+use super::q8_0::{Q8_0MatVecBackend, q8_0_mul_vec_with_backend};
+use super::q8_0::{q8_0_argmax_mul_vec, q8_0_argmax_mul_vec_batch, q8_0_mul_vec};
 
 #[cfg(target_arch = "x86_64")]
 fn expected_q4_k_x86_backend() -> Q4KMatVecBackend {

@@ -1,4 +1,4 @@
-use super::{usize_from_u64, GgmlType, GgufError, MetadataValue, MetadataValueType};
+use super::{GgmlType, GgufError, MetadataValue, MetadataValueType, usize_from_u64};
 
 const MAX_TENSOR_DIMENSIONS: usize = 4;
 const MAX_METADATA_NESTING_DEPTH: usize = 64;

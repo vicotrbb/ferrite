@@ -6,11 +6,11 @@ members = [
     "crates/ferrite-model",
     "crates/ferrite-server",
 ]
-resolver = "2"
+resolver = "3"
 
 [workspace.package]
 authors = ["Victor Bona"]
-edition = "2021"
+edition = "2024"
 license = "Apache-2.0"
 repository = "https://github.com/vicotrbb/ferrite"
 rust-version = "1.96"

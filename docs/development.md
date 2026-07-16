@@ -1,6 +1,6 @@
 # Development guide
 
-Ferrite uses Rust 1.96.1 and the 2021 edition. The explicit toolchain and MSRV
+Ferrite uses Rust 1.96.1 and the 2024 edition. The explicit toolchain and MSRV
 keep local development, CI, and package metadata aligned.
 
 ## Set up
@@ -45,6 +45,31 @@ No sibling checkout is required. The optional Locus backend uses the published
 Keep each change focused. Run formatting and strict Clippy early, then tests,
 docs, and dependency policy. Performance changes also need the eval workflow in
 [evaluation and regression gates](evaluation.md).
+
+## Test organization
+
+Cargo test targets are deliberate. Small fixture-backed suites remain separate
+when they exercise distinct binaries or operational surfaces. The server's
+artifact-gated model cases share the `real_models` harness, which compiles the
+server and test support once while retaining an isolated module for each model
+and behavior.
+
+List the artifact-gated cases without running them:
+
+```sh
+cargo test -p ferrite-server --test real_models -- --list
+```
+
+Run one model module by its harness path, for example:
+
+```sh
+FERRITE_PHI3_MODEL=/absolute/path/to/Phi-3-mini-4k-instruct-q4.gguf \
+  cargo test --release --locked -p ferrite-server --all-features \
+    --test real_models http_phi3:: -- --ignored --test-threads=1
+```
+
+Do not split every artifact-gated case into a separate integration binary.
+That repeats code generation and linking for tests that are normally ignored.
 
 When adding a dependency:
 

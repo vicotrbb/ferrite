@@ -1,6 +1,6 @@
 use super::error::OpenAiHttpError;
 use crate::state::ServerState;
-use axum::http::{header, HeaderMap};
+use axum::http::{HeaderMap, header};
 
 pub(super) fn ensure_authorized(
     state: &ServerState,

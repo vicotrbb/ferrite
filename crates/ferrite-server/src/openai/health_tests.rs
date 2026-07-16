@@ -8,8 +8,8 @@ use axum::{
 use tower::ServiceExt;
 
 #[tokio::test]
-async fn health_endpoint_reports_not_ready_without_loaded_model(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn health_endpoint_reports_not_ready_without_loaded_model()
+-> Result<(), Box<dyn std::error::Error>> {
     let app = router(ServerState::new("test-model".to_owned()));
     let response = app
         .oneshot(Request::builder().uri("/health").body(Body::empty())?)

@@ -58,9 +58,11 @@ fn q8_matvec_rejects_non_finite_vector_values() -> Result<(), Box<dyn Error>> {
             Err(error) => error,
         };
 
-        assert!(error
-            .to_string()
-            .contains("matrix vector values must be finite"));
+        assert!(
+            error
+                .to_string()
+                .contains("matrix vector values must be finite")
+        );
     }
     Ok(())
 }
@@ -79,9 +81,11 @@ fn q8_matrix_rejects_non_finite_scale_values() -> Result<(), Box<dyn Error>> {
             Err(error) => error,
         };
 
-        assert!(error
-            .to_string()
-            .contains("Q8_0 matrix scale values must be finite"));
+        assert!(
+            error
+                .to_string()
+                .contains("Q8_0 matrix scale values must be finite")
+        );
     }
     Ok(())
 }
@@ -115,9 +119,11 @@ fn q5_matrix_rejects_non_finite_scale_values() -> Result<(), Box<dyn Error>> {
             Err(error) => error,
         };
 
-        assert!(error
-            .to_string()
-            .contains("Q5_0 matrix scale values must be finite"));
+        assert!(
+            error
+                .to_string()
+                .contains("Q5_0 matrix scale values must be finite")
+        );
     }
     Ok(())
 }
@@ -147,9 +153,11 @@ fn q4_k_matrix_rejects_non_finite_scale_values() -> Result<(), Box<dyn Error>> {
             Err(error) => error,
         };
 
-        assert!(error
-            .to_string()
-            .contains("Q4_K matrix scale values must be finite"));
+        assert!(
+            error
+                .to_string()
+                .contains("Q4_K matrix scale values must be finite")
+        );
     }
     Ok(())
 }
@@ -193,9 +201,11 @@ fn q6_k_matrix_rejects_non_finite_scale_values() -> Result<(), Box<dyn Error>> {
             Err(error) => error,
         };
 
-        assert!(error
-            .to_string()
-            .contains("Q6_K matrix scale values must be finite"));
+        assert!(
+            error
+                .to_string()
+                .contains("Q6_K matrix scale values must be finite")
+        );
     }
     Ok(())
 }
@@ -244,9 +254,11 @@ fn matvec_check_rejects_negative_relative_tolerance() -> Result<(), Box<dyn Erro
         Err(error) => error,
     };
 
-    assert!(error
-        .to_string()
-        .contains("relative error tolerance -0.1 must be non-negative"));
+    assert!(
+        error
+            .to_string()
+            .contains("relative error tolerance -0.1 must be non-negative")
+    );
     Ok(())
 }
 

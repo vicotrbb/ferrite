@@ -145,7 +145,7 @@ unsafe fn quantize_neon(values: &[f32], inverse_scale: f32, qs: &mut [i8; Q8_K_B
 
 #[cfg(test)]
 mod tests {
-    use super::{quantize_scalar, BlockQ8K, Q8_K_BLOCK_VALUES, Q8_K_GROUPS, Q8_K_GROUP_SIZE};
+    use super::{BlockQ8K, Q8_K_BLOCK_VALUES, Q8_K_GROUP_SIZE, Q8_K_GROUPS, quantize_scalar};
     use crate::scalar::InferenceError;
 
     #[test]
@@ -184,8 +184,8 @@ mod tests {
     }
 
     #[test]
-    fn q8_k_quantization_matches_llama_signed_scale_for_positive_dominant_activation(
-    ) -> Result<(), InferenceError> {
+    fn q8_k_quantization_matches_llama_signed_scale_for_positive_dominant_activation()
+    -> Result<(), InferenceError> {
         let mut values = [0.0; Q8_K_BLOCK_VALUES];
         values[0] = 2.0;
         values[1] = -0.75;
@@ -203,8 +203,8 @@ mod tests {
     }
 
     #[test]
-    fn q8_k_quantization_matches_llama_signed_scale_for_negative_dominant_activation(
-    ) -> Result<(), InferenceError> {
+    fn q8_k_quantization_matches_llama_signed_scale_for_negative_dominant_activation()
+    -> Result<(), InferenceError> {
         let mut values = [0.0; Q8_K_BLOCK_VALUES];
         values[0] = -2.0;
         values[1] = 0.75;

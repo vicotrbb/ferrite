@@ -1,4 +1,4 @@
-use super::{quantized::decode_q6_k_values, InferenceError};
+use super::{InferenceError, quantized::decode_q6_k_values};
 use ferrite_model::gguf::{GgmlType, TensorInfo};
 
 pub(super) fn raw_bytes(tensor: &TensorInfo, bytes: &[u8]) -> Result<Vec<u8>, InferenceError> {

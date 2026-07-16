@@ -1,11 +1,11 @@
 use super::{
+    InferenceError,
     float::f16_bits_to_f32,
     q4_k::{Q4_K_BLOCK_BYTES, Q4_K_BLOCK_VALUES},
     q4_k_q8_k::q4_k_q8_k_block_dot,
     q6_k::{Q6_K_BLOCK_BYTES, Q6_K_BLOCK_VALUES},
     q6_k_q8_k::q6_k_q8_k_block_dot,
     q8_k::BlockQ8K,
-    InferenceError,
 };
 
 #[test]

@@ -1,5 +1,5 @@
 use super::ScalarLlamaSession;
-use crate::scalar::{memory, InferenceError};
+use crate::scalar::{InferenceError, memory};
 
 #[derive(Clone, Debug, PartialEq)]
 /// An owned, backend-independent snapshot of a session KV cache.
@@ -113,13 +113,13 @@ impl<'a> ScalarLlamaSession<'a> {
         &mut self,
         snapshot: &ScalarLlamaSessionSnapshot,
     ) -> Result<(), InferenceError> {
-        if let Some(context_length) = self.model.context_length {
-            if snapshot.cached_token_count > context_length {
-                return Err(InferenceError::new(format!(
-                    "cache snapshot with {} tokens exceeds model context length {context_length}",
-                    snapshot.cached_token_count
-                )));
-            }
+        if let Some(context_length) = self.model.context_length
+            && snapshot.cached_token_count > context_length
+        {
+            return Err(InferenceError::new(format!(
+                "cache snapshot with {} tokens exceeds model context length {context_length}",
+                snapshot.cached_token_count
+            )));
         }
         let expected_layers = self.model.weights.layers.len();
         if snapshot.layer_keys.len() != expected_layers

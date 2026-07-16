@@ -4,9 +4,9 @@
 )]
 
 use super::{
-    neon_util::{native_f16_bits_to_f32, widen_s8_lanes},
-    q6_k::{Q6KMatVecBackend, Q6KMatVecOutput, Q6_K_BLOCK_BYTES, Q6_K_BLOCK_VALUES},
     InferenceError,
+    neon_util::{native_f16_bits_to_f32, widen_s8_lanes},
+    q6_k::{Q6_K_BLOCK_BYTES, Q6_K_BLOCK_VALUES, Q6KMatVecBackend, Q6KMatVecOutput},
 };
 use rayon::prelude::*;
 use std::arch::aarch64::{
@@ -231,8 +231,8 @@ pub(super) unsafe fn neon_q6_k_block_dot(
 mod tests {
     use super::neon_q6_k_block_dot;
     use crate::scalar::{
-        q6_k::{decode_q6_k_values, Q6_K_BLOCK_VALUES},
         InferenceError,
+        q6_k::{Q6_K_BLOCK_VALUES, decode_q6_k_values},
     };
 
     #[test]

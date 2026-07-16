@@ -1,7 +1,7 @@
 use ferrite_fixtures::{
     scalar_llama_f32_gguf_fixture, scalar_llama_f32_gguf_fixture_with_context_length,
 };
-use ferrite_inference::scalar::{accept_token_contexts_batch, ScalarLlamaModel};
+use ferrite_inference::scalar::{ScalarLlamaModel, accept_token_contexts_batch};
 use ferrite_model::gguf::parse_gguf;
 use std::error::Error;
 
@@ -69,7 +69,7 @@ fn executes_two_and_eight_k_token_context_boundaries() -> Result<(), Box<dyn Err
         }
         let error = match session.accept_token_context_only(1) {
             Ok(()) => {
-                return Err(format!("token beyond {context_length}-token context passed").into())
+                return Err(format!("token beyond {context_length}-token context passed").into());
             }
             Err(error) => error,
         };

@@ -1,4 +1,4 @@
-/// Qwen2.5 Instruct ChatML template as stored in its GGUF metadata.
+/// Qwen2.5 Instruct `ChatML` template as stored in its GGUF metadata.
 pub const QWEN2_5_INSTRUCT_CHAT_TEMPLATE: &str = r#"{%- if tools %}
     {{- '<|im_start|>system\n' }}
     {%- if messages[0]['role'] == 'system' %}
@@ -54,7 +54,7 @@ pub const QWEN2_5_INSTRUCT_CHAT_TEMPLATE: &str = r#"{%- if tools %}
     {{- '<|im_start|>assistant\n' }}
 {%- endif %}"#;
 
-/// SmolLM2 Instruct ChatML template as stored in its GGUF metadata.
+/// `SmolLM2` Instruct `ChatML` template as stored in its GGUF metadata.
 pub const SMOLLM2_INSTRUCT_CHAT_TEMPLATE: &str = r#"{% for message in messages %}{% if loop.first and messages[0]['role'] != 'system' %}{{ '<|im_start|>system
 You are a helpful AI assistant named SmolLM, trained by Hugging Face<|im_end|>
 ' }}{% endif %}{{'<|im_start|>' + message['role'] + '

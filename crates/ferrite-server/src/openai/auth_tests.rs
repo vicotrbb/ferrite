@@ -1,15 +1,15 @@
 use super::routes::router;
 use crate::state::ServerState;
 use axum::{
-    body::{to_bytes, Body},
-    http::{header, Request, StatusCode},
+    body::{Body, to_bytes},
+    http::{Request, StatusCode, header},
 };
 use serde_json::Value;
 use tower::ServiceExt;
 
 #[tokio::test]
-async fn protected_openai_routes_require_matching_bearer_token(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn protected_openai_routes_require_matching_bearer_token()
+-> Result<(), Box<dyn std::error::Error>> {
     let response = get_models(None).await?;
 
     assert_eq!(response.status, StatusCode::UNAUTHORIZED);
@@ -28,8 +28,8 @@ async fn protected_openai_routes_require_matching_bearer_token(
 }
 
 #[tokio::test]
-async fn protected_openai_routes_accept_case_insensitive_bearer_scheme(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn protected_openai_routes_accept_case_insensitive_bearer_scheme()
+-> Result<(), Box<dyn std::error::Error>> {
     let response = get_models(Some("bearer local-secret")).await?;
 
     assert_eq!(response.status, StatusCode::OK);
@@ -38,8 +38,8 @@ async fn protected_openai_routes_accept_case_insensitive_bearer_scheme(
 }
 
 #[tokio::test]
-async fn protected_openai_routes_accept_repeated_bearer_separator_spaces(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn protected_openai_routes_accept_repeated_bearer_separator_spaces()
+-> Result<(), Box<dyn std::error::Error>> {
     let response = get_models(Some("Bearer   local-secret")).await?;
 
     assert_eq!(response.status, StatusCode::OK);
@@ -48,8 +48,8 @@ async fn protected_openai_routes_accept_repeated_bearer_separator_spaces(
 }
 
 #[tokio::test]
-async fn unknown_openai_routes_require_matching_bearer_token(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn unknown_openai_routes_require_matching_bearer_token()
+-> Result<(), Box<dyn std::error::Error>> {
     let app = router(ServerState::new("fixture-model".to_owned()).with_api_key("local-secret"));
     let response = app
         .oneshot(
@@ -66,8 +66,8 @@ async fn unknown_openai_routes_require_matching_bearer_token(
 }
 
 #[tokio::test]
-async fn wrong_method_openai_routes_require_matching_bearer_token(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn wrong_method_openai_routes_require_matching_bearer_token()
+-> Result<(), Box<dyn std::error::Error>> {
     let app = router(ServerState::new("fixture-model".to_owned()).with_api_key("local-secret"));
     let response = app
         .oneshot(
@@ -85,8 +85,8 @@ async fn wrong_method_openai_routes_require_matching_bearer_token(
 }
 
 #[tokio::test]
-async fn protected_generation_routes_authenticate_before_json_extraction(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn protected_generation_routes_authenticate_before_json_extraction()
+-> Result<(), Box<dyn std::error::Error>> {
     let app = router(ServerState::new("fixture-model".to_owned()).with_api_key("local-secret"));
     let response = app
         .oneshot(
@@ -118,8 +118,8 @@ async fn health_route_does_not_require_bearer_token() -> Result<(), Box<dyn std:
 }
 
 #[tokio::test]
-async fn wrong_method_health_route_does_not_require_bearer_token(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn wrong_method_health_route_does_not_require_bearer_token()
+-> Result<(), Box<dyn std::error::Error>> {
     let app = router(ServerState::new("fixture-model".to_owned()).with_api_key("local-secret"));
     let response = app
         .oneshot(

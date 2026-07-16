@@ -300,9 +300,11 @@ fn rejects_end_of_generation_token_id_outside_vocabulary() -> Result<(), Box<dyn
         Err(error) => error,
     };
 
-    assert!(error
-        .to_string()
-        .contains("tokenizer.ggml.eot_token_id value 5 is outside vocabulary size 5"));
+    assert!(
+        error
+            .to_string()
+            .contains("tokenizer.ggml.eot_token_id value 5 is outside vocabulary size 5")
+    );
     Ok(())
 }
 
@@ -366,8 +368,8 @@ fn encodes_with_ranked_bpe_merges_from_gguf_metadata() -> Result<(), Box<dyn Err
 }
 
 #[test]
-fn encodes_scored_llama_vocabularies_with_spm_merges_and_byte_fallback(
-) -> Result<(), Box<dyn Error>> {
+fn encodes_scored_llama_vocabularies_with_spm_merges_and_byte_fallback()
+-> Result<(), Box<dyn Error>> {
     let bytes = spm_tokenizer_fixture();
     let file = parse_gguf(&bytes)?;
     let tokenizer = GgufTokenizer::from_gguf(&file)?;
@@ -379,8 +381,8 @@ fn encodes_scored_llama_vocabularies_with_spm_merges_and_byte_fallback(
 }
 
 #[test]
-fn spm_encoding_preserves_user_defined_tokens_and_restarts_the_space_prefix(
-) -> Result<(), Box<dyn Error>> {
+fn spm_encoding_preserves_user_defined_tokens_and_restarts_the_space_prefix()
+-> Result<(), Box<dyn Error>> {
     let bytes = spm_tokenizer_fixture();
     let file = parse_gguf(&bytes)?;
     let tokenizer = GgufTokenizer::from_gguf(&file)?;

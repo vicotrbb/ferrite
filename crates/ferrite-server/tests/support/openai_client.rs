@@ -7,7 +7,7 @@ use async_openai::types::{
     },
     completions::CreateCompletionRequest,
 };
-use async_openai::{config::OpenAIConfig, Client};
+use async_openai::{Client, config::OpenAIConfig};
 use tokio_stream::StreamExt;
 
 pub fn ferrite_client(server: &LiveServer, api_key: &str) -> Client<OpenAIConfig> {

@@ -1,9 +1,8 @@
 use crate::gguf_writer::{
-    align_len, align_value, f32_to_bf16_bits, f32_to_f16_bits, push_kv_string,
-    push_kv_string_array, push_kv_u64, push_q8_0_values, push_tensor_info_with_type,
-    push_typed_tensor_info, push_typed_tensor_values, push_u32, push_u64, q8_storage_bytes,
-    typed_storage_bytes, F32TensorFixture, GGML_TYPE_BF16, GGML_TYPE_F16, GGML_TYPE_F32,
-    GGML_TYPE_Q8_0,
+    F32TensorFixture, GGML_TYPE_BF16, GGML_TYPE_F16, GGML_TYPE_F32, GGML_TYPE_Q8_0, align_len,
+    align_value, f32_to_bf16_bits, f32_to_f16_bits, push_kv_string, push_kv_string_array,
+    push_kv_u64, push_q8_0_values, push_tensor_info_with_type, push_typed_tensor_info,
+    push_typed_tensor_values, push_u32, push_u64, q8_storage_bytes, typed_storage_bytes,
 };
 use crate::scalar_llama_tensors::{
     matrix_dims, q4_k_scalar_tensors, q5_0_scalar_tensors, q6_k_scalar_tensors, q8_scalar_tensors,
@@ -59,7 +58,7 @@ pub fn scalar_llama_bf16_gguf_fixture() -> Vec<u8> {
     scalar_llama_gguf_fixture(GGML_TYPE_BF16, true, None)
 }
 
-/// Builds the minimal quantized Q8_0 Llama GGUF fixture.
+/// Builds the minimal quantized `Q8_0` Llama GGUF fixture.
 #[must_use]
 pub fn scalar_llama_q8_0_gguf_fixture() -> Vec<u8> {
     let alignment = 64u64;
@@ -107,7 +106,7 @@ pub fn scalar_llama_q8_0_gguf_fixture() -> Vec<u8> {
     bytes
 }
 
-/// Builds the minimal quantized Q5_0 Llama GGUF fixture.
+/// Builds the minimal quantized `Q5_0` Llama GGUF fixture.
 #[must_use]
 pub fn scalar_llama_q5_0_gguf_fixture() -> Vec<u8> {
     let alignment = 64u64;
@@ -155,7 +154,7 @@ pub fn scalar_llama_q5_0_gguf_fixture() -> Vec<u8> {
     bytes
 }
 
-/// Builds the minimal quantized Q4_K Llama GGUF fixture.
+/// Builds the minimal quantized `Q4_K` Llama GGUF fixture.
 #[must_use]
 pub fn scalar_llama_q4_k_gguf_fixture() -> Vec<u8> {
     let alignment = 64u64;
@@ -207,7 +206,7 @@ pub fn scalar_llama_q4_k_gguf_fixture() -> Vec<u8> {
     bytes
 }
 
-/// Builds the minimal quantized Q6_K Llama GGUF fixture.
+/// Builds the minimal quantized `Q6_K` Llama GGUF fixture.
 #[must_use]
 pub fn scalar_llama_q6_k_gguf_fixture() -> Vec<u8> {
     let alignment = 64u64;

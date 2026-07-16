@@ -3,7 +3,7 @@
     reason = "audited aarch64 SIMD intrinsics are isolated in this quantizer module"
 )]
 
-use super::{q8_k::BlockQ8K, InferenceError};
+use super::{InferenceError, q8_k::BlockQ8K};
 
 use std::arch::aarch64::{
     vcombine_s16, vcvtq_f32_s32, vcvtq_s32_f32, vdupq_n_f32, vld1q_f32, vmaxq_f32, vminq_f32,

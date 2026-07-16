@@ -5,12 +5,12 @@ use axum::{
     body::Body,
     http::{Request, StatusCode},
 };
-use tokio::time::{sleep, Duration};
+use tokio::time::{Duration, sleep};
 use tower::ServiceExt;
 
 #[tokio::test]
-async fn completions_endpoint_returns_429_when_inference_is_busy(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn completions_endpoint_returns_429_when_inference_is_busy()
+-> Result<(), Box<dyn std::error::Error>> {
     let model_path = write_fixture_model()?;
     let engine = InferenceEngine::load(&model_path)?;
     let state = ServerState::with_engine("fixture-model".to_owned(), engine);
@@ -35,8 +35,8 @@ async fn completions_endpoint_returns_429_when_inference_is_busy(
 }
 
 #[tokio::test]
-async fn completions_endpoint_waits_for_busy_inference_within_configured_timeout(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn completions_endpoint_waits_for_busy_inference_within_configured_timeout()
+-> Result<(), Box<dyn std::error::Error>> {
     let model_path = write_fixture_model()?;
     let engine = InferenceEngine::load(&model_path)?;
     let state = ServerState::with_engine("fixture-model".to_owned(), engine)

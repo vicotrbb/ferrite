@@ -20,20 +20,20 @@ use super::{
         ResponsesRequest, ResponsesResponse,
     },
     stream_generation::{
-        chat_batched_stream_response, chat_stream_response, completion_batched_stream_response,
-        completion_stream_response, ChatStreamOptions, CompletionStreamOptions,
+        ChatStreamOptions, CompletionStreamOptions, chat_batched_stream_response,
+        chat_stream_response, completion_batched_stream_response, completion_stream_response,
     },
 };
 use crate::runtime::GenerationCacheOptions;
 use crate::state::ServerState;
 use axum::{
+    Json, Router,
     extract::{DefaultBodyLimit, OriginalUri, State},
     http::HeaderMap,
     middleware,
     response::{IntoResponse, Response},
     routing::get,
     routing::post,
-    Json, Router,
 };
 
 pub(super) const MAX_OPENAI_REQUEST_BODY_BYTES: usize = 2 * 1024 * 1024;
@@ -101,29 +101,32 @@ async fn responses(
     let cache_options = request
         .cache_options()
         .with_prefix_cache_enabled(state.prefix_cache_enabled());
-    let generated = if let Some(scheduler) = eligible_batch_scheduler(&state, &sampling) {
-        let permit = acquire_batch_admission_permit(&state).await?;
-        generate_batched_text(
-            scheduler,
-            prompt,
-            max_output_tokens,
-            Vec::new(),
-            cache_options,
-            permit,
-        )
-        .await?
-    } else {
-        let permit = acquire_inference_permit(&state).await?;
-        generate_text(
-            Some(engine),
-            prompt,
-            max_output_tokens,
-            Vec::new(),
-            sampling.clone(),
-            cache_options,
-            permit,
-        )
-        .await?
+    let generated = match eligible_batch_scheduler(&state, &sampling) {
+        Some(scheduler) => {
+            let permit = acquire_batch_admission_permit(&state).await?;
+            generate_batched_text(
+                scheduler,
+                prompt,
+                max_output_tokens,
+                Vec::new(),
+                cache_options,
+                permit,
+            )
+            .await?
+        }
+        None => {
+            let permit = acquire_inference_permit(&state).await?;
+            generate_text(
+                Some(engine),
+                prompt,
+                max_output_tokens,
+                Vec::new(),
+                sampling.clone(),
+                cache_options,
+                permit,
+            )
+            .await?
+        }
     };
     Ok(Json(ResponsesResponse::from_generation(
         &request,
@@ -238,29 +241,34 @@ async fn chat_completions(
     let generated = if json_object {
         let permit = acquire_inference_permit(&state).await?;
         generate_json_object(engine, prompt, max_tokens, sampling, cache_options, permit).await?
-    } else if let Some(scheduler) = eligible_batch_scheduler(&state, &sampling) {
-        let permit = acquire_batch_admission_permit(&state).await?;
-        generate_batched_text(
-            scheduler,
-            prompt,
-            max_tokens,
-            request.stop_sequences(),
-            cache_options,
-            permit,
-        )
-        .await?
     } else {
-        let permit = acquire_inference_permit(&state).await?;
-        generate_text(
-            Some(engine),
-            prompt,
-            max_tokens,
-            request.stop_sequences(),
-            sampling,
-            cache_options,
-            permit,
-        )
-        .await?
+        match eligible_batch_scheduler(&state, &sampling) {
+            Some(scheduler) => {
+                let permit = acquire_batch_admission_permit(&state).await?;
+                generate_batched_text(
+                    scheduler,
+                    prompt,
+                    max_tokens,
+                    request.stop_sequences(),
+                    cache_options,
+                    permit,
+                )
+                .await?
+            }
+            None => {
+                let permit = acquire_inference_permit(&state).await?;
+                generate_text(
+                    Some(engine),
+                    prompt,
+                    max_tokens,
+                    request.stop_sequences(),
+                    sampling,
+                    cache_options,
+                    permit,
+                )
+                .await?
+            }
+        }
     };
     let response = if tools.enabled() {
         let parsed = tools.parse_output(generated.text()).map_err(|error| {
@@ -368,29 +376,32 @@ async fn completions(
             permit,
         ));
     }
-    let generated = if let Some(scheduler) = eligible_batch_scheduler(&state, &sampling) {
-        let permit = acquire_batch_admission_permit(&state).await?;
-        generate_batched_texts(
-            scheduler,
-            request.prompts().to_vec(),
-            max_tokens,
-            request.stop_sequences(),
-            cache_options,
-            permit,
-        )
-        .await?
-    } else {
-        let permit = acquire_inference_permit(&state).await?;
-        generate_texts(
-            Some(engine),
-            request.prompts().to_vec(),
-            max_tokens,
-            request.stop_sequences(),
-            sampling,
-            cache_options,
-            permit,
-        )
-        .await?
+    let generated = match eligible_batch_scheduler(&state, &sampling) {
+        Some(scheduler) => {
+            let permit = acquire_batch_admission_permit(&state).await?;
+            generate_batched_texts(
+                scheduler,
+                request.prompts().to_vec(),
+                max_tokens,
+                request.stop_sequences(),
+                cache_options,
+                permit,
+            )
+            .await?
+        }
+        None => {
+            let permit = acquire_inference_permit(&state).await?;
+            generate_texts(
+                Some(engine),
+                request.prompts().to_vec(),
+                max_tokens,
+                request.stop_sequences(),
+                sampling,
+                cache_options,
+                permit,
+            )
+            .await?
+        }
     };
     Ok(Json(CompletionResponse::from_prompt_generations(
         state.model_id().to_owned(),
@@ -445,10 +456,10 @@ async fn method_not_allowed(
     headers: HeaderMap,
     OriginalUri(uri): OriginalUri,
 ) -> OpenAiHttpError {
-    if uri.path().starts_with("/v1/") {
-        if let Err(error) = ensure_authorized(&state, &headers) {
-            return error;
-        }
+    if uri.path().starts_with("/v1/")
+        && let Err(error) = ensure_authorized(&state, &headers)
+    {
+        return error;
     }
     OpenAiHttpError::method_not_allowed()
 }
@@ -458,10 +469,10 @@ async fn not_found(
     headers: HeaderMap,
     OriginalUri(uri): OriginalUri,
 ) -> OpenAiHttpError {
-    if uri.path().starts_with("/v1/") {
-        if let Err(error) = ensure_authorized(&state, &headers) {
-            return error;
-        }
+    if uri.path().starts_with("/v1/")
+        && let Err(error) = ensure_authorized(&state, &headers)
+    {
+        return error;
     }
     OpenAiHttpError::route_not_found(uri.path())
 }

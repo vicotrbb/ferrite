@@ -7,7 +7,7 @@ use super::{
     prompt_cache_key::is_prompt_cache_key,
     reasoning_effort::is_no_reasoning_effort,
     safety_identifier::is_safety_identifier,
-    sampling_options::{sampling_config, SamplingOptionError},
+    sampling_options::{SamplingOptionError, sampling_config},
     service_tier::{is_local_service_tier, response_service_tier},
     stream_flag::StreamFlag,
     token_limit::RequestTokenLimit,
@@ -768,8 +768,8 @@ mod tests {
     }
 
     #[test]
-    fn neutral_response_options_are_accepted_but_stateful_features_are_not(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn neutral_response_options_are_accepted_but_stateful_features_are_not()
+    -> Result<(), Box<dyn std::error::Error>> {
         let neutral: ResponsesRequest = serde_json::from_value(json!({
             "model":"fixture-model",
             "input":"hello",
@@ -851,8 +851,8 @@ mod tests {
     }
 
     #[test]
-    fn response_preserves_an_omitted_max_output_token_limit_as_null(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn response_preserves_an_omitted_max_output_token_limit_as_null()
+    -> Result<(), Box<dyn std::error::Error>> {
         let request: ResponsesRequest = serde_json::from_value(json!({
             "model":"fixture-model",
             "input":"hello"

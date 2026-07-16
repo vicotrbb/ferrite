@@ -6,13 +6,13 @@
 use super::{
     float::f16_bits_to_f32,
     q5_0::{
-        q5_0_signed_values, Q5_0MatVecBackend, Q5_0MatVecOutput, Q5_0_BLOCK_BYTES,
-        Q5_0_BLOCK_VALUES,
+        Q5_0_BLOCK_BYTES, Q5_0_BLOCK_VALUES, Q5_0MatVecBackend, Q5_0MatVecOutput,
+        q5_0_signed_values,
     },
 };
 use std::arch::x86_64::{
-    __m128i, _mm256_add_ps, _mm256_cvtepi32_ps, _mm256_cvtepi8_epi32, _mm256_loadu_ps,
-    _mm256_mul_ps, _mm256_setzero_ps, _mm256_storeu_ps, _mm_loadl_epi64,
+    __m128i, _mm_loadl_epi64, _mm256_add_ps, _mm256_cvtepi8_epi32, _mm256_cvtepi32_ps,
+    _mm256_loadu_ps, _mm256_mul_ps, _mm256_setzero_ps, _mm256_storeu_ps,
 };
 
 pub(super) fn avx2_q5_0_mul_vec(

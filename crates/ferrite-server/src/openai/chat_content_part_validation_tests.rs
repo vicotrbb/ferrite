@@ -72,8 +72,8 @@ async fn chat_endpoint_rejects_audio_content_parts() -> Result<(), Box<dyn std::
 }
 
 #[tokio::test]
-async fn chat_endpoint_rejects_malformed_text_content_parts(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_endpoint_rejects_malformed_text_content_parts()
+-> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat_json(
         r#"{
             "model":"fixture-model",
@@ -94,8 +94,8 @@ async fn chat_endpoint_rejects_malformed_text_content_parts(
 }
 
 #[tokio::test]
-async fn chat_endpoint_rejects_non_string_text_content_parts(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_endpoint_rejects_non_string_text_content_parts()
+-> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat_json(
         r#"{
             "model":"fixture-model",

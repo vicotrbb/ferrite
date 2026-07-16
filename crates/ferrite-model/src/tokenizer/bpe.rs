@@ -222,7 +222,7 @@ fn apply_merge(symbols: &mut Vec<String>, left: &str, right: &str, merged: &str)
     let mut index = 0usize;
     while index + 1 < symbols.len() {
         if symbols[index] == left && symbols[index + 1] == right {
-            symbols[index] = merged.to_owned();
+            merged.clone_into(&mut symbols[index]);
             symbols.remove(index + 1);
         } else {
             index += 1;

@@ -49,16 +49,18 @@ async fn chat_endpoint_rejects_malformed_user_identifier() -> Result<(), Box<dyn
     assert_eq!(body.status, StatusCode::BAD_REQUEST);
     assert_eq!(body.json["error"]["type"], "invalid_request_error");
     assert_eq!(body.json["error"]["param"], "user");
-    assert!(body.json["error"]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("user"));
+    assert!(
+        body.json["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("user")
+    );
     Ok(())
 }
 
 #[tokio::test]
-async fn completion_endpoint_rejects_malformed_user_identifier(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn completion_endpoint_rejects_malformed_user_identifier()
+-> Result<(), Box<dyn std::error::Error>> {
     let body = post_completion_json(
         r#"{
             "model":"fixture-model",
@@ -71,9 +73,11 @@ async fn completion_endpoint_rejects_malformed_user_identifier(
     assert_eq!(body.status, StatusCode::BAD_REQUEST);
     assert_eq!(body.json["error"]["type"], "invalid_request_error");
     assert_eq!(body.json["error"]["param"], "user");
-    assert!(body.json["error"]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("user"));
+    assert!(
+        body.json["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("user")
+    );
     Ok(())
 }

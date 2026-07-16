@@ -1,4 +1,5 @@
 use super::{
+    InferenceError, ScalarExecutionOptions,
     dense16::{bf16_mul_vec_with_options, f16_mul_vec_with_options},
     kernel_check::ensure_within_relative_error,
     math::{argmax, dot},
@@ -8,7 +9,6 @@ use super::{
     q5_k::q5_k_mul_vec_with_options,
     q6_k::q6_k_mul_vec_with_options,
     q8_0::{q8_0_argmax_mul_vec_with_options, q8_0_mul_vec_with_options},
-    InferenceError, ScalarExecutionOptions,
 };
 use ferrite_model::model_file::MappedModelFile;
 use std::{ops::Deref, ops::Range};
@@ -548,12 +548,12 @@ impl Matrix {
         options: ScalarExecutionOptions,
         activation: &[super::q8_residual_activation::BlockQ8Residual],
     ) -> Result<Vec<f32>, InferenceError> {
-        if options.residual_q8_activation_matvec() {
-            if let MatrixData::Q5_0(data) = &self.data {
-                return super::q5_0_q8_residual_neon::neon_q5_0_q8_residual_mul_vec_prequantized(
-                    data, self.rows, self.cols, activation,
-                );
-            }
+        if options.residual_q8_activation_matvec()
+            && let MatrixData::Q5_0(data) = &self.data
+        {
+            return super::q5_0_q8_residual_neon::neon_q5_0_q8_residual_mul_vec_prequantized(
+                data, self.rows, self.cols, activation,
+            );
         }
         self.mul_vec_with_options(vector, options)
     }

@@ -94,10 +94,10 @@ pub use options::{
 pub use output::ScalarLlamaOutputWeights;
 pub use profile::{ProfiledNextToken, ProfiledTokenId, ScalarMatVecComparison, ScalarProfileEvent};
 use rope::apply_rope_with_layout;
-pub use rope::{apply_rope, RopeLayout};
+pub use rope::{RopeLayout, apply_rope};
 pub use session::{
-    accept_token_contexts_batch, accept_token_ids_batch, PromptEvaluationControl,
-    PromptEvaluationLocation, ScalarLlamaSession, ScalarLlamaSessionSnapshot,
+    PromptEvaluationControl, PromptEvaluationLocation, ScalarLlamaSession,
+    ScalarLlamaSessionSnapshot, accept_token_contexts_batch, accept_token_ids_batch,
 };
 
 /// Architecture-neutral name for mutable scalar generation state.

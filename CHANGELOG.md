@@ -5,7 +5,22 @@ versioning for published crates while it remains in the `0.x` series.
 
 ## Unreleased
 
-No unreleased changes.
+### Changed
+
+- Migrated the workspace to the Rust 2024 edition and Cargo resolver 3, with
+  explicit scheduler and channel-sender destruction order at migration-sensitive
+  boundaries.
+- Consolidated the server's artifact-gated integration cases into explicit
+  test harnesses, reducing its Cargo targets from 43 to 11 without removing a
+  test case.
+- Reused the existing token buffer allocation when applying BPE merges, while
+  preserving the exact tokenizer output contract.
+- Applied the canonical Rust 2024 rustfmt style across the workspace.
+
+### Documentation
+
+- Updated the Rust quality baseline, development workflow, portability gates,
+  and real-model test commands for the current edition and harness layout.
 
 ## 0.2.0 - 2026-07-13
 

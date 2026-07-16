@@ -6,12 +6,12 @@ use super::{
 use crate::openai::stop_filter::StopSequenceFilter;
 use ferrite_inference::prefix_cache::PrefixCacheKey;
 use ferrite_inference::scalar::{
-    accept_token_contexts_batch, accept_token_ids_batch, ScalarLlamaSession,
+    ScalarLlamaSession, accept_token_contexts_batch, accept_token_ids_batch,
 };
 use std::collections::VecDeque;
 use std::sync::{
-    mpsc::{self, Receiver, RecvTimeoutError, SyncSender, TryRecvError, TrySendError},
     Arc,
+    mpsc::{self, Receiver, RecvTimeoutError, SyncSender, TryRecvError, TrySendError},
 };
 use std::thread;
 use std::time::{Duration, Instant};
@@ -362,7 +362,8 @@ impl<'model> ActiveJob<'model> {
 
     fn flush_pending_events(&mut self) {
         while !self.pending_events.is_empty() {
-            match self.events.try_reserve() {
+            let reservation = self.events.try_reserve();
+            match reservation {
                 Ok(permit) => {
                     if let Some(event) = self.pending_events.pop_front() {
                         permit.send(event);
@@ -375,7 +376,7 @@ impl<'model> ActiveJob<'model> {
                     self.decode_input_token_id = None;
                     break;
                 }
-            }
+            };
         }
     }
 
@@ -405,7 +406,7 @@ fn scheduler_loop(
             match receiver.recv() {
                 Ok(job) => pending_jobs.push(job),
                 Err(_) => input_closed = true,
-            }
+            };
             let admission_deadline = Instant::now() + BATCH_ADMISSION_WINDOW;
             while pending_jobs.len() < max_batch_streams && !input_closed {
                 let remaining = admission_deadline.saturating_duration_since(Instant::now());
@@ -416,7 +417,7 @@ fn scheduler_loop(
                     Ok(job) => pending_jobs.push(job),
                     Err(RecvTimeoutError::Timeout) => break,
                     Err(RecvTimeoutError::Disconnected) => input_closed = true,
-                }
+                };
             }
         }
         while active.len() + pending_jobs.len() < max_batch_streams && !input_closed {
@@ -424,7 +425,7 @@ fn scheduler_loop(
                 Ok(job) => pending_jobs.push(job),
                 Err(TryRecvError::Empty) => break,
                 Err(TryRecvError::Disconnected) => input_closed = true,
-            }
+            };
         }
         if !pending_jobs.is_empty() {
             admit_jobs(&engine, &mut active, pending_jobs);
@@ -449,7 +450,7 @@ fn scheduler_loop(
                     Ok(job) => admit_jobs(&engine, &mut active, vec![job]),
                     Err(RecvTimeoutError::Timeout) => {}
                     Err(RecvTimeoutError::Disconnected) => input_closed = true,
-                }
+                };
             } else {
                 thread::yield_now();
             }
@@ -540,7 +541,7 @@ fn admit_jobs<'model>(
             Err(error) => {
                 let _ = error_sender.blocking_send(BatchedGenerationEvent::Failed(error));
             }
-        }
+        };
     }
     if prepared.is_empty() {
         return;
@@ -594,7 +595,7 @@ fn admit_jobs<'model>(
             Err(error) => {
                 let _ = error_sender.blocking_send(BatchedGenerationEvent::Failed(error));
             }
-        }
+        };
     }
 }
 
@@ -800,7 +801,7 @@ fn restore_prefill_sessions<'model>(
 
 #[cfg(test)]
 mod tests {
-    use super::{equal_prompt_groups, BatchScheduler, BatchedGenerationEvent};
+    use super::{BatchScheduler, BatchedGenerationEvent, equal_prompt_groups};
     use crate::runtime::{
         GenerationCacheOptions, GenerationFinishReason, GenerationFinishSource, InferenceEngine,
     };

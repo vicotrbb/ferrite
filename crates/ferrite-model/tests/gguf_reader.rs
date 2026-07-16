@@ -1,6 +1,6 @@
 mod support;
 
-use ferrite_model::gguf::{parse_gguf, GgmlType, MetadataValue};
+use ferrite_model::gguf::{GgmlType, MetadataValue, parse_gguf};
 use std::error::Error;
 use std::io;
 use support::gguf::{
@@ -80,9 +80,11 @@ fn exposes_optional_string_chat_template() -> Result<(), Box<dyn Error>> {
         Ok(_) => return Err(io::Error::other("non-string chat template should fail").into()),
         Err(error) => error,
     };
-    assert!(error
-        .to_string()
-        .contains("tokenizer.chat_template must be a string"));
+    assert!(
+        error
+            .to_string()
+            .contains("tokenizer.chat_template must be a string")
+    );
     Ok(())
 }
 
@@ -97,9 +99,11 @@ fn rejects_tensor_offsets_that_violate_alignment() -> Result<(), Box<dyn Error>>
         Err(error) => error,
     };
 
-    assert!(error
-        .to_string()
-        .contains("tensor offset 1 is not aligned to 64"));
+    assert!(
+        error
+            .to_string()
+            .contains("tensor offset 1 is not aligned to 64")
+    );
     Ok(())
 }
 
@@ -117,9 +121,11 @@ fn rejects_invalid_metadata_keys() -> Result<(), Box<dyn Error>> {
         Err(error) => error,
     };
 
-    assert!(error
-        .to_string()
-        .contains("metadata key is not valid GGUF lower_snake_case hierarchy"));
+    assert!(
+        error
+            .to_string()
+            .contains("metadata key is not valid GGUF lower_snake_case hierarchy")
+    );
     Ok(())
 }
 
@@ -138,9 +144,11 @@ fn rejects_duplicate_metadata_keys() -> Result<(), Box<dyn Error>> {
         Err(error) => error,
     };
 
-    assert!(error
-        .to_string()
-        .contains("duplicate metadata key general.architecture"));
+    assert!(
+        error
+            .to_string()
+            .contains("duplicate metadata key general.architecture")
+    );
     Ok(())
 }
 
@@ -168,9 +176,11 @@ fn rejects_duplicate_tensor_names() -> Result<(), Box<dyn Error>> {
         Err(error) => error,
     };
 
-    assert!(error
-        .to_string()
-        .contains("duplicate tensor name token_embd.weight"));
+    assert!(
+        error
+            .to_string()
+            .contains("duplicate tensor name token_embd.weight")
+    );
     Ok(())
 }
 
@@ -183,9 +193,11 @@ fn rejects_tensors_with_no_dimensions() -> Result<(), Box<dyn Error>> {
         Err(error) => error,
     };
 
-    assert!(error
-        .to_string()
-        .contains("tensor token_embd.weight must have at least one dimension"));
+    assert!(
+        error
+            .to_string()
+            .contains("tensor token_embd.weight must have at least one dimension")
+    );
     Ok(())
 }
 
@@ -198,9 +210,11 @@ fn rejects_tensors_with_zero_dimensions() -> Result<(), Box<dyn Error>> {
         Err(error) => error,
     };
 
-    assert!(error
-        .to_string()
-        .contains("tensor token_embd.weight has zero dimension"));
+    assert!(
+        error
+            .to_string()
+            .contains("tensor token_embd.weight has zero dimension")
+    );
     Ok(())
 }
 
@@ -213,9 +227,11 @@ fn rejects_tensors_with_too_many_dimensions() -> Result<(), Box<dyn Error>> {
         Err(error) => error,
     };
 
-    assert!(error
-        .to_string()
-        .contains("tensor token_embd.weight has 5 dimensions; maximum supported is 4"));
+    assert!(
+        error
+            .to_string()
+            .contains("tensor token_embd.weight has 5 dimensions; maximum supported is 4")
+    );
     Ok(())
 }
 
@@ -260,9 +276,11 @@ fn rejects_metadata_array_beyond_decoded_value_budget() -> Result<(), Box<dyn Er
         Ok(_) => return Err(io::Error::other("unbounded array should be rejected").into()),
         Err(error) => error,
     };
-    assert!(error
-        .to_string()
-        .contains("metadata array length 1048576 exceeds remaining decoded-value budget"));
+    assert!(
+        error
+            .to_string()
+            .contains("metadata array length 1048576 exceeds remaining decoded-value budget")
+    );
     Ok(())
 }
 
@@ -282,9 +300,11 @@ fn rejects_metadata_array_that_cannot_fit_in_remaining_bytes() -> Result<(), Box
         Ok(_) => return Err(io::Error::other("impossible array should be rejected").into()),
         Err(error) => error,
     };
-    assert!(error
-        .to_string()
-        .contains("metadata array requires at least 800 bytes, but only 0 remain"));
+    assert!(
+        error
+            .to_string()
+            .contains("metadata array requires at least 800 bytes, but only 0 remain")
+    );
     Ok(())
 }
 
@@ -309,9 +329,11 @@ fn rejects_metadata_array_nesting_beyond_parser_limit() -> Result<(), Box<dyn Er
         Ok(_) => return Err(io::Error::other("excessive nesting should be rejected").into()),
         Err(error) => error,
     };
-    assert!(error
-        .to_string()
-        .contains("metadata array nesting exceeds parser limit 64"));
+    assert!(
+        error
+            .to_string()
+            .contains("metadata array nesting exceeds parser limit 64")
+    );
     Ok(())
 }
 
@@ -328,9 +350,11 @@ fn rejects_oversized_strings_before_copying_them() -> Result<(), Box<dyn Error>>
         Ok(_) => return Err(io::Error::other("oversized key should be rejected").into()),
         Err(error) => error,
     };
-    assert!(error
-        .to_string()
-        .contains("metadata key length 65536 exceeds parser limit 65535"));
+    assert!(
+        error
+            .to_string()
+            .contains("metadata key length 65536 exceeds parser limit 65535")
+    );
 
     let mut bytes = Vec::new();
     bytes.extend_from_slice(b"GGUF");
@@ -345,8 +369,10 @@ fn rejects_oversized_strings_before_copying_them() -> Result<(), Box<dyn Error>>
         Ok(_) => return Err(io::Error::other("oversized value should be rejected").into()),
         Err(error) => error,
     };
-    assert!(error
-        .to_string()
-        .contains("metadata string length 16777217 exceeds parser limit 16777216"));
+    assert!(
+        error
+            .to_string()
+            .contains("metadata string length 16777217 exceeds parser limit 16777216")
+    );
     Ok(())
 }

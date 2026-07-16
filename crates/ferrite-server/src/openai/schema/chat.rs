@@ -8,9 +8,9 @@ use super::{
     neutral_options::{is_neutral_bool, is_neutral_number, is_optional_bool},
     prompt_cache_key::is_prompt_cache_key,
     reasoning_effort::is_no_reasoning_effort,
-    response_format::{is_supported_response_format, response_format_kind, ResponseFormatKind},
+    response_format::{ResponseFormatKind, is_supported_response_format, response_format_kind},
     safety_identifier::is_safety_identifier,
-    sampling_options::{sampling_config, SamplingOptionError},
+    sampling_options::{SamplingOptionError, sampling_config},
     service_tier::{is_local_service_tier, response_service_tier},
     stop_sequences::{is_supported_stop_sequences, stop_sequences},
     stream_flag::StreamFlag,
@@ -270,8 +270,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn chat_request_maps_prompt_cache_key_to_generation_cache_namespace(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn chat_request_maps_prompt_cache_key_to_generation_cache_namespace()
+    -> Result<(), Box<dyn std::error::Error>> {
         let request: ChatCompletionRequest = serde_json::from_str(
             r#"{
                 "model":"fixture-model",
@@ -288,8 +288,8 @@ mod tests {
     }
 
     #[test]
-    fn chat_request_omits_cache_namespace_for_null_prompt_cache_key(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn chat_request_omits_cache_namespace_for_null_prompt_cache_key()
+    -> Result<(), Box<dyn std::error::Error>> {
         let request: ChatCompletionRequest = serde_json::from_str(
             r#"{
                 "model":"fixture-model",
@@ -303,8 +303,8 @@ mod tests {
     }
 
     #[test]
-    fn chat_request_metadata_can_enable_ferrite_cache_trace(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn chat_request_metadata_can_enable_ferrite_cache_trace()
+    -> Result<(), Box<dyn std::error::Error>> {
         let request: ChatCompletionRequest = serde_json::from_str(
             r#"{
                 "model":"fixture-model",
@@ -322,8 +322,8 @@ mod tests {
     }
 
     #[test]
-    fn chat_request_keeps_ferrite_cache_trace_disabled_by_default(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn chat_request_keeps_ferrite_cache_trace_disabled_by_default()
+    -> Result<(), Box<dyn std::error::Error>> {
         let request: ChatCompletionRequest = serde_json::from_str(
             r#"{
                 "model":"fixture-model",

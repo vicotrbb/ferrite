@@ -4,14 +4,14 @@
 )]
 
 use super::{
-    neon_util::native_f16_bits_to_f32,
-    q6_k::{q6_k_storage_bytes, Q6_K_BLOCK_BYTES, Q6_K_BLOCK_VALUES},
-    q8_k::BlockQ8K,
     InferenceError,
+    neon_util::native_f16_bits_to_f32,
+    q6_k::{Q6_K_BLOCK_BYTES, Q6_K_BLOCK_VALUES, q6_k_storage_bytes},
+    q8_k::BlockQ8K,
 };
 use rayon::prelude::*;
 use std::arch::aarch64::{
-    int32x4_t, int8x16_t, vaddq_s32, vaddvq_s32, vget_high_s8, vget_low_s8, vld1q_s8, vmull_s8,
+    int8x16_t, int32x4_t, vaddq_s32, vaddvq_s32, vget_high_s8, vget_low_s8, vld1q_s8, vmull_s8,
     vpaddlq_s16,
 };
 
@@ -232,10 +232,10 @@ unsafe fn dot_i8x16(left: int8x16_t, right: int8x16_t) -> int32x4_t {
 mod tests {
     use super::{neon_q6_k_q8_k_block_dot, neon_q6_k_q8_k_mul_vec};
     use crate::scalar::{
+        InferenceError,
         q6_k::Q6_K_BLOCK_VALUES,
         q6_k_q8_k::{q6_k_q8_k_block_dot, q6_k_q8_k_mul_vec},
         q8_k::BlockQ8K,
-        InferenceError,
     };
 
     #[test]

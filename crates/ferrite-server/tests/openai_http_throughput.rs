@@ -1,14 +1,14 @@
 mod support;
 
-use ferrite_server::throughput_client::{run_completion_benchmark, ThroughputClientConfig};
+use ferrite_server::throughput_client::{ThroughputClientConfig, run_completion_benchmark};
 use std::{ffi::OsString, time::Duration};
 use support::throughput::{
     measure_concurrent_completion_requests, measure_sequential_completion_requests,
 };
 
 #[tokio::test]
-async fn live_http_server_measures_sequential_completion_request_rate(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn live_http_server_measures_sequential_completion_request_rate()
+-> Result<(), Box<dyn std::error::Error>> {
     let server = support::LiveServer::start().await?;
     let request_body = format!(
         r#"{{"model":"{}","prompt":"hello","max_tokens":1}}"#,
@@ -26,8 +26,8 @@ async fn live_http_server_measures_sequential_completion_request_rate(
 }
 
 #[tokio::test]
-async fn live_http_server_measures_queued_concurrent_completion_request_rate(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn live_http_server_measures_queued_concurrent_completion_request_rate()
+-> Result<(), Box<dyn std::error::Error>> {
     let server = support::LiveServer::start_configured(|state| {
         state.with_inference_wait_timeout(Duration::from_secs(2))
     })
@@ -48,8 +48,8 @@ async fn live_http_server_measures_queued_concurrent_completion_request_rate(
 }
 
 #[tokio::test]
-async fn throughput_client_tracks_repeated_requests_per_configured_prompt(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn throughput_client_tracks_repeated_requests_per_configured_prompt()
+-> Result<(), Box<dyn std::error::Error>> {
     let server = support::LiveServer::start_configured(|state| {
         state.with_inference_wait_timeout(Duration::from_secs(2))
     })
@@ -88,8 +88,8 @@ async fn throughput_client_tracks_repeated_requests_per_configured_prompt(
 }
 
 #[tokio::test]
-async fn throughput_client_tracks_mixed_output_budgets_per_prompt(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn throughput_client_tracks_mixed_output_budgets_per_prompt()
+-> Result<(), Box<dyn std::error::Error>> {
     let server = support::LiveServer::start_configured(|state| {
         state.with_inference_wait_timeout(Duration::from_secs(2))
     })

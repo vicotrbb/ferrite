@@ -16,10 +16,12 @@ async fn chat_endpoint_rejects_malformed_tool_definitions() -> Result<(), Box<dy
     assert_eq!(body.status, StatusCode::BAD_REQUEST);
     assert_eq!(body.json["error"]["type"], "invalid_request_error");
     assert_eq!(body.json["error"]["param"], "tools");
-    assert!(body.json["error"]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("function name"));
+    assert!(
+        body.json["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("function name")
+    );
     Ok(())
 }
 
@@ -44,8 +46,8 @@ async fn chat_endpoint_rejects_function_fields() -> Result<(), Box<dyn std::erro
 }
 
 #[tokio::test]
-async fn chat_endpoint_rejects_streaming_tool_calls_until_chunk_parsing_is_supported(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_endpoint_rejects_streaming_tool_calls_until_chunk_parsing_is_supported()
+-> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat_json(
         r#"{
             "model":"fixture-model",
@@ -58,16 +60,18 @@ async fn chat_endpoint_rejects_streaming_tool_calls_until_chunk_parsing_is_suppo
 
     assert_eq!(body.status, StatusCode::BAD_REQUEST);
     assert_eq!(body.json["error"]["param"], "stream");
-    assert!(body.json["error"]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("streaming tool calls"));
+    assert!(
+        body.json["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("streaming tool calls")
+    );
     Ok(())
 }
 
 #[tokio::test]
-async fn chat_endpoint_rejects_unknown_specific_tool_choice(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_endpoint_rejects_unknown_specific_tool_choice()
+-> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat_json(
         r#"{
             "model":"fixture-model",
@@ -84,8 +88,8 @@ async fn chat_endpoint_rejects_unknown_specific_tool_choice(
 }
 
 #[tokio::test]
-async fn chat_endpoint_rejects_unimplemented_json_schema_format(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_endpoint_rejects_unimplemented_json_schema_format()
+-> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat_json(
         r#"{
             "model":"fixture-model",
@@ -97,16 +101,18 @@ async fn chat_endpoint_rejects_unimplemented_json_schema_format(
 
     assert_eq!(body.status, StatusCode::BAD_REQUEST);
     assert_eq!(body.json["error"]["type"], "invalid_request_error");
-    assert!(body.json["error"]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("response_format"));
+    assert!(
+        body.json["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("response_format")
+    );
     Ok(())
 }
 
 #[tokio::test]
-async fn chat_json_mode_requires_an_explicit_json_instruction(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_json_mode_requires_an_explicit_json_instruction()
+-> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat_json(
         r#"{
             "model":"fixture-model",
@@ -118,16 +124,18 @@ async fn chat_json_mode_requires_an_explicit_json_instruction(
 
     assert_eq!(body.status, StatusCode::BAD_REQUEST);
     assert_eq!(body.json["error"]["param"], "messages");
-    assert!(body.json["error"]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("JSON mode"));
+    assert!(
+        body.json["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("JSON mode")
+    );
     Ok(())
 }
 
 #[tokio::test]
-async fn chat_json_mode_rejects_streaming_until_constrained_stream_chunks_are_supported(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_json_mode_rejects_streaming_until_constrained_stream_chunks_are_supported()
+-> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat_json(
         r#"{
             "model":"fixture-model",
@@ -144,8 +152,8 @@ async fn chat_json_mode_rejects_streaming_until_constrained_stream_chunks_are_su
 }
 
 #[tokio::test]
-async fn chat_endpoint_rejects_invalid_sampling_parameters(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_endpoint_rejects_invalid_sampling_parameters()
+-> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat_json(
         r#"{
             "model":"fixture-model",
@@ -158,10 +166,12 @@ async fn chat_endpoint_rejects_invalid_sampling_parameters(
     assert_eq!(body.status, StatusCode::BAD_REQUEST);
     assert_eq!(body.json["error"]["type"], "invalid_request_error");
     assert_eq!(body.json["error"]["param"], "temperature");
-    assert!(body.json["error"]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("temperature"));
+    assert!(
+        body.json["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("temperature")
+    );
     Ok(())
 }
 
@@ -179,10 +189,12 @@ async fn chat_endpoint_rejects_enabled_reasoning_effort() -> Result<(), Box<dyn 
 
     assert_eq!(body.status, StatusCode::BAD_REQUEST);
     assert_eq!(body.json["error"]["type"], "invalid_request_error");
-    assert!(body.json["error"]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("reasoning_effort"));
+    assert!(
+        body.json["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("reasoning_effort")
+    );
     Ok(())
 }
 
@@ -215,16 +227,18 @@ async fn chat_endpoint_rejects_multiple_choice_request() -> Result<(), Box<dyn s
 
     assert_eq!(body.status, StatusCode::BAD_REQUEST);
     assert_eq!(body.json["error"]["type"], "invalid_request_error");
-    assert!(body.json["error"]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("n"));
+    assert!(
+        body.json["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("n")
+    );
     Ok(())
 }
 
 #[tokio::test]
-async fn chat_endpoint_rejects_malformed_max_completion_tokens(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_endpoint_rejects_malformed_max_completion_tokens()
+-> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat_json(
         r#"{
             "model":"fixture-model",
@@ -294,9 +308,11 @@ async fn chat_endpoint_rejects_unknown_fields() -> Result<(), Box<dyn std::error
 
     assert_eq!(body.status, StatusCode::BAD_REQUEST);
     assert_eq!(body.json["error"]["type"], "invalid_request_error");
-    assert!(body.json["error"]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("unsupported_option"));
+    assert!(
+        body.json["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("unsupported_option")
+    );
     Ok(())
 }

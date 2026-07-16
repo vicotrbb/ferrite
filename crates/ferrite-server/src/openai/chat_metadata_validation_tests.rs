@@ -30,10 +30,12 @@ async fn chat_endpoint_rejects_malformed_metadata() -> Result<(), Box<dyn std::e
 
     assert_eq!(body.status, StatusCode::BAD_REQUEST);
     assert_eq!(body.json["error"]["type"], "invalid_request_error");
-    assert!(body.json["error"]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("metadata"));
+    assert!(
+        body.json["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("metadata")
+    );
     Ok(())
 }
 
@@ -51,10 +53,12 @@ async fn chat_endpoint_rejects_malformed_prompt_cache_key() -> Result<(), Box<dy
 
     assert_eq!(body.status, StatusCode::BAD_REQUEST);
     assert_eq!(body.json["error"]["type"], "invalid_request_error");
-    assert!(body.json["error"]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("prompt_cache_key"));
+    assert!(
+        body.json["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("prompt_cache_key")
+    );
     Ok(())
 }
 
@@ -75,8 +79,8 @@ async fn chat_endpoint_accepts_null_prompt_cache_key() -> Result<(), Box<dyn std
 }
 
 #[tokio::test]
-async fn chat_endpoint_rejects_malformed_safety_identifier(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_endpoint_rejects_malformed_safety_identifier()
+-> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat_json(
         r#"{
             "model":"fixture-model",
@@ -88,10 +92,12 @@ async fn chat_endpoint_rejects_malformed_safety_identifier(
 
     assert_eq!(body.status, StatusCode::BAD_REQUEST);
     assert_eq!(body.json["error"]["type"], "invalid_request_error");
-    assert!(body.json["error"]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("safety_identifier"));
+    assert!(
+        body.json["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("safety_identifier")
+    );
     Ok(())
 }
 
@@ -126,10 +132,12 @@ async fn chat_endpoint_rejects_overlong_safety_identifier() -> Result<(), Box<dy
 
     assert_eq!(body.status, StatusCode::BAD_REQUEST);
     assert_eq!(body.json["error"]["type"], "invalid_request_error");
-    assert!(body.json["error"]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("safety_identifier"));
+    assert!(
+        body.json["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("safety_identifier")
+    );
     Ok(())
 }
 
@@ -146,9 +154,11 @@ async fn chat_endpoint_rejects_malformed_seed() -> Result<(), Box<dyn std::error
 
     assert_eq!(body.status, StatusCode::BAD_REQUEST);
     assert_eq!(body.json["error"]["type"], "invalid_request_error");
-    assert!(body.json["error"]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("seed"));
+    assert!(
+        body.json["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("seed")
+    );
     Ok(())
 }

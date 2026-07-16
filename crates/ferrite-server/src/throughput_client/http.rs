@@ -195,17 +195,17 @@ async fn read_http_response(
         response.extend_from_slice(&chunk[..bytes_read]);
         streaming_tracker.observe(&response, read_started.elapsed());
 
-        if header_end.is_none() {
-            if let Some(index) = find_header_end(&response) {
-                header_end = Some(index);
-                content_length = parse_content_length(&response[..index])?;
-            }
+        if header_end.is_none()
+            && let Some(index) = find_header_end(&response)
+        {
+            header_end = Some(index);
+            content_length = parse_content_length(&response[..index])?;
         }
 
-        if let (Some(index), Some(length)) = (header_end, content_length) {
-            if response.len() >= index + 4 + length {
-                break;
-            }
+        if let (Some(index), Some(length)) = (header_end, content_length)
+            && response.len() >= index + 4 + length
+        {
+            break;
         }
     }
 
@@ -321,10 +321,10 @@ fn find_header_end(response: &[u8]) -> Option<usize> {
 fn parse_content_length(headers: &[u8]) -> Result<Option<usize>, Box<dyn Error>> {
     let headers = std::str::from_utf8(headers)?;
     for line in headers.lines() {
-        if let Some((name, value)) = line.split_once(':') {
-            if name.eq_ignore_ascii_case("content-length") {
-                return Ok(Some(value.trim().parse()?));
-            }
+        if let Some((name, value)) = line.split_once(':')
+            && name.eq_ignore_ascii_case("content-length")
+        {
+            return Ok(Some(value.trim().parse()?));
         }
     }
     Ok(None)

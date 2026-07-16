@@ -1,9 +1,10 @@
 //! Long-context lifecycle, cache, cancellation, and queue validation binary.
 
 use ferrite_server::long_chat_gate::{
-    format_disconnect_probe_result, format_error_probe_result, format_queue_probe_result,
-    format_report, format_run_summary, format_scenario_result, LongChatDisconnectProbeResult,
-    LongChatErrorProbeResult, LongChatGateConfig, LongChatProofArtifacts, LongChatQueueProbeResult,
+    LongChatDisconnectProbeResult, LongChatErrorProbeResult, LongChatGateConfig,
+    LongChatProofArtifacts, LongChatQueueProbeResult, format_disconnect_probe_result,
+    format_error_probe_result, format_queue_probe_result, format_report, format_run_summary,
+    format_scenario_result,
 };
 use std::io::Write;
 

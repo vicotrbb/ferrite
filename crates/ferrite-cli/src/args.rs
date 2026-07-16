@@ -789,9 +789,11 @@ mod tests {
             Err(error) => error,
         };
 
-        assert!(error
-            .to_string()
-            .contains("sampling and stop-token options"));
+        assert!(
+            error
+                .to_string()
+                .contains("sampling and stop-token options")
+        );
         Ok(())
     }
 

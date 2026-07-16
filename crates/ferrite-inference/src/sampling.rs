@@ -634,18 +634,24 @@ mod tests {
 
     #[test]
     fn validates_ranges_and_logit_bias_vocabulary() -> Result<(), SamplingError> {
-        assert!(SamplingConfig::default()
-            .with_temperature(2.1)
-            .validate()
-            .is_err());
-        assert!(SamplingConfig::default()
-            .with_top_k(Some(0))
-            .validate()
-            .is_err());
-        assert!(SamplingConfig::default()
-            .with_top_p(-0.1)
-            .validate()
-            .is_err());
+        assert!(
+            SamplingConfig::default()
+                .with_temperature(2.1)
+                .validate()
+                .is_err()
+        );
+        assert!(
+            SamplingConfig::default()
+                .with_top_k(Some(0))
+                .validate()
+                .is_err()
+        );
+        assert!(
+            SamplingConfig::default()
+                .with_top_p(-0.1)
+                .validate()
+                .is_err()
+        );
 
         let mut biases = BTreeMap::new();
         biases.insert(4, 1.0);

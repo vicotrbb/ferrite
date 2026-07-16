@@ -30,8 +30,8 @@ async fn chat_endpoint_applies_logit_bias() -> Result<(), Box<dyn std::error::Er
 }
 
 #[tokio::test]
-async fn chat_endpoint_rejects_out_of_vocabulary_logit_bias(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_endpoint_rejects_out_of_vocabulary_logit_bias()
+-> Result<(), Box<dyn std::error::Error>> {
     let model_path = write_chat_fixture_model()?;
     let engine = InferenceEngine::load(&model_path)?;
     let app = router(ServerState::with_engine("fixture-model".to_owned(), engine));
@@ -49,10 +49,12 @@ async fn chat_endpoint_rejects_out_of_vocabulary_logit_bias(
     let body = to_json(response.into_body()).await?;
     assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
     assert_eq!(body["error"]["param"], "logit_bias");
-    assert!(body["error"]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("vocabulary size"));
+    assert!(
+        body["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("vocabulary size")
+    );
     Ok(())
 }
 
@@ -71,8 +73,8 @@ async fn chat_endpoint_accepts_empty_stop_array() -> Result<(), Box<dyn std::err
 }
 
 #[tokio::test]
-async fn chat_endpoint_accepts_disabled_logprobs_and_store(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_endpoint_accepts_disabled_logprobs_and_store()
+-> Result<(), Box<dyn std::error::Error>> {
     assert_chat_option_is_accepted(r#""logprobs":false,"store":false"#).await
 }
 
@@ -102,8 +104,8 @@ async fn chat_endpoint_accepts_null_modalities() -> Result<(), Box<dyn std::erro
 }
 
 #[tokio::test]
-async fn chat_endpoint_accepts_null_optional_openai_options(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_endpoint_accepts_null_optional_openai_options()
+-> Result<(), Box<dyn std::error::Error>> {
     assert_chat_option_is_accepted(
         r#""audio":null,"moderation":null,"prediction":null,"verbosity":null,"web_search_options":null"#,
     )
@@ -118,26 +120,26 @@ async fn chat_endpoint_accepts_explicit_no_tool_options() -> Result<(), Box<dyn 
 }
 
 #[tokio::test]
-async fn chat_endpoint_accepts_auto_tool_choice_without_tools(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_endpoint_accepts_auto_tool_choice_without_tools()
+-> Result<(), Box<dyn std::error::Error>> {
     assert_chat_option_is_accepted(r#""tool_choice":"auto""#).await
 }
 
 #[tokio::test]
-async fn chat_endpoint_accepts_parallel_tool_calls_without_tools(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_endpoint_accepts_parallel_tool_calls_without_tools()
+-> Result<(), Box<dyn std::error::Error>> {
     assert_chat_option_is_accepted(r#""tools":[],"parallel_tool_calls":true"#).await
 }
 
 #[tokio::test]
-async fn chat_endpoint_accepts_explicit_no_function_options(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_endpoint_accepts_explicit_no_function_options()
+-> Result<(), Box<dyn std::error::Error>> {
     assert_chat_option_is_accepted(r#""functions":[],"function_call":"none""#).await
 }
 
 #[tokio::test]
-async fn chat_endpoint_accepts_auto_function_call_without_functions(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_endpoint_accepts_auto_function_call_without_functions()
+-> Result<(), Box<dyn std::error::Error>> {
     assert_chat_option_is_accepted(r#""function_call":"auto""#).await
 }
 

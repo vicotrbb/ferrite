@@ -3,7 +3,7 @@
     reason = "audited SIMD half conversion is isolated in this quantization module"
 )]
 
-use super::{float::f16_bits_to_f32, InferenceError, ScalarExecutionOptions};
+use super::{InferenceError, ScalarExecutionOptions, float::f16_bits_to_f32};
 #[cfg(any(target_arch = "aarch64", test))]
 use rayon::prelude::*;
 
@@ -360,11 +360,7 @@ where
         .reduce(
             || (0usize, f32::NEG_INFINITY),
             |left, right| {
-                if right.1 > left.1 {
-                    right
-                } else {
-                    left
-                }
+                if right.1 > left.1 { right } else { left }
             },
         )
         .0

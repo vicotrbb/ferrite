@@ -3,7 +3,7 @@ use super::{
     model_id::deserialize_model_id,
     neutral_options::is_neutral_number,
     prompt_cache_key::is_prompt_cache_key,
-    sampling_options::{sampling_config, SamplingOptionError},
+    sampling_options::{SamplingOptionError, sampling_config},
     stop_sequences::{is_supported_stop_sequences, stop_sequences},
     stream_flag::StreamFlag,
     stream_options::StreamOptions,

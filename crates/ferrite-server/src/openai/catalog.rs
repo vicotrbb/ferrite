@@ -1,9 +1,9 @@
 use super::{auth::ensure_authorized, error::OpenAiHttpError};
 use crate::state::ServerState;
 use axum::{
+    Json,
     extract::{Path, State},
     http::HeaderMap,
-    Json,
 };
 
 use super::schema::{HealthResponse, ModelObject, ModelsResponse};

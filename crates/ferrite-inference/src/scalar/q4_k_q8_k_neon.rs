@@ -4,14 +4,14 @@
 )]
 
 use super::{
-    neon_util::native_f16_bits_to_f32,
-    q4_k::{q4_k_storage_bytes, Q4_K_BLOCK_BYTES, Q4_K_BLOCK_VALUES},
-    q8_k::BlockQ8K,
     InferenceError,
+    neon_util::native_f16_bits_to_f32,
+    q4_k::{Q4_K_BLOCK_BYTES, Q4_K_BLOCK_VALUES, q4_k_storage_bytes},
+    q8_k::BlockQ8K,
 };
 use rayon::prelude::*;
 use std::arch::aarch64::{
-    int32x4_t, int8x16_t, uint8x16_t, vaddq_s32, vaddvq_s32, vandq_u8, vdupq_n_u8, vget_high_s8,
+    int8x16_t, int32x4_t, uint8x16_t, vaddq_s32, vaddvq_s32, vandq_u8, vdupq_n_u8, vget_high_s8,
     vget_low_s8, vld1q_s8, vld1q_u8, vmull_s8, vpaddlq_s16, vreinterpretq_s8_u8, vshrq_n_u8,
 };
 
@@ -201,10 +201,10 @@ fn q4_k_scale_min(index: usize, scales: &[u8]) -> (u8, u8) {
 mod tests {
     use super::{neon_q4_k_q8_k_block_dot, neon_q4_k_q8_k_mul_vec};
     use crate::scalar::{
+        InferenceError,
         q4_k::Q4_K_BLOCK_VALUES,
         q4_k_q8_k::{q4_k_q8_k_block_dot, q4_k_q8_k_mul_vec},
         q8_k::BlockQ8K,
-        InferenceError,
     };
 
     #[test]

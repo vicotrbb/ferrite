@@ -10,8 +10,8 @@ use axum::{
 use tower::ServiceExt;
 
 #[tokio::test]
-async fn completions_endpoint_generates_with_loaded_fixture_model(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn completions_endpoint_generates_with_loaded_fixture_model()
+-> Result<(), Box<dyn std::error::Error>> {
     let model_path = write_fixture_model()?;
     let engine = InferenceEngine::load(&model_path)?;
     let app = router(ServerState::with_engine("fixture-model".to_owned(), engine));
@@ -37,8 +37,8 @@ async fn completions_endpoint_generates_with_loaded_fixture_model(
 }
 
 #[tokio::test]
-async fn completions_endpoint_accepts_array_of_string_prompts(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn completions_endpoint_accepts_array_of_string_prompts()
+-> Result<(), Box<dyn std::error::Error>> {
     let model_path = write_fixture_model()?;
     let engine = InferenceEngine::load(&model_path)?;
     let app = router(ServerState::with_engine("fixture-model".to_owned(), engine));
@@ -88,8 +88,8 @@ async fn chat_endpoint_accepts_text_content_parts() -> Result<(), Box<dyn std::e
 }
 
 #[tokio::test]
-async fn chat_endpoint_reports_cached_tokens_when_experimental_prefix_cache_is_enabled(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_endpoint_reports_cached_tokens_when_experimental_prefix_cache_is_enabled()
+-> Result<(), Box<dyn std::error::Error>> {
     let model_path = write_chat_fixture_model()?;
     let engine = InferenceEngine::load(&model_path)?;
     let state = ServerState::with_engine("fixture-model".to_owned(), engine)
@@ -140,8 +140,8 @@ async fn chat_endpoint_reports_cached_tokens_when_experimental_prefix_cache_is_e
 }
 
 #[tokio::test]
-async fn completions_endpoint_reports_cached_tokens_when_experimental_prefix_cache_is_enabled(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn completions_endpoint_reports_cached_tokens_when_experimental_prefix_cache_is_enabled()
+-> Result<(), Box<dyn std::error::Error>> {
     let model_path = write_fixture_model()?;
     let engine = InferenceEngine::load(&model_path)?;
     let state = ServerState::with_engine("fixture-model".to_owned(), engine)
@@ -192,8 +192,8 @@ async fn completions_endpoint_reports_cached_tokens_when_experimental_prefix_cac
 }
 
 #[tokio::test]
-async fn chat_endpoint_accepts_assistant_refusal_content_parts(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_endpoint_accepts_assistant_refusal_content_parts()
+-> Result<(), Box<dyn std::error::Error>> {
     let model_path = write_chat_fixture_model()?;
     let engine = InferenceEngine::load(&model_path)?;
     let app = router(ServerState::with_engine("fixture-model".to_owned(), engine));
@@ -215,8 +215,8 @@ async fn chat_endpoint_accepts_assistant_refusal_content_parts(
 }
 
 #[tokio::test]
-async fn chat_endpoint_accepts_null_assistant_refusal_message_metadata(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_endpoint_accepts_null_assistant_refusal_message_metadata()
+-> Result<(), Box<dyn std::error::Error>> {
     let model_path = write_chat_fixture_model()?;
     let engine = InferenceEngine::load(&model_path)?;
     let app = router(ServerState::with_engine("fixture-model".to_owned(), engine));
@@ -238,8 +238,8 @@ async fn chat_endpoint_accepts_null_assistant_refusal_message_metadata(
 }
 
 #[tokio::test]
-async fn chat_endpoint_accepts_null_assistant_audio_message_metadata(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_endpoint_accepts_null_assistant_audio_message_metadata()
+-> Result<(), Box<dyn std::error::Error>> {
     let model_path = write_chat_fixture_model()?;
     let engine = InferenceEngine::load(&model_path)?;
     let app = router(ServerState::with_engine("fixture-model".to_owned(), engine));
@@ -261,8 +261,8 @@ async fn chat_endpoint_accepts_null_assistant_audio_message_metadata(
 }
 
 #[tokio::test]
-async fn chat_endpoint_accepts_deprecated_function_message_role(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_endpoint_accepts_deprecated_function_message_role()
+-> Result<(), Box<dyn std::error::Error>> {
     let model_path = write_chat_fixture_model()?;
     let engine = InferenceEngine::load(&model_path)?;
     let app = router(ServerState::with_engine("fixture-model".to_owned(), engine));
