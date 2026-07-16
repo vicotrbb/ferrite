@@ -246,8 +246,10 @@ mod tests {
 
     #[test]
     fn capability_diagnostics_are_stable_and_nonempty() {
-        assert!(!CpuKernelCapabilities::detect()
-            .detected_feature_labels()
-            .is_empty());
+        assert!(
+            !CpuKernelCapabilities::detect()
+                .detected_feature_labels()
+                .is_empty()
+        );
     }
 }

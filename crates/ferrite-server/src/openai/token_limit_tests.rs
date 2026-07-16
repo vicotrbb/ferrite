@@ -2,7 +2,7 @@ use super::routes::router;
 use super::test_support::{remove_fixture_model, write_chat_fixture_model};
 use crate::{limits::TokenLimits, runtime::InferenceEngine, state::ServerState};
 use axum::{
-    body::{to_bytes, Body},
+    body::{Body, to_bytes},
     http::{Request, StatusCode},
 };
 use serde_json::Value;
@@ -74,16 +74,18 @@ async fn chat_endpoint_rejects_configured_hard_max_tokens() -> Result<(), Box<dy
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
     let body = to_json(response.into_body()).await?;
     assert_eq!(body["error"]["type"], "invalid_request_error");
-    assert!(body["error"]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("less than or equal to 2"));
+    assert!(
+        body["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("less than or equal to 2")
+    );
     Ok(())
 }
 
 #[tokio::test]
-async fn chat_stream_endpoint_honors_max_completion_tokens(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_stream_endpoint_honors_max_completion_tokens()
+-> Result<(), Box<dyn std::error::Error>> {
     let model_path = write_chat_fixture_model()?;
     let engine = InferenceEngine::load(&model_path)?;
     let app = router(ServerState::with_engine("fixture-model".to_owned(), engine));
@@ -109,8 +111,8 @@ async fn chat_stream_endpoint_honors_max_completion_tokens(
 }
 
 #[tokio::test]
-async fn chat_endpoint_reports_max_completion_tokens_param_when_hard_limit_is_exceeded(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_endpoint_reports_max_completion_tokens_param_when_hard_limit_is_exceeded()
+-> Result<(), Box<dyn std::error::Error>> {
     let body = post_json(
         "/v1/chat/completions",
         r#"{
@@ -132,8 +134,8 @@ async fn chat_endpoint_reports_max_completion_tokens_param_when_hard_limit_is_ex
 }
 
 #[tokio::test]
-async fn completion_endpoint_reports_max_tokens_param_when_hard_limit_is_exceeded(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn completion_endpoint_reports_max_tokens_param_when_hard_limit_is_exceeded()
+-> Result<(), Box<dyn std::error::Error>> {
     let body = post_json(
         "/v1/completions",
         r#"{
@@ -147,16 +149,18 @@ async fn completion_endpoint_reports_max_tokens_param_when_hard_limit_is_exceede
     assert_eq!(body.status, StatusCode::BAD_REQUEST);
     assert_eq!(body.json["error"]["type"], "invalid_request_error");
     assert_eq!(body.json["error"]["param"], "max_tokens");
-    assert!(body.json["error"]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("less than or equal to 2"));
+    assert!(
+        body.json["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("less than or equal to 2")
+    );
     Ok(())
 }
 
 #[tokio::test]
-async fn endpoints_report_token_limit_param_when_zero_is_requested(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn endpoints_report_token_limit_param_when_zero_is_requested()
+-> Result<(), Box<dyn std::error::Error>> {
     for (uri, payload, param) in [
         (
             "/v1/chat/completions",

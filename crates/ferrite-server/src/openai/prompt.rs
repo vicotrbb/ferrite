@@ -487,8 +487,8 @@ mod tests {
     }
 
     #[test]
-    fn renders_qwen_tool_definitions_inside_the_system_message(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn renders_qwen_tool_definitions_inside_the_system_message()
+    -> Result<(), Box<dyn std::error::Error>> {
         let messages = [ChatMessage::new(ChatRole::User, "Weather in Paris?")];
         let suffix = "\n\n# Tools\n<tools>\n{\"type\":\"function\"}\n</tools>";
 
@@ -535,8 +535,8 @@ mod tests {
     }
 
     #[test]
-    fn qwen_template_supplies_its_model_default_system_message(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn qwen_template_supplies_its_model_default_system_message()
+    -> Result<(), Box<dyn std::error::Error>> {
         let messages = [ChatMessage::new(ChatRole::User, "Hello")];
 
         assert_eq!(
@@ -553,8 +553,8 @@ mod tests {
     }
 
     #[test]
-    fn smollm2_template_supplies_its_model_default_system_message(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn smollm2_template_supplies_its_model_default_system_message()
+    -> Result<(), Box<dyn std::error::Error>> {
         let messages = [ChatMessage::new(ChatRole::User, "hello world")];
 
         assert_eq!(
@@ -623,8 +623,8 @@ mod tests {
     }
 
     #[test]
-    fn phi3_template_rejects_roles_it_would_otherwise_drop(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn phi3_template_rejects_roles_it_would_otherwise_drop()
+    -> Result<(), Box<dyn std::error::Error>> {
         let result = render_chat_prompt_with_model_template(
             Some(PHI3_INSTRUCT_CHAT_TEMPLATE),
             Some("<s>"),
@@ -633,15 +633,17 @@ mod tests {
         let Err(error) = result else {
             return Err("Phi-3 system message should be rejected explicitly".into());
         };
-        assert!(error
-            .to_string()
-            .contains("does not support system messages"));
+        assert!(
+            error
+                .to_string()
+                .contains("does not support system messages")
+        );
         Ok(())
     }
 
     #[test]
-    fn unrecognized_model_template_uses_documented_fallback(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn unrecognized_model_template_uses_documented_fallback()
+    -> Result<(), Box<dyn std::error::Error>> {
         let messages = [ChatMessage::new(ChatRole::User, "Hello")];
 
         assert_eq!(
@@ -664,8 +666,8 @@ mod tests {
     }
 
     #[test]
-    fn oversized_rendered_prompt_is_rejected_before_copying_message(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn oversized_rendered_prompt_is_rejected_before_copying_message()
+    -> Result<(), Box<dyn std::error::Error>> {
         let content = "x".repeat(MAX_RENDERED_PROMPT_BYTES);
         let messages = [ChatMessage::new(ChatRole::User, content)];
 

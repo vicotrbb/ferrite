@@ -1,7 +1,7 @@
 use super::routes::router;
 use crate::{runtime::InferenceEngine, state::ServerState};
 use axum::{
-    body::{to_bytes, Body},
+    body::{Body, to_bytes},
     http::{Request, StatusCode},
 };
 use serde_json::Value;
@@ -34,8 +34,8 @@ async fn chat_endpoint_accepts_auto_service_tier() -> Result<(), Box<dyn std::er
 }
 
 #[tokio::test]
-async fn chat_endpoint_accepts_openai_service_tier_options_as_local_default(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_endpoint_accepts_openai_service_tier_options_as_local_default()
+-> Result<(), Box<dyn std::error::Error>> {
     for service_tier in ["flex", "scale", "priority"] {
         let body = chat_completion_with_service_tier(service_tier).await?;
 
@@ -83,10 +83,12 @@ async fn chat_endpoint_rejects_unknown_service_tier() -> Result<(), Box<dyn std:
     let body = to_json(response.into_body()).await?;
     assert_eq!(status, StatusCode::BAD_REQUEST);
     assert_eq!(body["error"]["type"], "invalid_request_error");
-    assert!(body["error"]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("service_tier"));
+    assert!(
+        body["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("service_tier")
+    );
     Ok(())
 }
 

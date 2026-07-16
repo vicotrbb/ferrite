@@ -10,7 +10,7 @@ mod streaming_usage;
 #[cfg(test)]
 mod tests;
 
-pub use config::{usage, OpenAiEndpoint, ThroughputClientConfig};
+pub use config::{OpenAiEndpoint, ThroughputClientConfig, usage};
 pub use rss::RssSummary;
 pub use streaming_finish::StreamingFinishSummary;
 pub use streaming_metrics::StreamingTimingSummary;
@@ -142,10 +142,8 @@ async fn run_requests(
                 response_finish.as_ref(),
                 response_usage.as_ref(),
             )?;
-            if stream {
-                if let Some(timing) = response.streaming_timing() {
-                    streaming_timings.push(timing);
-                }
+            if stream && let Some(timing) = response.streaming_timing() {
+                streaming_timings.push(timing);
             }
             if stream && streaming_finish.is_none() {
                 streaming_finish = response_finish;
@@ -166,15 +164,13 @@ async fn run_requests(
                     &mut all_streaming_token_id_traces_match,
                 );
             }
-            if stream {
-                if let Some(response_usage) = response_usage {
-                    if let Some(summary) = &mut streaming_usage {
-                        summary
-                            .accumulate(&response_usage)
-                            .map_err(std::io::Error::other)?;
-                    } else {
-                        streaming_usage = Some(response_usage);
-                    }
+            if stream && let Some(response_usage) = response_usage {
+                if let Some(summary) = &mut streaming_usage {
+                    summary
+                        .accumulate(&response_usage)
+                        .map_err(std::io::Error::other)?;
+                } else {
+                    streaming_usage = Some(response_usage);
                 }
             }
             completed_requests += 1;
@@ -310,10 +306,10 @@ pub fn format_result(config: &ThroughputClientConfig, result: ThroughputResult) 
         if let Some(matches) = token_ids.all_request_traces_match() {
             output.push_str(&format!("\nstreaming_all_token_id_traces_match={matches}"));
         }
-        if let Some(traces) = token_ids.prompt_token_id_traces() {
-            if let Ok(encoded) = serde_json::to_string(traces) {
-                output.push_str(&format!("\nstreaming_prompt_token_id_traces={encoded}"));
-            }
+        if let Some(traces) = token_ids.prompt_token_id_traces()
+            && let Ok(encoded) = serde_json::to_string(traces)
+        {
+            output.push_str(&format!("\nstreaming_prompt_token_id_traces={encoded}"));
         }
         if let Some(stable) = token_ids.all_prompt_traces_stable() {
             output.push_str(&format!(

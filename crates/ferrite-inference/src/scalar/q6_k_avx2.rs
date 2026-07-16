@@ -4,10 +4,10 @@
 )]
 
 use super::{
-    q6_k::{
-        q6_k_block_values, Q6KMatVecBackend, Q6KMatVecOutput, Q6_K_BLOCK_BYTES, Q6_K_BLOCK_VALUES,
-    },
     InferenceError,
+    q6_k::{
+        Q6_K_BLOCK_BYTES, Q6_K_BLOCK_VALUES, Q6KMatVecBackend, Q6KMatVecOutput, q6_k_block_values,
+    },
 };
 use rayon::prelude::*;
 use std::arch::x86_64::{
@@ -116,8 +116,8 @@ unsafe fn avx2_f32_block_dot(left: *const f32, right: *const f32) -> f32 {
 mod tests {
     use super::avx2_q6_k_argmax_mul_vec;
     use crate::scalar::{
-        q6_k::{q6_k_mul_vec, Q6_K_BLOCK_VALUES},
         InferenceError,
+        q6_k::{Q6_K_BLOCK_VALUES, q6_k_mul_vec},
     };
 
     #[test]

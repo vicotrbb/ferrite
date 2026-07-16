@@ -74,8 +74,8 @@ mod tests {
     }
 
     #[test]
-    fn records_negative_token_limit_for_request_validation(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn records_negative_token_limit_for_request_validation()
+    -> Result<(), Box<dyn std::error::Error>> {
         let limit: RequestTokenLimit = serde_json::from_str("-1")?;
 
         assert_eq!(limit.value(), None);

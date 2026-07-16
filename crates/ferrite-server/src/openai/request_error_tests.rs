@@ -1,15 +1,15 @@
-use super::routes::{router, MAX_OPENAI_REQUEST_BODY_BYTES};
+use super::routes::{MAX_OPENAI_REQUEST_BODY_BYTES, router};
 use crate::state::ServerState;
 use axum::{
-    body::{to_bytes, Body},
+    body::{Body, to_bytes},
     http::{Request, StatusCode},
 };
 use serde_json::Value;
 use tower::ServiceExt;
 
 #[tokio::test]
-async fn completions_endpoint_returns_openai_error_for_malformed_json(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn completions_endpoint_returns_openai_error_for_malformed_json()
+-> Result<(), Box<dyn std::error::Error>> {
     let app = router(ServerState::new("fixture-model".to_owned()));
     let request = Request::builder()
         .method("POST")
@@ -25,8 +25,8 @@ async fn completions_endpoint_returns_openai_error_for_malformed_json(
 }
 
 #[tokio::test]
-async fn completions_endpoint_returns_openai_error_for_missing_json_content_type(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn completions_endpoint_returns_openai_error_for_missing_json_content_type()
+-> Result<(), Box<dyn std::error::Error>> {
     let app = router(ServerState::new("fixture-model".to_owned()));
     let request = Request::builder()
         .method("POST")
@@ -41,8 +41,8 @@ async fn completions_endpoint_returns_openai_error_for_missing_json_content_type
 }
 
 #[tokio::test]
-async fn completions_endpoint_rejects_body_beyond_explicit_limit(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn completions_endpoint_rejects_body_beyond_explicit_limit()
+-> Result<(), Box<dyn std::error::Error>> {
     let app = router(ServerState::new("fixture-model".to_owned()));
     let request = Request::builder()
         .method("POST")
@@ -60,8 +60,8 @@ async fn completions_endpoint_rejects_body_beyond_explicit_limit(
 }
 
 #[tokio::test]
-async fn completions_endpoint_returns_openai_error_for_wrong_method(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn completions_endpoint_returns_openai_error_for_wrong_method()
+-> Result<(), Box<dyn std::error::Error>> {
     let app = router(ServerState::new("fixture-model".to_owned()));
     let request = Request::builder()
         .method("GET")
@@ -73,10 +73,12 @@ async fn completions_endpoint_returns_openai_error_for_wrong_method(
     let body = to_json(response.into_body()).await?;
     assert_eq!(body["error"]["type"], "invalid_request_error");
     assert_eq!(body["error"]["code"], "method_not_allowed");
-    assert!(body["error"]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("method not allowed"));
+    assert!(
+        body["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("method not allowed")
+    );
     Ok(())
 }
 
@@ -94,10 +96,12 @@ async fn unknown_openai_route_returns_openai_error_body() -> Result<(), Box<dyn 
     let body = to_json(response.into_body()).await?;
     assert_eq!(body["error"]["type"], "invalid_request_error");
     assert_eq!(body["error"]["code"], "not_found");
-    assert!(body["error"]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("/v1/not-a-ferrite-route"));
+    assert!(
+        body["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("/v1/not-a-ferrite-route")
+    );
     Ok(())
 }
 

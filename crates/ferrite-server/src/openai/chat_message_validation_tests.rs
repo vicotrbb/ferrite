@@ -17,16 +17,18 @@ async fn chat_endpoint_rejects_assistant_audio_object() -> Result<(), Box<dyn st
 
     assert_eq!(body.status, StatusCode::BAD_REQUEST);
     assert_eq!(body.json["error"]["type"], "invalid_request_error");
-    assert!(body.json["error"]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("messages.audio"));
+    assert!(
+        body.json["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("messages.audio")
+    );
     Ok(())
 }
 
 #[tokio::test]
-async fn chat_endpoint_rejects_assistant_refusal_metadata_string(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_endpoint_rejects_assistant_refusal_metadata_string()
+-> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat_json(
         r#"{
             "model":"fixture-model",
@@ -41,10 +43,12 @@ async fn chat_endpoint_rejects_assistant_refusal_metadata_string(
 
     assert_eq!(body.status, StatusCode::BAD_REQUEST);
     assert_eq!(body.json["error"]["type"], "invalid_request_error");
-    assert!(body.json["error"]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("messages.refusal"));
+    assert!(
+        body.json["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("messages.refusal")
+    );
     Ok(())
 }
 
@@ -64,10 +68,12 @@ async fn chat_endpoint_rejects_unknown_message_fields() -> Result<(), Box<dyn st
 
     assert_eq!(body.status, StatusCode::BAD_REQUEST);
     assert_eq!(body.json["error"]["type"], "invalid_request_error");
-    assert!(body.json["error"]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("messages.vendor_context"));
+    assert!(
+        body.json["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("messages.vendor_context")
+    );
     Ok(())
 }
 
@@ -191,9 +197,11 @@ async fn chat_endpoint_rejects_malformed_message_name() -> Result<(), Box<dyn st
 
     assert_eq!(body.status, StatusCode::BAD_REQUEST);
     assert_eq!(body.json["error"]["type"], "invalid_request_error");
-    assert!(body.json["error"]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("messages.name"));
+    assert!(
+        body.json["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("messages.name")
+    );
     Ok(())
 }

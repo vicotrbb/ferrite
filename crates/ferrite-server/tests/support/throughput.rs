@@ -1,6 +1,6 @@
 use super::{
-    http::{response_json, send_http_request},
     MODEL_ID,
+    http::{response_json, send_http_request},
 };
 use std::{
     net::SocketAddr,

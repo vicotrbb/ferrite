@@ -27,8 +27,8 @@ async fn live_http_server_accepts_openai_style_model_list() -> Result<(), Box<dy
 }
 
 #[tokio::test]
-async fn live_http_server_accepts_openai_style_model_retrieve(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn live_http_server_accepts_openai_style_model_retrieve()
+-> Result<(), Box<dyn std::error::Error>> {
     let server = support::LiveServer::start().await?;
     let path = format!("/v1/models/{}", support::MODEL_ID);
     let response = send_http_request(server.addr(), "GET", &path, &[]).await?;
@@ -45,8 +45,8 @@ async fn live_http_server_accepts_openai_style_model_retrieve(
 }
 
 #[tokio::test]
-async fn live_http_server_retrieves_encoded_slash_model_id(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn live_http_server_retrieves_encoded_slash_model_id()
+-> Result<(), Box<dyn std::error::Error>> {
     let model_id = "HuggingFaceTB/SmolLM2-135M-Instruct";
     let server = support::LiveServer::start_with_model_id(model_id).await?;
     let response = send_http_request(
@@ -69,8 +69,8 @@ async fn live_http_server_retrieves_encoded_slash_model_id(
 }
 
 #[tokio::test]
-async fn live_http_server_accepts_openai_style_chat_request(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn live_http_server_accepts_openai_style_chat_request()
+-> Result<(), Box<dyn std::error::Error>> {
     let server = support::LiveServer::start().await?;
     let request_body = format!(
         r#"{{"model":"{}","messages":[{{"role":"user","content":"hello"}}],"max_completion_tokens":1}}"#,
@@ -97,8 +97,8 @@ async fn live_http_server_accepts_openai_style_chat_request(
 }
 
 #[tokio::test]
-async fn live_http_server_accepts_openai_style_legacy_completion(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn live_http_server_accepts_openai_style_legacy_completion()
+-> Result<(), Box<dyn std::error::Error>> {
     let server = support::LiveServer::start().await?;
     let request_body = format!(
         r#"{{"model":"{}","prompt":"hello","max_tokens":1}}"#,
@@ -125,8 +125,8 @@ async fn live_http_server_accepts_openai_style_legacy_completion(
 }
 
 #[tokio::test]
-async fn live_http_server_streams_openai_style_chat_chunks(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn live_http_server_streams_openai_style_chat_chunks()
+-> Result<(), Box<dyn std::error::Error>> {
     let server = support::LiveServer::start().await?;
     let request_body = format!(
         r#"{{"model":"{}","messages":[{{"role":"user","content":"hello"}}],"max_completion_tokens":1,"stream":true}}"#,
@@ -158,8 +158,8 @@ async fn live_http_server_streams_openai_style_chat_chunks(
 }
 
 #[tokio::test]
-async fn live_http_server_releases_inference_permit_after_streaming_tcp_disconnect(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn live_http_server_releases_inference_permit_after_streaming_tcp_disconnect()
+-> Result<(), Box<dyn std::error::Error>> {
     let token_limits = TokenLimits::new(16, 4096)?;
     let fixture = ferrite_fixtures::scalar_llama_chat_f32_gguf_fixture_with_context_length(
         DISCONNECT_TEST_CONTEXT_LENGTH,
@@ -204,8 +204,8 @@ async fn live_http_server_releases_inference_permit_after_streaming_tcp_disconne
 }
 
 #[tokio::test]
-async fn live_http_server_releases_inference_permit_after_initial_role_chunk_disconnect(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn live_http_server_releases_inference_permit_after_initial_role_chunk_disconnect()
+-> Result<(), Box<dyn std::error::Error>> {
     let token_limits = TokenLimits::new(16, 4096)?;
     let fixture = ferrite_fixtures::scalar_llama_chat_f32_gguf_fixture_with_context_length(
         DISCONNECT_TEST_CONTEXT_LENGTH,
@@ -254,8 +254,8 @@ async fn live_http_server_releases_inference_permit_after_initial_role_chunk_dis
 }
 
 #[tokio::test]
-async fn live_http_server_streams_openai_style_legacy_completion_chunks(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn live_http_server_streams_openai_style_legacy_completion_chunks()
+-> Result<(), Box<dyn std::error::Error>> {
     let server = support::LiveServer::start().await?;
     let request_body = format!(
         r#"{{"model":"{}","prompt":"hello","max_tokens":1,"stream":true}}"#,

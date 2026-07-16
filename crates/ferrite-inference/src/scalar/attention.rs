@@ -1,7 +1,7 @@
 use super::{
+    InferenceError, ScalarLlamaConfig,
     kv_store::KvCacheStore,
     math::{ensure_len, softmax_in_place},
-    InferenceError, ScalarLlamaConfig,
 };
 
 pub(super) fn causal_attention(
@@ -70,9 +70,9 @@ fn attention_dot(left: &[f32], right: &[f32]) -> Result<f32, InferenceError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::scalar::RopeLayout;
     use crate::scalar::kv_store::KvCacheStore;
     use crate::scalar::math::dot;
-    use crate::scalar::RopeLayout;
 
     fn config_for_ratio(heads_per_kv: usize) -> ScalarLlamaConfig {
         let kv_heads = 2;

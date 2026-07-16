@@ -1,6 +1,6 @@
 use crate::scalar::{
-    profile::{ScalarMatVecComparison, ScalarProfileEvent},
     InferenceError, Matrix, MatrixStorageKind, ScalarExecutionOptions,
+    profile::{ScalarMatVecComparison, ScalarProfileEvent},
 };
 use std::time::{Duration, Instant};
 
@@ -68,15 +68,16 @@ pub(super) fn profiled_argmax_mul_vec(
         nonzero_duration(elapsed),
         matrix,
     ));
-    if let Some(events) = comparison_events {
-        if options.compare_q8_k_activation_matvec() && is_q8_k_comparable(matrix.storage_kind()) {
-            let reference = matrix.mul_vec(vector)?;
-            let candidate =
-                matrix.mul_vec_with_options(vector, options.q8_k_activation_matvec_candidate())?;
-            events.push(ScalarMatVecComparison::new(
-                label, matrix, &reference, &candidate,
-            )?);
-        }
+    if let Some(events) = comparison_events
+        && options.compare_q8_k_activation_matvec()
+        && is_q8_k_comparable(matrix.storage_kind())
+    {
+        let reference = matrix.mul_vec(vector)?;
+        let candidate =
+            matrix.mul_vec_with_options(vector, options.q8_k_activation_matvec_candidate())?;
+        events.push(ScalarMatVecComparison::new(
+            label, matrix, &reference, &candidate,
+        )?);
     }
     Ok(token_id)
 }

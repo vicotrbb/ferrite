@@ -15,8 +15,8 @@ use serde_json::Value;
 use tower::ServiceExt;
 
 #[tokio::test]
-async fn completions_endpoint_applies_string_stop_sequence(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn completions_endpoint_applies_string_stop_sequence()
+-> Result<(), Box<dyn std::error::Error>> {
     let body = post_completion(
         r#"{"model":"fixture-model","prompt":"hello","max_tokens":1,"stop":"ner"}"#,
     )
@@ -28,8 +28,8 @@ async fn completions_endpoint_applies_string_stop_sequence(
 }
 
 #[tokio::test]
-async fn completions_endpoint_stops_generation_when_stop_sequence_matches(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn completions_endpoint_stops_generation_when_stop_sequence_matches()
+-> Result<(), Box<dyn std::error::Error>> {
     let body = post_completion(
         r#"{"model":"fixture-model","prompt":"hello","max_tokens":3,"stop":"ner"}"#,
     )
@@ -53,8 +53,8 @@ async fn chat_endpoint_applies_string_stop_sequence() -> Result<(), Box<dyn std:
 }
 
 #[tokio::test]
-async fn chat_endpoint_stops_generation_when_stop_sequence_matches(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_endpoint_stops_generation_when_stop_sequence_matches()
+-> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat(
         r#"{"model":"fixture-model","messages":[{"role":"user","content":"hello"}],"max_completion_tokens":3,"stop":"ner"}"#,
     )
@@ -66,8 +66,8 @@ async fn chat_endpoint_stops_generation_when_stop_sequence_matches(
 }
 
 #[tokio::test]
-async fn completions_stream_endpoint_applies_string_stop_sequence(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn completions_stream_endpoint_applies_string_stop_sequence()
+-> Result<(), Box<dyn std::error::Error>> {
     let body = post_completion_stream(
         r#"{"model":"fixture-model","prompt":"hello","max_tokens":1,"stream":true,"stop":"ner"}"#,
     )
@@ -82,8 +82,8 @@ async fn completions_stream_endpoint_applies_string_stop_sequence(
 }
 
 #[tokio::test]
-async fn completions_stream_endpoint_flushes_chunks_when_stop_sequence_does_not_match(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn completions_stream_endpoint_flushes_chunks_when_stop_sequence_does_not_match()
+-> Result<(), Box<dyn std::error::Error>> {
     let body = post_completion_stream(
         r#"{"model":"fixture-model","prompt":"hello","max_tokens":2,"stream":true,"stop":"zzz"}"#,
     )
@@ -105,8 +105,8 @@ async fn completions_stream_endpoint_flushes_chunks_when_stop_sequence_does_not_
 }
 
 #[tokio::test]
-async fn chat_stream_endpoint_applies_string_stop_sequence(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_stream_endpoint_applies_string_stop_sequence()
+-> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat_stream(
         r#"{"model":"fixture-model","messages":[{"role":"user","content":"hello"}],"max_completion_tokens":1,"stream":true,"stop":"ner"}"#,
     )
@@ -124,8 +124,8 @@ async fn chat_stream_endpoint_applies_string_stop_sequence(
 }
 
 #[tokio::test]
-async fn chat_stream_endpoint_flushes_chunks_when_stop_sequence_does_not_match(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_stream_endpoint_flushes_chunks_when_stop_sequence_does_not_match()
+-> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat_stream(
         r#"{"model":"fixture-model","messages":[{"role":"user","content":"hello"}],"max_completion_tokens":2,"stream":true,"stop":"zzz"}"#,
     )
@@ -161,8 +161,8 @@ async fn completions_endpoint_suppresses_visible_eos_text() -> Result<(), Box<dy
 }
 
 #[tokio::test]
-async fn completions_stream_endpoint_suppresses_visible_eos_text(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn completions_stream_endpoint_suppresses_visible_eos_text()
+-> Result<(), Box<dyn std::error::Error>> {
     let body = post_completion_stream_with_eos_token_id(
         r#"{"model":"fixture-model","prompt":"hello","max_tokens":3,"stream":true,"stream_options":{"include_usage":true}}"#,
         2,
@@ -187,8 +187,8 @@ async fn completions_stream_endpoint_suppresses_visible_eos_text(
 }
 
 #[tokio::test]
-async fn chat_stream_endpoint_reports_eos_finish_source_in_usage(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_stream_endpoint_reports_eos_finish_source_in_usage()
+-> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat_stream_with_eos_token_id(
         r#"{"model":"fixture-model","messages":[{"role":"user","content":"hello"}],"max_completion_tokens":3,"stream":true,"stream_options":{"include_usage":true}}"#,
         2,

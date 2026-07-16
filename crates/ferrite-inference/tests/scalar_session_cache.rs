@@ -60,9 +60,11 @@ fn session_rejects_truncation_beyond_cached_tokens() -> Result<(), Box<dyn Error
         Err(error) => error,
     };
 
-    assert!(error
-        .to_string()
-        .contains("cannot truncate kv cache from 1 tokens to 2 tokens"));
+    assert!(
+        error
+            .to_string()
+            .contains("cannot truncate kv cache from 1 tokens to 2 tokens")
+    );
     Ok(())
 }
 

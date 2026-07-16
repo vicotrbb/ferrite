@@ -1,9 +1,8 @@
 use super::{auth::ensure_authorized, error::OpenAiHttpError};
 use crate::state::ServerState;
 use axum::{
-    async_trait,
-    extract::{rejection::JsonRejection, FromRequest, Request},
-    Json,
+    Json, async_trait,
+    extract::{FromRequest, Request, rejection::JsonRejection},
 };
 
 pub struct AuthorizedOpenAiJson<T>(pub T);

@@ -1,8 +1,8 @@
 use std::process::Command;
 
 #[test]
-fn short_help_exits_successfully_without_starting_the_server(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn short_help_exits_successfully_without_starting_the_server()
+-> Result<(), Box<dyn std::error::Error>> {
     let output = Command::new(env!("CARGO_BIN_EXE_ferrite-server"))
         .arg("-h")
         .output()?;

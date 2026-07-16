@@ -90,8 +90,8 @@ async fn chat_endpoint_rejects_non_array_messages() -> Result<(), Box<dyn std::e
 }
 
 #[tokio::test]
-async fn chat_endpoint_reports_messages_param_for_empty_messages(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_endpoint_reports_messages_param_for_empty_messages()
+-> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat_json(
         r#"{
             "model":"fixture-model",

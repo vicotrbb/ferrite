@@ -6,14 +6,14 @@
 use super::{
     neon_util::native_f16_bits_to_f32,
     q8_0::{
-        argmax_q8_0_rows, parallel_argmax_q8_0_rows, Q8_0MatVecBackend, Q8_0MatVecOutput,
-        Q8_0_BLOCK_BYTES, Q8_0_BLOCK_VALUES,
+        Q8_0_BLOCK_BYTES, Q8_0_BLOCK_VALUES, Q8_0MatVecBackend, Q8_0MatVecOutput, argmax_q8_0_rows,
+        parallel_argmax_q8_0_rows,
     },
 };
 use rayon::prelude::*;
 use std::arch::aarch64::{
     float32x4_t, vaddvq_f32, vcvtq_f32_s32, vdupq_n_f32, vfmaq_f32, vget_high_s16, vget_low_s16,
-    vld1_s8, vld1q_f32, vmovl_s16, vmovl_s8,
+    vld1_s8, vld1q_f32, vmovl_s8, vmovl_s16,
 };
 
 const ROW_PARALLEL_MIN_ROWS: usize = 4096;
@@ -293,7 +293,7 @@ pub(super) unsafe fn neon_q8_0_block_dot(quantized: *const i8, vector: *const f3
 #[cfg(test)]
 mod tests {
     use super::neon_q8_0_block_dot;
-    use crate::scalar::{q8_0::Q8_0_BLOCK_VALUES, InferenceError};
+    use crate::scalar::{InferenceError, q8_0::Q8_0_BLOCK_VALUES};
 
     #[test]
     fn neon_q8_0_block_dot_matches_decoded_values() -> Result<(), InferenceError> {

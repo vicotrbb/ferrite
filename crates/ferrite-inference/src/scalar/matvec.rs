@@ -3,7 +3,7 @@
     reason = "audited architecture-specific SIMD intrinsics are isolated in this module"
 )]
 
-use super::{kernels::KernelDispatch, math::dot, InferenceError, ScalarExecutionOptions};
+use super::{InferenceError, ScalarExecutionOptions, kernels::KernelDispatch, math::dot};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum F32MatVecBackend {

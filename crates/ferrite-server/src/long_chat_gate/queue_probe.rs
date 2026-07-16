@@ -336,10 +336,10 @@ async fn send_chat_stream_probe_with_start_signal(
         response.extend_from_slice(&chunk[..bytes_read]);
         if started_tx.is_some() {
             let text = std::str::from_utf8(&response).map_err(|error| error.to_string())?;
-            if has_generated_stream_event(text) {
-                if let Some(started_tx) = started_tx.take() {
-                    let _ = started_tx.send(true);
-                }
+            if has_generated_stream_event(text)
+                && let Some(started_tx) = started_tx.take()
+            {
+                let _ = started_tx.send(true);
             }
         }
     }

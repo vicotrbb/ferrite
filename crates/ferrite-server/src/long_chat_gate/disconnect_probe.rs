@@ -3,7 +3,7 @@ use std::{error::Error, net::SocketAddr, time::Duration};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
-    time::{sleep, Instant},
+    time::{Instant, sleep},
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]

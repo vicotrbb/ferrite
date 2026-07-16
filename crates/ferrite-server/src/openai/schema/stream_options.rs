@@ -121,8 +121,8 @@ mod tests {
     }
 
     #[test]
-    fn records_malformed_include_usage_for_request_validation(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn records_malformed_include_usage_for_request_validation()
+    -> Result<(), Box<dyn std::error::Error>> {
         let options: StreamOptions = serde_json::from_str(r#"{"include_usage":"yes"}"#)?;
 
         assert!(!options.include_usage());

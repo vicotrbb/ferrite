@@ -1,5 +1,6 @@
 use super::MatrixData;
 use crate::scalar::{
+    InferenceError,
     dense16::{bf16_row_values, f16_row_values},
     q4_k::Q4_K_BLOCK_VALUES,
     q5_k::Q5_K_BLOCK_VALUES,
@@ -9,7 +10,6 @@ use crate::scalar::{
         decode_q8_0_row, q4_k_storage_bytes, q5_0_row_bytes, q5_k_storage_bytes,
         q6_k_storage_bytes, q8_0_row_bytes,
     },
-    InferenceError,
 };
 
 pub(super) fn row_values(
@@ -203,7 +203,7 @@ fn q8_0_row_values(bytes: &[u8], cols: usize, index: usize) -> Result<Vec<f32>, 
 #[cfg(test)]
 mod tests {
     use super::super::Matrix;
-    use super::{quantized_k_row_values, QuantizedKCodec};
+    use super::{QuantizedKCodec, quantized_k_row_values};
     use crate::scalar::InferenceError;
 
     #[test]

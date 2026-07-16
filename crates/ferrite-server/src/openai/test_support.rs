@@ -1,7 +1,7 @@
 use super::routes::router;
 use crate::state::ServerState;
 use axum::{
-    body::{to_bytes, Body},
+    body::{Body, to_bytes},
     http::{Request, StatusCode},
 };
 use serde_json::Value;

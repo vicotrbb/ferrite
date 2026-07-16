@@ -460,8 +460,8 @@ mod tests {
     }
 
     #[test]
-    fn constraint_masks_invalid_high_logit_tokens_until_object_completion(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn constraint_masks_invalid_high_logit_tokens_until_object_completion()
+    -> Result<(), Box<dyn std::error::Error>> {
         let mut constraint = JsonObjectConstraint::from_test_pieces(&[b"garbage", b"{", b"}"]);
         let mut sampler = Sampler::new(SamplingConfig::greedy())?;
 

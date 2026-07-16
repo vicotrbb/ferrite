@@ -1,8 +1,8 @@
 #[cfg(all(feature = "locus-kv", unix))]
 pub(in crate::scalar) mod locus;
 
-use super::session::ScalarLlamaSessionSnapshot;
 use super::InferenceError;
+use super::session::ScalarLlamaSessionSnapshot;
 
 /// KV-cache storage behind a stable interface. `Vec` is the default backend and
 /// reproduces the historical nested-`Vec` behavior exactly.

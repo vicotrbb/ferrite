@@ -176,8 +176,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn records_unknown_message_role_for_request_validation(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn records_unknown_message_role_for_request_validation()
+    -> Result<(), Box<dyn std::error::Error>> {
         let message: ChatMessage = serde_json::from_str(r#"{"role":"critic","content":"hello"}"#)?;
 
         assert_eq!(message.unsupported_fields(), ["messages.role"]);
@@ -185,8 +185,8 @@ mod tests {
     }
 
     #[test]
-    fn records_missing_message_role_for_request_validation(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn records_missing_message_role_for_request_validation()
+    -> Result<(), Box<dyn std::error::Error>> {
         let message: ChatMessage = serde_json::from_str(r#"{"content":"hello"}"#)?;
 
         assert_eq!(message.unsupported_fields(), ["messages.role"]);

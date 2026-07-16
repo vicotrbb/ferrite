@@ -1,7 +1,7 @@
 use super::routes::router;
 use crate::{runtime::InferenceEngine, state::ServerState};
 use axum::{
-    body::{to_bytes, Body},
+    body::{Body, to_bytes},
     http::{Request, StatusCode},
 };
 use serde_json::Value;
@@ -11,8 +11,8 @@ use tower::ServiceExt;
 static FIXTURE_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 #[tokio::test]
-async fn models_endpoint_returns_empty_list_when_no_model_is_loaded(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn models_endpoint_returns_empty_list_when_no_model_is_loaded()
+-> Result<(), Box<dyn std::error::Error>> {
     let app = router(ServerState::new("test-model".to_owned()));
     let response = app
         .oneshot(Request::builder().uri("/v1/models").body(Body::empty())?)
@@ -44,8 +44,8 @@ async fn models_endpoint_returns_openai_list_shape() -> Result<(), Box<dyn std::
 }
 
 #[tokio::test]
-async fn model_retrieve_endpoint_rejects_configured_id_when_no_model_is_loaded(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn model_retrieve_endpoint_rejects_configured_id_when_no_model_is_loaded()
+-> Result<(), Box<dyn std::error::Error>> {
     let app = router(ServerState::new("test-model".to_owned()));
     let response = app
         .oneshot(
@@ -109,8 +109,8 @@ async fn model_retrieve_endpoint_supports_encoded_slashes() -> Result<(), Box<dy
 }
 
 #[tokio::test]
-async fn model_retrieve_endpoint_supports_literal_slash_model_ids_from_clients(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn model_retrieve_endpoint_supports_literal_slash_model_ids_from_clients()
+-> Result<(), Box<dyn std::error::Error>> {
     let model_id = "HuggingFaceTB/SmolLM2-135M-Instruct";
     let model_path = write_fixture_model()?;
     let engine = InferenceEngine::load(&model_path)?;

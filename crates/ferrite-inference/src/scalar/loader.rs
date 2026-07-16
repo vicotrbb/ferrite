@@ -1,6 +1,6 @@
 use super::{
-    tensor, InferenceError, Matrix, ScalarLlamaConfig, ScalarLlamaLayerWeights,
-    ScalarLlamaOutputWeights, ScalarLlamaWeights,
+    InferenceError, Matrix, ScalarLlamaConfig, ScalarLlamaLayerWeights, ScalarLlamaOutputWeights,
+    ScalarLlamaWeights, tensor,
 };
 use ferrite_model::gguf::{
     AttentionProjectionLayout, FeedForwardProjectionLayout, GgmlType, GgufFile, RotaryPairing,

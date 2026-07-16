@@ -168,8 +168,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn completion_stream_context_ids_are_unique_between_streams_in_the_same_second(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn completion_stream_context_ids_are_unique_between_streams_in_the_same_second()
+    -> Result<(), Box<dyn std::error::Error>> {
         for _ in 0..1_000 {
             let first = CompletionStreamContext::new("fixture-model".to_owned());
             let second = CompletionStreamContext::new("fixture-model".to_owned());
@@ -194,14 +194,16 @@ mod tests {
     }
 
     #[test]
-    fn completion_stream_context_emits_obfuscation_by_default(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn completion_stream_context_emits_obfuscation_by_default()
+    -> Result<(), Box<dyn std::error::Error>> {
         let context = CompletionStreamContext::new("fixture-model".to_owned());
         let chunk = serde_json::to_value(context.token("hello".to_owned()))?;
 
-        assert!(chunk["obfuscation"]
-            .as_str()
-            .is_some_and(|value| !value.is_empty()));
+        assert!(
+            chunk["obfuscation"]
+                .as_str()
+                .is_some_and(|value| !value.is_empty())
+        );
         Ok(())
     }
 
@@ -217,8 +219,8 @@ mod tests {
     }
 
     #[test]
-    fn completion_stream_content_chunk_can_include_token_ids(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn completion_stream_content_chunk_can_include_token_ids()
+    -> Result<(), Box<dyn std::error::Error>> {
         let context =
             CompletionStreamContext::new("fixture-model".to_owned()).with_obfuscation_field(false);
         let chunk = serde_json::to_value(context.token_with_ids("hello".to_owned(), &[42, 43]))?;

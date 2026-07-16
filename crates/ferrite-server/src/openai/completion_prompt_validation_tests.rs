@@ -74,8 +74,8 @@ async fn completion_endpoint_rejects_token_prompt_array() -> Result<(), Box<dyn 
 }
 
 #[tokio::test]
-async fn completion_endpoint_rejects_token_prompt_array_batch(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn completion_endpoint_rejects_token_prompt_array_batch()
+-> Result<(), Box<dyn std::error::Error>> {
     let body = post_completion_json(
         r#"{
             "model":"fixture-model",
@@ -93,8 +93,8 @@ async fn completion_endpoint_rejects_token_prompt_array_batch(
 }
 
 #[tokio::test]
-async fn completion_endpoint_reports_prompt_param_for_empty_or_whitespace_prompt(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn completion_endpoint_reports_prompt_param_for_empty_or_whitespace_prompt()
+-> Result<(), Box<dyn std::error::Error>> {
     for (payload, expected_message) in [
         (
             r#"{

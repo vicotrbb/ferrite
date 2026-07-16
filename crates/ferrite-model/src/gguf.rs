@@ -461,12 +461,12 @@ fn validate_attention_layer_norm_rms_epsilon(
     prefix: &str,
     epsilon: Option<f32>,
 ) -> Result<(), GgufError> {
-    if let Some(value) = epsilon {
-        if !value.is_finite() || value < 0.0 {
-            return Err(GgufError::new(format!(
-                "{prefix}.attention.layer_norm_rms_epsilon must be finite and non-negative"
-            )));
-        }
+    if let Some(value) = epsilon
+        && (!value.is_finite() || value < 0.0)
+    {
+        return Err(GgufError::new(format!(
+            "{prefix}.attention.layer_norm_rms_epsilon must be finite and non-negative"
+        )));
     }
 
     Ok(())

@@ -1,4 +1,4 @@
-use super::{math::ensure_len, InferenceError, Matrix, ScalarLlamaConfig, ScalarLlamaWeights};
+use super::{InferenceError, Matrix, ScalarLlamaConfig, ScalarLlamaWeights, math::ensure_len};
 
 pub(super) fn validate_config(config: &ScalarLlamaConfig) -> Result<(), InferenceError> {
     if config.vocab_size == 0

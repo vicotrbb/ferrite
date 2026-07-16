@@ -1,7 +1,7 @@
 use locus_alloc::{KvBlockHandle, KvBlockPool, KvBlockPoolError, KvReuseOrder, NodeId};
 
-use crate::scalar::session::ScalarLlamaSessionSnapshot;
 use crate::scalar::InferenceError;
+use crate::scalar::session::ScalarLlamaSessionSnapshot;
 
 const F32_BYTES: usize = std::mem::size_of::<f32>();
 

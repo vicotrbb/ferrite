@@ -469,11 +469,13 @@ mod tests {
             Err(error) => error,
         };
         assert!(error.to_string().contains("does not match expected"));
-        assert!(!root
-            .join(TEST_ARTIFACT.id)
-            .join(TEST_ARTIFACT.revision)
-            .join(TEST_ARTIFACT.filename)
-            .exists());
+        assert!(
+            !root
+                .join(TEST_ARTIFACT.id)
+                .join(TEST_ARTIFACT.revision)
+                .join(TEST_ARTIFACT.filename)
+                .exists()
+        );
         cleanup(&root)?;
         Ok(())
     }

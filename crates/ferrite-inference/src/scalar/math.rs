@@ -244,7 +244,7 @@ mod tests {
                 Ok(_) => {
                     return Err(InferenceError::new(
                         "non-finite rms_norm weight should fail",
-                    ))
+                    ));
                 }
                 Err(error) => error,
             };
@@ -260,7 +260,7 @@ mod tests {
             Ok(_) => {
                 return Err(InferenceError::new(
                     "overflowing rms_norm scale should fail",
-                ))
+                ));
             }
             Err(error) => error,
         };
@@ -275,7 +275,7 @@ mod tests {
             Ok(_) => {
                 return Err(InferenceError::new(
                     "overflowing rms_norm output should fail",
-                ))
+                ));
             }
             Err(error) => error,
         };
@@ -358,9 +358,11 @@ mod tests {
             Err(error) => error,
         };
 
-        assert!(product_error
-            .to_string()
-            .contains("dot result must be finite"));
+        assert!(
+            product_error
+                .to_string()
+                .contains("dot result must be finite")
+        );
 
         let sum_error = match dot(&[f32::MAX, f32::MAX], &[1.0, 1.0]) {
             Ok(_) => return Err(InferenceError::new("overflowing dot sum should fail")),
@@ -402,7 +404,7 @@ mod tests {
             Ok(_) => {
                 return Err(InferenceError::new(
                     "overflowing residual result should fail",
-                ))
+                ));
             }
             Err(error) => error,
         };

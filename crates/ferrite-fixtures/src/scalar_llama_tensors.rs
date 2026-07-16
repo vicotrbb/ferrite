@@ -1,6 +1,6 @@
 use crate::gguf_writer::{
-    F32TensorFixture, TypedTensorFixture, GGML_TYPE_F32, GGML_TYPE_Q4_K, GGML_TYPE_Q5_0,
-    GGML_TYPE_Q6_K,
+    F32TensorFixture, GGML_TYPE_F32, GGML_TYPE_Q4_K, GGML_TYPE_Q5_0, GGML_TYPE_Q6_K,
+    TypedTensorFixture,
 };
 
 pub(crate) fn q8_scalar_tensors() -> Vec<F32TensorFixture> {

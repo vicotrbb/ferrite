@@ -5,7 +5,7 @@
 
 use super::{
     neon_util::{native_f16_bits_to_f32, widen_s8_lanes},
-    q5_0::{Q5_0MatVecBackend, Q5_0MatVecOutput, Q5_0_BLOCK_BYTES, Q5_0_BLOCK_VALUES},
+    q5_0::{Q5_0_BLOCK_BYTES, Q5_0_BLOCK_VALUES, Q5_0MatVecBackend, Q5_0MatVecOutput},
 };
 use rayon::prelude::*;
 use std::arch::aarch64::{
@@ -375,8 +375,8 @@ pub(super) unsafe fn neon_q5_0_block_dot(block: &[u8], vector: &[f32]) -> f32 {
 mod tests {
     use super::{neon_q5_0_block_dot, neon_q5_0_block_dot_batch};
     use crate::scalar::{
-        q5_0::{decode_q5_0_row, Q5_0_BLOCK_BYTES, Q5_0_BLOCK_VALUES},
         InferenceError,
+        q5_0::{Q5_0_BLOCK_BYTES, Q5_0_BLOCK_VALUES, decode_q5_0_row},
     };
 
     #[test]
@@ -427,8 +427,8 @@ mod tests {
     }
 
     #[test]
-    fn neon_q5_0_block_dot_matches_decoded_values_across_high_bit_patterns(
-    ) -> Result<(), InferenceError> {
+    fn neon_q5_0_block_dot_matches_decoded_values_across_high_bit_patterns()
+    -> Result<(), InferenceError> {
         let vector = (0..Q5_0_BLOCK_VALUES)
             .map(|index| (index % 7) as f32 - 3.0)
             .collect::<Vec<_>>();

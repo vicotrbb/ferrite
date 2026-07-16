@@ -4,9 +4,9 @@
 )]
 
 use super::{
-    neon_util::{native_f16_bits_to_f32, widen_s8_lanes},
-    q4_k::{Q4KMatVecBackend, Q4KMatVecOutput, Q4_K_BLOCK_BYTES, Q4_K_BLOCK_VALUES},
     InferenceError,
+    neon_util::{native_f16_bits_to_f32, widen_s8_lanes},
+    q4_k::{Q4_K_BLOCK_BYTES, Q4_K_BLOCK_VALUES, Q4KMatVecBackend, Q4KMatVecOutput},
 };
 use rayon::prelude::*;
 use std::arch::aarch64::{
@@ -185,8 +185,8 @@ fn q4_k_scale_min(index: usize, scales: &[u8]) -> (u8, u8) {
 mod tests {
     use super::neon_q4_k_block_dot;
     use crate::scalar::{
-        q4_k::{decode_q4_k_values, Q4_K_BLOCK_VALUES},
         InferenceError,
+        q4_k::{Q4_K_BLOCK_VALUES, decode_q4_k_values},
     };
 
     #[test]

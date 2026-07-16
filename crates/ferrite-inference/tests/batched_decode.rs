@@ -3,8 +3,8 @@ use ferrite_fixtures::{
     scalar_llama_q8_0_gguf_fixture,
 };
 use ferrite_inference::scalar::{
-    accept_token_contexts_batch, accept_token_ids_batch, KernelProvider, ScalarExecutionOptions,
-    ScalarLlamaModel,
+    KernelProvider, ScalarExecutionOptions, ScalarLlamaModel, accept_token_contexts_batch,
+    accept_token_ids_batch,
 };
 use ferrite_model::gguf::parse_gguf;
 use std::error::Error;

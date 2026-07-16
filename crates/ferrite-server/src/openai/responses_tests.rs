@@ -5,13 +5,13 @@ use super::{
 use crate::{runtime::InferenceEngine, state::ServerState};
 use axum::{
     body::Body,
-    http::{header, Request, StatusCode},
+    http::{Request, StatusCode, header},
 };
 use tower::ServiceExt;
 
 #[tokio::test]
-async fn responses_endpoint_generates_standard_non_streaming_text_shape(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn responses_endpoint_generates_standard_non_streaming_text_shape()
+-> Result<(), Box<dyn std::error::Error>> {
     let model_path = write_chat_fixture_model()?;
     let engine = InferenceEngine::load(&model_path)?;
     let app = router(ServerState::with_engine("fixture-model".to_owned(), engine));
@@ -36,9 +36,11 @@ async fn responses_endpoint_generates_standard_non_streaming_text_shape(
     let status = response.status();
     let body = to_json(response.into_body()).await?;
     assert_eq!(status, StatusCode::OK, "{body}");
-    assert!(body["id"]
-        .as_str()
-        .is_some_and(|id| id.starts_with("resp-")));
+    assert!(
+        body["id"]
+            .as_str()
+            .is_some_and(|id| id.starts_with("resp-"))
+    );
     assert_eq!(body["object"], "response");
     assert_eq!(body["status"], "incomplete");
     assert_eq!(body["incomplete_details"]["reason"], "max_output_tokens");
@@ -58,8 +60,8 @@ async fn responses_endpoint_generates_standard_non_streaming_text_shape(
 }
 
 #[tokio::test]
-async fn responses_endpoint_accepts_bounded_message_arrays(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn responses_endpoint_accepts_bounded_message_arrays()
+-> Result<(), Box<dyn std::error::Error>> {
     let model_path = write_chat_fixture_model()?;
     let engine = InferenceEngine::load(&model_path)?;
     let app = router(ServerState::with_engine("fixture-model".to_owned(), engine));
@@ -143,8 +145,8 @@ async fn responses_endpoint_reports_cached_input_tokens() -> Result<(), Box<dyn 
 }
 
 #[tokio::test]
-async fn responses_endpoint_rejects_streaming_and_stateful_or_multimodal_input(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn responses_endpoint_rejects_streaming_and_stateful_or_multimodal_input()
+-> Result<(), Box<dyn std::error::Error>> {
     let streaming =
         post_responses_json(r#"{"model":"fixture-model","input":"hello","stream":true}"#).await?;
     assert_eq!(streaming.status, StatusCode::BAD_REQUEST);
@@ -181,8 +183,8 @@ async fn responses_endpoint_rejects_streaming_and_stateful_or_multimodal_input(
 }
 
 #[tokio::test]
-async fn responses_endpoint_rejects_tools_and_non_text_output_formats(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn responses_endpoint_rejects_tools_and_non_text_output_formats()
+-> Result<(), Box<dyn std::error::Error>> {
     for (payload, parameter) in [
         (
             r#"{
@@ -209,8 +211,8 @@ async fn responses_endpoint_rejects_tools_and_non_text_output_formats(
 }
 
 #[tokio::test]
-async fn responses_endpoint_authenticates_and_supports_cors_preflight(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn responses_endpoint_authenticates_and_supports_cors_preflight()
+-> Result<(), Box<dyn std::error::Error>> {
     let state = ServerState::new("fixture-model".to_owned()).with_api_key("local-secret");
     let unauthorized = router(state.clone())
         .oneshot(

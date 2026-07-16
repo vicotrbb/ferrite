@@ -5,8 +5,8 @@
 )]
 
 use std::arch::aarch64::{
-    float32x4_t, int8x16_t, vcvt_f32_f16, vcvtq_f32_s32, vdup_n_u16, vget_high_s16, vget_high_s8,
-    vget_low_s16, vget_low_s8, vgetq_lane_f32, vmovl_s16, vmovl_s8, vreinterpret_f16_u16,
+    float32x4_t, int8x16_t, vcvt_f32_f16, vcvtq_f32_s32, vdup_n_u16, vget_high_s8, vget_high_s16,
+    vget_low_s8, vget_low_s16, vgetq_lane_f32, vmovl_s8, vmovl_s16, vreinterpret_f16_u16,
 };
 
 /// Converts an IEEE-754 binary16 scale with `AArch64` native widening

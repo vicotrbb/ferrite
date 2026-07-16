@@ -10,8 +10,8 @@ use ferrite_model::gguf::parse_gguf;
 use support::models::documented_argmax_model;
 
 #[test]
-fn accept_prompt_with_control_stops_before_next_prompt_token(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn accept_prompt_with_control_stops_before_next_prompt_token()
+-> Result<(), Box<dyn std::error::Error>> {
     let bytes = scalar_llama_f32_gguf_fixture();
     let gguf = parse_gguf(&bytes)?;
     let model = ScalarLlamaModel::from_gguf_scalar(&gguf, &bytes)?;
@@ -37,8 +37,8 @@ fn accept_prompt_with_control_stops_before_next_prompt_token(
 }
 
 #[test]
-fn accept_prompt_with_cancellation_stops_during_prompt_token_evaluation(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn accept_prompt_with_cancellation_stops_during_prompt_token_evaluation()
+-> Result<(), Box<dyn std::error::Error>> {
     let model = documented_argmax_model()?;
     let mut session = model.start_session();
     let mut polls = 0;
@@ -62,8 +62,8 @@ fn accept_prompt_with_cancellation_stops_during_prompt_token_evaluation(
 }
 
 #[test]
-fn accept_prompt_with_control_and_cancellation_keeps_token_context_and_layer_polling(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn accept_prompt_with_control_and_cancellation_keeps_token_context_and_layer_polling()
+-> Result<(), Box<dyn std::error::Error>> {
     let model = documented_argmax_model()?;
     let mut session = model.start_session();
     let mut observed_tokens = Vec::new();

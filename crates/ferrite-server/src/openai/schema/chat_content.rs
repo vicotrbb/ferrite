@@ -167,8 +167,8 @@ mod tests {
     }
 
     #[test]
-    fn records_non_text_content_parts_for_request_validation(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn records_non_text_content_parts_for_request_validation()
+    -> Result<(), Box<dyn std::error::Error>> {
         let content: ChatContent = serde_json::from_str(
             r#"[{"type":"image_url","image_url":{"url":"https://example.test/image.png"}}]"#,
         )?;
@@ -180,8 +180,8 @@ mod tests {
     }
 
     #[test]
-    fn records_malformed_text_content_parts_for_request_validation(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn records_malformed_text_content_parts_for_request_validation()
+    -> Result<(), Box<dyn std::error::Error>> {
         let content: ChatContent = serde_json::from_str(r#"[{"type":"text"}]"#)?;
 
         assert_eq!(content.text(), "");

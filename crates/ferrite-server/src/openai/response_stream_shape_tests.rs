@@ -13,8 +13,8 @@ use axum::{
 use tower::ServiceExt;
 
 #[tokio::test]
-async fn completions_stream_endpoint_returns_openai_choice_shape(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn completions_stream_endpoint_returns_openai_choice_shape()
+-> Result<(), Box<dyn std::error::Error>> {
     let model_path = write_fixture_model()?;
     let engine = InferenceEngine::load(&model_path)?;
     let app = router(ServerState::with_engine("fixture-model".to_owned(), engine));

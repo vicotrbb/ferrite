@@ -68,8 +68,8 @@ fn rejects_more_prompts_than_requests() {
 }
 
 #[test]
-fn parses_repeatable_max_token_budgets_with_round_robin_assignment(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn parses_repeatable_max_token_budgets_with_round_robin_assignment()
+-> Result<(), Box<dyn std::error::Error>> {
     let config = ThroughputClientConfig::parse([
         OsString::from("ferrite-openai-throughput"),
         OsString::from("--max-tokens"),
@@ -113,8 +113,8 @@ fn rejects_mismatched_repeated_prompt_and_token_budget_counts() {
 }
 
 #[test]
-fn builds_request_body_for_each_configured_prompt_and_token_budget(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn builds_request_body_for_each_configured_prompt_and_token_budget()
+-> Result<(), Box<dyn std::error::Error>> {
     let config = ThroughputClientConfig::parse([
         OsString::from("ferrite-openai-throughput"),
         OsString::from("--model"),
@@ -211,8 +211,8 @@ fn builds_openai_compatible_completion_stop_request_body() -> Result<(), Box<dyn
 }
 
 #[test]
-fn builds_openai_compatible_completion_prompt_cache_key_request_body(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn builds_openai_compatible_completion_prompt_cache_key_request_body()
+-> Result<(), Box<dyn std::error::Error>> {
     let config = ThroughputClientConfig::parse([
         OsString::from("ferrite-openai-throughput"),
         OsString::from("--endpoint"),
@@ -293,8 +293,8 @@ fn builds_openai_compatible_chat_stop_request_body() -> Result<(), Box<dyn std::
 }
 
 #[test]
-fn builds_openai_compatible_chat_prompt_cache_key_request_body(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn builds_openai_compatible_chat_prompt_cache_key_request_body()
+-> Result<(), Box<dyn std::error::Error>> {
     let config = ThroughputClientConfig::parse([
         OsString::from("ferrite-openai-throughput"),
         OsString::from("--endpoint"),
@@ -318,8 +318,8 @@ fn builds_openai_compatible_chat_prompt_cache_key_request_body(
 }
 
 #[test]
-fn builds_chat_request_body_with_ferrite_cache_trace_metadata(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn builds_chat_request_body_with_ferrite_cache_trace_metadata()
+-> Result<(), Box<dyn std::error::Error>> {
     let config = ThroughputClientConfig::parse([
         OsString::from("ferrite-openai-throughput"),
         OsString::from("--endpoint"),
@@ -675,8 +675,8 @@ fn rejects_stream_usage_without_streaming() -> Result<(), Box<dyn std::error::Er
 }
 
 #[test]
-fn builds_openai_compatible_streaming_completion_request_body(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn builds_openai_compatible_streaming_completion_request_body()
+-> Result<(), Box<dyn std::error::Error>> {
     let config = ThroughputClientConfig::parse([
         OsString::from("ferrite-openai-throughput"),
         OsString::from("--stream"),
@@ -696,8 +696,8 @@ fn builds_openai_compatible_streaming_completion_request_body(
 }
 
 #[test]
-fn builds_openai_compatible_streaming_completion_usage_request_body(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn builds_openai_compatible_streaming_completion_usage_request_body()
+-> Result<(), Box<dyn std::error::Error>> {
     let config = ThroughputClientConfig::parse([
         OsString::from("ferrite-openai-throughput"),
         OsString::from("--stream"),
@@ -718,8 +718,8 @@ fn builds_openai_compatible_streaming_completion_usage_request_body(
 }
 
 #[test]
-fn builds_openai_compatible_streaming_chat_completion_request_body(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn builds_openai_compatible_streaming_chat_completion_request_body()
+-> Result<(), Box<dyn std::error::Error>> {
     let config = ThroughputClientConfig::parse([
         OsString::from("ferrite-openai-throughput"),
         OsString::from("--endpoint"),
@@ -741,8 +741,8 @@ fn builds_openai_compatible_streaming_chat_completion_request_body(
 }
 
 #[test]
-fn builds_openai_compatible_streaming_chat_usage_request_body(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn builds_openai_compatible_streaming_chat_usage_request_body()
+-> Result<(), Box<dyn std::error::Error>> {
     let config = ThroughputClientConfig::parse([
         OsString::from("ferrite-openai-throughput"),
         OsString::from("--endpoint"),
@@ -916,8 +916,8 @@ fn formats_streaming_usage_summary() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
-fn formats_mixed_token_budgets_and_aggregate_streaming_usage(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn formats_mixed_token_budgets_and_aggregate_streaming_usage()
+-> Result<(), Box<dyn std::error::Error>> {
     let config = ThroughputClientConfig::parse([
         OsString::from("ferrite-openai-throughput"),
         OsString::from("--stream"),
@@ -1110,8 +1110,8 @@ fn extracts_streaming_usage_finish_source_from_sse_body() -> Result<(), Box<dyn 
 }
 
 #[test]
-fn extracts_streaming_text_from_chat_and_completion_sse_bodies(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn extracts_streaming_text_from_chat_and_completion_sse_bodies()
+-> Result<(), Box<dyn std::error::Error>> {
     let chat_body = concat!(
         "data: {\"choices\":[{\"delta\":{\"role\":\"assistant\",\"content\":\"\"}}]}\n\n",
         "data: {\"choices\":[{\"delta\":{\"content\":\"Hello\"}}]}\n\n",
@@ -1137,8 +1137,8 @@ fn extracts_streaming_text_from_chat_and_completion_sse_bodies(
 }
 
 #[test]
-fn accepts_length_streaming_usage_matching_requested_max_tokens(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn accepts_length_streaming_usage_matching_requested_max_tokens()
+-> Result<(), Box<dyn std::error::Error>> {
     let config = ThroughputClientConfig::parse([
         OsString::from("ferrite-openai-throughput"),
         OsString::from("--stream"),
@@ -1158,8 +1158,8 @@ fn accepts_length_streaming_usage_matching_requested_max_tokens(
 }
 
 #[test]
-fn rejects_length_streaming_usage_below_requested_max_tokens(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn rejects_length_streaming_usage_below_requested_max_tokens()
+-> Result<(), Box<dyn std::error::Error>> {
     let config = ThroughputClientConfig::parse([
         OsString::from("ferrite-openai-throughput"),
         OsString::from("--stream"),
@@ -1186,8 +1186,8 @@ fn rejects_length_streaming_usage_below_requested_max_tokens(
 }
 
 #[test]
-fn accepts_stop_streaming_usage_below_requested_max_tokens(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn accepts_stop_streaming_usage_below_requested_max_tokens()
+-> Result<(), Box<dyn std::error::Error>> {
     let config = ThroughputClientConfig::parse([
         OsString::from("ferrite-openai-throughput"),
         OsString::from("--stream"),
@@ -1298,8 +1298,8 @@ fn validate_stream_error(
 }
 
 #[test]
-fn derives_streaming_timing_from_incremental_response_snapshots(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn derives_streaming_timing_from_incremental_response_snapshots()
+-> Result<(), Box<dyn std::error::Error>> {
     let base = "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\n\r\n";
     let role_event = r#"data: {"choices":[{"delta":{"role":"assistant"}}]}"#;
     let first_token_event = r#"data: {"choices":[{"delta":{"content":"A"}}]}"#;
@@ -1343,8 +1343,8 @@ fn derives_streaming_timing_from_incremental_response_snapshots(
 }
 
 #[test]
-fn waits_for_completed_sse_event_before_recording_streaming_timing(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn waits_for_completed_sse_event_before_recording_streaming_timing()
+-> Result<(), Box<dyn std::error::Error>> {
     let base = "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\n\r\n";
     let token_event = r#"data: {"choices":[{"delta":{"content":"A"}}]}"#;
     let snapshots = [
@@ -1377,8 +1377,8 @@ fn waits_for_completed_sse_event_before_recording_streaming_timing(
 }
 
 #[test]
-fn derives_streaming_timing_from_terminal_stop_event_without_visible_content(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn derives_streaming_timing_from_terminal_stop_event_without_visible_content()
+-> Result<(), Box<dyn std::error::Error>> {
     let base = "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\n\r\n";
     let stop_event = r#"data: {"choices":[{"delta":{},"finish_reason":"stop"}]}"#;
     let done_event = "data: [DONE]";

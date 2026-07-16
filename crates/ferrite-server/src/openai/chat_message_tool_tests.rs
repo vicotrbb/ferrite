@@ -1,15 +1,15 @@
 use super::routes::router;
 use crate::state::ServerState;
 use axum::{
-    body::{to_bytes, Body},
+    body::{Body, to_bytes},
     http::{Request, StatusCode},
 };
 use serde_json::Value;
 use tower::ServiceExt;
 
 #[tokio::test]
-async fn chat_endpoint_accepts_valid_message_tool_call_history_before_engine_requirement(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_endpoint_accepts_valid_message_tool_call_history_before_engine_requirement()
+-> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat(
         r#"{
             "model":"fixture-model",
@@ -38,8 +38,8 @@ async fn chat_endpoint_accepts_valid_message_tool_call_history_before_engine_req
 }
 
 #[tokio::test]
-async fn chat_endpoint_rejects_malformed_message_tool_call_arguments(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_endpoint_rejects_malformed_message_tool_call_arguments()
+-> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat(
         r#"{
             "model":"fixture-model",
@@ -64,8 +64,8 @@ async fn chat_endpoint_rejects_malformed_message_tool_call_arguments(
 }
 
 #[tokio::test]
-async fn chat_endpoint_rejects_message_function_call_fields(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_endpoint_rejects_message_function_call_fields()
+-> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat(
         r#"{
             "model":"fixture-model",
@@ -80,16 +80,18 @@ async fn chat_endpoint_rejects_message_function_call_fields(
 
     assert_eq!(body.status, StatusCode::BAD_REQUEST);
     assert_eq!(body.json["error"]["type"], "invalid_request_error");
-    assert!(body.json["error"]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("messages.function_call"));
+    assert!(
+        body.json["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("messages.function_call")
+    );
     Ok(())
 }
 
 #[tokio::test]
-async fn chat_endpoint_rejects_message_function_call_fields_without_content(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_endpoint_rejects_message_function_call_fields_without_content()
+-> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat(
         r#"{
             "model":"fixture-model",
@@ -110,8 +112,8 @@ async fn chat_endpoint_rejects_message_function_call_fields_without_content(
 }
 
 #[tokio::test]
-async fn chat_endpoint_rejects_function_message_without_name(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_endpoint_rejects_function_message_without_name()
+-> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat(
         r#"{
             "model":"fixture-model",
@@ -125,16 +127,18 @@ async fn chat_endpoint_rejects_function_message_without_name(
 
     assert_eq!(body.status, StatusCode::BAD_REQUEST);
     assert_eq!(body.json["error"]["type"], "invalid_request_error");
-    assert!(body.json["error"]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("messages.name"));
+    assert!(
+        body.json["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("messages.name")
+    );
     Ok(())
 }
 
 #[tokio::test]
-async fn chat_endpoint_rejects_malformed_message_tool_call_id(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_endpoint_rejects_malformed_message_tool_call_id()
+-> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat(
         r#"{
             "model":"fixture-model",
@@ -149,16 +153,18 @@ async fn chat_endpoint_rejects_malformed_message_tool_call_id(
 
     assert_eq!(body.status, StatusCode::BAD_REQUEST);
     assert_eq!(body.json["error"]["type"], "invalid_request_error");
-    assert!(body.json["error"]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("messages.tool_call_id"));
+    assert!(
+        body.json["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("messages.tool_call_id")
+    );
     Ok(())
 }
 
 #[tokio::test]
-async fn chat_endpoint_rejects_tool_message_without_tool_call_id(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_endpoint_rejects_tool_message_without_tool_call_id()
+-> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat(
         r#"{
             "model":"fixture-model",
@@ -172,16 +178,18 @@ async fn chat_endpoint_rejects_tool_message_without_tool_call_id(
 
     assert_eq!(body.status, StatusCode::BAD_REQUEST);
     assert_eq!(body.json["error"]["type"], "invalid_request_error");
-    assert!(body.json["error"]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("messages.tool_call_id"));
+    assert!(
+        body.json["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("messages.tool_call_id")
+    );
     Ok(())
 }
 
 #[tokio::test]
-async fn chat_endpoint_rejects_tool_call_id_on_non_tool_message(
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn chat_endpoint_rejects_tool_call_id_on_non_tool_message()
+-> Result<(), Box<dyn std::error::Error>> {
     let body = post_chat(
         r#"{
             "model":"fixture-model",
@@ -196,10 +204,12 @@ async fn chat_endpoint_rejects_tool_call_id_on_non_tool_message(
 
     assert_eq!(body.status, StatusCode::BAD_REQUEST);
     assert_eq!(body.json["error"]["type"], "invalid_request_error");
-    assert!(body.json["error"]["message"]
-        .as_str()
-        .unwrap_or_default()
-        .contains("messages.tool_call_id"));
+    assert!(
+        body.json["error"]["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("messages.tool_call_id")
+    );
     Ok(())
 }
 

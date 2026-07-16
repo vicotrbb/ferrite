@@ -4,8 +4,8 @@
 )]
 
 use super::{
-    tensor::{bf16_bits_to_f32, f16_bits_to_f32},
     InferenceError, ScalarExecutionOptions,
+    tensor::{bf16_bits_to_f32, f16_bits_to_f32},
 };
 
 pub(super) fn f16_mul_vec_with_options(
@@ -291,9 +291,9 @@ mod aarch64 {
 #[cfg(target_arch = "x86_64")]
 mod x86_64 {
     use std::arch::x86_64::{
-        __m128i, _mm256_add_ps, _mm256_castsi256_ps, _mm256_cvtepu16_epi32, _mm256_cvtph_ps,
-        _mm256_loadu_ps, _mm256_mul_ps, _mm256_setzero_ps, _mm256_slli_epi32, _mm256_storeu_ps,
-        _mm_loadu_si128,
+        __m128i, _mm_loadu_si128, _mm256_add_ps, _mm256_castsi256_ps, _mm256_cvtepu16_epi32,
+        _mm256_cvtph_ps, _mm256_loadu_ps, _mm256_mul_ps, _mm256_setzero_ps, _mm256_slli_epi32,
+        _mm256_storeu_ps,
     };
 
     use super::{bf16_bits_to_f32, f16_bits_to_f32};
@@ -409,7 +409,7 @@ mod x86_64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::scalar::{matvec::f32_mul_vec_with_options, KernelProvider, ScalarExecutionOptions};
+    use crate::scalar::{KernelProvider, ScalarExecutionOptions, matvec::f32_mul_vec_with_options};
     use crate::scalar::{Matrix, MatrixStorageKind};
 
     fn f16_bytes(bits: &[u16]) -> Vec<u8> {

@@ -155,8 +155,8 @@ mod tests {
     }
 
     #[test]
-    fn records_token_prompt_batches_for_request_validation(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn records_token_prompt_batches_for_request_validation()
+    -> Result<(), Box<dyn std::error::Error>> {
         let prompt: CompletionPrompt = serde_json::from_str(r#"[[1,2,3]]"#)?;
 
         assert!(prompt.prompts().is_empty());

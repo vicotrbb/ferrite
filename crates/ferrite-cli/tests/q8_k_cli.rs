@@ -69,8 +69,8 @@ fn cli_enables_experimental_residual_q8_activation_matvec() -> Result<(), Box<dy
 }
 
 #[test]
-fn cli_compares_q8_k_activation_matvec_without_changing_execution_policy(
-) -> Result<(), Box<dyn Error>> {
+fn cli_compares_q8_k_activation_matvec_without_changing_execution_policy()
+-> Result<(), Box<dyn Error>> {
     let model_path = write_q4_k_fixture_model()?;
     let binary = cli_binary()?;
 
@@ -203,8 +203,8 @@ fn cli_accepts_all_q8_k_activation_role_scope() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn cli_rejects_q8_k_role_scope_without_comparison_or_experimental_dispatch(
-) -> Result<(), Box<dyn Error>> {
+fn cli_rejects_q8_k_role_scope_without_comparison_or_experimental_dispatch()
+-> Result<(), Box<dyn Error>> {
     let model_path = write_q4_k_fixture_model()?;
     let binary = cli_binary()?;
 

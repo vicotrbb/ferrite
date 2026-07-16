@@ -1,7 +1,7 @@
 use super::routes::router;
 use crate::{runtime::InferenceEngine, state::ServerState};
 use axum::{
-    body::{to_bytes, Body},
+    body::{Body, to_bytes},
     http::{Request, StatusCode},
 };
 use std::sync::atomic::{AtomicU64, Ordering};

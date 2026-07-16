@@ -54,8 +54,8 @@ mod tests {
     }
 
     #[test]
-    fn preserves_non_object_message_items_for_request_validation(
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    fn preserves_non_object_message_items_for_request_validation()
+    -> Result<(), Box<dyn std::error::Error>> {
         let request: Request = serde_json::from_str(r#"{"messages":[42]}"#)?;
 
         assert_eq!(request.messages.len(), 1);

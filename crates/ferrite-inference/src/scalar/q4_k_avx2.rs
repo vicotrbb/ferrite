@@ -4,10 +4,10 @@
 )]
 
 use super::{
-    q4_k::{
-        q4_k_block_values, Q4KMatVecBackend, Q4KMatVecOutput, Q4_K_BLOCK_BYTES, Q4_K_BLOCK_VALUES,
-    },
     InferenceError,
+    q4_k::{
+        Q4_K_BLOCK_BYTES, Q4_K_BLOCK_VALUES, Q4KMatVecBackend, Q4KMatVecOutput, q4_k_block_values,
+    },
 };
 use rayon::prelude::*;
 use std::arch::x86_64::{

@@ -1,9 +1,9 @@
 use ferrite_server::long_chat_gate::{
-    format_disconnect_probe_result, format_error_probe_result, format_plan,
+    LongChatAssistantContextSource, LongChatDisconnectProbeResult, LongChatErrorProbeResult,
+    LongChatGateConfig, LongChatProofArtifacts, LongChatQueueProbeResult, LongChatScenarioResult,
+    LongChatTextIdentity, format_disconnect_probe_result, format_error_probe_result, format_plan,
     format_queue_probe_result, format_report, format_run_summary, format_scenario_result,
-    format_scenarios, LongChatAssistantContextSource, LongChatDisconnectProbeResult,
-    LongChatErrorProbeResult, LongChatGateConfig, LongChatProofArtifacts, LongChatQueueProbeResult,
-    LongChatScenarioResult, LongChatTextIdentity,
+    format_scenarios,
 };
 use ferrite_server::throughput_client::{
     OpenAiEndpoint, RssSummary, StreamingFinishSummary, StreamingPromptCacheTraceSummary,
@@ -201,8 +201,8 @@ fn rejects_invalid_long_chat_probe_max_tokens() -> Result<(), Box<dyn std::error
 }
 
 #[test]
-fn rejects_required_cached_follow_ups_without_prompt_cache_key(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn rejects_required_cached_follow_ups_without_prompt_cache_key()
+-> Result<(), Box<dyn std::error::Error>> {
     let result = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),
         OsString::from("--require-cached-follow-ups"),
@@ -427,8 +427,8 @@ fn rejects_queue_probe_without_two_prompt_cache_keys() -> Result<(), Box<dyn std
 }
 
 #[test]
-fn rejects_combining_prompt_cache_key_and_prompt_cache_keys(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn rejects_combining_prompt_cache_key_and_prompt_cache_keys()
+-> Result<(), Box<dyn std::error::Error>> {
     let result = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),
         OsString::from("--prompt-cache-key"),
@@ -451,8 +451,8 @@ fn rejects_combining_prompt_cache_key_and_prompt_cache_keys(
 }
 
 #[test]
-fn formats_long_chat_gate_plan_with_required_cached_follow_ups(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn formats_long_chat_gate_plan_with_required_cached_follow_ups()
+-> Result<(), Box<dyn std::error::Error>> {
     let config = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),
         OsString::from("--models"),
@@ -548,8 +548,8 @@ fn formats_long_chat_gate_plan_with_probe_metadata() -> Result<(), Box<dyn std::
 }
 
 #[test]
-fn formats_long_chat_gate_plan_with_generated_response_requirements(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn formats_long_chat_gate_plan_with_generated_response_requirements()
+-> Result<(), Box<dyn std::error::Error>> {
     let config = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),
         OsString::from("--models"),
@@ -593,8 +593,8 @@ fn formats_long_chat_gate_plan_with_state_capsule() -> Result<(), Box<dyn std::e
 }
 
 #[test]
-fn formats_long_chat_gate_plan_with_follow_up_state_capsule_placement(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn formats_long_chat_gate_plan_with_follow_up_state_capsule_placement()
+-> Result<(), Box<dyn std::error::Error>> {
     let config = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),
         OsString::from("--models"),
@@ -826,8 +826,8 @@ fn passes_prompt_cache_keys_to_their_long_chat_lanes() -> Result<(), Box<dyn std
 }
 
 #[test]
-fn passes_prompt_cache_trace_to_long_chat_throughput_config(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn passes_prompt_cache_trace_to_long_chat_throughput_config()
+-> Result<(), Box<dyn std::error::Error>> {
     let config = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),
         OsString::from("--models"),
@@ -891,13 +891,17 @@ fn builds_typed_throughput_configs_for_all_scenarios() -> Result<(), Box<dyn std
     assert_eq!(throughput_configs[8].max_tokens(), 256);
     assert_eq!(throughput_configs[15].model(), "model-b");
     assert_eq!(throughput_configs[15].max_tokens(), 512);
-    assert!(throughput_configs
-        .iter()
-        .all(|config| config.endpoint() == OpenAiEndpoint::ChatCompletions));
+    assert!(
+        throughput_configs
+            .iter()
+            .all(|config| config.endpoint() == OpenAiEndpoint::ChatCompletions)
+    );
     assert!(throughput_configs.iter().all(|config| config.stream()));
-    assert!(throughput_configs
-        .iter()
-        .all(|config| config.stream_usage()));
+    assert!(
+        throughput_configs
+            .iter()
+            .all(|config| config.stream_usage())
+    );
     Ok(())
 }
 
@@ -986,8 +990,8 @@ fn formats_prompt_cache_key_in_long_chat_scenario_result() -> Result<(), Box<dyn
 }
 
 #[test]
-fn formats_long_chat_stop_result_as_not_hitting_token_limit(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn formats_long_chat_stop_result_as_not_hitting_token_limit()
+-> Result<(), Box<dyn std::error::Error>> {
     let config = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),
         OsString::from("--models"),
@@ -1173,8 +1177,8 @@ fn formats_integrated_long_chat_run_summary() -> Result<(), Box<dyn std::error::
 }
 
 #[test]
-fn required_token_lengths_make_summary_incomplete_when_ladder_is_partial(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn required_token_lengths_make_summary_incomplete_when_ladder_is_partial()
+-> Result<(), Box<dyn std::error::Error>> {
     let config = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),
         OsString::from("--models"),
@@ -1248,8 +1252,8 @@ fn required_token_lengths_make_summary_incomplete_when_ladder_is_partial(
 }
 
 #[test]
-fn required_models_make_summary_incomplete_when_model_set_is_partial(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn required_models_make_summary_incomplete_when_model_set_is_partial()
+-> Result<(), Box<dyn std::error::Error>> {
     let config = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),
         OsString::from("--models"),
@@ -1323,8 +1327,8 @@ fn required_models_make_summary_incomplete_when_model_set_is_partial(
 }
 
 #[test]
-fn required_probes_make_summary_incomplete_when_probe_set_is_partial(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn required_probes_make_summary_incomplete_when_probe_set_is_partial()
+-> Result<(), Box<dyn std::error::Error>> {
     let config = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),
         OsString::from("--models"),
@@ -1456,8 +1460,8 @@ fn queue_probe_participates_in_long_chat_run_summary() -> Result<(), Box<dyn std
 }
 
 #[test]
-fn explicit_stop_summary_can_complete_without_generated_follow_up_context(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn explicit_stop_summary_can_complete_without_generated_follow_up_context()
+-> Result<(), Box<dyn std::error::Error>> {
     let config = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),
         OsString::from("--models"),
@@ -1517,16 +1521,20 @@ fn explicit_stop_summary_can_complete_without_generated_follow_up_context(
     assert!(summary.contains("long_chat_summary_all_timing_present=true"));
     assert!(summary.contains("long_chat_summary_streaming_token_ids_required=false"));
     assert!(summary.contains("long_chat_summary_all_rss_present=true"));
-    assert!(summary.contains("long_chat_summary_error_probe_reconnect_started_new_generation=true"));
-    assert!(summary
-        .contains("long_chat_summary_disconnect_probe_reconnect_started_new_generation=true"));
+    assert!(
+        summary.contains("long_chat_summary_error_probe_reconnect_started_new_generation=true")
+    );
+    assert!(
+        summary
+            .contains("long_chat_summary_disconnect_probe_reconnect_started_new_generation=true")
+    );
     assert!(summary.contains("long_chat_summary_run_complete=true"));
     Ok(())
 }
 
 #[test]
-fn required_finish_sources_participate_in_long_chat_summary(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn required_finish_sources_participate_in_long_chat_summary()
+-> Result<(), Box<dyn std::error::Error>> {
     let config = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),
         OsString::from("--models"),
@@ -1611,8 +1619,8 @@ fn required_finish_sources_participate_in_long_chat_summary(
 }
 
 #[test]
-fn error_probe_without_generated_reconnect_event_makes_summary_incomplete(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn error_probe_without_generated_reconnect_event_makes_summary_incomplete()
+-> Result<(), Box<dyn std::error::Error>> {
     let config = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),
         OsString::from("--models"),
@@ -1781,7 +1789,9 @@ fn summarizes_generated_context_identity_continuity() -> Result<(), Box<dyn std:
     assert!(summary.contains("long_chat_summary_generated_context_identity_required=true"));
     assert!(summary.contains("long_chat_summary_generated_context_identity_links=3"));
     assert!(summary.contains("long_chat_summary_matching_generated_context_identity_links=3"));
-    assert!(summary.contains("long_chat_summary_all_generated_context_identity_links_present=true"));
+    assert!(
+        summary.contains("long_chat_summary_all_generated_context_identity_links_present=true")
+    );
     assert!(summary.contains(
         "long_chat_summary_all_generated_context_identities_match_previous_response=true"
     ));
@@ -1790,8 +1800,8 @@ fn summarizes_generated_context_identity_continuity() -> Result<(), Box<dyn std:
 }
 
 #[test]
-fn summary_is_incomplete_when_generated_context_identity_is_missing(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn summary_is_incomplete_when_generated_context_identity_is_missing()
+-> Result<(), Box<dyn std::error::Error>> {
     let config = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),
         OsString::from("--models"),
@@ -1853,8 +1863,8 @@ fn summary_is_incomplete_when_generated_context_identity_is_missing(
 }
 
 #[test]
-fn formats_prompt_cache_trace_in_long_chat_scenario_result(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn formats_prompt_cache_trace_in_long_chat_scenario_result()
+-> Result<(), Box<dyn std::error::Error>> {
     let config = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),
         OsString::from("--models"),
@@ -1896,15 +1906,17 @@ fn formats_prompt_cache_trace_in_long_chat_scenario_result(
     let formatted = format_scenario_result(&result);
 
     assert!(formatted.contains("long_chat_result_prompt_cache_lookup=shared_prefix_hit"));
-    assert!(formatted
-        .contains("long_chat_result_prompt_cache_prompt_token_hash=fnv64:0000000000001234"));
+    assert!(
+        formatted
+            .contains("long_chat_result_prompt_cache_prompt_token_hash=fnv64:0000000000001234")
+    );
     assert!(formatted.contains("long_chat_result_prompt_cache_shared_prefix_tokens=5"));
     Ok(())
 }
 
 #[test]
-fn cache_summary_does_not_treat_missing_generated_follow_ups_as_cached(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn cache_summary_does_not_treat_missing_generated_follow_ups_as_cached()
+-> Result<(), Box<dyn std::error::Error>> {
     let config = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),
         OsString::from("--models"),
@@ -1950,8 +1962,8 @@ fn cache_summary_does_not_treat_missing_generated_follow_ups_as_cached(
 }
 
 #[test]
-fn required_cached_follow_ups_make_summary_incomplete_without_cache_hits(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn required_cached_follow_ups_make_summary_incomplete_without_cache_hits()
+-> Result<(), Box<dyn std::error::Error>> {
     let config = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),
         OsString::from("--models"),
@@ -2120,8 +2132,8 @@ fn observes_long_chat_results_as_each_scenario_finishes() -> Result<(), Box<dyn 
 }
 
 #[test]
-fn carries_generated_assistant_text_between_turns_per_token_length(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn carries_generated_assistant_text_between_turns_per_token_length()
+-> Result<(), Box<dyn std::error::Error>> {
     let config = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),
         OsString::from("--models"),
@@ -2208,8 +2220,8 @@ fn carries_generated_assistant_text_between_turns_per_token_length(
 }
 
 #[test]
-fn validates_required_substrings_in_generated_follow_up_responses(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn validates_required_substrings_in_generated_follow_up_responses()
+-> Result<(), Box<dyn std::error::Error>> {
     let config = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),
         OsString::from("--models"),
@@ -2252,8 +2264,8 @@ fn validates_required_substrings_in_generated_follow_up_responses(
 }
 
 #[test]
-fn rejects_missing_required_substring_in_generated_follow_up_response(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn rejects_missing_required_substring_in_generated_follow_up_response()
+-> Result<(), Box<dyn std::error::Error>> {
     let config = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),
         OsString::from("--models"),
@@ -2291,7 +2303,7 @@ fn rejects_missing_required_substring_in_generated_follow_up_response(
     });
     let error = match result {
         Ok(results) => {
-            return Err(format!("expected response substring mismatch, got {results:?}").into())
+            return Err(format!("expected response substring mismatch, got {results:?}").into());
         }
         Err(error) => error,
     };
@@ -2307,8 +2319,8 @@ fn rejects_missing_required_substring_in_generated_follow_up_response(
 }
 
 #[test]
-fn can_window_generated_assistant_context_before_follow_up_turns(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn can_window_generated_assistant_context_before_follow_up_turns()
+-> Result<(), Box<dyn std::error::Error>> {
     let config = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),
         OsString::from("--models"),
@@ -2361,8 +2373,8 @@ fn can_window_generated_assistant_context_before_follow_up_turns(
 }
 
 #[test]
-fn can_window_generated_assistant_context_by_streaming_chunks(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn can_window_generated_assistant_context_by_streaming_chunks()
+-> Result<(), Box<dyn std::error::Error>> {
     let config = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),
         OsString::from("--models"),
@@ -2420,8 +2432,8 @@ fn can_window_generated_assistant_context_by_streaming_chunks(
 }
 
 #[test]
-fn can_add_state_capsule_to_generated_follow_up_contexts_only(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn can_add_state_capsule_to_generated_follow_up_contexts_only()
+-> Result<(), Box<dyn std::error::Error>> {
     let config = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),
         OsString::from("--models"),
@@ -2482,8 +2494,8 @@ fn can_add_state_capsule_to_generated_follow_up_contexts_only(
 }
 
 #[test]
-fn state_capsule_wrapped_assistant_context_preserves_generated_identity_summary(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn state_capsule_wrapped_assistant_context_preserves_generated_identity_summary()
+-> Result<(), Box<dyn std::error::Error>> {
     let config = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),
         OsString::from("--models"),
@@ -2586,8 +2598,8 @@ fn uses_configured_follow_up_for_each_turn() -> Result<(), Box<dyn std::error::E
 }
 
 #[test]
-fn can_add_state_capsule_to_generated_follow_up_prompt_instead_of_assistant_context(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn can_add_state_capsule_to_generated_follow_up_prompt_instead_of_assistant_context()
+-> Result<(), Box<dyn std::error::Error>> {
     let config = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),
         OsString::from("--models"),
@@ -2663,8 +2675,8 @@ fn can_add_state_capsule_to_generated_follow_up_prompt_instead_of_assistant_cont
 }
 
 #[test]
-fn can_use_state_capsule_as_generated_follow_up_context_without_retained_prose(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn can_use_state_capsule_as_generated_follow_up_context_without_retained_prose()
+-> Result<(), Box<dyn std::error::Error>> {
     let config = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),
         OsString::from("--models"),
@@ -2757,8 +2769,8 @@ fn rejects_invalid_state_capsule_placement() -> Result<(), Box<dyn std::error::E
 }
 
 #[test]
-fn rejects_combined_generated_context_char_and_token_windows(
-) -> Result<(), Box<dyn std::error::Error>> {
+fn rejects_combined_generated_context_char_and_token_windows()
+-> Result<(), Box<dyn std::error::Error>> {
     let result = LongChatGateConfig::parse([
         OsString::from("ferrite-openai-long-chat-gate"),
         OsString::from("--generated-context-max-chars"),
@@ -2812,7 +2824,7 @@ fn rejects_unexpected_long_chat_finish_reason() -> Result<(), Box<dyn std::error
     });
     let error = match result {
         Ok(results) => {
-            return Err(format!("expected finish reason mismatch, got {results:?}").into())
+            return Err(format!("expected finish reason mismatch, got {results:?}").into());
         }
         Err(error) => error,
     };
@@ -2855,7 +2867,7 @@ fn rejects_missing_long_chat_finish_reason_when_expected() -> Result<(), Box<dyn
     });
     let error = match result {
         Ok(results) => {
-            return Err(format!("expected missing finish reason error, got {results:?}").into())
+            return Err(format!("expected missing finish reason error, got {results:?}").into());
         }
         Err(error) => error,
     };

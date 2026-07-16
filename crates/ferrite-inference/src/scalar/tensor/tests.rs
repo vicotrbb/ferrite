@@ -1,7 +1,7 @@
 use super::{
-    bf16_values_from_le_bytes, f16_bits_to_f32, f16_values_from_le_bytes, f32_values_from_le_bytes,
-    q4_k_values_from_le_bytes, q5_0_values_from_le_bytes, q6_k_values_from_le_bytes,
-    q8_0_values_from_le_bytes, InferenceError,
+    InferenceError, bf16_values_from_le_bytes, f16_bits_to_f32, f16_values_from_le_bytes,
+    f32_values_from_le_bytes, q4_k_values_from_le_bytes, q5_0_values_from_le_bytes,
+    q6_k_values_from_le_bytes, q8_0_values_from_le_bytes,
 };
 
 type DecodeResult = Result<(), InferenceError>;
@@ -22,9 +22,11 @@ fn dense_tensor_decoders_reject_non_finite_values() -> DecodeResult {
             }
             Err(error) => error,
         };
-        assert!(error
-            .to_string()
-            .contains("tensor dense value 0 must be finite"));
+        assert!(
+            error
+                .to_string()
+                .contains("tensor dense value 0 must be finite")
+        );
     }
 
     for bits in [0x7e00u16, 0x7c00, 0xfc00] {
@@ -36,9 +38,11 @@ fn dense_tensor_decoders_reject_non_finite_values() -> DecodeResult {
             }
             Err(error) => error,
         };
-        assert!(error
-            .to_string()
-            .contains("tensor dense value 0 must be finite"));
+        assert!(
+            error
+                .to_string()
+                .contains("tensor dense value 0 must be finite")
+        );
     }
 
     for bits in [0x7fc0u16, 0x7f80, 0xff80] {
@@ -50,9 +54,11 @@ fn dense_tensor_decoders_reject_non_finite_values() -> DecodeResult {
             }
             Err(error) => error,
         };
-        assert!(error
-            .to_string()
-            .contains("tensor dense value 0 must be finite"));
+        assert!(
+            error
+                .to_string()
+                .contains("tensor dense value 0 must be finite")
+        );
     }
 
     Ok(())
@@ -70,9 +76,11 @@ fn quantized_tensor_decoders_reject_non_finite_scale_values() -> DecodeResult {
                 }
                 Err(error) => error,
             };
-        assert!(error
-            .to_string()
-            .contains("tensor quantized Q8_0 scale values must be finite"));
+        assert!(
+            error
+                .to_string()
+                .contains("tensor quantized Q8_0 scale values must be finite")
+        );
     }
 
     for scale_bits in [0x7e00u16, 0x7c00, 0xfc00] {
@@ -85,9 +93,11 @@ fn quantized_tensor_decoders_reject_non_finite_scale_values() -> DecodeResult {
                 }
                 Err(error) => error,
             };
-        assert!(error
-            .to_string()
-            .contains("tensor quantized Q5_0 scale values must be finite"));
+        assert!(
+            error
+                .to_string()
+                .contains("tensor quantized Q5_0 scale values must be finite")
+        );
     }
 
     for scale_bits in [0x7e00u16, 0x7c00, 0xfc00] {
@@ -102,9 +112,11 @@ fn quantized_tensor_decoders_reject_non_finite_scale_values() -> DecodeResult {
             }
             Err(error) => error,
         };
-        assert!(error
-            .to_string()
-            .contains("tensor quantized Q4K scale values must be finite"));
+        assert!(
+            error
+                .to_string()
+                .contains("tensor quantized Q4K scale values must be finite")
+        );
     }
 
     for scale_bits in [0x7e00u16, 0x7c00, 0xfc00] {
@@ -117,9 +129,11 @@ fn quantized_tensor_decoders_reject_non_finite_scale_values() -> DecodeResult {
                 }
                 Err(error) => error,
             };
-        assert!(error
-            .to_string()
-            .contains("tensor quantized Q6K scale values must be finite"));
+        assert!(
+            error
+                .to_string()
+                .contains("tensor quantized Q6K scale values must be finite")
+        );
     }
 
     Ok(())

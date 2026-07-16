@@ -38,16 +38,15 @@ impl ToolConfiguration {
             }
         };
 
-        if let ToolChoice::Specific(name) = &choice {
-            if !definitions
+        if let ToolChoice::Specific(name) = &choice
+            && !definitions
                 .iter()
                 .any(|definition| definition.function.name == *name)
-            {
-                return Err(ToolOptionError::new(
-                    format!("tool_choice names unknown function {name:?}"),
-                    "tool_choice",
-                ));
-            }
+        {
+            return Err(ToolOptionError::new(
+                format!("tool_choice names unknown function {name:?}"),
+                "tool_choice",
+            ));
         }
 
         Ok(Self {
@@ -658,9 +657,11 @@ mod tests {
     fn rejects_undefined_and_parallel_calls() -> Result<(), Box<dyn std::error::Error>> {
         let configuration =
             ToolConfiguration::from_request(&weather_tools(), &None, &Some(json!(false)))?;
-        assert!(configuration
-            .parse_output("<tool_call>{\"name\":\"delete_all\",\"arguments\":{}}</tool_call>")
-            .is_err());
+        assert!(
+            configuration
+                .parse_output("<tool_call>{\"name\":\"delete_all\",\"arguments\":{}}</tool_call>")
+                .is_err()
+        );
         assert!(configuration
             .parse_output(
                 "<tool_call>{\"name\":\"get_weather\",\"arguments\":{}}</tool_call><tool_call>{\"name\":\"get_weather\",\"arguments\":{}}</tool_call>"

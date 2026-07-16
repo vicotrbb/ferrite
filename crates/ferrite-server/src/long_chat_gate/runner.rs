@@ -1,12 +1,12 @@
 use super::{
+    LongChatAssistantContextSource, LongChatGateConfig, LongChatScenarioResult,
+    LongChatTextIdentity,
     state_capsule::{
         format_state_capsule_context, format_state_capsule_follow_up, format_state_capsule_only,
     },
-    LongChatAssistantContextSource, LongChatGateConfig, LongChatScenarioResult,
-    LongChatTextIdentity,
 };
 use crate::throughput_client::{
-    run_completion_benchmark, ThroughputClientConfig, ThroughputResult,
+    ThroughputClientConfig, ThroughputResult, run_completion_benchmark,
 };
 use std::{collections::HashMap, error::Error};
 
