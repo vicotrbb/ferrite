@@ -50,7 +50,7 @@ name = "tool_metadata_cli"
 path = "tests/tool_metadata_cli.rs"
 
 [dependencies]
-axum = "0.7"
+axum = "0.8"
 ferrite-inference.workspace = true
 ferrite-model.workspace = true
 serde = { version = "1", features = ["derive"] }
