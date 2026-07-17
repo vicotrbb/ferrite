@@ -20,7 +20,7 @@ path = "src/main.rs"
 ferrite-inference.workspace = true
 ferrite-model.workspace = true
 serde_json = "1"
-sha2 = "0.10"
+sha2 = "0.11"
 
 [dev-dependencies]
 ferrite-fixtures.workspace = true
