@@ -11,6 +11,9 @@ experiments that still inform Ferrite's current architecture.
 - [`2026-07-14 bounded embedding row decode`](2026-07-14-bounded-embedding-row-decode.md)
   records the rejected whole-matrix decode, the bounded block-window fix, exact
   trace retention, and the diagnostic-only memory result.
+- [`2026-07-17 reusable normalization scratch`](2026-07-17-reusable-normalization-scratch.md)
+  records the single-stream allocation reduction, exact 128-token trace
+  parity, and a contaminated-host interleaved timing diagnostic.
 - [`2026-07-09-concurrent-serving-phase1.md`](2026-07-09-concurrent-serving-phase1.md)
   records concurrent serving and batching evidence.
 - [`2026-07-10-oss-quality-hardening.md`](2026-07-10-oss-quality-hardening.md)

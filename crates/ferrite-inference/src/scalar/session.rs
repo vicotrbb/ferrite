@@ -1,7 +1,7 @@
 use super::{
     InferenceError, NextToken, Q8KActivationMatvecRole, ScalarExecutionOptions, ScalarLlamaModel,
     attention::causal_attention,
-    math::{add_assign, argmax, rms_norm, swiglu_in_place},
+    math::{add_assign, argmax, rms_norm, rms_norm_into, swiglu_in_place},
     profile::{ProfiledNextToken, ProfiledTokenId, ScalarMatVecComparison, ScalarProfileEvent},
 };
 
@@ -384,15 +384,17 @@ impl<'a> ScalarLlamaSession<'a> {
 
         let position = self.cached_token_count;
         let mut hidden = self.model.weights.token_embedding.row_values(token_id)?;
+        let mut normed = Vec::with_capacity(self.model.config.hidden_size);
 
         for (layer_index, layer) in self.model.weights.layers.iter().enumerate() {
             if on_layer(layer_index)? == PromptEvaluationControl::Cancel {
                 return Err(InferenceError::new("prompt evaluation cancelled"));
             }
-            let normed = rms_norm(
+            rms_norm_into(
                 &hidden,
                 &layer.attn_norm,
                 self.model.config.rms_norm_epsilon,
+                &mut normed,
             )?;
             let q_options = self
                 .options
@@ -487,8 +489,12 @@ impl<'a> ScalarLlamaSession<'a> {
             )?;
             add_assign(&mut hidden, &attention_output)?;
 
-            let ffn_normed =
-                rms_norm(&hidden, &layer.ffn_norm, self.model.config.rms_norm_epsilon)?;
+            rms_norm_into(
+                &hidden,
+                &layer.ffn_norm,
+                self.model.config.rms_norm_epsilon,
+                &mut normed,
+            )?;
             let gate_options = self
                 .options
                 .scoped_to_q8_k_activation_role(Q8KActivationMatvecRole::FfnGate);
@@ -498,7 +504,7 @@ impl<'a> ScalarLlamaSession<'a> {
             let (mut gate, up) = if profile_events.is_none() && comparison_events.is_none() {
                 let paired = layer.ffn_gate.mul_vec_pair_with_options(
                     &layer.ffn_up,
-                    &ffn_normed,
+                    &normed,
                     gate_options,
                     up_options,
                 )?;
@@ -506,19 +512,15 @@ impl<'a> ScalarLlamaSession<'a> {
                     pair
                 } else {
                     let (gate, up) = rayon::join(
-                        || {
-                            layer
-                                .ffn_gate
-                                .mul_vec_with_options(&ffn_normed, gate_options)
-                        },
-                        || layer.ffn_up.mul_vec_with_options(&ffn_normed, up_options),
+                        || layer.ffn_gate.mul_vec_with_options(&normed, gate_options),
+                        || layer.ffn_up.mul_vec_with_options(&normed, up_options),
                     );
                     (gate?, up?)
                 }
             } else {
                 let gate = profiled_layer_mul_vec(
                     &layer.ffn_gate,
-                    &ffn_normed,
+                    &normed,
                     layer_index,
                     "ffn_gate",
                     profile_events.as_deref_mut(),
@@ -527,7 +529,7 @@ impl<'a> ScalarLlamaSession<'a> {
                 )?;
                 let up = profiled_layer_mul_vec(
                     &layer.ffn_up,
-                    &ffn_normed,
+                    &normed,
                     layer_index,
                     "ffn_up",
                     profile_events.as_deref_mut(),
@@ -552,10 +554,11 @@ impl<'a> ScalarLlamaSession<'a> {
 
         let (token_id, logits) = match output_mode {
             OutputMode::Logits => {
-                let normed = rms_norm(
+                rms_norm_into(
                     &hidden,
                     &self.model.weights.output_norm,
                     self.model.config.rms_norm_epsilon,
+                    &mut normed,
                 )?;
                 let output = self
                     .model
@@ -574,10 +577,11 @@ impl<'a> ScalarLlamaSession<'a> {
                 (Some(argmax(&logits)?), Some(logits))
             }
             OutputMode::TokenIdOnly => {
-                let normed = rms_norm(
+                rms_norm_into(
                     &hidden,
                     &self.model.weights.output_norm,
                     self.model.config.rms_norm_epsilon,
+                    &mut normed,
                 )?;
                 let output = self
                     .model
