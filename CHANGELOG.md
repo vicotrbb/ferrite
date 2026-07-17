@@ -15,6 +15,9 @@ versioning for published crates while it remains in the `0.x` series.
   test case.
 - Reused the existing token buffer allocation when applying BPE merges, while
   preserving the exact tokenizer output contract.
+- Reused one normalization scratch buffer across every transformer layer in a
+  single-stream token step, eliminating repeated layer-local allocations while
+  preserving the exact generated token trace.
 - Applied the canonical Rust 2024 rustfmt style across the workspace.
 
 ### Documentation

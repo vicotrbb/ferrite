@@ -7,6 +7,17 @@ use super::InferenceError;
 /// Returns an error for empty or mismatched inputs, non-finite values, an
 /// invalid epsilon, or a zero or non-finite normalization scale.
 pub fn rms_norm(input: &[f32], weight: &[f32], epsilon: f32) -> Result<Vec<f32>, InferenceError> {
+    let mut output = Vec::with_capacity(input.len());
+    rms_norm_into(input, weight, epsilon, &mut output)?;
+    Ok(output)
+}
+
+pub(super) fn rms_norm_into(
+    input: &[f32],
+    weight: &[f32],
+    epsilon: f32,
+    output: &mut Vec<f32>,
+) -> Result<(), InferenceError> {
     if input.is_empty() {
         return Err(InferenceError::new("rms_norm input must not be empty"));
     }
@@ -32,7 +43,8 @@ pub fn rms_norm(input: &[f32], weight: &[f32], epsilon: f32) -> Result<Vec<f32>,
         return Err(InferenceError::new("rms_norm scale must be finite"));
     }
 
-    let mut output = Vec::with_capacity(input.len());
+    output.clear();
+    output.reserve(input.len());
     for (value, weight) in input.iter().zip(weight.iter()) {
         let normalized = value / scale * weight;
         if !normalized.is_finite() {
@@ -40,7 +52,7 @@ pub fn rms_norm(input: &[f32], weight: &[f32], epsilon: f32) -> Result<Vec<f32>,
         }
         output.push(normalized);
     }
-    Ok(output)
+    Ok(())
 }
 
 /// Returns the index of the first greatest finite value.
@@ -206,6 +218,21 @@ mod tests {
 
             assert!(error.to_string().contains("softmax input must be finite"));
         }
+        Ok(())
+    }
+
+    #[test]
+    fn rms_norm_into_reuses_output_allocation() -> Result<(), InferenceError> {
+        let mut output = Vec::new();
+        rms_norm_into(&[3.0, 4.0], &[1.0, 0.5], 0.0, &mut output)?;
+        let allocation = output.as_ptr();
+        let capacity = output.capacity();
+
+        rms_norm_into(&[1.0, -1.0], &[0.5, 0.25], 0.0, &mut output)?;
+
+        assert_eq!(output.as_ptr(), allocation);
+        assert_eq!(output.capacity(), capacity);
+        assert_eq!(output, [0.5, -0.25]);
         Ok(())
     }
 
