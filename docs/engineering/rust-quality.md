@@ -2,7 +2,7 @@
 
 Date: 2026-07-10
 
-Updated: 2026-07-16
+Updated: 2026-07-21
 
 ## Purpose
 
@@ -76,6 +76,10 @@ sources and separates stable guidance from context-dependent lint opinions.
 12. Keep Cargo integration targets bounded. Group artifact-gated real-model
     cases into one explicit harness so routine checks compile shared server and
     support code once, without deleting or weakening model coverage.
+13. Prefer internal in-place helpers when an inference stage has exclusive
+    ownership of an existing buffer. Preserve allocating public APIs, compare
+    against an independent arithmetic oracle, and require real-model token
+    parity before accepting the allocation reduction.
 
 ## Repository enforcement
 

@@ -93,7 +93,7 @@ pub use options::{
 };
 pub use output::ScalarLlamaOutputWeights;
 pub use profile::{ProfiledNextToken, ProfiledTokenId, ScalarMatVecComparison, ScalarProfileEvent};
-use rope::apply_rope_with_layout;
+use rope::apply_rope_with_layout_in_place;
 pub use rope::{RopeLayout, apply_rope};
 pub use session::{
     PromptEvaluationControl, PromptEvaluationLocation, ScalarLlamaSession,
@@ -365,14 +365,14 @@ impl ScalarLlamaModel {
         Ok(self)
     }
 
-    fn apply_rope_to_heads(
+    fn apply_rope_to_heads_in_place(
         &self,
-        values: &[f32],
+        values: &mut [f32],
         position: usize,
         head_count: usize,
-    ) -> Result<Vec<f32>, InferenceError> {
+    ) -> Result<(), InferenceError> {
         if self.config.rope_dimension_count == 0 {
-            return Ok(values.to_vec());
+            return Ok(());
         }
 
         let expected = head_count
@@ -380,19 +380,18 @@ impl ScalarLlamaModel {
             .ok_or_else(|| InferenceError::new("rope head width overflow"))?;
         ensure_len("rope input", values, expected)?;
 
-        let mut output = Vec::with_capacity(values.len());
         for head in 0..head_count {
             let start = head * self.config.head_dim;
             let end = start + self.config.head_dim;
-            output.extend(apply_rope_with_layout(
-                &values[start..end],
+            apply_rope_with_layout_in_place(
+                &mut values[start..end],
                 position,
                 self.config.rope_dimension_count,
                 self.config.rope_freq_base,
                 self.config.rope_layout,
-            )?);
+            )?;
         }
-        Ok(output)
+        Ok(())
     }
 }
 

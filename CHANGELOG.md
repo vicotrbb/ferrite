@@ -5,6 +5,13 @@ versioning for published crates while it remains in the `0.x` series.
 
 ## Unreleased
 
+### Compatibility
+
+- Public Phi-3 architecture variants and additional matrix storage variants
+  require the next pre-1.0 release to advance from `0.2` to `0.3`. A `0.2.x`
+  release would violate the published exhaustive enum contracts and is rejected
+  by `cargo semver-checks`.
+
 ### Changed
 
 - Migrated the workspace to the Rust 2024 edition and Cargo resolver 3, with
@@ -18,12 +25,17 @@ versioning for published crates while it remains in the `0.x` series.
 - Reused one normalization scratch buffer across every transformer layer in a
   single-stream token step, eliminating repeated layer-local allocations while
   preserving the exact generated token trace.
+- Applied rotary position encoding inside existing query and key buffers,
+  eliminating per-head replacement allocations in single and batched token
+  steps while preserving the exact generated token trace.
 - Applied the canonical Rust 2024 rustfmt style across the workspace.
 
 ### Documentation
 
 - Updated the Rust quality baseline, development workflow, portability gates,
   and real-model test commands for the current edition and harness layout.
+- Clarified the three published crate boundaries and recorded the in-place RoPE
+  allocation and parity diagnostic without promoting contaminated-host timing.
 
 ## 0.2.0 - 2026-07-13
 

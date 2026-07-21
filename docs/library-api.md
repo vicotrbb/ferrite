@@ -1,8 +1,17 @@
 # Library API
 
-Ferrite publishes two reusable library boundaries. The CLI, HTTP server,
-fixtures, and operational clients are repository tools, not stable library
-contracts.
+Ferrite publishes three crates. `ferrite-model` and `ferrite-inference` are the
+two production library boundaries. `ferrite-fixtures` is a source-generated
+test-support API published so downstream package verification can build the
+inference crate's tests. The CLI, HTTP server, and operational clients are
+repository tools, not stable library contracts.
+
+## `ferrite-fixtures`
+
+`ferrite-fixtures` builds deterministic GGUF byte vectors entirely from
+source-controlled values. It contains no model binaries and performs no network
+access. Its API is intended for parser, tokenizer, loader, and inference tests,
+not application inference.
 
 ## `ferrite-model`
 
@@ -47,14 +56,16 @@ token-parity gate for each supported model and machine.
 
 ```sh
 RUSTDOCFLAGS="-D warnings" \
-  cargo doc -p ferrite-model -p ferrite-inference --all-features --no-deps --locked
+  cargo doc -p ferrite-fixtures -p ferrite-model -p ferrite-inference \
+    --all-features --no-deps --locked
 
-cargo test -p ferrite-model -p ferrite-inference --all-features --doc --locked
+cargo test -p ferrite-fixtures -p ferrite-model -p ferrite-inference \
+  --all-features --doc --locked
 ```
 
-Both publishable crates deny missing public documentation, malformed rustdoc,
-undocumented result failures selected by policy, and builder methods that
-silently discard a returned replacement value.
+All three publishable crates deny missing public documentation, malformed
+rustdoc, undocumented result failures selected by policy, and builder methods
+that silently discard a returned replacement value.
 
 ## Stability
 

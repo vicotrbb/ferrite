@@ -23,15 +23,18 @@ pub fn apply_rope(
     rope_dimension_count: usize,
     rope_freq_base: f32,
 ) -> Result<Vec<f32>, InferenceError> {
-    apply_rope_with_layout(
-        values,
+    let mut output = values.to_vec();
+    apply_rope_with_layout_in_place(
+        &mut output,
         position,
         rope_dimension_count,
         rope_freq_base,
         RopeLayout::AdjacentPairs,
-    )
+    )?;
+    Ok(output)
 }
 
+#[cfg(test)]
 pub(super) fn apply_rope_with_layout(
     values: &[f32],
     position: usize,
@@ -39,11 +42,29 @@ pub(super) fn apply_rope_with_layout(
     rope_freq_base: f32,
     layout: RopeLayout,
 ) -> Result<Vec<f32>, InferenceError> {
+    let mut output = values.to_vec();
+    apply_rope_with_layout_in_place(
+        &mut output,
+        position,
+        rope_dimension_count,
+        rope_freq_base,
+        layout,
+    )?;
+    Ok(output)
+}
+
+pub(super) fn apply_rope_with_layout_in_place(
+    values: &mut [f32],
+    position: usize,
+    rope_dimension_count: usize,
+    rope_freq_base: f32,
+    layout: RopeLayout,
+) -> Result<(), InferenceError> {
     if values.iter().any(|value| !value.is_finite()) {
         return Err(InferenceError::new("rope input must be finite"));
     }
     if rope_dimension_count == 0 {
-        return Ok(values.to_vec());
+        return Ok(());
     }
     if rope_dimension_count > values.len() {
         return Err(InferenceError::new(format!(
@@ -65,7 +86,6 @@ pub(super) fn apply_rope_with_layout(
         )));
     }
 
-    let mut output = values.to_vec();
     match layout {
         RopeLayout::AdjacentPairs => {
             for pair_start in (0..rope_dimension_count).step_by(2) {
@@ -73,8 +93,8 @@ pub(super) fn apply_rope_with_layout(
                     rotation(pair_start, position, rope_dimension_count, rope_freq_base);
                 let left = values[pair_start];
                 let right = values[pair_start + 1];
-                output[pair_start] = left * cos - right * sin;
-                output[pair_start + 1] = left * sin + right * cos;
+                values[pair_start] = left * cos - right * sin;
+                values[pair_start + 1] = left * sin + right * cos;
             }
         }
         RopeLayout::SplitHalf => {
@@ -84,13 +104,13 @@ pub(super) fn apply_rope_with_layout(
                     rotation(index * 2, position, rope_dimension_count, rope_freq_base);
                 let left = values[index];
                 let right = values[index + half];
-                output[index] = left * cos - right * sin;
-                output[index + half] = left * sin + right * cos;
+                values[index] = left * cos - right * sin;
+                values[index + half] = left * sin + right * cos;
             }
         }
     }
 
-    Ok(output)
+    Ok(())
 }
 
 fn rotation(
@@ -114,6 +134,40 @@ mod tests {
             diff <= 0.0001,
             "expected {actual} to be within 0.0001 of {expected}; diff={diff}"
         );
+    }
+
+    fn reference_apply_rope_with_layout(
+        values: &[f32],
+        position: usize,
+        rope_dimension_count: usize,
+        rope_freq_base: f32,
+        layout: RopeLayout,
+    ) -> Vec<f32> {
+        let mut output = values.to_vec();
+        match layout {
+            RopeLayout::AdjacentPairs => {
+                for pair_start in (0..rope_dimension_count).step_by(2) {
+                    let (cos, sin) =
+                        rotation(pair_start, position, rope_dimension_count, rope_freq_base);
+                    let left = values[pair_start];
+                    let right = values[pair_start + 1];
+                    output[pair_start] = left * cos - right * sin;
+                    output[pair_start + 1] = left * sin + right * cos;
+                }
+            }
+            RopeLayout::SplitHalf => {
+                let half = rope_dimension_count / 2;
+                for index in 0..half {
+                    let (cos, sin) =
+                        rotation(index * 2, position, rope_dimension_count, rope_freq_base);
+                    let left = values[index];
+                    let right = values[index + half];
+                    output[index] = left * cos - right * sin;
+                    output[index + half] = left * sin + right * cos;
+                }
+            }
+        }
+        output
     }
 
     #[test]
@@ -150,6 +204,45 @@ mod tests {
         assert_close(rotated[2], 1.0_f32.sin());
         assert_close(rotated[1], -1.0_f32.sin());
         assert_close(rotated[3], 1.0_f32.cos());
+        Ok(())
+    }
+
+    #[test]
+    fn in_place_rope_matches_allocating_api_without_replacing_storage() -> Result<(), InferenceError>
+    {
+        for layout in [RopeLayout::AdjacentPairs, RopeLayout::SplitHalf] {
+            for head_dimension in [64, 128] {
+                let original = (0..head_dimension)
+                    .map(|index| (index as f32 - 31.0) / 7.0)
+                    .collect::<Vec<_>>();
+                for rope_dimension_count in [0, head_dimension / 2, head_dimension] {
+                    for position in [0, 1, 7, 257] {
+                        let expected = reference_apply_rope_with_layout(
+                            &original,
+                            position,
+                            rope_dimension_count,
+                            10_000.0,
+                            layout,
+                        );
+                        let mut actual = original.clone();
+                        let pointer = actual.as_ptr();
+                        let capacity = actual.capacity();
+
+                        apply_rope_with_layout_in_place(
+                            &mut actual,
+                            position,
+                            rope_dimension_count,
+                            10_000.0,
+                            layout,
+                        )?;
+
+                        assert_eq!(actual, expected);
+                        assert_eq!(actual.as_ptr(), pointer);
+                        assert_eq!(actual.capacity(), capacity);
+                    }
+                }
+            }
+        }
         Ok(())
     }
 

@@ -462,13 +462,13 @@ impl<'a> ScalarLlamaSession<'a> {
             add_optional_bias(&mut key, layer.k_bias.as_deref())?;
             add_optional_bias(&mut value, layer.v_bias.as_deref())?;
 
-            query = self.model.apply_rope_to_heads(
-                &query,
+            self.model.apply_rope_to_heads_in_place(
+                &mut query,
                 position,
                 self.model.config.attention_head_count,
             )?;
-            key = self.model.apply_rope_to_heads(
-                &key,
+            self.model.apply_rope_to_heads_in_place(
+                &mut key,
                 position,
                 self.model.config.attention_head_count_kv,
             )?;
@@ -751,23 +751,25 @@ fn accept_token_ids_batch_inner(
             add_optional_bias(&mut values[index], layer.v_bias.as_deref())?;
 
             let position = session.cached_token_count;
-            let query = model.apply_rope_to_heads(
-                &queries[index],
+            model.apply_rope_to_heads_in_place(
+                &mut queries[index],
                 position,
                 model.config.attention_head_count,
             )?;
-            let key = model.apply_rope_to_heads(
-                &keys[index],
+            model.apply_rope_to_heads_in_place(
+                &mut keys[index],
                 position,
                 model.config.attention_head_count_kv,
             )?;
 
-            session
-                .store
-                .push(layer_index, key, std::mem::take(&mut values[index]))?;
+            session.store.push(
+                layer_index,
+                std::mem::take(&mut keys[index]),
+                std::mem::take(&mut values[index]),
+            )?;
             attention_outputs.push(causal_attention(
                 &model.config,
-                &query,
+                &queries[index],
                 &mut session.store,
                 layer_index,
             )?);
