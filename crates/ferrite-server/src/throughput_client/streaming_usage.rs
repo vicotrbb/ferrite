@@ -30,12 +30,14 @@ impl StreamingUsageSummary {
         }
     }
 
+    #[must_use]
     pub fn with_cached_prompt_tokens(mut self, cached_prompt_tokens: u64) -> Self {
         self.cached_prompt_tokens = cached_prompt_tokens;
         self.cohort_cached_prompt_tokens = cached_prompt_tokens;
         self
     }
 
+    #[must_use]
     pub fn with_prompt_cache_trace(
         mut self,
         prompt_cache_trace: StreamingPromptCacheTraceSummary,
@@ -44,6 +46,7 @@ impl StreamingUsageSummary {
         self
     }
 
+    #[must_use]
     pub fn with_finish_source(mut self, finish_source: impl Into<String>) -> Self {
         self.finish_source = Some(finish_source.into());
         self
@@ -178,6 +181,7 @@ impl StreamingPromptCacheTraceSummary {
         }
     }
 
+    #[must_use]
     pub fn with_selected_entry_token_hash(mut self, selected_entry_token_hash: String) -> Self {
         self.selected_entry_token_hash = Some(selected_entry_token_hash);
         self

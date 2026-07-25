@@ -208,6 +208,7 @@ impl InferenceEngine {
         self.model.context_length()
     }
 
+    #[must_use]
     pub fn with_execution_options(mut self, execution_options: ScalarExecutionOptions) -> Self {
         self.execution_options = execution_options;
         self
@@ -976,6 +977,7 @@ impl GeneratedText {
         self.finish_source
     }
 
+    #[must_use]
     pub fn with_finish_source(mut self, finish_source: GenerationFinishSource) -> Self {
         self.finish_source = finish_source;
         self

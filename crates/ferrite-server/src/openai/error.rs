@@ -38,6 +38,7 @@ impl OpenAiErrorBody {
         }
     }
 
+    #[must_use]
     pub fn with_param(mut self, param: impl Into<String>) -> Self {
         self.param = Some(param.into());
         self
