@@ -48,21 +48,25 @@ impl ServerState {
         }
     }
 
+    #[must_use]
     pub fn with_api_key(mut self, api_key: impl Into<String>) -> Self {
         self.api_key = Some(Arc::from(api_key.into()));
         self
     }
 
+    #[must_use]
     pub fn with_token_limits(mut self, token_limits: TokenLimits) -> Self {
         self.token_limits = token_limits;
         self
     }
 
+    #[must_use]
     pub fn with_inference_wait_timeout(mut self, timeout: Duration) -> Self {
         self.inference_wait_timeout = timeout;
         self
     }
 
+    #[must_use]
     pub fn with_prefix_cache_enabled(mut self, enabled: bool) -> Self {
         self.prefix_cache_enabled = enabled;
         self
@@ -70,6 +74,7 @@ impl ServerState {
 
     /// Sets how many generations may run concurrently. Counts of zero are
     /// clamped to one so the server can always make progress.
+    #[must_use]
     pub fn with_max_concurrent_inferences(mut self, permits: usize) -> Self {
         self.inference_permits = Arc::new(Semaphore::new(permits.max(1)));
         self

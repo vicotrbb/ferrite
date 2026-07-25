@@ -51,12 +51,14 @@ impl PromptCacheTrace {
         }
     }
 
+    #[must_use]
     pub fn with_selected_entry(mut self, token_count: usize, token_hash: u64) -> Self {
         self.selected_entry_token_count = Some(token_count);
         self.selected_entry_token_hash = Some(token_hash);
         self
     }
 
+    #[must_use]
     pub fn with_shared_prefix_tokens(mut self, token_count: usize) -> Self {
         self.shared_prefix_tokens = token_count;
         self

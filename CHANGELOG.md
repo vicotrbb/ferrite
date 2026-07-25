@@ -28,6 +28,12 @@ versioning for published crates while it remains in the `0.x` series.
 - Applied rotary position encoding inside existing query and key buffers,
   eliminating per-head replacement allocations in single and batched token
   steps while preserving the exact generated token trace.
+- Declared the three crates.io package boundaries explicitly and hid the
+  package-internal server implementation from its generated Rust library
+  documentation.
+- Marked server builder methods as `must_use` so discarded configuration values
+  are reported during compilation.
+- Added a current-stable Rust CI lane alongside the pinned and MSRV lanes.
 - Applied the canonical Rust 2024 rustfmt style across the workspace.
 
 ### Documentation
@@ -36,6 +42,8 @@ versioning for published crates while it remains in the `0.x` series.
   and real-model test commands for the current edition and harness layout.
 - Clarified the three published crate boundaries and recorded the in-place RoPE
   allocation and parity diagnostic without promoting contaminated-host timing.
+- Added tested crate-level examples, refreshed the primary-source Rust quality
+  review, and recorded the rejected session-workspace allocation experiment.
 
 ## 0.2.0 - 2026-07-13
 

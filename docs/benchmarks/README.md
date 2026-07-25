@@ -17,6 +17,9 @@ experiments that still inform Ferrite's current architecture.
 - [`2026-07-21 in-place RoPE`](2026-07-21-in-place-rope.md) records removal of
   per-head rotary-position vector allocations, independent bit-parity coverage,
   exact real-model trace parity, and a rejected-host timing diagnostic.
+- [`2026-07-25 rejected session workspaces`](2026-07-25-rejected-session-workspaces.md)
+  records an allocation-reuse candidate that retained exact Phi-3 token parity
+  but failed the clean-host and repeated-median promotion requirements.
 - [`2026-07-09-concurrent-serving-phase1.md`](2026-07-09-concurrent-serving-phase1.md)
   records concurrent serving and batching evidence.
 - [`2026-07-10-oss-quality-hardening.md`](2026-07-10-oss-quality-hardening.md)

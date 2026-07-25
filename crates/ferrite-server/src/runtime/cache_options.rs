@@ -18,6 +18,7 @@ impl GenerationCacheOptions {
         self.namespace.as_deref()
     }
 
+    #[must_use]
     pub fn with_prefix_cache_enabled(mut self, enabled: bool) -> Self {
         self.prefix_cache_enabled = enabled;
         self
@@ -27,6 +28,7 @@ impl GenerationCacheOptions {
         self.prefix_cache_enabled
     }
 
+    #[must_use]
     pub fn with_prompt_cache_trace_enabled(mut self, enabled: bool) -> Self {
         self.prompt_cache_trace_enabled = enabled;
         self

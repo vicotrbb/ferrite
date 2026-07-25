@@ -3,6 +3,14 @@
 //! Fixtures are assembled from source-controlled values at test time. The
 //! crate keeps binary model assets out of Git while exercising the real parser,
 //! tokenizer, loader, and inference boundaries.
+//!
+//! # Example
+//!
+//! ```
+//! let bytes = ferrite_fixtures::scalar_llama_f32_gguf_fixture();
+//!
+//! assert_eq!(&bytes[..4], b"GGUF");
+//! ```
 #![deny(missing_docs)]
 #![deny(
     clippy::doc_markdown,

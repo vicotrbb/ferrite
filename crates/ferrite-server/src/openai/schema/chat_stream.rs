@@ -45,16 +45,19 @@ impl ChatCompletionStreamContext {
         }
     }
 
+    #[must_use]
     pub fn with_usage_field(mut self, include_usage: bool) -> Self {
         self.include_usage = include_usage;
         self
     }
 
+    #[must_use]
     pub fn with_obfuscation_field(mut self, include_obfuscation: bool) -> Self {
         self.include_obfuscation = include_obfuscation;
         self
     }
 
+    #[must_use]
     pub fn with_service_tier(mut self, service_tier: Option<&'static str>) -> Self {
         self.service_tier = service_tier;
         self
