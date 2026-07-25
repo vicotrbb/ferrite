@@ -61,7 +61,7 @@ tokio-stream = { version = "0.1", features = ["sync"] }
 [dev-dependencies]
 async-openai = { version = "0.41.1", default-features = false, features = ["chat-completion", "completions", "model"] }
 ferrite-fixtures.workspace = true
-sha2 = "0.10"
+sha2 = "0.11"
 tower = { version = "0.5", features = ["util"] }
 
 [features]
