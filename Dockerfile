@@ -13,7 +13,7 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     cargo build --release --locked -p ferrite-server --bin ferrite-server && \
     install -D -m 0755 target/release/ferrite-server /out/ferrite-server
 
-FROM gcr.io/distroless/cc-debian12:nonroot@sha256:ce0d66bc0f64aae46e6a03add867b07f42cc7b8799c949c2e898057b7f75a151
+FROM gcr.io/distroless/cc-debian12:nonroot@sha256:66aa873a4a14fb164aa01296058efd8253744606d72715e45acface073359faa
 
 ARG FERRITE_BUILD_SHA=unknown
 ARG FERRITE_VERSION=dev
